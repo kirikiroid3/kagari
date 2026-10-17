@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 744 170" width="100%" style="max-width:744px" role="img" aria-label="Compilation pipeline: collect, structure check, represent check, high-level checks, emit">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-dash{fill:none;stroke:var(--fg,#333);stroke-width:1.2;stroke-dasharray:5 4}
+.kg-head{fill:var(--fg,#333)}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+</style>
+<defs><marker id="kg-arrow-pipeline" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<rect x="10" y="10" width="104" height="34" rx="4" class="kg-box"/>
+<text x="62" y="32" class="kg-t kg-m kg-c">main.kis</text>
+<rect x="170" y="10" width="216" height="34" rx="4" class="kg-box"/>
+<text x="278" y="32" class="kg-t kg-c">included .kis, .kix, .kirp</text>
+<path d="M62,44V98" class="kg-ln" marker-end="url(#kg-arrow-pipeline)"/>
+<path d="M200,44L104,98" class="kg-ln" marker-end="url(#kg-arrow-pipeline)"/>
+<text x="156" y="84" class="kg-s">chased via src</text>
+<path d="M340,44L304,98" class="kg-dash" marker-end="url(#kg-arrow-pipeline)"/>
+<text x="330" y="84" class="kg-s">.kix declarations</text>
+<rect x="10" y="100" width="104" height="56" rx="4" class="kg-box"/>
+<text x="62" y="124" class="kg-t kg-c">1 · Collect</text>
+<text x="62" y="143" class="kg-s kg-c">full program</text>
+<rect x="134" y="100" width="104" height="56" rx="4" class="kg-box"/>
+<text x="186" y="124" class="kg-t kg-c">2 · Structure</text>
+<text x="186" y="143" class="kg-s kg-c">tags and names</text>
+<rect x="258" y="100" width="104" height="56" rx="4" class="kg-box"/>
+<text x="310" y="124" class="kg-t kg-c">3 · Represent</text>
+<text x="310" y="143" class="kg-s kg-c">type check</text>
+<rect x="382" y="100" width="104" height="56" rx="4" class="kg-box"/>
+<text x="434" y="124" class="kg-t kg-c">4 · High-level</text>
+<text x="434" y="143" class="kg-s kg-c">consistency</text>
+<rect x="506" y="100" width="104" height="56" rx="4" class="kg-box"/>
+<text x="558" y="124" class="kg-t kg-c">5 · Emit</text>
+<text x="558" y="143" class="kg-s kg-c">script + renders</text>
+<rect x="630" y="100" width="104" height="56" rx="4" class="kg-hl"/>
+<text x="682" y="133" class="kg-t kg-m kg-c">.kagari</text>
+<path d="M114,128H132" class="kg-ln" marker-end="url(#kg-arrow-pipeline)"/>
+<path d="M238,128H256" class="kg-ln" marker-end="url(#kg-arrow-pipeline)"/>
+<path d="M362,128H380" class="kg-ln" marker-end="url(#kg-arrow-pipeline)"/>
+<path d="M486,128H504" class="kg-ln" marker-end="url(#kg-arrow-pipeline)"/>
+<path d="M610,128H628" class="kg-ln" marker-end="url(#kg-arrow-pipeline)"/>
+</svg>
