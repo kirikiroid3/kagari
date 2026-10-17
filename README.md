@@ -1,0 +1,2 @@
+# Kagari Visual Novel Engine
+
