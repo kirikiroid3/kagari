@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = [
+    "core/kagari-bytecode",
+    "core/kagari-lang",
     "core/kagari-syntax"
 ]
 

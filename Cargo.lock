@@ -3,5 +3,13 @@
 version = 4
 
 [[package]]
+name = "kagari-bytecode"
+version = "0.1.0"
+
+[[package]]
+name = "kagari-lang"
+version = "0.1.0"
+
+[[package]]
 name = "kagari-syntax"
 version = "0.1.0"
