@@ -1,6 +1,7 @@
 # Enums and Variables
 
-Every variable has a finite type: `bool`, an enum declared in the script, or `char`. There are no
+Every variable has a finite type: `bool`, an enum declared in the script, `char`, or an `int` in a
+declared range. There are no
 strings, lists, maps or unbounded integers in script variables. This is what keeps the script a
 pushdown system with decidable reachability: two unbounded counters would already make it
 Turing-complete.
@@ -32,7 +33,8 @@ Enums are declared at top level.
 ```xml
 <var-bool name="met_azusa" init="false" />
 <var-enum name="route" type="Route" init="None" />
-<var-char name="affection_azusa" init="0" />
+<var-char name="flags_seen" init="0" />
+<var-int name="affection_azusa" min="0" max="5" init="0" />
 ```
 
 | Element      | Type                       | Attributes                                    |
@@ -40,9 +42,11 @@ Enums are declared at top level.
 | `<var-bool>` | `bool`                     | `name`, `init`                                |
 | `<var-enum>` | an enum from `<declare-enum>` | `name`, `type`, `init`                     |
 | `<var-char>` | `char`: unsigned 8-bit, 0–255 | `name`, `init`                             |
+| `<var-int>`  | *Tentative.* `int` from `min` to `max` | `name`, `min`, `max`, `init`      |
 
-`char` is a number, not a character: it is the script's only integer type, and it is exactly
-`u8`.
+`char` is a number, not a character: it is exactly `u8`. Prefer `<var-int>` with the smallest
+range that fits, such as `0`–`5` for an affection counter: the analyzer represents each variable
+with as many bits as its range needs, so a 6-value counter costs 3 bits where a `char` costs 8.
 
 *Tentative:* `init` is required. With an initial value on every variable, a read can never see an
 unset variable, and the read-before-write lint becomes unnecessary.
@@ -71,8 +75,19 @@ Assigns a literal value. `<set>` is not a step.
 | `bool`        | `true` or `false`                    |
 | enum          | A variant name of the variable's enum |
 | `char`        | A decimal number, 0–255             |
+| `int`         | A decimal number from `min` to `max` |
 
 The value is checked against the variable's type at compile time.
 
-`<set>` only assigns literals. Whether it should also support arithmetic (for example
-incrementing an affection counter) is an [open question](../open-questions.md#arithmetic-on-char).
+## `<add>` and `<sub>`: change a counter
+
+```xml
+<add var="affection_azusa" val="1" />
+<sub var="affection_azusa" val="2" />
+```
+
+*Tentative.* Adds or subtracts a literal amount on a `char` or `int` variable. Neither is a
+step. The result **saturates**: it stops at `max` (255 for `char`) going up and at `min` (0 for
+`char`) going down, so every step stays total. When the analyzer can prove that a reachable
+`<add>` or `<sub>` hits a bound, it reports a warning, since a counter that silently saturates is
+often a sign that its range is too small.

@@ -27,12 +27,12 @@ See [Representing Code](./kirp.md).
 ## `.kix`: extension
 
 The vocabulary that `.kirp` code is written in: types, methods, functions and constants. The
-syntax is the same as `.kirp`, but a `.kix` file works like a C header: it only *declares*. It
-never contains a `render` function or any statement that runs.
+syntax is the same as `.kirp`. Its structs describe the data the engine works with, like a
+protobuf schema, and its functions have bodies that the compiler evaluates. A `.kix` file never
+contains a `render` function or any top-level statement.
 
-The engine ships basic presets (entity handles, layers, common animations) as `.kix`
-declarations; a studio extends the engine by writing its own `.kix` files backed by its own
-implementation.
+The engine ships basic presets (components, common animations) as `.kix` files; a studio extends
+the engine by writing its own `.kix` files.
 
 See [Extensions](./kix.md).
 
@@ -41,8 +41,8 @@ See [Extensions](./kix.md).
 | From   | Tag                     | To      | Effect                                              |
 | ------ | ----------------------- | ------- | --------------------------------------------------- |
 | `.kis` | `<include src="…" />`   | `.kis`  | Textual insertion of the other script               |
-| `.kis` | `<import src="…" />`    | `.kix`  | Makes the declarations visible; hoisted             |
+| `.kis` | `<import src="…" />`    | `.kix`  | Makes the definitions visible; hoisted              |
 | `.kis` | `<represent src="…" />` | `.kirp` | Runs that file's `render` when the step is entered |
 
 `.kirp` and `.kix` files never reference other files themselves. Because `<import>` is hoisted
-to the whole program, a `.kirp` file sees every `.kix` declaration imported anywhere in it.
+to the whole program, a `.kirp` file sees every `.kix` definition imported anywhere in it.

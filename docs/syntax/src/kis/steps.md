@@ -62,8 +62,34 @@ reordering and rewording of the script.
 `<choice>` may also contain `<r>` and `<represent>` children, which run when the choice is
 entered, like those of `<s>`.
 
-There is no syntax yet for arms that are only available under a condition; see
-[Open Questions](../open-questions.md#conditional-choice-arms).
+### Conditional arms
+
+*Tentative.* An arm that is offered only under a condition is wrapped in a
+[`<match>`](./control-flow.md#match-branch-on-variables) inside the `<choice>`. In this position
+the bodies of the `<do>` elements may contain only `<choice-arm>` elements:
+
+```xml
+<choice id="map">
+  <choice-arm id="a" text="Go to stall A">...</choice-arm>
+  <match vars="visited_a visited_b visited_c">
+    <cases>
+      <case val="true true true" />
+      <do>
+        <choice-arm id="leave" text="Leave" />
+      </do>
+    </cases>
+    <cases>
+      <case val="_ _ _" />
+      <do />
+    </cases>
+  </match>
+</choice>
+```
+
+When the choice is entered, the engine offers the arms whose enclosing matches select them. Arm
+ids stay unique within the whole `<choice>`, across all branches. The compiler reports a
+`<choice>` that can be reached in a state where no arm is offered, since the player would be
+stuck.
 
 ## `<label>`: position marker
 
@@ -76,4 +102,6 @@ It exists only as a target for [`<goto>`](./control-flow.md#goto-jump-within-the
 
 - Label ids are unique within a scene. Different scenes may reuse the same id.
 - A label placed after the last step of a scene marks the scene's end; jumping there returns to
-  the caller.
+  the caller, like [`<return>`](./control-flow.md#return-leave-the-scene-early).
+- A `<goto>` may only reach labels in its own block or an enclosing one (see
+  [`<goto>`](./control-flow.md#goto-jump-within-the-scene)).

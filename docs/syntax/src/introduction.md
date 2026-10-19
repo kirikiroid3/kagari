@@ -8,7 +8,7 @@ A Kagari game is written in three kinds of source files:
 | --------- | -------------- | --------- | --------------------------------------------------------- |
 | `.kis`    | Game script    | XML       | The story: steps, choices, scenes, variables, control flow |
 | `.kirp`   | Representing   | Rust-like | How the screen changes: `fn render(Screen) -> Screen`     |
-| `.kix`    | Extension      | Rust-like | Declarations only: types, methods, functions, constants   |
+| `.kix`    | Extension      | Rust-like | Definitions only: types, methods, functions, constants    |
 
 All three are compiled together into a single `.kagari` bytecode file.
 

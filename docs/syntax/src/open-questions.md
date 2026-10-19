@@ -22,20 +22,6 @@ The magic is `....KAGARI..V000`. What are the bytes shown as `.` (for example no
 that detect text-mode transfer corruption, as PNG does)? Is the version only ever `V` plus three
 decimal digits? What follows the header?
 
-## Keyframes
-
-`Screen -> Screen` render functions have no equivalent of the proposal's keyframes. Without a step
-that declares the complete screen, previewing or loading at an arbitrary step requires running
-every render since the start, and the consistency check must carry screens through the whole
-program. Should there be a way to declare a full screen (for example a render that starts from an
-empty screen), and should scene entry or choice points be natural places for it?
-
-## Path-dependent presentation
-
-When the [consistency check](./kirp.md#consistency) reports a step whose screen depends on the
-path, and the dependency is intended, how does the author say so? Options include an attribute on
-the step, or requiring the dependency to be expressed through a variable and `<match>`.
-
 ## Unapplied changes
 
 A layer change without `apply_animation(TransitionAnimation)` does not happen. Is such a dropped
@@ -46,29 +32,10 @@ pending change a compile error, a warning, or silently allowed?
 Which parts of Rust syntax does `.kirp` have: `let` bindings, `match`, loops, closures, user
 functions besides `render`? Loops must keep `render` total.
 
-## Kix implementations
-
-`.kix` declares functions without bodies. How is a declaration bound to its implementation for
-engine presets and for studio extensions: a native plugin interface, built-in primitives only, or
-bodies written in `.kirp` syntax that compose primitives?
-
 ## Asset binding
 
 How is an `ImageId` constant bound to an image file? A numeric id in `.kix` plus a separate
 manifest, or a path in the declaration itself?
-
-## Conditional choice arms
-
-There is no `if`, and `<choice-arm>` has no condition. How is an arm offered only when a condition
-holds (for example "Leave" only after all stalls were visited)? Wrapping arms in `<match>` inside
-`<choice>` is one option; an attribute on `<choice-arm>` that names an enum or bool value is
-another.
-
-## Arithmetic on char
-
-`<set>` only assigns literals. Affection counters need increments. Should `<set>` support
-arithmetic, and on overflow does `char` saturate, wrap, or fail the build when the analyzer can
-prove overflow is reachable?
 
 ## Text markup
 
@@ -84,3 +51,21 @@ template labels be renamed per use, forbidden, or left as an error?
 Choice and arm `id`s are tentatively written by the author: readable in save divergence
 reports, but a rename breaks saves. Generated ids survive renames but are unreadable. Which, or
 both?
+
+## Keyframe placement
+
+The compiler detects [keyframes](./kirp.md#keyframes) and they are recommended at choice points
+and chapter starts. Should they be *required* there, so that loading and jumping always replay a
+bounded amount of presentation, or only suggested by a lint?
+
+## Compound conditions
+
+Conditions over several variables are written as a `<match vars="…">` with one pattern per
+variable. Is that readable enough for writers, or should there be a small guard expression
+language (for example `visited_a and visited_b`) that compiles to the same decision?
+
+## Unbounded-screen analysis
+
+Which arithmetic in `.kirp` does the [unbounded-screen check](./kirp.md#unbounded-screens)
+understand precisely (constant offsets, clamps, wrapping), and which does it reject as possibly
+unbounded?

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 744 212" width="100%" style="max-width:744px" role="img" aria-label="With keyframes, a step is computed from the nearest keyframe; with Screen to Screen renders, every render since the start is replayed">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 744 212" width="100%" style="max-width:744px" role="img" aria-label="With a keyframe on the path, a step is computed from the nearest keyframe; without one, every render since the start is replayed">
 <style>
 .kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
 .kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
@@ -11,7 +11,7 @@
 .kg-c{text-anchor:middle}
 </style>
 <defs><marker id="kg-arrow-keyframes" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
-<text x="10" y="22" class="kg-t">Proposal: keyframes and deltas</text>
+<text x="10" y="22" class="kg-t">A keyframe on the path</text>
 <path d="M40,58H628" class="kg-ln"/>
 <rect x="28" y="46" width="24" height="24" rx="2" class="kg-hl"/>
 <text x="40" y="63" class="kg-s kg-c">K</text>
@@ -29,7 +29,7 @@
 <text x="124" y="92" class="kg-s kg-c">delta</text>
 <text x="628" y="92" class="kg-s kg-c">target step</text>
 <g transform="translate(0,20)">
-<text x="10" y="114" class="kg-t">Kagari: Screen → Screen per step</text>
+<text x="10" y="114" class="kg-t">No keyframe on the path</text>
 <path d="M40,150H628" class="kg-ln"/>
 <circle cx="40" cy="150" r="9" class="kg-box"/>
 <circle cx="124" cy="150" r="9" class="kg-box"/>
