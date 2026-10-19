@@ -11,15 +11,15 @@ direct children of `<scene>`.
 | `<kagari>` *(tent.)*   | –    | document root              | –                 | top-level declarations           | [Overview](./overview.md#document-structure) |
 | `<scene>`              | –    | top level                  | `name`            | scene body                       | [Control Flow](./control-flow.md#scene-scene-declaration) |
 | `<include>`            | –    | top level                  | `src`             | –                                | [Reuse](./reuse.md#include-splice-another-script) |
-| `<import>`             | –    | top level                  | `src`             | –                                | [Reuse](./reuse.md#import-use-extension-declarations) |
+| `<import>`             | –    | top level                  | `src`             | –                                | [Reuse](./reuse.md#import-use-extension-definitions) |
 
 ## Steps
 
 | Tag            | Step | Allowed in    | Attributes                     | Children                          | See |
 | -------------- | ---- | ------------- | ------------------------------ | --------------------------------- | --- |
 | `<s>`          | yes  | scene body    | –                              | text, `<r>`, `<represent>`        | [Steps](./steps.md#s-ordinary-step) |
-| `<choice>`     | yes  | scene body    | `id`                           | `<choice-arm>`, `<r>`, `<represent>` | [Steps](./steps.md#choice-and-choice-arm-choice-step) |
-| `<choice-arm>` | –    | `<choice>`    | `id`, `text`                   | scene body                        | [Steps](./steps.md#choice-and-choice-arm-choice-step) |
+| `<choice>`     | yes  | scene body    | `id`                           | `<choice-arm>`, `<match>`, `<r>`, `<represent>` | [Steps](./steps.md#choice-and-choice-arm-choice-step) |
+| `<choice-arm>` | –    | `<choice>`, `<do>` in a choice | `id`, `text`  | scene body                        | [Steps](./steps.md#choice-and-choice-arm-choice-step) |
 
 ## Control flow
 
@@ -28,10 +28,11 @@ direct children of `<scene>`.
 | `<label>`  | no   | scene body             | `id`       | –                         | [Steps](./steps.md#label-position-marker) |
 | `<goto>`   | no   | scene body             | `label`    | –                         | [Control Flow](./control-flow.md#goto-jump-within-the-scene) |
 | `<call>`   | no   | scene body             | `scene`    | –                         | [Control Flow](./control-flow.md#call-enter-a-scene) |
-| `<match>`  | no   | scene body             | `var`      | `<cases>`                 | [Control Flow](./control-flow.md#match-branch-on-a-variable) |
-| `<cases>`  | –    | `<match>`              | –          | `<case>`…, then `<do>`    | [Control Flow](./control-flow.md#match-branch-on-a-variable) |
-| `<case>`   | –    | `<cases>`              | `val`      | –                         | [Control Flow](./control-flow.md#match-branch-on-a-variable) |
-| `<do>`     | –    | `<cases>`              | –          | scene body                | [Control Flow](./control-flow.md#match-branch-on-a-variable) |
+| `<return>` *(tent.)* | no | scene body       | –          | –                         | [Control Flow](./control-flow.md#return-leave-the-scene-early) |
+| `<match>`  | no   | scene body, `<choice>` | `var` or `vars` | `<cases>`            | [Control Flow](./control-flow.md#match-branch-on-variables) |
+| `<cases>`  | –    | `<match>`              | –          | `<case>`…, then `<do>`    | [Control Flow](./control-flow.md#match-branch-on-variables) |
+| `<case>`   | –    | `<cases>`              | `val`      | –                         | [Control Flow](./control-flow.md#match-branch-on-variables) |
+| `<do>`     | –    | `<cases>`              | –          | scene body; only `<choice-arm>` inside `<choice>` | [Control Flow](./control-flow.md#match-branch-on-variables) |
 
 ## Data
 
@@ -42,7 +43,9 @@ direct children of `<scene>`.
 | `<var-bool>`     | no   | top level, scene *(tent.)* | `name`, `init`         | –         | [Data](./data.md#variable-declarations) |
 | `<var-enum>`     | no   | top level, scene *(tent.)* | `name`, `type`, `init` | –         | [Data](./data.md#variable-declarations) |
 | `<var-char>`     | no   | top level, scene *(tent.)* | `name`, `init`         | –         | [Data](./data.md#variable-declarations) |
+| `<var-int>` *(tent.)* | no | top level, scene *(tent.)* | `name`, `min`, `max`, `init` | – | [Data](./data.md#variable-declarations) |
 | `<set>`          | no   | scene body                 | `var`, `val`           | –         | [Data](./data.md#set-assign-a-variable) |
+| `<add>`, `<sub>` *(tent.)* | no | scene body       | `var`, `val`           | –         | [Data](./data.md#add-and-sub-change-a-counter) |
 
 ## Reuse
 

@@ -2,13 +2,13 @@
 
 Three mechanisms bring script in from elsewhere. Templates and includes are macros: they are
 expanded at compile time and leave nothing behind in the bytecode. Imports bring in `.kix`
-declarations.
+definitions.
 
 | Tag           | Expands to                         | Resolved in stage |
 | ------------- | ---------------------------------- | ----------------- |
 | `<x tpl="…">` | The template body with slots filled | 1 (collect)       |
 | `<include>`   | The content of another `.kis` file  | 1 (collect)       |
-| `<import>`    | Nothing; declarations become visible | 1 (collect)      |
+| `<import>`    | Nothing; definitions become visible | 1 (collect)       |
 
 ## `<template>` and `<slot>`: define a reusable block
 
@@ -74,17 +74,17 @@ files.
   templates and declarations rather than fragments of a scene. Reusable fragments are what
   templates are for.
 
-## `<import>`: use extension declarations
+## `<import>`: use extension definitions
 
 ```xml
 <import src="characters.kix" />
 ```
 
-Makes every declaration in a `.kix` file visible to the represent code of the program.
+Makes every definition in a `.kix` file visible to the represent code of the program.
 
 - `src` is relative to the importing file.
 - Imports are hoisted: an import anywhere, including in an included file, is visible to all
   represent code in the program, regardless of position. By convention imports go at the top of
   the file.
 - Importing the same file more than once is the same as importing it once.
-- Two imported files declaring the same name is an error.
+- Two imported files defining the same name is an error.

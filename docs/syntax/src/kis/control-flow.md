@@ -1,7 +1,7 @@
 # Scenes and Control Flow
 
-Control flow has three forms: `<call>` between scenes, `<goto>` within a scene, and `<match>` for
-branching on a variable. There is no `if`.
+Control flow has four forms: `<call>` and `<return>` between scenes, `<goto>` within a scene, and
+`<match>` for branching on variables. There is no `if`.
 
 ## `<scene>`: scene declaration
 
@@ -20,8 +20,7 @@ holds one frame per active scene.
 - Scenes do not nest.
 
 When execution reaches the end of a scene, the scene returns: its frame is popped and execution
-continues after the `<call>` that entered it. There is no `<return>` element; to leave early,
-`<goto>` a label placed at the end of the scene.
+continues after the `<call>` that entered it.
 
 ## `<call>`: enter a scene
 
@@ -38,6 +37,18 @@ being duplicated.
 
 {{#include ../diagrams/call-stack.svg}}
 
+A scene that needs to report how it ended (a confession that is accepted or rejected) sets a
+global enum before returning, and the caller branches on it with `<match>`.
+
+## `<return>`: leave the scene early
+
+```xml
+<return />
+```
+
+*Tentative.* Returns from the current scene immediately, exactly as if execution had reached its
+end. It is an instant element, not a step, and may appear anywhere in a scene body.
+
 ## `<goto>`: jump within the scene
 
 ```xml
@@ -48,10 +59,28 @@ Continues at the named `<label>` of the current scene. A `<goto>` cannot leave i
 into the middle of another scene would break call/return nesting and make the program
 unanalyzable. Use `<call>` to move between scenes.
 
-A loop built from `<goto>` must pass through at least one step. A loop without a step would never
-wait for input and might never terminate; the compiler rejects it.
+A `<goto>` may only target a label in its own block or in a block that encloses it, such as the
+scene body around a `<choice-arm>` or a `<do>`. It cannot jump into a nested block, for example
+into another arm of a choice. This keeps every block entered from its start.
 
-## `<match>`: branch on a variable
+A scene that runs in a cycle, such as a day loop, is written as a `<goto>` loop in one driver
+scene that calls each day in turn. Scenes that call each other in a ring and never return grow the
+call stack on every lap.
+
+## Termination
+
+Everything between two steps runs instantly, so it must always finish. The compiler rejects:
+
+- a `<goto>` loop that does not pass through a step, and
+- a cycle of calls that does not pass through a step, such as a scene that calls itself before
+  any step.
+
+The check is interprocedural. For each scene the compiler computes whether it *may return without
+passing a step*; a `<call>` to such a scene counts as stepless. A loop or call cycle is rejected
+when every path around it may be stepless. The computation is a least fixpoint over the call
+graph, linear in the size of the program.
+
+## `<match>`: branch on variables
 
 ```xml
 <match var="route">
@@ -77,35 +106,64 @@ wait for input and might never terminate; the compiler rejects it.
 </match>
 ```
 
-`<match>` reads one variable and runs the body of the first `<cases>` block that matches its
-value. After the body, execution continues after `</match>`. `<match>` is not a step.
+`<match>` reads a variable and runs the body of the first `<cases>` block that matches its value.
+After the body, execution continues after `</match>`. `<match>` is not a step.
 
-| Element   | Contains                                  | Attribute | Meaning                         |
-| --------- | ----------------------------------------- | --------- | ------------------------------- |
-| `<match>` | one or more `<cases>`                     | `var`     | Variable to inspect             |
-| `<cases>` | one or more `<case>`, then one `<do>`     |           | One arm of the match            |
-| `<case>`  | nothing                                   | `val`     | A value that selects this arm   |
-| `<do>`    | script content                            |           | Body run when the arm is chosen |
+| Element   | Contains                                  | Attribute      | Meaning                         |
+| --------- | ----------------------------------------- | -------------- | ------------------------------- |
+| `<match>` | one or more `<cases>`                     | `var` or `vars` | Variable(s) to inspect         |
+| `<cases>` | one or more `<case>`, then one `<do>`     |                | One arm of the match            |
+| `<case>`  | nothing                                   | `val`          | A pattern that selects this arm |
+| `<do>`    | script content                            |                | Body run when the arm is chosen |
 
-Several `<case>` elements in one `<cases>` are alternatives: the arm runs if the variable equals
+Several `<case>` elements in one `<cases>` are alternatives: the arm runs if the variable matches
 any of them. `<do>` may be empty.
 
-`val` is written as the value would be written in [`<set>`](./data.md#set-assign-a-variable):
-a variant name for enums, `true`/`false` for `bool`, a decimal number for `char`.
+### Patterns
+
+| Pattern          | Matches                                       | Types            |
+| ---------------- | --------------------------------------------- | ---------------- |
+| A literal        | That value, written as in [`<set>`](./data.md#set-assign-a-variable) | all |
+| `_`              | Any value                                     | all              |
+| `lo..=hi`        | *Tentative.* Any value from `lo` to `hi`, inclusive | `char`, `int` |
+
+A variant name is the literal for enums, `true`/`false` for `bool`, a decimal number for `char`
+and `int`. A range such as `3..=255` expresses a threshold like "affection is at least 3".
+
+### Matching several variables
+
+*Tentative:* `vars` names several variables separated by spaces, and each `val` then holds one
+pattern per variable, in the same order, as in a Rust tuple pattern:
+
+```xml
+<match vars="visited_a visited_b visited_c">
+  <cases>
+    <case val="true true true" />
+    <do>
+      <call scene="festival_end" />
+    </do>
+  </cases>
+  <cases>
+    <case val="_ _ _" />
+    <do />
+  </cases>
+</match>
+```
+
+`var` and `vars` are mutually exclusive.
 
 ### Exhaustiveness
 
-Every possible value of the variable must be covered by some `<case>`. The compiler rejects a
-`<match>` that misses one. For `bool` this means both `true` and `false`; for an enum, every
-variant.
-
-*Tentative:* `<case val="_" />` matches any value. It is required in practice for `char`, which has
-256 values, and must be the last `<cases>`.
+Every possible value of the variable, or combination of values for `vars`, must be covered by some
+`<case>`. The compiler rejects a `<match>` that misses one. For `bool` this means both `true` and
+`false`; for an enum, every variant; for `char` and `int`, every number in range, usually with `_`
+or a range in the last arm.
 
 ### Why no `if`
 
-A boolean is an enum with two variants, so `<match>` covers everything `if` would. Requiring every
-case to be listed makes the author decide what happens on each branch, which is also what the
-compiler needs in order to check presentation after branches merge.
+A boolean is an enum with two variants, so `<match>` covers everything `if` would, and `vars` with
+ranges covers compound conditions. Requiring every case to be listed is an authoring rule: it makes
+the author decide what happens on each branch, including the one where nothing happens. The
+analyzer does not need it, since a missing branch is just an edge to the end of the `<match>`.
 
-Branch on several variables by nesting `<match>`.
+Branching on several variables can also be written by nesting `<match>`.

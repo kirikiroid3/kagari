@@ -63,3 +63,7 @@ its representation runs before the step waits for input:
 Representation is attached to steps only. To present differently depending on a variable, put
 differently represented steps in the arms of a `<match>`; render functions themselves never see
 script variables.
+
+A representation that ignores the screen it receives and builds the whole screen itself is a
+[keyframe](../kirp.md#keyframes). Put one at choice points and chapter starts so that loading and
+jumping replay little presentation.
