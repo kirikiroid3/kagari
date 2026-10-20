@@ -4,28 +4,50 @@ A `.kis` file is an XML document describing the story as scenes made of steps.
 
 ## Document structure
 
-*Tentative:* the root element is `<kagari>`. Its children are top-level declarations:
+*Tentative:* the root element is `<kagari>`. It has exactly two children, one `<system>` and one
+`<game>`:
 
 ```xml
 <kagari>
-  <import src="std.kix" />
-  <import src="characters.kix" />
-  <include src="common/templates.kis" />
+  <system start="title">
+    <!-- settings, meta, save slots, modes and their UI -->
+  </system>
 
-  <declare-enum name="Route">...</declare-enum>
-  <var-enum name="route" type="Route" init="None" />
+  <game>
+    <import src="characters.kix" />
+    <include src="common/templates.kis" />
 
-  <template name="...">...</template>
+    <entry name="main" scene="prologue" />
 
-  <scene name="prologue">...</scene>
-  <scene name="festival_hub">...</scene>
+    <declare-enum name="Route">...</declare-enum>
+    <var-enum name="route" type="Route" init="None" />
+
+    <template name="...">...</template>
+
+    <scene name="prologue">...</scene>
+    <scene name="festival_hub">...</scene>
+  </game>
 </kagari>
 ```
+
+| Element    | Contains                                                | See |
+| ---------- | ------------------------------------------------------- | --- |
+| `<system>` | The game system: settings, meta, save slots, modes and their UI | [System Script](./system.md) |
+| `<game>`   | The story                                               | this chapter and the next ones |
+
+`<game>` is a module boundary. Names declared inside it are invisible to the system, except
+through what `<entry>` exports and the standard library's narrative interface. In the other
+direction, game code sees nothing of the system except the standard library's system context. The
+*Kagari STD Book* describes both interfaces.
+
+In this book, **top level** means a direct child of `<game>`, or of the root of a file included
+there (see [`<include>`](./reuse.md#include-splice-another-script)). The top-level children are:
 
 | Top-level child                          | Meaning                       |
 | ---------------------------------------- | ----------------------------- |
 | `<import>`                               | Use a `.kix` file             |
 | `<include>`                              | Splice another `.kis` file    |
+| `<entry>`                                | Export a starting scene to the system |
 | `<declare-enum>`                         | Enum type                     |
 | `<var-bool>`, `<var-enum>`, `<var-char>`, `<var-int>` | Global variable |
 | `<template>`                             | Reusable script block (macro) |
@@ -48,7 +70,7 @@ Elements fall into two groups:
 | Kind                   | Elements                                            | Waits for input       |
 | ---------------------- | --------------------------------------------------- | --------------------- |
 | Steps                  | `<s>`, `<choice>`                                   | Yes                   |
-| Instant (not a step)   | `<label>`, `<goto>`, `<call>`, `<return>`, `<match>`, `<set>`, `<add>`, `<sub>` | No |
+| Instant (not a step)   | `<label>`, `<goto>`, `<call>`, `<return>`, `<match>`, `<set>`, `<add>`, `<sub>`, `<meta-set>` | No |
 
 When the engine enters a step it runs the step's representation, shows it, and waits. Input
 moves it on: `NextStep` for `<s>`, an arm selection for `<choice>`. Everything between two steps
@@ -74,67 +96,72 @@ was visited. Scenes `stall_b` and `dorm_night` are omitted.
 
 ```xml
 <kagari>
-  <import src="std.kix" />
-  <import src="characters.kix" />
+  <system start="title" />
 
-  <var-bool name="visited_a" init="false" />
-  <var-bool name="visited_b" init="false" />
-  <var-bool name="visited_c" init="false" />
+  <game>
+    <import src="characters.kix" />
 
-  <scene name="day1">
-    <s>The school festival starts today.</s>
-    <call scene="festival_hub" />
-    <call scene="dorm_night" />
-  </scene>
+    <entry name="main" scene="day1" />
 
-  <scene name="festival_hub">
-    <label id="map" />
-    <choice id="map">
-      <choice-arm id="a" text="Go to stall A">
-        <call scene="stall_a" />
-        <goto label="map" />
-      </choice-arm>
-      <choice-arm id="b" text="Go to stall B">
-        <call scene="stall_b" />
-        <goto label="map" />
-      </choice-arm>
-      <match vars="visited_a visited_b">
+    <var-bool name="visited_a" init="false" />
+    <var-bool name="visited_b" init="false" />
+    <var-bool name="visited_c" init="false" />
+
+    <scene name="day1">
+      <s><m who="">The school festival starts today.</m></s>
+      <call scene="festival_hub" />
+      <call scene="dorm_night" />
+    </scene>
+
+    <scene name="festival_hub">
+      <label id="map" />
+      <choice id="map">
+        <choice-arm id="a" text="Go to stall A">
+          <call scene="stall_a" />
+          <goto label="map" />
+        </choice-arm>
+        <choice-arm id="b" text="Go to stall B">
+          <call scene="stall_b" />
+          <goto label="map" />
+        </choice-arm>
+        <match vars="visited_a visited_b">
+          <cases>
+            <case val="true true" />
+            <do>
+              <choice-arm id="leave" text="Leave" />
+            </do>
+          </cases>
+          <cases>
+            <case val="_ _" />
+            <do />
+          </cases>
+        </match>
+      </choice>
+    </scene>
+
+    <scene name="stall_a">
+      <match var="visited_a">
         <cases>
-          <case val="true true" />
+          <case val="true" />
           <do>
-            <choice-arm id="leave" text="Leave" />
+            <s><m who="">The stall is already packing up.</m></s>
+            <return />
           </do>
         </cases>
         <cases>
-          <case val="_ _" />
+          <case val="false" />
           <do />
         </cases>
       </match>
-    </choice>
-  </scene>
+      <set var="visited_a" val="true" />
+      <s>
+        <r>screen.entity(HANAKO).cord.apply_animation(jump(20));</r>
+        <m who="Hanako">Welcome to stall A!</m>
+      </s>
+    </scene>
 
-  <scene name="stall_a">
-    <match var="visited_a">
-      <cases>
-        <case val="true" />
-        <do>
-          <s>The stall is already packing up.</s>
-          <return />
-        </do>
-      </cases>
-      <cases>
-        <case val="false" />
-        <do />
-      </cases>
-    </match>
-    <set var="visited_a" val="true" />
-    <s>
-      <r>screen.entity(HANAKO).cord.apply_animation(jump(20));</r>
-      Welcome to stall A!
-    </s>
-  </scene>
-
-  <!-- stall_b, dorm_night: omitted -->
+    <!-- stall_b, dorm_night: omitted -->
+  </game>
 </kagari>
 ```
 

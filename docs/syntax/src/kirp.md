@@ -142,13 +142,13 @@ step was reached:
 ```xml
 <choice id="where">
   <choice-arm id="roof" text="Go to the roof">
-    <s><r>screen.background().change(BG::ROOF).apply_animation(fade(30));</r>The wind is cold.</s>
+    <s><r>screen.background().change(BG::ROOF).apply_animation(fade(30));</r><m who="">The wind is cold.</m></s>
   </choice-arm>
   <choice-arm id="classroom" text="Stay in the classroom">
-    <s><r>screen.background().change(BG::CLASSROOM).apply_animation(fade(30));</r>It's quiet.</s>
+    <s><r>screen.background().change(BG::CLASSROOM).apply_animation(fade(30));</r><m who="">It's quiet.</m></s>
   </choice-arm>
 </choice>
-<s>"So, about tomorrow…"</s>
+<s><m who="Azusa">So, about tomorrow…</m></s>
 ```
 
 {{#include diagrams/consistency.svg}}

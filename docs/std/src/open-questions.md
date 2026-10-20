@@ -2,9 +2,10 @@
 
 ## Text interpolation
 
-If `<s>` text ever interpolates a story variable, such as a player name, a line is no longer a
-function of its step, and backlog entries must carry the interpolated values. Is interpolation
-needed at all, and if so, are those values recorded in the history or recomputed by replay?
+If the text of an `<m>` ever interpolates a story variable, such as a player name, a line is no
+longer a function of its step, and backlog entries must carry the interpolated values. Is
+interpolation needed at all, and if so, are those values recorded in the history or recomputed by
+replay?
 
 ## Shared `.kix` across scopes
 

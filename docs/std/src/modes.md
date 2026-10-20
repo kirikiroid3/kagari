@@ -48,52 +48,14 @@ rare.
 
 ## Declaring modes
 
-```xml
-<system start="title">
-  <page name="title" root="true">
-    <button on-click="start(main)">New Game</button>
-    <button on-click="push(load)">Load</button>
-    <button on-click="push(config)">Config</button>
-    <button on-click="ask_quit">Quit</button>
-  </page>
+Modes are declared in `<system>` as `<page>`, `<dialog>` and one `<game-mode>`, and a mode's view
+is split into named `<layer>`s. The syntax book's *System Script* chapter gives the elements, their
+attributes and an example. In terms of this chapter:
 
-  <game-mode name="game">
-    <game-screen />
-    <layer name="text">
-      <text-frame on-click="advance" />
-    </layer>
-    <layer name="quick">
-      <button on-click="push(save)">Save</button>
-      <button on-click="push(load)">Load</button>
-      <button on-click="push(backlog)">Log</button>
-    </layer>
-    <on-exit>
-      <case val="AzusaEnd"><meta-set var="cleared_azusa" val="true" /><goto page="credits" /></case>
-      <case val="_"><goto page="title" /></case>
-    </on-exit>
-  </game-mode>
-
-  <page name="save" requires="game">
-    <for-slots>
-      <button on-click="push(confirm_overwrite)">…</button>
-    </for-slots>
-    <button on-click="pop">Back</button>
-  </page>
-
-  <dialog name="confirm_overwrite" requires="game">…</dialog>
-</system>
-```
-
-| Element       | Attributes                 | Meaning |
-| ------------- | -------------------------- | ------- |
-| `<page>`      | `name`, `root`, `requires` | A mode. `root="true"` makes it a base; otherwise it is an overlay |
-| `<dialog>`    | `name`, `requires`         | An overlay page drawn over a still image of the frames below |
-| `<game-mode>` | `name`                     | The mode that owns the `Narrative`. One per program |
-| `<layer>`     | `name`                     | A named part of a mode's view |
-| `<game-screen>` | —                        | The narrative's ECS screen, drawn as a layer of `<game-mode>` |
-
-All element and attribute names here are *tentative*, except the form of interaction attributes:
-an attribute such as `on-click` holds one operation call, as in `on-click="push(save)"`.
+- A `<page root="true">` is a root page. Every other `<page>` and every `<dialog>` is an overlay.
+- `requires="game"` on an overlay is its context requirement, checked as in
+  [Context typing](#context-typing).
+- An interaction attribute such as `on-click` holds one of the [operations](#operations).
 
 ### Game mode
 

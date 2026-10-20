@@ -15,7 +15,7 @@ A scene is a named sequence of script content. Scenes are the unit of calling: t
 holds one frame per active scene.
 
 - `name` is required and unique in the program.
-- *Tentative:* the program starts at the scene named `main`.
+- The story starts at a scene exported by an [`<entry>`](#entry-export-a-starting-scene).
 - Scenes may contain local variable declarations (see [Enums and Variables](./data.md)).
 - Scenes do not nest.
 
@@ -39,6 +39,29 @@ being duplicated.
 
 A scene that needs to report how it ended (a confession that is accepted or rejected) sets a
 global enum before returning, and the caller branches on it with `<match>`.
+
+## `<entry>`: export a starting scene
+
+```xml
+<entry name="main" scene="main" exit="ending" />
+<entry name="after_story" scene="after_story" exit="ending" />
+```
+
+*Tentative.* An entry is a named starting scene that the system can start (see
+[System Script](./system.md)). Entries are declared at top level, and `<game>` must contain at
+least one.
+
+| Attribute | Required | Meaning                                                                 |
+| --------- | -------- | ----------------------------------------------------------------------- |
+| `name`    | yes      | Name used by `start(…)` in the system                                   |
+| `scene`   | yes      | The scene the narrative starts in                                       |
+| `exit`    | no       | A global `<var-enum>` the system reads when the entry scene returns     |
+
+`exit` exports that variable, and only that variable, to the system's
+[`<on-exit>`](./system.md#game-mode-and-on-exit) handler. It is how the story reports how it ended.
+
+A program has one `<game>`, so extra chapters and after stories are further `<entry>` elements of
+the same `<game>`.
 
 ## `<return>`: leave the scene early
 

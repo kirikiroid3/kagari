@@ -25,56 +25,28 @@ by frame), are part of the engine. They are not written in `.kix` or `.kirp`.
 
 Every function and method in a `.kix` file has a body. `.kix` is not a header: functions are
 there because they are useful, for example to build an animation value from a few parameters.
+The one exception is a function marked `#[builtin]`, which the engine implements; it is only
+allowed in the bundled standard library.
 
 Since representing code is evaluated at compile time, so is every `.kix` function it calls.
 `.kix` functions are therefore held to the same rules as `render`: they must be **total** and
 **deterministic**, and they cannot read script variables.
 
-## Presets and studio extensions
+## The standard library and studio extensions
 
-- The engine ships **presets** as `.kix` files: the common components and basic animations such
-  as `jump` or `instant_switch`.
+- The engine ships a **standard library** of `.kix` files, imported as `std/<name>.kix`. Its
+  prelude is visible in the game scope without an import and provides the screen access API, the
+  common components and basic animations such as `jump` or `instant_switch`. The *Kagari STD
+  Book* describes every standard file.
 - A **studio** that needs more (its own animation curves, effects, component kinds) writes its own
   `.kix` file, without changing the engine or the compiler. The compiler type-checks all
   representing code against these definitions, so studio extensions get the same checking as the
-  presets.
+  standard library.
 
 ## Example
 
-The definitions used by the examples in this book. The names and shapes here are illustrative,
-not the actual preset library.
-
-*Tentative:* the screen access API (`Screen`, `Screen::entity`, `Screen::background`,
-`Screen::empty`, `Layer::change`, `apply_animation`) is built into the language as the interface
-to the ECS world; `.kix` files define the components and functions used with it.
-
-```kix
-// std.kix — shipped with the engine
-
-type EntityId = u64;
-type ImageId = u64;
-
-struct CordAnimation {
-    height: u64,
-    frames: u64,
-}
-
-struct TransitionAnimation {
-    frames: u64,
-}
-
-fn jump(height: u64) -> CordAnimation {
-    CordAnimation { height, frames: 12 }
-}
-
-fn instant_switch() -> TransitionAnimation {
-    TransitionAnimation { frames: 0 }
-}
-
-fn fade(frames: u64) -> TransitionAnimation {
-    TransitionAnimation { frames }
-}
-```
+The examples in this book use the prelude of the standard library (`Screen`, `jump`,
+`instant_switch`, `fade`, …) and these studio definitions:
 
 ```kix
 // characters.kix — written by the studio

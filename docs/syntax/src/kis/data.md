@@ -39,10 +39,12 @@ Enums are declared at top level.
 
 | Element      | Type                       | Attributes                                    |
 | ------------ | -------------------------- | --------------------------------------------- |
-| `<var-bool>` | `bool`                     | `name`, `init`                                |
-| `<var-enum>` | an enum from `<declare-enum>` | `name`, `type`, `init`                     |
-| `<var-char>` | `char`: unsigned 8-bit, 0–255 | `name`, `init`                             |
-| `<var-int>`  | *Tentative.* `int` from `min` to `max` | `name`, `min`, `max`, `init`      |
+| `<var-bool>` | `bool`                     | `name`, `init`, `from-meta`                   |
+| `<var-enum>` | an enum from `<declare-enum>` | `name`, `type`, `init`, `from-meta`        |
+| `<var-char>` | `char`: unsigned 8-bit, 0–255 | `name`, `init`, `from-meta`                |
+| `<var-int>`  | *Tentative.* `int` from `min` to `max` | `name`, `min`, `max`, `init`, `from-meta` |
+
+`from-meta` is optional; see [`from-meta`](#from-meta-copy-a-meta-field-at-start).
 
 `char` is a number, not a character: it is exactly `u8`. Prefer `<var-int>` with the smallest
 range that fits, such as `0`–`5` for an affection counter: the analyzer represents each variable
@@ -91,3 +93,27 @@ step. The result **saturates**: it stops at `max` (255 for `char`) going up and 
 `char`) going down, so every step stays total. When the analyzer can prove that a reachable
 `<add>` or `<sub>` hits a bound, it reports a warning, since a counter that silently saturates is
 often a sign that its range is too small.
+
+## `<meta-set>`: write a meta field
+
+```xml
+<meta-set var="cleared_azusa" val="true" />
+```
+
+*Tentative.* Writes a literal value to a meta field declared in `<system>` (see
+[meta declarations](./system.md#settings-meta-and-save-slots)). `<meta-set>` is not a step. `val`
+is written as for `<set>`, against the type of the meta field.
+
+Meta is write-only from the story: no script element reads a meta field back, except
+`from-meta` when the story starts. The *Kagari STD Book* explains why this keeps every narrative
+analysis unaffected. A `<meta-enum>` field cannot be used from the game yet.
+
+## `from-meta`: copy a meta field at start
+
+```xml
+<var-bool name="cleared_azusa" init="false" from-meta="cleared_azusa" />
+```
+
+*Tentative.* A variable declaration with `from-meta` is copied from the named meta field once,
+when the story starts. During the run it is an ordinary variable. The meta field and the variable
+must have the same type.

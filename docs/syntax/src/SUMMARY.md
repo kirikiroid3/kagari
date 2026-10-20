@@ -10,6 +10,7 @@
   - [Enums and Variables](./kis/data.md)
   - [Templates, Include and Import](./kis/reuse.md)
   - [Presentation Tags](./kis/presentation.md)
+  - [System Script](./kis/system.md)
   - [Tag Reference](./kis/reference.md)
 - [Representing Code (`.kirp`)](./kirp.md)
 - [Extensions (`.kix`)](./kix.md)

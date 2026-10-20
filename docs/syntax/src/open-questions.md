@@ -2,9 +2,8 @@
 
 ## Game system
 
-The game system (title screen, settings, save and load, backlog, system UI) is proposed in the
-*Kagari STD Book* (`docs/std`). That proposal splits the program into `<system>` and `<game>`,
-and it amends this book in one place: `<import>` is hoisted per scope, not to the whole program.
+The syntax of `<system>` is in [System Script](./kis/system.md); its semantics are proposed in
+the *Kagari STD Book* (`docs/std`). Most of its element and attribute names are still tentative.
 
 ## Bytecode header
 
@@ -29,7 +28,13 @@ manifest, or a path in the declaration itself?
 
 ## Text markup
 
-What markup does the text of `<s>` support: speaker name, ruby, line breaks, emphasis, voice?
+What markup does the text of `<m>` support besides plain text: ruby, line breaks, emphasis?
+
+## Speakers
+
+`who` in [`<m>`](./kis/steps.md#m-message) is free text for now, and an empty `who` is narration.
+Should `who` name a declared character, a closed set checked at compile time, and how are
+characters declared?
 
 ## Template hygiene
 

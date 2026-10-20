@@ -3,13 +3,15 @@
 This book describes the Kagari standard library and the **game system** built on it: the title
 screen, settings, save and load, backlog, and the in-game UI around the story.
 
-The *Kagari Language Syntax Reference* (the syntax book, `docs/syntax`) describes the story
-itself: `.kis` scenes, `.kirp` render functions and `.kix` extensions. This book describes
-everything around the story, and the standard `.kix` files through which the two talk to each
-other.
+The *Kagari Language Syntax Reference* (the syntax book, `docs/syntax`) describes the source
+languages: `.kis` scripts, `.kirp` render functions and `.kix` extensions, including every tag of
+both the story and the game system. This book describes what the game system means and the
+standard `.kix` files: the prelude the story is presented with, and the files through which the
+story and the system talk to each other.
 
 | File                     | Scope  | Provides                                                       |
 | ------------------------ | ------ | -------------------------------------------------------------- |
+| `std/prelude.kix`        | game   | The screen access API, common components, asset types and basic animations; no import needed |
 | `std/ui.kix`             | system | UI elements, layout and style types                            |
 | `std/system-setting.kix` | system | Setting and meta declarations, and their types                 |
 | `std/narrative.kix`      | system | The abstract `Narrative` type: lines, history, save and load   |

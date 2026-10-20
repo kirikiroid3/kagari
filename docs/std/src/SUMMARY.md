@@ -4,6 +4,7 @@
 
 - [The System Model](./model.md)
 - [Program Structure](./structure.md)
+- [The Prelude (`std/prelude.kix`)](./prelude.md)
 - [Modes and the Mode Stack](./modes.md)
 - [The Narrative Interface (`std/narrative.kix`)](./narrative.md)
 - [Settings and Meta (`std/system-setting.kix`)](./settings-meta.md)

@@ -2,12 +2,9 @@
 
 ## Style is local, layout is an engine pass
 
-```xml
-<button style="common_btn" on-click="push(save)">Save</button>
-```
-
-`style` names a function in a `.kix` file of the system scope that returns the element's style.
-The function is total and takes no parameters, so the compiler evaluates it.
+The `style` attribute of a UI element (syntax book, *System Script*) names a function in a `.kix`
+file of the system scope that returns the element's style. The function is total and takes no
+parameters, so the compiler evaluates it.
 
 Flex layout is non-local, but only in *solving sizes*: a child's size depends on its siblings and
 on its parent's constraints. Deriving styles stays local. The two are separate:

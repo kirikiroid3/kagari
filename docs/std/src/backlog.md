@@ -16,23 +16,11 @@ Entries are keyed by `index`, the position in the run, not by `StepId`, because 
 calls visit the same step more than once. Since history is derived from the trace, a loaded save
 gets its full backlog for free. The engine may cache it, but it is never extra saved state.
 
-## `<m>`: speaker and voice
+## Lines
 
-```xml
-<s><m who="Azusa" voice="azusa_0072_nux">ぬっ</m></s>
-<s>The wind stopped.</s>
-```
-
-*Tentative.* `<m>` marks a message inside an `<s>`: who says it, and an optional voice line. Text
-outside `<m>` is narration. This settles part of the syntax book's open question on text markup.
-
-| Attribute | Required | Meaning                                         |
-| --------- | -------- | ----------------------------------------------- |
-| `who`     | yes      | A declared character                            |
-| `voice`   | no       | A voice id                                      |
-
-The attribute is `who`, not `char`, because the syntax book already uses `char` for the unsigned
-8-bit variable type.
+What a step shows is written with `<m>` elements inside its `<s>` (syntax book, *Steps and
+Labels*): each message has a speaker, its text, and an optional voice line. Text outside `<m>` is
+a comment and never reaches the player.
 
 ### A closed type for lines
 
@@ -40,17 +28,16 @@ Every `<s>` is known at compile time, so the compiler emits a static table from 
 
 ```text
 line      : StepId -> Line              -- compile-time table, no runtime data
-Line      = [Segment]
-Segment   = Narration(TextId)
-          | Message { who: Character, voice: Option<VoiceId>, text: TextId }
+Line      = [Message]                   -- the <m> elements of the step, in order
+Message   = { who: Speaker, voice: Option<VoiceId>, text: TextId }
+Speaker   = Narration | Character
 
-Character = a closed enum, from the character declarations in <game>
 VoiceId   = a closed enum, generated from every voice="…" in the program
 ```
 
-`current_line` and each backlog entry are lookups in this table. Compile checks: `who` names a
-declared character, and every `voice` resolves to an asset (see the syntax book's open question on
-asset binding).
+`current_line` and each backlog entry are lookups in this table. Every `voice` must name a
+`VoiceAsset` constant, which the compiler checks. *Tentative:* `Character` is a closed set of
+declared characters; how characters are declared is an open question of the syntax book.
 
 Playing a voice from the backlog is the system operation `play_voice(v)`. It only uses the audio
 system and applies the voice volume setting. The narrative is not involved.
@@ -75,20 +62,9 @@ revert(i) :  game := rewind(game, i);  pop        -- requires game; the top is t
   deterministic because the narrative reads meta only at `start`, when it is copied into σ (see
   [Reading meta](./settings-meta.md#reading-meta-from-the-narrative)).
 
-## Example
+## The backlog page
 
-```xml
-<page name="backlog" requires="game">
-  <for-history>
-    <row>
-      <backlog-line />
-      <button on-click="play_voice(entry.voice)">▶</button>
-      <button on-click="revert(entry.index)">Revert</button>
-    </row>
-  </for-history>
-  <button on-click="pop">Back</button>
-</page>
-```
-
-*Tentative* element names. `<for-history>` repeats its body once per history entry, with `entry`
-bound to it. `entry.voice` is the voice of the entry's line, looked up in the `line` table. A voice button for an entry without a voice is not shown.
+A backlog page repeats over the history with `<for-history>` and shows each entry's line with
+`<backlog-line>`; the syntax book's *System Script* chapter has a complete example. Its buttons
+use the two operations above: `play_voice(entry.voice)` and `revert(entry.index)`. A voice button
+for an entry without a voice is not shown.

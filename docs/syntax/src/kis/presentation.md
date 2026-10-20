@@ -11,7 +11,7 @@ connect them.
     screen.entity(HANAKO).cord.apply_animation(jump(20));
     screen.entity(AZUSA).appearance.emotion.change(AZUSA::CLOSE_EYE_SMILE).apply_animation(instant_switch());
   </r>
-  "Hanako, calm down."
+  <m who="">"Hanako, calm down."</m>
 </s>
 ```
 
@@ -41,7 +41,7 @@ XML parser leaves it alone. Wrapping code that does not need it is harmless:
 ```xml
 <s>
   <represent src="opening.kirp" />
-  The opening begins.
+  <m who="">The opening begins.</m>
 </s>
 ```
 
@@ -56,8 +56,8 @@ its representation runs before the step waits for input:
 {{#include ../diagrams/render-chain.svg}}
 
 - Several `<r>`/`<represent>` children run in document order, each receiving the previous result.
-- Position relative to the text inside `<s>` does not matter. *Tentative:* by convention they come
-  first.
+- Position relative to the `<m>` children of `<s>` does not matter. *Tentative:* by convention
+  they come first.
 - A step without either leaves the screen unchanged.
 
 Representation is attached to steps only. To present differently depending on a variable, put

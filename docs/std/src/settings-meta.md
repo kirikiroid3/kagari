@@ -10,36 +10,23 @@ runs. They differ in who may touch them.
 
 ## Declarations
 
-```xml
-<system start="title">
-  <setting-int  name="bgm_volume"   min="0" max="100" init="80" />
-  <setting-int  name="voice_volume" min="0" max="100" init="80" />
-  <setting-enum name="text_speed"   type="Speed" init="Normal" />
-
-  <meta-bool name="cleared_azusa" init="false" />
-
-  <save-slots count="60" />
-</system>
-```
-
-*Tentative* names. Settings and meta declare an initial value, used when the stored file has no
-value for them, for example on first boot or after an update adds a field.
+Settings, meta fields and save slots are declared in `<system>` with `<setting-*>`, `<meta-*>` and
+`<save-slots>`; the syntax book's *System Script* chapter gives the elements. Every setting and
+meta field declares an initial value, used when the stored file has no value for it, for example
+on first boot or after an update adds a field.
 
 Settings are never part of an analysis, so they may in principle have richer types than story
 variables, such as floats or strings. *Tentative:* the standard declarations are bounded types
 anyway, because UI controls (sliders, toggles, selectors) are bounded.
 
-`<save-slots count>` fixes the number of slots, so the slot list in the UI is finite.
+The number of save slots is fixed, so the slot list in the UI is finite.
 
 ## Writing meta from the narrative
 
-```xml
-<meta-set var="cleared_azusa" val="true" />
-```
-
-*Tentative.* Inside `<game>`, `<meta-set>` writes a meta field. It is an instant element, not a
-step. Meta is **write-only** from the narrative: a write that the narrative can never read back
-cannot change narrative control flow, so every narrative analysis is unaffected.
+The story writes a meta field with `<meta-set>` (syntax book, *Enums and Variables*). It is an
+instant element, not a step. Meta is **write-only** from the narrative: a write that the narrative
+can never read back cannot change narrative control flow, so every narrative analysis is
+unaffected.
 
 Meta written by the narrative is not reverted by load, rewind or revert. Read flags and unlocks
 stay written. That is intended.
@@ -47,11 +34,8 @@ stay written. That is intended.
 ## Reading meta from the narrative
 
 Some games make cross-playthrough state part of the story on purpose; the proposal's meta layer
-covers them. *Tentative:* a story variable may be declared as a copy of a meta field:
-
-```xml
-<var-bool name="cleared_azusa" init="false" from-meta="cleared_azusa" />
-```
+covers them. *Tentative:* a story variable may be declared as a copy of a meta field, with the
+`from-meta` attribute (syntax book, *Enums and Variables*).
 
 - The value is copied from meta into σ once, at `start`. During the run it is an ordinary story
   variable.
