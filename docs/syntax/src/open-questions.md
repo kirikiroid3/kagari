@@ -2,19 +2,9 @@
 
 ## Game system
 
-The pushdown machine is strong enough to build the game system on top of it: title screen,
-settings, save and load, gallery, read-text tracking. How to design that system is not decided.
-Questions it has to answer:
-
-- Are system screens written as `.kis` scenes, or are they a separate layer outside the story?
-- Where does system state live? Settings and unlocks persist across runs and must not become
-  part of the story's narrative state, or every analysis would have to consider them. The
-  proposal's *meta layer* (state read at the start of a run and written at defined points) is
-  one candidate.
-- If a save menu is a scene called on top of the story, the saved call stack must exclude the
-  menu's own frames, and loading must replace the story stack rather than push onto it.
-- Some games make the meta layer part of the story on purpose. Which meta fields may the script
-  read, and at which points may it write them?
+The game system (title screen, settings, save and load, backlog, system UI) is proposed in the
+*Kagari STD Book* (`docs/std`). That proposal splits the program into `<system>` and `<game>`,
+and it amends this book in one place: `<import>` is hoisted per scope, not to the whole program.
 
 ## Bytecode header
 
