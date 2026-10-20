@@ -19,8 +19,8 @@ gets its full backlog for free. The engine may cache it, but it is never extra s
 ## Lines
 
 What a step shows is written with `<m>` elements inside its `<s>` (syntax book, *Steps and
-Labels*): each message has a speaker, its text, and an optional voice line. Text outside `<m>` is
-a comment and never reaches the player.
+Labels*): each message has a speaker name, its text, and an optional voice line. Text outside
+`<m>` is a comment and never reaches the player.
 
 ### A closed type for lines
 
@@ -29,15 +29,13 @@ Every `<s>` is known at compile time, so the compiler emits a static table from 
 ```text
 line      : StepId -> Line              -- compile-time table, no runtime data
 Line      = [Message]                   -- the <m> elements of the step, in order
-Message   = { who: Speaker, voice: Option<VoiceId>, text: TextId }
-Speaker   = Narration | Character
+Message   = { who: TextId, voice: Option<VoiceId>, text: TextId }   -- empty who: narration
 
 VoiceId   = a closed enum, generated from every voice="…" in the program
 ```
 
-`current_line` and each backlog entry are lookups in this table. Every `voice` must name a
-`VoiceAsset` constant, which the compiler checks. *Tentative:* `Character` is a closed set of
-declared characters; how characters are declared is an open question of the syntax book.
+`current_line` and each backlog entry are lookups in this table. `who` is display text like
+`text`. Every `voice` must name a `VoiceAsset` constant, which the compiler checks.
 
 Playing a voice from the backlog is the system operation `play_voice(v)`. It only uses the audio
 system and applies the voice volume setting. The narrative is not involved.

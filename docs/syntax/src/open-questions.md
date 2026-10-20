@@ -20,12 +20,6 @@ functions besides `render`? Loops must keep `render` total.
 
 What markup does the text of `<m>` support besides plain text: ruby, line breaks, emphasis?
 
-## Speakers
-
-`who` in [`<m>`](./kis/steps.md#m-message) is free text for now, and an empty `who` is narration.
-Should `who` name a declared character, a closed set checked at compile time, and how are
-characters declared?
-
 ## Template hygiene
 
 A template containing a `<label>` produces duplicate labels when used twice in one scene. Should

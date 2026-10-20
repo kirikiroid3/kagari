@@ -6,11 +6,13 @@ and `<choice>`. `<label>` names a position between steps.
 ## `<s>`: ordinary step
 
 ```xml
-<s><m who="">It was the last day of summer.</m></s>
+<s>
+    <m who="">It was the last day of summer.</m>
+</s>
 
 <s>
-  <r>screen.entity(AZUSA).appearance.emotion.change(AZUSA::CLOSE_EYE_SMILE).apply_animation(instant_switch());</r>
-  <m who="Azusa">Did you forget again?</m>
+<r>screen.entity(AZUSA).appearance.emotion.change(AZUSA::CLOSE_EYE_SMILE).apply_animation(instant_switch());</r>
+<m who="Azusa">Did you forget again?</m>
 </s>
 ```
 
@@ -23,8 +25,8 @@ ignored by the compiler. Everything the player reads is inside an `<m>`.
 
 ```xml
 <s>
-  Azusa glances at the clock. (A note for the writers; never shown.)
-  <m who="Azusa">We're late.</m>
+    Azusa glances at the clock. (A note for the writers; never shown.)
+    <m who="Azusa">We're late.</m>
 </s>
 ```
 
@@ -41,23 +43,27 @@ selections are recorded.
 ## `<m>`: message
 
 ```xml
-<s><m who="Azusa" voice="AZUSA_0072">ぬっ</m></s>
-<s><m who="">The wind stopped.</m></s>
+<s>
+    <m who="Azusa" voice="AZUSA_0072">ぬっ</m>
+</s>
+<s>
+<m who="">The wind stopped.</m>
+</s>
 ```
 
 `<m>` is one message of an `<s>`: who says it, the text, and an optional voice line. It may only
 appear directly inside an `<s>`, and its content is text only.
 
-| Attribute | Required | Meaning                                                                    |
-| --------- | -------- | -------------------------------------------------------------------------- |
-| `who`     | yes      | *Tentative.* The speaker. An empty `who` is narration: no speaker is shown |
+| Attribute | Required | Meaning                                                                                                             |
+|-----------|----------|---------------------------------------------------------------------------------------------------------------------|
+| `who`     | yes      | The speaker name, as plain display text. An empty `who` is narration: no name is shown                              |
 | `voice`   | no       | A constant of type `VoiceAsset` from an imported `.kix` file, as a path such as `AZUSA_0072` or `VOICE::AZUSA_0072` |
 
 The attribute is `who`, not `char`, because `char` is already the unsigned 8-bit
 [variable type](./data.md#variable-declarations).
 
-A `voice` that does not name a `VoiceAsset` constant is an error in compilation stage 3. `who` is
-not checked yet; see [Open Questions](../open-questions.md#speakers).
+A `voice` that does not name a `VoiceAsset` constant is an error in
+compilation stage 3.
 
 *Tentative:* further text markup inside `<m>` (ruby, line breaks, emphasis) is not designed yet;
 see [Open Questions](../open-questions.md#text-markup).
@@ -66,13 +72,15 @@ see [Open Questions](../open-questions.md#text-markup).
 
 ```xml
 <choice id="confess">
-  <choice-arm id="yes" text="Tell her the truth">
-    <set var="route" val="Azusa" />
-    <call scene="azusa_confession" />
-  </choice-arm>
-  <choice-arm id="no" text="Say nothing">
-    <s><m who="">I kept quiet.</m></s>
-  </choice-arm>
+    <choice-arm id="yes" text="Tell her the truth">
+        <set var="route" val="Azusa"/>
+        <call scene="azusa_confession"/>
+    </choice-arm>
+    <choice-arm id="no" text="Say nothing">
+        <s>
+            <m who="">I kept quiet.</m>
+        </s>
+    </choice-arm>
 </choice>
 ```
 
@@ -80,11 +88,11 @@ see [Open Questions](../open-questions.md#text-markup).
 waits for the player to select one. The selected arm's body runs, then execution continues after
 `</choice>`.
 
-| Element        | Attribute | Required | Meaning                                                      |
-| -------------- | --------- | -------- | ------------------------------------------------------------ |
-| `<choice>`     | `id`      | yes      | *Tentative.* Stable identifier, unique within the scene      |
-| `<choice-arm>` | `id`      | yes      | *Tentative.* Stable identifier, unique within the choice     |
-| `<choice-arm>` | `text`    | yes      | *Tentative.* Option text shown to the player                 |
+| Element        | Attribute | Required | Meaning                                                  |
+|----------------|-----------|----------|----------------------------------------------------------|
+| `<choice>`     | `id`      | yes      | *Tentative.* Stable identifier, unique within the scene  |
+| `<choice-arm>` | `id`      | yes      | *Tentative.* Stable identifier, unique within the choice |
+| `<choice-arm>` | `text`    | yes      | *Tentative.* Option text shown to the player             |
 
 The body of a `<choice-arm>` may contain anything a scene body may contain, including further
 steps, or nothing at all.
@@ -104,19 +112,19 @@ the bodies of the `<do>` elements may contain only `<choice-arm>` elements:
 
 ```xml
 <choice id="map">
-  <choice-arm id="a" text="Go to stall A">...</choice-arm>
-  <match vars="visited_a visited_b visited_c">
-    <cases>
-      <case val="true true true" />
-      <do>
-        <choice-arm id="leave" text="Leave" />
-      </do>
-    </cases>
-    <cases>
-      <case val="_ _ _" />
-      <do />
-    </cases>
-  </match>
+    <choice-arm id="a" text="Go to stall A">...</choice-arm>
+    <match vars="visited_a visited_b visited_c">
+        <cases>
+            <case val="true true true"/>
+            <do>
+                <choice-arm id="leave" text="Leave"/>
+            </do>
+        </cases>
+        <cases>
+            <case val="_ _ _"/>
+            <do/>
+        </cases>
+    </match>
 </choice>
 ```
 
@@ -128,7 +136,7 @@ stuck.
 ## `<label>`: position marker
 
 ```xml
-<label id="map" />
+<label id="map"/>
 ```
 
 `<label>` names the position of the next step. It is not a step and does nothing when executed.
