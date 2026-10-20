@@ -113,7 +113,7 @@ pub struct Stmt {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StmtKind {
     Say {
-        segments: Vec<Segment>,
+        messages: Vec<Message>,
         renders: Vec<Idx<Render>>,
     },
     Choice {
@@ -175,15 +175,13 @@ pub struct ChoiceArm {
     pub body: Block,
 }
 
+/// An `<m>` inside an `<s>`. An empty `who` is narration.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Segment {
-    Narration(Vec<TextPiece>),
-    Message {
-        who: String,
-        voice: Option<(String, Span)>,
-        text: Vec<TextPiece>,
-        span: Span,
-    },
+pub struct Message {
+    pub who: String,
+    pub voice: Option<(String, Span)>,
+    pub text: Vec<TextPiece>,
+    pub span: Span,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

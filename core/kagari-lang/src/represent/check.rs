@@ -12,7 +12,7 @@ use crate::db::Db;
 use crate::diagnostic::{Diagnostic, DiagnosticCode, Span};
 use crate::input::{FilePath, Program, SourceFile};
 use crate::kis::game_hir;
-use crate::kis::hir::{Block, ChoiceItem, Render, Segment, StmtKind};
+use crate::kis::hir::{Block, ChoiceItem, Render, StmtKind};
 use crate::kis::value::check_name;
 use crate::parse::parse_kis;
 use crate::represent::infer::{Body, RefEdge};
@@ -510,13 +510,9 @@ pub fn check_voices(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
 fn collect_voices(block: &Block, out: &mut Vec<(String, Span)>) {
     for stmt in &block.stmts {
         match &stmt.kind {
-            StmtKind::Say { segments, .. } => {
-                for segment in segments {
-                    if let Segment::Message {
-                        voice: Some((text, span)),
-                        ..
-                    } = segment
-                    {
+            StmtKind::Say { messages, .. } => {
+                for message in messages {
+                    if let Some((text, span)) = &message.voice {
                         out.push((text.clone(), *span));
                     }
                 }

@@ -15,7 +15,7 @@ use crate::exhaustive::{self, TyKind, Types, Witness};
 use crate::input::{Program, SourceFile, resolve_src};
 use crate::kis::hir::{
     Block, BlockId, ChoiceArm, ChoiceItem, EntryDecl, EnumDecl, GameHir, LabelDecl, MatchArm,
-    MatchStmt, MetaDecl, MetaType, Render, SceneDecl, Segment, Stmt, StmtKind, TextPiece, VarDecl,
+    MatchStmt, Message, MetaDecl, MetaType, Render, SceneDecl, Stmt, StmtKind, TextPiece, VarDecl,
     VarScope, VariantDecl,
 };
 use crate::kis::schema::{Tag, attrs, tag};
@@ -127,18 +127,8 @@ struct SceneState {
 
 #[derive(Default)]
 struct SayBuilder {
-    segments: Vec<Segment>,
+    messages: Vec<Message>,
     renders: Vec<Idx<Render>>,
-    narration: Vec<TextPiece>,
-}
-
-impl SayBuilder {
-    fn flush(&mut self) {
-        if !self.narration.is_empty() {
-            self.segments
-                .push(Segment::Narration(std::mem::take(&mut self.narration)));
-        }
-    }
 }
 
 #[derive(Default)]
@@ -953,9 +943,8 @@ impl<'db> Lowerer<'db> {
         self.check_attrs(file, element, Tag::S);
         let mut builder = SayBuilder::default();
         self.step_text(file, element, &mut builder);
-        builder.flush();
         StmtKind::Say {
-            segments: builder.segments,
+            messages: builder.messages,
             renders: builder.renders,
         }
     }
@@ -963,12 +952,9 @@ impl<'db> Lowerer<'db> {
     fn step_text(&mut self, file: SourceFile, parent: &Element, builder: &mut SayBuilder) {
         const PLACE: &str = "inside `<s>`";
         for child in children(parent) {
-            let element = match child {
-                Child::Text(run) => {
-                    builder.narration.extend(text_piece(file, run));
-                    continue;
-                }
-                Child::Element(element) => element,
+            // Text directly inside `<s>` is a comment: only `<m>` is shown.
+            let Child::Element(element) = child else {
+                continue;
             };
             let Some(tag) = self.classify(file, &element) else {
                 continue;
@@ -977,9 +963,8 @@ impl<'db> Lowerer<'db> {
                 Tag::R => builder.renders.push(self.inline_render(file, &element)),
                 Tag::Represent => builder.renders.extend(self.file_render(file, &element)),
                 Tag::M => {
-                    builder.flush();
                     let message = self.message(file, &element);
-                    builder.segments.push(message);
+                    builder.messages.push(message);
                 }
                 Tag::Slot if self.sc.env.is_some() => {
                     if let Some((snip_file, snip, saved)) = self.enter_slot(file, &element) {
@@ -992,13 +977,13 @@ impl<'db> Lowerer<'db> {
         }
     }
 
-    fn message(&mut self, file: SourceFile, element: &Element) -> Segment {
+    fn message(&mut self, file: SourceFile, element: &Element) -> Message {
         self.check_attrs(file, element, Tag::M);
         let who = attr(element, "who").map(|a| a.text).unwrap_or_default();
         let voice = attr(element, "voice").map(|a| (a.text, Span::new(file, a.range)));
         let mut text = Vec::new();
         self.message_text(file, element, &mut text);
-        Segment::Message {
+        Message {
             who,
             voice,
             text,
@@ -1894,7 +1879,7 @@ fn significant_range(decoded: &DecodedText) -> Option<TextRange> {
     Some(decoded.map.range_to_source(TextRange::new(start, end)))
 }
 
-/// A narration or message piece, or `None` for whitespace-only text.
+/// A message text piece, or `None` for whitespace-only text.
 fn text_piece(file: SourceFile, run: Vec<Content>) -> Option<TextPiece> {
     let decoded = decode_content(run.into_iter());
     let range = significant_range(&decoded)?;
