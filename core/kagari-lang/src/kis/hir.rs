@@ -14,7 +14,6 @@ pub struct GameHir {
     pub vars: Arena<VarDecl>,
     pub metas: Arena<MetaDecl>,
     pub scenes: Arena<SceneDecl>,
-    pub entries: Vec<EntryDecl>,
     pub renders: Arena<Render>,
     pub diagnostics: Vec<Diagnostic>,
 }
@@ -72,6 +71,11 @@ pub enum MetaType {
 pub struct SceneDecl {
     pub name: SmolStr,
     pub span: Span,
+    /// The type of the returned value; `None` for a scene that returns no value, or whose
+    /// `returns` is invalid.
+    pub returns: Option<VarType>,
+    /// Whether the system can start the story at this scene (`entry="true"`).
+    pub entry: bool,
     pub locals: Vec<Idx<VarDecl>>,
     pub labels: Vec<LabelDecl>,
     pub body: Block,
@@ -82,14 +86,6 @@ pub struct LabelDecl {
     pub id: SmolStr,
     pub span: Span,
     pub block: BlockId,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct EntryDecl {
-    pub name: SmolStr,
-    pub span: Span,
-    pub scene: Idx<SceneDecl>,
-    pub exit: Option<Idx<VarDecl>>,
 }
 
 /// Unique per scene.
@@ -125,9 +121,14 @@ pub enum StmtKind {
     Label(u32),
     /// Index into `SceneDecl::labels`; `None` when unresolved.
     Goto(Option<u32>),
-    /// `None` when the scene is unknown.
-    Call(Option<Idx<SceneDecl>>),
-    Return,
+    Call {
+        /// `None` when the scene is unknown.
+        scene: Option<Idx<SceneDecl>>,
+        /// The variable the returned value is assigned to.
+        assign: Option<Idx<VarDecl>>,
+    },
+    /// `None` for a `<return>` without a value.
+    Return(Option<ReturnValue>),
     Match(MatchStmt<Block>),
     Set {
         var: Idx<VarDecl>,
@@ -145,6 +146,14 @@ pub enum StmtKind {
         meta: Idx<MetaDecl>,
         value: Value,
     },
+}
+
+/// The value a `<return>` passes to the caller.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReturnValue {
+    /// A local of the returning scene.
+    Var(Idx<VarDecl>),
+    Literal(Value),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

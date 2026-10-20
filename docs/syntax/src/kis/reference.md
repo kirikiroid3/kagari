@@ -17,8 +17,7 @@ direct children of `<scene>`.
 | `<kagari-system>`      | –    | root of an included file   | –                 | as `<system>`                    | [Reuse](./reuse.md#include-splice-another-script) |
 | `<include>`            | –    | `<game>`, `<system>`, included roots | `src`   | –                                | [Reuse](./reuse.md#include-splice-another-script) |
 | `<import>`             | –    | `<game>`, `<system>`, included roots | `src`   | –                                | [Reuse](./reuse.md#import-use-extension-definitions) |
-| `<entry>`              | –    | top level                  | `name`, `scene`, `exit` | –                          | [Control Flow](./control-flow.md#entry-export-a-starting-scene) |
-| `<scene>`              | –    | top level                  | `name`            | scene body                       | [Control Flow](./control-flow.md#scene-scene-declaration) |
+| `<scene>`              | –    | top level                  | `name`, `returns`, `entry` | scene body              | [Control Flow](./control-flow.md#scene-scene-declaration) |
 
 ## Steps
 
@@ -35,8 +34,8 @@ direct children of `<scene>`.
 | ---------- | ---- | ---------------------- | ---------- | ------------------------- | --- |
 | `<label>`  | no   | scene body             | `id`       | –                         | [Steps](./steps.md#label-position-marker) |
 | `<goto>`   | no   | scene body             | `label`    | –                         | [Control Flow](./control-flow.md#goto-jump-within-the-scene) |
-| `<call>`   | no   | scene body             | `scene`    | –                         | [Control Flow](./control-flow.md#call-enter-a-scene) |
-| `<return>` *(tent.)* | no | scene body       | –          | –                         | [Control Flow](./control-flow.md#return-leave-the-scene-early) |
+| `<call>`   | no   | scene body             | `scene`, `assign` | –                  | [Control Flow](./control-flow.md#call-enter-a-scene) |
+| `<return>` | no   | scene body             | `var` or `literal` | –                 | [Control Flow](./control-flow.md#return-leave-the-scene-early) |
 | `<match>`  | no   | scene body, `<choice>` | `var` or `vars` | `<cases>`            | [Control Flow](./control-flow.md#match-branch-on-variables) |
 | `<cases>`  | –    | `<match>`              | –          | `<case>`…, then `<do>`    | [Control Flow](./control-flow.md#match-branch-on-variables) |
 | `<case>`   | –    | `<cases>`              | `val`      | –                         | [Control Flow](./control-flow.md#match-branch-on-variables) |

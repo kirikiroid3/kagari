@@ -3,9 +3,9 @@ source: core/kagari-lang/tests/game_source.rs
 expression: "render_diagnostics(&db, diags, Some(&base))"
 input_file: core/kagari-lang/tests/game_source/script/009__meta_and_entries.kis
 ---
-script/009__meta_and_entries.kis:8:42: error[kis/bad-entry-exit]: `exit` must name an enum variable visible in the entry scene, found `cleared`
-script/009__meta_and_entries.kis:12:55: error[kis/meta-type-mismatch]: meta field `cleared_azusa` has type `bool`, but the variable has type `char`
+script/009__meta_and_entries.kis:9:55: error[kis/meta-type-mismatch]: meta field `cleared_azusa` has type `bool`, but the variable has type `char`
   note: script/009__meta_and_entries.kis:3:5: meta field declared here
-script/009__meta_and_entries.kis:18:21: error[kis/meta-enum-unsupported]: meta enum `last_route` cannot be used from the game yet
-script/009__meta_and_entries.kis:20:21: error[kis/unknown-meta]: unknown meta field `no_such_meta`
-script/009__meta_and_entries.kis:37:50: error[kis/bad-entry-exit]: `exit` must name an enum variable visible in the entry scene, found `ending`
+script/009__meta_and_entries.kis:16:21: error[kis/meta-enum-unsupported]: meta enum `last_route` cannot be used from the game yet
+script/009__meta_and_entries.kis:18:21: error[kis/unknown-meta]: unknown meta field `no_such_meta`
+script/009__meta_and_entries.kis:37:36: error[kis/entry-returns]: an entry scene must return enum `Ending`, but this one returns `bool`
+script/009__meta_and_entries.kis:48:31: error[kis/bad-value]: `sometimes` is not a bool; expected `true` or `false`

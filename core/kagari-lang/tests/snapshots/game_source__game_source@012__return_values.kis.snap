@@ -1,0 +1,24 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: "render_diagnostics(&db, diags, Some(&base))"
+input_file: core/kagari-lang/tests/game_source/script/012__return_values.kis
+---
+script/012__return_values.kis:27:33: error[kis/assign-mismatch]: scene `talk` returns no value to assign
+  note: script/012__return_values.kis:82:5: scene declared here
+script/012__return_values.kis:29:32: error[kis/assign-mismatch]: scene `qte` returns `bool`, but `answer` has type enum `Answer`
+  note: script/012__return_values.kis:60:5: scene declared here
+script/012__return_values.kis:31:32: error[kis/unknown-variable]: unknown variable `nothing`
+script/012__return_values.kis:89:5: error[kis/missing-return]: scene `half` declares `returns`, but can reach its end without `<return>`
+  note: script/012__return_values.kis:91:7: the scene can reach its end after this
+script/012__return_values.kis:106:5: error[kis/missing-return]: scene `empty` declares `returns`, but can reach its end without `<return>`
+script/012__return_values.kis:111:8: error[kis/var-conflict]: `<return>` takes at most one of `var` and `literal`
+script/012__return_values.kis:113:8: error[kis/return-mismatch]: this scene returns enum `Answer`; `<return>` needs `var` or `literal`
+script/012__return_values.kis:115:19: error[kis/return-mismatch]: `local_flag` has type `bool`, but this scene returns enum `Answer`
+  note: script/012__return_values.kis:109:7: variable declared here
+script/012__return_values.kis:117:19: error[kis/return-not-local]: `answer` is a global variable; `<return var>` must name a local of this scene
+script/012__return_values.kis:119:19: error[kis/unknown-variable]: unknown variable `nothing`
+script/012__return_values.kis:121:23: error[kis/bad-value]: `Maybe` is not a variant of `Answer`
+script/012__return_values.kis:126:8: error[kis/return-mismatch]: this scene returns no value; declare `returns` on the `<scene>` to return one
+script/012__return_values.kis:130:37: error[kis/bad-returns]: a scene cannot return `int`; return a `char` or an enum instead
+script/012__return_values.kis:135:40: error[kis/unknown-enum]: unknown enum `Mood`
+script/012__return_values.kis:141:23: error[kis/value-out-of-range]: `300` is outside 0..=255

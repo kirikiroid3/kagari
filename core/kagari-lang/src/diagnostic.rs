@@ -153,7 +153,6 @@ codes! {
     KisDuplicateTemplate = "kis/duplicate-template";
     KisDuplicateScene = "kis/duplicate-scene";
     KisDuplicateMeta = "kis/duplicate-meta";
-    KisDuplicateEntry = "kis/duplicate-entry";
     KisDuplicateChoiceId = "kis/duplicate-choice-id";
     KisDuplicateArmId = "kis/duplicate-arm-id";
     KisDuplicateLabel = "kis/duplicate-label";
@@ -171,7 +170,12 @@ codes! {
     KisNotACounter = "kis/not-a-counter";
     KisTemplateRecursion = "kis/template-recursion";
     KisSnipCount = "kis/snip-count";
-    KisBadEntryExit = "kis/bad-entry-exit";
+    KisBadReturns = "kis/bad-returns";
+    KisEntryReturns = "kis/entry-returns";
+    KisReturnMismatch = "kis/return-mismatch";
+    KisReturnNotLocal = "kis/return-not-local";
+    KisMissingReturn = "kis/missing-return";
+    KisAssignMismatch = "kis/assign-mismatch";
     KisNoEntry = "kis/no-entry";
     KisSteplessLoop = "kis/stepless-loop";
     KisSteplessCallCycle = "kis/stepless-call-cycle";

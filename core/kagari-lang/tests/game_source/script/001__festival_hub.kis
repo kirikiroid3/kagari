@@ -3,16 +3,19 @@
   <game>
     <import src="../extension/characters.kix" />
 
-    <entry name="main" scene="day1" />
+    <declare-enum name="Ending">
+      <enum name="Normal" repr="0" />
+    </declare-enum>
 
     <var-bool name="visited_a" init="false" />
     <var-bool name="visited_b" init="false" />
     <var-bool name="visited_c" init="false" />
 
-    <scene name="day1">
+    <scene name="day1" entry="true">
       <s>The school festival starts today.</s>
       <call scene="festival_hub" />
       <call scene="dorm_night" />
+      <return literal="Normal" />
     </scene>
 
     <scene name="festival_hub">

@@ -1,7 +1,9 @@
 <kagari>
   <system start="title" />
   <game>
-    <entry name="main" scene="main" />
+    <declare-enum name="Ending">
+      <enum name="Normal" repr="0" />
+    </declare-enum>
 
     <template name="phone_call">
       <s>The phone rings. It's <slot pos="1" />.</s>
@@ -28,7 +30,7 @@
       <s>Hi, <slot pos="1" />.</s>
     </template>
 
-    <scene name="main">
+    <scene name="main" entry="true">
       <x tpl="phone_call">
         <snip>Hanako</snip>
         <snip>
@@ -53,6 +55,7 @@
       <x tpl="greet">
         <snip><s>Hanako</s></snip>
       </x>
+      <return literal="Normal" />
     </scene>
   </game>
 </kagari>

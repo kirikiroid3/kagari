@@ -108,6 +108,7 @@ fn stepless_succ(scene: &IrScene, n: usize, returns: &[bool]) -> Vec<usize> {
     let targets: Vec<NodeId> = match &node.op {
         Op::Say { .. } | Op::Choice { .. } | Op::Exit => Vec::new(),
         Op::Jump { next, .. }
+        | Op::Return { next, .. }
         | Op::Assign { next, .. }
         | Op::Add { next, .. }
         | Op::Sub { next, .. }
@@ -116,6 +117,7 @@ fn stepless_succ(scene: &IrScene, n: usize, returns: &[bool]) -> Vec<usize> {
         Op::Call {
             scene: callee,
             next,
+            ..
         } => {
             if returns.get(scene_index(*callee)).copied().unwrap_or(false) {
                 vec![*next]
@@ -404,6 +406,7 @@ mod tests {
             .collect();
         IrScene {
             decl: Idx::from_raw(RawIdx::from(0u32)),
+            returns: None,
             nodes,
             entry: NodeId(entry),
             exit: NodeId(0),
@@ -420,6 +423,7 @@ mod tests {
     fn call(scene: u32, next: u32) -> Op {
         Op::Call {
             scene: SceneId(scene),
+            assign: None,
             next: NodeId(next),
         }
     }

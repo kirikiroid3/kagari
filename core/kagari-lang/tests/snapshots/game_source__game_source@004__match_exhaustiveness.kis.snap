@@ -3,7 +3,7 @@ source: core/kagari-lang/tests/game_source.rs
 expression: "render_diagnostics(&db, diags, Some(&base))"
 input_file: core/kagari-lang/tests/game_source/script/004__match_exhaustiveness.kis
 ---
-script/004__match_exhaustiveness.kis:22:8: error[kis/non-exhaustive-match]: non-exhaustive `<match>`: `false` is not covered
-script/004__match_exhaustiveness.kis:30:8: error[kis/non-exhaustive-match]: non-exhaustive `<match>`: `Azusa` is not covered
-script/004__match_exhaustiveness.kis:42:8: error[kis/non-exhaustive-match]: non-exhaustive `<match>`: `3..=3` is not covered
-script/004__match_exhaustiveness.kis:54:8: error[kis/non-exhaustive-match]: non-exhaustive `<match>`: `false false` is not covered
+script/004__match_exhaustiveness.kis:24:8: error[kis/non-exhaustive-match]: non-exhaustive `<match>`: `false` is not covered
+script/004__match_exhaustiveness.kis:32:8: error[kis/non-exhaustive-match]: non-exhaustive `<match>`: `Azusa` is not covered
+script/004__match_exhaustiveness.kis:44:8: error[kis/non-exhaustive-match]: non-exhaustive `<match>`: `3..=3` is not covered
+script/004__match_exhaustiveness.kis:56:8: error[kis/non-exhaustive-match]: non-exhaustive `<match>`: `false false` is not covered

@@ -10,12 +10,12 @@ use crate::db::Db;
 use crate::diagnostic::Span;
 use crate::input::Program;
 use crate::ir::{
-    Domain, IrArm, IrBranchArm, IrChoiceMatch, IrEntry, IrPattern, IrScene, IrVar, NarrativeIr,
+    Domain, IrArm, IrBranchArm, IrChoiceMatch, IrPattern, IrReturn, IrScene, IrVar, NarrativeIr,
     Node, NodeId, Op, SceneId, VarId,
 };
 use crate::kis::game_hir;
 use crate::kis::hir::{
-    Block, ChoiceItem, GameHir, MatchStmt, SceneDecl, StmtKind, VarDecl, VarScope,
+    Block, ChoiceItem, GameHir, MatchStmt, ReturnValue, SceneDecl, StmtKind, VarDecl, VarScope,
 };
 use crate::kis::value::{Pattern, Value, VarType};
 
@@ -30,16 +30,16 @@ pub fn narrative_ir(db: &dyn Db, program: Program) -> NarrativeIr {
     let scenes = hir
         .scenes
         .iter()
-        .map(|(idx, scene)| SceneBuilder::new(&vars, idx, scene).finish(scene))
+        .map(|(idx, scene)| {
+            let returns = scene.returns.map(|ty| domain(hir, ty));
+            SceneBuilder::new(&vars, idx, scene, returns).finish(scene)
+        })
         .collect();
     let entries = hir
-        .entries
+        .scenes
         .iter()
-        .map(|entry| IrEntry {
-            name: entry.name.clone(),
-            scene: scene_id(entry.scene),
-            exit_var: entry.exit.map(var_id),
-        })
+        .filter(|(_, scene)| scene.entry)
+        .map(|(idx, _)| scene_id(idx))
         .collect();
     NarrativeIr {
         vars,
@@ -60,8 +60,8 @@ fn scene_id(idx: Idx<SceneDecl>) -> SceneId {
     SceneId(raw(idx))
 }
 
-fn lower_var(hir: &GameHir, idx: Idx<VarDecl>, decl: &VarDecl) -> IrVar {
-    let domain = match decl.ty {
+fn domain(hir: &GameHir, ty: VarType) -> Domain {
+    match ty {
         VarType::Bool => Domain::Bool,
         VarType::Enum(e) => Domain::Enum {
             size: u32::try_from(hir.enums[e].variants.len()).unwrap_or(u32::MAX),
@@ -71,7 +71,11 @@ fn lower_var(hir: &GameHir, idx: Idx<VarDecl>, decl: &VarDecl) -> IrVar {
             min: i32::from(min),
             max: i32::from(max),
         },
-    };
+    }
+}
+
+fn lower_var(hir: &GameHir, idx: Idx<VarDecl>, decl: &VarDecl) -> IrVar {
+    let domain = domain(hir, decl.ty);
     IrVar {
         decl: idx,
         domain,
@@ -125,6 +129,7 @@ fn lower_pattern(domain: Domain, pattern: Pattern) -> IrPattern {
 struct SceneBuilder<'a> {
     vars: &'a [IrVar],
     decl: Idx<SceneDecl>,
+    returns: Option<Domain>,
     nodes: Vec<Node>,
     exit: NodeId,
     /// One pre-allocated `Jump` node per `SceneDecl::labels` entry, so gotos can target
@@ -135,10 +140,16 @@ struct SceneBuilder<'a> {
 }
 
 impl<'a> SceneBuilder<'a> {
-    fn new(vars: &'a [IrVar], decl: Idx<SceneDecl>, scene: &SceneDecl) -> SceneBuilder<'a> {
+    fn new(
+        vars: &'a [IrVar],
+        decl: Idx<SceneDecl>,
+        scene: &SceneDecl,
+        returns: Option<Domain>,
+    ) -> SceneBuilder<'a> {
         let mut builder = SceneBuilder {
             vars,
             decl,
+            returns,
             nodes: Vec::new(),
             exit: NodeId(0),
             labels: Vec::new(),
@@ -166,6 +177,7 @@ impl<'a> SceneBuilder<'a> {
         let entry = self.block(&scene.body, self.exit);
         IrScene {
             decl: self.decl,
+            returns: self.returns,
             nodes: self.nodes,
             entry,
             exit: self.exit,
@@ -228,17 +240,27 @@ impl<'a> SceneBuilder<'a> {
                     },
                 }
             }
-            StmtKind::Goto(None) | StmtKind::Call(None) => Op::Jump {
+            StmtKind::Goto(None) | StmtKind::Call { scene: None, .. } => Op::Jump {
                 next,
                 from_goto: false,
             },
-            StmtKind::Call(Some(scene)) => Op::Call {
+            StmtKind::Call {
+                scene: Some(scene),
+                assign,
+            } => Op::Call {
                 scene: scene_id(*scene),
+                assign: assign.map(var_id),
                 next,
             },
-            StmtKind::Return => Op::Jump {
+            StmtKind::Return(value) => Op::Return {
+                value: value.map(|value| match value {
+                    ReturnValue::Var(var) => IrReturn::Var(var_id(var)),
+                    ReturnValue::Literal(literal) => IrReturn::Literal(
+                        self.returns
+                            .map_or(0, |domain| value_index(domain, literal)),
+                    ),
+                }),
                 next: self.exit,
-                from_goto: false,
             },
             StmtKind::Match(m) => {
                 let (vars, domains) = self.match_vars(m);

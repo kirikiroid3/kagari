@@ -3,12 +3,12 @@ source: core/kagari-lang/tests/game_source.rs
 expression: "render_diagnostics(&db, diags, Some(&base))"
 input_file: core/kagari-lang/tests/game_source/script/005__templates.kis
 ---
-script/005__templates.kis:19:14: error[kis/template-recursion]: template `a` uses itself
-  note: script/005__templates.kis:14:7: in expansion of template `b`
-  note: script/005__templates.kis:46:7: in expansion of template `a`
-script/005__templates.kis:23:7: error[kis/duplicate-label]: label `here` is already declared in this scene
-  note: script/005__templates.kis:23:7: first defined here
-  note: script/005__templates.kis:50:7: in expansion of template `marker`
-script/005__templates.kis:41:8: error[kis/snip-count]: template `phone_call` has 2 slot(s), but `<x>` gives 1 `<snip>`
-  note: script/005__templates.kis:6:5: template declared here
-script/005__templates.kis:54:16: error[kis/element-not-allowed]: `<s>` is not allowed inside `<s>`
+script/005__templates.kis:21:14: error[kis/template-recursion]: template `a` uses itself
+  note: script/005__templates.kis:16:7: in expansion of template `b`
+  note: script/005__templates.kis:48:7: in expansion of template `a`
+script/005__templates.kis:25:7: error[kis/duplicate-label]: label `here` is already declared in this scene
+  note: script/005__templates.kis:25:7: first defined here
+  note: script/005__templates.kis:52:7: in expansion of template `marker`
+script/005__templates.kis:43:8: error[kis/snip-count]: template `phone_call` has 2 slot(s), but `<x>` gives 1 `<snip>`
+  note: script/005__templates.kis:8:5: template declared here
+script/005__templates.kis:56:16: error[kis/element-not-allowed]: `<s>` is not allowed inside `<s>`

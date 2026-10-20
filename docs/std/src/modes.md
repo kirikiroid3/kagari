@@ -60,8 +60,8 @@ attributes and an example. In terms of this chapter:
 ### Game mode
 
 `<game-mode>` owns the `Narrative` value. Its `<on-exit>` handler runs when the entry scene
-returns. It receives the value of the variable named by the entry's `exit` attribute, matches on
-it, and must be exhaustive, like a `<match>` in the story.
+returns. It receives the `Ending` value the entry scene returns, matches on it, and must be
+exhaustive, like a `<match>` in the story.
 
 ## Operations
 
@@ -73,7 +73,7 @@ change state.
 | `push(m)`       | `stack := stack ++ [m]`                              | `m` is an overlay, and `m.requires ⊆ ctx(stack)` |
 | `pop`           | drops the top frame                                  | the top is an overlay, never the base |
 | `goto(m)`       | `stack := [m]`                                       | `m` is a root page |
-| `start(e)`      | `stack := [Game(new(e), hud₀)]`                      | `e` is an `<entry>` of `<game>` |
+| `start(e)`      | `stack := [Game(new(e), hud₀)]`                      | `e` is an entry scene of `<game>` |
 | `load(k)`       | `stack := [Game(restore(slots[k]), hud₀)]`           | none: the same op from Title and from in-game |
 | `save(k)`       | `slots[k] := snapshot(game(stack))`                  | `game ∈ ctx(stack)` |
 | `advance`       | `game := step(game, NextStep)`                       | `game ∈ ctx(stack)`, the top is `Game` |

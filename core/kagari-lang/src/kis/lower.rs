@@ -14,9 +14,9 @@ use crate::diagnostic::{Diagnostic, DiagnosticCode, Related, Span};
 use crate::exhaustive::{self, TyKind, Types, Witness};
 use crate::input::{Program, SourceFile, resolve_src};
 use crate::kis::hir::{
-    Block, BlockId, ChoiceArm, ChoiceItem, EntryDecl, EnumDecl, GameHir, LabelDecl, MatchArm,
-    MatchStmt, Message, MetaDecl, MetaType, Render, SceneDecl, Stmt, StmtKind, TextPiece, VarDecl,
-    VarScope, VariantDecl,
+    Block, BlockId, ChoiceArm, ChoiceItem, EnumDecl, GameHir, LabelDecl, MatchArm, MatchStmt,
+    Message, MetaDecl, MetaType, Render, ReturnValue, SceneDecl, Stmt, StmtKind, TextPiece,
+    VarDecl, VarScope, VariantDecl,
 };
 use crate::kis::schema::{Tag, attrs, tag};
 use crate::kis::value::{
@@ -43,12 +43,12 @@ pub fn game_hir(db: &dyn Db, program: Program) -> GameHir {
         lowerer.global_var(*file, element, *tag);
     }
     for (scene, file, element) in &top.scenes {
+        lowerer.scene_signature(*scene, *file, element);
+    }
+    for (scene, file, element) in &top.scenes {
         lowerer.scene(*scene, *file, element);
     }
-    for (file, element) in &top.entries {
-        lowerer.entry(*file, element);
-    }
-    if top.entries.is_empty()
+    if !lowerer.hir.scenes.iter().any(|(_, scene)| scene.entry)
         && let Some(game) = &collected.game
         && let Some(element) = game.element(db)
     {
@@ -56,7 +56,7 @@ pub fn game_hir(db: &dyn Db, program: Program) -> GameHir {
         lowerer.report(
             span,
             DiagnosticCode::KisNoEntry,
-            "`<game>` has no `<entry>`; declare at least one start scene",
+            "`<game>` has no entry scene; mark at least one `<scene entry=\"true\">`",
             Vec::new(),
         );
     }
@@ -68,7 +68,16 @@ pub fn game_hir(db: &dyn Db, program: Program) -> GameHir {
 struct TopLevel {
     globals: Vec<(SourceFile, Element, Tag)>,
     scenes: Vec<(Idx<SceneDecl>, SourceFile, Element)>,
-    entries: Vec<(SourceFile, Element)>,
+}
+
+/// What a scene returns, as `<return>` and `<call assign>` see it.
+#[derive(Clone, Copy, Default)]
+enum Sig {
+    #[default]
+    Void,
+    Value(VarType),
+    /// `returns` is invalid (already reported); uses are not checked against it.
+    Invalid,
 }
 
 /// A declared variable. `decl` is `None` when its declaration is invalid; uses of it are
@@ -114,6 +123,7 @@ struct PendingGoto {
 #[derive(Default)]
 struct SceneState {
     locals: FxHashMap<SmolStr, VarSlot>,
+    returns: Sig,
     labels: Vec<LabelDecl>,
     label_ids: FxHashMap<SmolStr, u32>,
     choice_ids: FxHashMap<SmolStr, Span>,
@@ -156,12 +166,10 @@ struct Lowerer<'db> {
     hir: GameHir,
     enums: FxHashMap<SmolStr, Idx<EnumDecl>>,
     globals: FxHashMap<SmolStr, VarSlot>,
-    /// Each lowered scene's locals, kept so `<entry exit>` can resolve in its scene.
-    scene_locals: FxHashMap<Idx<SceneDecl>, FxHashMap<SmolStr, VarSlot>>,
     metas: FxHashMap<SmolStr, MetaSlot>,
     scenes: FxHashMap<SmolStr, Idx<SceneDecl>>,
+    sigs: FxHashMap<Idx<SceneDecl>, Sig>,
     templates: FxHashMap<SmolStr, Template>,
-    entries: FxHashMap<SmolStr, Span>,
     inline_renders: FxHashMap<(SourceFile, TextRange), Idx<Render>>,
     file_renders: FxHashMap<SourceFile, Idx<Render>>,
     sc: SceneState,
@@ -174,11 +182,10 @@ impl<'db> Lowerer<'db> {
             hir: GameHir::default(),
             enums: FxHashMap::default(),
             globals: FxHashMap::default(),
-            scene_locals: FxHashMap::default(),
             metas: FxHashMap::default(),
             scenes: FxHashMap::default(),
+            sigs: FxHashMap::default(),
             templates: FxHashMap::default(),
-            entries: FxHashMap::default(),
             inline_renders: FxHashMap::default(),
             file_renders: FxHashMap::default(),
             sc: SceneState::default(),
@@ -378,11 +385,6 @@ impl<'db> Lowerer<'db> {
                     top.scenes.push((scene, file, element));
                 }
             }
-            Tag::Entry => {
-                self.check_attrs(file, &element, tag);
-                self.leaf(file, &element, tag);
-                top.entries.push((file, element));
-            }
             // Consumed by stage 1.
             Tag::Include | Tag::Import => {}
             _ => self.not_allowed(file, &element, tag, "at the top level of the game"),
@@ -530,6 +532,8 @@ impl<'db> Lowerer<'db> {
         let idx = self.hir.scenes.alloc(SceneDecl {
             name: name.clone(),
             span,
+            returns: None,
+            entry: false,
             locals: Vec::new(),
             labels: Vec::new(),
             body: Block {
@@ -541,6 +545,99 @@ impl<'db> Lowerer<'db> {
             self.scenes.insert(name, idx);
         }
         Some(idx)
+    }
+
+    /// Resolve a scene's `entry` and `returns`. Runs after every enum is declared and before
+    /// any scene body is lowered, so `<call assign>` can be checked against any scene.
+    fn scene_signature(&mut self, scene: Idx<SceneDecl>, file: SourceFile, element: &Element) {
+        let entry = attr(element, "entry").filter(|entry| {
+            match parse_value(VarType::Bool, &self.hir.enums, &entry.text) {
+                Ok(value) => value == Value::Bool(true),
+                Err(err) => {
+                    self.report_value(Span::new(file, entry.range), &err);
+                    false
+                }
+            }
+        });
+        // `None` when `returns` is absent; its type is `None` when invalid (already reported).
+        let declared = attr(element, "returns").map(|returns| {
+            let span = Span::new(file, returns.range);
+            (self.return_type(span, &returns.text), span)
+        });
+        let sig = match (&entry, declared) {
+            (None, None) => Sig::Void,
+            (None, Some((Some(ty), _))) => Sig::Value(ty),
+            (_, Some((None, _))) => Sig::Invalid,
+            (Some(_), Some((Some(ty), span))) => self.entry_sig(span, Some(ty)),
+            (Some(entry), None) => self.entry_sig(Span::new(file, entry.range), None),
+        };
+        let decl = &mut self.hir.scenes[scene];
+        decl.entry = entry.is_some();
+        decl.returns = match sig {
+            Sig::Value(ty) => Some(ty),
+            Sig::Void | Sig::Invalid => None,
+        };
+        self.sigs.insert(scene, sig);
+    }
+
+    /// The type named by a scene's `returns`, or `None` when it cannot be returned.
+    fn return_type(&mut self, span: Span, text: &str) -> Option<VarType> {
+        match text {
+            "bool" => Some(VarType::Bool),
+            "char" => Some(VarType::Char),
+            "int" => {
+                self.report(
+                    span,
+                    DiagnosticCode::KisBadReturns,
+                    "a scene cannot return `int`; return a `char` or an enum instead",
+                    Vec::new(),
+                );
+                None
+            }
+            name => {
+                let found = self.enums.get(name).copied();
+                if found.is_none() {
+                    self.report(
+                        span,
+                        DiagnosticCode::KisUnknownEnum,
+                        format!("unknown enum `{name}`"),
+                        Vec::new(),
+                    );
+                }
+                found.map(VarType::Enum)
+            }
+        }
+    }
+
+    /// The signature of an entry scene, which returns `Ending` whether or not `returns` says
+    /// so. `span` is the `returns` attribute when it is written, else the `entry` attribute.
+    fn entry_sig(&mut self, span: Span, declared: Option<VarType>) -> Sig {
+        let ending = self.enums.get("Ending").copied().map(VarType::Enum);
+        match (declared, ending) {
+            (None, Some(ending)) => Sig::Value(ending),
+            (Some(ty), Some(ending)) if ty == ending => Sig::Value(ending),
+            (Some(ty), _) => {
+                let found = self.type_name(ty);
+                self.report(
+                    span,
+                    DiagnosticCode::KisEntryReturns,
+                    format!(
+                        "an entry scene must return enum `Ending`, but this one returns {found}"
+                    ),
+                    Vec::new(),
+                );
+                Sig::Invalid
+            }
+            (None, None) => {
+                self.report(
+                    span,
+                    DiagnosticCode::KisEntryReturns,
+                    "an entry scene returns enum `Ending`, but no enum `Ending` is declared",
+                    Vec::new(),
+                );
+                Sig::Invalid
+            }
+        }
     }
 
     fn meta_decl(&mut self, item: &TopElement) {
@@ -762,7 +859,10 @@ impl<'db> Lowerer<'db> {
     // ---- scenes ---------------------------------------------------------------------------
 
     fn scene(&mut self, scene: Idx<SceneDecl>, file: SourceFile, element: &Element) {
-        self.sc = SceneState::default();
+        self.sc = SceneState {
+            returns: self.sigs.get(&scene).copied().unwrap_or_default(),
+            ..SceneState::default()
+        };
         let mut locals = Vec::new();
         for child in element.child_elements() {
             let Some(tag) = tag(&child.name_text().unwrap_or_default()).filter(|t| t.is_var())
@@ -800,7 +900,6 @@ impl<'db> Lowerer<'db> {
         patch_gotos(&mut body.stmts, &resolved);
 
         let state = std::mem::take(&mut self.sc);
-        self.scene_locals.insert(scene, state.locals);
         let decl = &mut self.hir.scenes[scene];
         decl.locals = locals;
         decl.labels = state.labels;
@@ -896,11 +995,7 @@ impl<'db> Lowerer<'db> {
                 Tag::Label => self.label(file, &element),
                 Tag::Goto => Some(self.goto(file, &element)),
                 Tag::Call => Some(self.call(file, &element)),
-                Tag::Return => {
-                    self.check_attrs(file, &element, tag);
-                    self.leaf(file, &element, tag);
-                    Some(StmtKind::Return)
-                }
+                Tag::Return => Some(self.return_stmt(file, &element)),
                 Tag::Match => self
                     .match_stmt(file, &element, |this, file, body| {
                         this.block(file, body, false)
@@ -1262,11 +1357,136 @@ impl<'db> Lowerer<'db> {
     fn call(&mut self, file: SourceFile, element: &Element) -> StmtKind {
         self.check_attrs(file, element, Tag::Call);
         self.leaf(file, element, Tag::Call);
-        let Some(scene) = attr(element, "scene") else {
-            return StmtKind::Call(None);
+        let scene = attr(element, "scene")
+            .and_then(|scene| self.lookup_scene(Span::new(file, scene.range), &scene.text));
+        let assign =
+            attr(element, "assign").and_then(|assign| self.call_assign(file, &assign, scene));
+        StmtKind::Call { scene, assign }
+    }
+
+    /// Resolve `<call assign>`: a variable visible here whose type is the callee's return type.
+    fn call_assign(
+        &mut self,
+        file: SourceFile,
+        assign: &Attr,
+        scene: Option<Idx<SceneDecl>>,
+    ) -> Option<Idx<VarDecl>> {
+        let span = Span::new(file, assign.range);
+        let var = self.lookup_var(span, &assign.text)?;
+        let scene = scene?;
+        let callee = &self.hir.scenes[scene];
+        let note = callee.span.related(self.db, "scene declared here");
+        let callee_name = callee.name.clone();
+        let var_ty = self.hir.vars[var].ty;
+        let message = match self.sigs.get(&scene).copied().unwrap_or_default() {
+            Sig::Invalid => return None,
+            Sig::Value(ty) if ty == var_ty => return Some(var),
+            Sig::Void => format!("scene `{callee_name}` returns no value to assign"),
+            Sig::Value(ty) => format!(
+                "scene `{callee_name}` returns {}, but `{}` has type {}",
+                self.type_name(ty),
+                assign.text,
+                self.type_name(var_ty)
+            ),
         };
-        let target = self.lookup_scene(Span::new(file, scene.range), &scene.text);
-        StmtKind::Call(target)
+        self.report(span, DiagnosticCode::KisAssignMismatch, message, vec![note]);
+        None
+    }
+
+    /// A `<return>`. A `<return>` whose value is invalid still leaves the scene, so control
+    /// flow is kept for the later checks.
+    fn return_stmt(&mut self, file: SourceFile, element: &Element) -> StmtKind {
+        self.check_attrs(file, element, Tag::Return);
+        self.leaf(file, element, Tag::Return);
+        let span = name_span(file, element);
+        let (var, literal) = (attr(element, "var"), attr(element, "literal"));
+        if var.is_some() && literal.is_some() {
+            self.report(
+                span,
+                DiagnosticCode::KisVarConflict,
+                "`<return>` takes at most one of `var` and `literal`",
+                Vec::new(),
+            );
+            return StmtKind::Return(None);
+        }
+        let has_value = var.is_some() || literal.is_some();
+        let ty = match (self.sc.returns, has_value) {
+            (Sig::Invalid, _) | (Sig::Void, false) => return StmtKind::Return(None),
+            (Sig::Void, true) => {
+                self.report(
+                    span,
+                    DiagnosticCode::KisReturnMismatch,
+                    "this scene returns no value; declare `returns` on the `<scene>` to return one",
+                    Vec::new(),
+                );
+                return StmtKind::Return(None);
+            }
+            (Sig::Value(ty), false) => {
+                self.report(
+                    span,
+                    DiagnosticCode::KisReturnMismatch,
+                    format!(
+                        "this scene returns {}; `<return>` needs `var` or `literal`",
+                        self.type_name(ty)
+                    ),
+                    Vec::new(),
+                );
+                return StmtKind::Return(None);
+            }
+            (Sig::Value(ty), true) => ty,
+        };
+        let value = match (var, literal) {
+            (Some(var), _) => self.return_var(file, &var, ty),
+            (None, Some(literal)) => match parse_value(ty, &self.hir.enums, &literal.text) {
+                Ok(value) => Some(ReturnValue::Literal(value)),
+                Err(err) => {
+                    self.report_value(Span::new(file, literal.range), &err);
+                    None
+                }
+            },
+            (None, None) => None,
+        };
+        StmtKind::Return(value)
+    }
+
+    /// The `var` of a `<return>`: a local of this scene of the scene's return type.
+    fn return_var(&mut self, file: SourceFile, var: &Attr, ty: VarType) -> Option<ReturnValue> {
+        let span = Span::new(file, var.range);
+        let name = var.text.as_str();
+        let Some(slot) = self.sc.locals.get(name).copied() else {
+            let (code, message) = if self.globals.contains_key(name) {
+                (
+                    DiagnosticCode::KisReturnNotLocal,
+                    format!(
+                        "`{name}` is a global variable; `<return var>` must name a local of this scene"
+                    ),
+                )
+            } else {
+                (
+                    DiagnosticCode::KisUnknownVariable,
+                    format!("unknown variable `{name}`"),
+                )
+            };
+            self.report(span, code, message, Vec::new());
+            return None;
+        };
+        let decl = slot.decl?;
+        let var_ty = self.hir.vars[decl].ty;
+        if var_ty != ty {
+            let note = slot.span.related(self.db, "variable declared here");
+            self.report(
+                span,
+                DiagnosticCode::KisReturnMismatch,
+                format!(
+                    "`{name}` has type {}, but this scene returns {}",
+                    self.type_name(var_ty),
+                    self.type_name(ty)
+                ),
+                vec![note],
+            );
+            return None;
+        }
+        Some(ReturnValue::Var(decl))
     }
 
     fn lookup_scene(&mut self, span: Span, name: &str) -> Option<Idx<SceneDecl>> {
@@ -1669,58 +1889,6 @@ impl<'db> Lowerer<'db> {
         let saved = self.sc.env;
         self.sc.env = frame.parent;
         Some((snip_file, snip, saved))
-    }
-
-    // ---- entries --------------------------------------------------------------------------
-
-    fn entry(&mut self, file: SourceFile, element: &Element) {
-        let name = self.name_attr(file, element, "name");
-        let span = tag_span(file, element);
-        if let Some(name) = &name {
-            let name = SmolStr::new(&name.text);
-            if let Some(first) = self.entries.get(&name).copied() {
-                let msg = format!("entry `{name}` is already declared");
-                self.duplicate(span, first, DiagnosticCode::KisDuplicateEntry, msg);
-                return;
-            }
-            self.entries.insert(name, span);
-        }
-        let scene = attr(element, "scene")
-            .and_then(|scene| self.lookup_scene(Span::new(file, scene.range), &scene.text));
-        // `exit` resolves as a variable use in the entry scene: its locals, then the globals.
-        let exit = attr(element, "exit").and_then(|exit| {
-            let slot = scene
-                .and_then(|scene| self.scene_locals.get(&scene))
-                .and_then(|locals| locals.get(exit.text.as_str()))
-                .or_else(|| self.globals.get(exit.text.as_str()))
-                .copied();
-            let decl = slot.and_then(|slot| slot.decl);
-            let is_enum = decl.is_some_and(|d| matches!(self.hir.vars[d].ty, VarType::Enum(_)));
-            // Stay quiet when the declaration is invalid, or when the name may be a local of a
-            // scene that did not resolve: both are already reported.
-            let wrong_type = decl.is_some() && !is_enum;
-            let unknown = slot.is_none() && scene.is_some();
-            if wrong_type || unknown {
-                self.report(
-                    Span::new(file, exit.range),
-                    DiagnosticCode::KisBadEntryExit,
-                    format!(
-                        "`exit` must name an enum variable visible in the entry scene, found `{}`",
-                        exit.text
-                    ),
-                    Vec::new(),
-                );
-            }
-            decl.filter(|_| is_enum)
-        });
-        if let (Some(name), Some(scene)) = (name, scene) {
-            self.hir.entries.push(EntryDecl {
-                name: SmolStr::new(&name.text),
-                span,
-                scene,
-                exit,
-            });
-        }
     }
 }
 

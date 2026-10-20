@@ -13,14 +13,14 @@ extension/bad.kix:22:21: error[kix/const-cycle]: cyclic constants: `LOOP_A`, `LO
 extension/bad.kix:25:6: error[kix/alias-cycle]: type alias `Endless` refers to itself
 extension/bad.kix:27:36: error[kix/bad-asset-type]: an asset import must be `as ImageAsset`, `as AudioAsset` or `as VoiceAsset`
 extension/bad.kix:29:1: warning[kix/unknown-attribute]: unknown attribute `derive`
-script/008__represent_errors.kis:12:61: error[type/mismatch]: expected `u64`, found `bool`
-script/008__represent_errors.kis:13:20: error[type/no-method]: no method `fly` taking `self` on type `Screen`
-script/008__represent_errors.kis:14:47: error[type/no-field]: no field `wings` on type `Entity`
-script/008__represent_errors.kis:15:37: error[type/non-exhaustive-match]: non-exhaustive match: `false` not covered
-script/008__represent_errors.kis:16:21: error[type/cannot-infer]: cannot infer the type of this integer literal; add a type annotation
-script/008__represent_errors.kis:17:13: warning[type/unapplied-change]: unused `LayerImageChange`: the change has no effect until it is applied
-script/008__represent_errors.kis:18:26: error[type/unresolved-name]: cannot find value `Hidden`
-script/008__represent_errors.kis:19:32: error[kis/bad-voice]: `HANAKO` is not an asset import or constant of type `VoiceAsset`
+script/008__represent_errors.kis:14:61: error[type/mismatch]: expected `u64`, found `bool`
+script/008__represent_errors.kis:15:20: error[type/no-method]: no method `fly` taking `self` on type `Screen`
+script/008__represent_errors.kis:16:47: error[type/no-field]: no field `wings` on type `Entity`
+script/008__represent_errors.kis:17:37: error[type/non-exhaustive-match]: non-exhaustive match: `false` not covered
+script/008__represent_errors.kis:18:21: error[type/cannot-infer]: cannot infer the type of this integer literal; add a type annotation
+script/008__represent_errors.kis:19:13: warning[type/unapplied-change]: unused `LayerImageChange`: the change has no effect until it is applied
+script/008__represent_errors.kis:20:26: error[type/unresolved-name]: cannot find value `Hidden`
+script/008__represent_errors.kis:21:32: error[kis/bad-voice]: `HANAKO` is not an asset import or constant of type `VoiceAsset`
 style/bad_signature.kirp:3:4: error[kirp/bad-render-signature]: `render` must have the signature `fn render(screen: Screen) -> Screen`
 style/no_render.kirp:1:1: error[kirp/missing-render]: a `.kirp` file must define `fn render(screen: Screen) -> Screen`
 style/no_render.kirp:3:8: error[kix/item-not-allowed]: asset import items are not allowed in a `.kirp` file; only functions are

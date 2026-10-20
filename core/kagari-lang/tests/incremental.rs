@@ -30,10 +30,11 @@ fn main_kis(scenes: &str) -> String {
   <system start="title"/>
   <game>
     <import src="a.kix"/>
-    <entry name="main" scene="start"/>
-    <scene name="start">
+    <declare-enum name="Ending"><enum name="Normal" repr="0"/></declare-enum>
+    <scene name="start" entry="true">
       <s>Hello.</s>
       <call scene="next"/>
+      <return literal="Normal"/>
     </scene>
 {scenes}  </game>
 </kagari>

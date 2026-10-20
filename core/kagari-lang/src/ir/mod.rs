@@ -1,9 +1,11 @@
 //! The narrative IR: one control-flow graph per scene over finite variable domains.
 //!
 //! This is the attachment point for stage 4 (model checking), which will consume
-//! [`narrative_ir`](lower::narrative_ir). Stage 2's termination check runs on it now.
+//! [`narrative_ir`](lower::narrative_ir). Stage 2's termination and missing-return checks run
+//! on it now.
 
 pub mod lower;
+pub mod returns;
 pub mod termination;
 
 use la_arena::Idx;
@@ -19,7 +21,8 @@ pub struct NarrativeIr {
     pub vars: Vec<IrVar>,
     /// Same order as `GameHir::scenes`.
     pub scenes: Vec<IrScene>,
-    pub entries: Vec<IrEntry>,
+    /// The scenes the system can start (`entry="true"`), in scene order.
+    pub entries: Vec<SceneId>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -68,6 +71,8 @@ impl Domain {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct IrScene {
     pub decl: Idx<SceneDecl>,
+    /// The domain of the returned value; `None` when the scene returns no value.
+    pub returns: Option<Domain>,
     pub nodes: Vec<Node>,
     pub entry: NodeId,
     pub exit: NodeId,
@@ -115,16 +120,24 @@ pub enum Op {
     },
     Call {
         scene: SceneId,
+        /// The variable the callee's returned value is assigned to.
+        assign: Option<VarId>,
         next: NodeId,
     },
     /// Writes a meta value; no effect on the game state.
     MetaWrite {
         next: NodeId,
     },
-    /// Label, goto, join, return (to exit), unresolved goto/call.
+    /// Label, goto, join, unresolved goto/call.
     Jump {
         next: NodeId,
         from_goto: bool,
+    },
+    /// `<return>`; `next` is always the scene's exit. `value` is `None` in a scene without a
+    /// return value, and after an invalid one (already reported).
+    Return {
+        value: Option<IrReturn>,
+        next: NodeId,
     },
     Exit,
 }
@@ -157,9 +170,11 @@ pub struct IrArm {
     pub target: NodeId,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct IrEntry {
-    pub name: SmolStr,
-    pub scene: SceneId,
-    pub exit_var: Option<VarId>,
+/// The value a `Return` passes to the caller.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IrReturn {
+    /// A local of the returning scene.
+    Var(VarId),
+    /// A domain index of the scene's return domain.
+    Literal(u32),
 }

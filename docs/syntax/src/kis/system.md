@@ -112,11 +112,10 @@ Backlog.
 
 ### `<game-mode>` and `<on-exit>`
 
-`<on-exit>` runs when the story's entry scene returns. It receives the value of the variable named
-by the [`<entry>`](./control-flow.md#entry-export-a-starting-scene)'s `exit` attribute and matches
-on it. Each `<case val>` holds a pattern for that value, written as in
-[`<match>`](./control-flow.md#match-branch-on-variables), and the operations to run. The cases must
-be exhaustive.
+`<on-exit>` runs when the story's entry scene returns. It receives the `Ending` value the
+[entry scene](./control-flow.md#entry-scenes) returns and matches on it. Each `<case val>` holds a
+pattern for that value, written as in [`<match>`](./control-flow.md#match-branch-on-variables), and
+the operations to run. The cases must be exhaustive.
 
 ## UI elements
 

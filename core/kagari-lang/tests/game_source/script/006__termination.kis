@@ -1,11 +1,14 @@
 <kagari>
   <system start="title" />
   <game>
-    <entry name="main" scene="hub" />
+    <declare-enum name="Ending">
+      <enum name="Normal" repr="0" />
+    </declare-enum>
     <var-bool name="flag" init="true" />
 
-    <!-- stepless-loop: the `false` arm skips the step -->
-    <scene name="hub">
+    <!-- stepless-loop: the `false` arm skips the step. The loop never ends, so the entry
+         scene needs no `<return>`. -->
+    <scene name="hub" entry="true">
       <label id="top" />
       <match var="flag">
         <cases>

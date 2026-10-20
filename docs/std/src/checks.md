@@ -15,9 +15,9 @@ must be reachable in the right context, and the player must never be trapped.
 | No `pop` from a base           | not applicable                     | required |
 | No trap                        | stuck-choice lint                  | every reachable mode reaches a root page or `quit` |
 | Bounded stack                  | not required                       | lint: the push graph is acyclic, so the stack depth is bounded |
-| Exhaustive endings             | not applicable                     | `<on-exit>` covers every value of the entry's `exit` enum |
-| Isolation                      | no system names except `std/system-ctx.kix` | no story names except `std/narrative.kix` and `<entry>` |
-| Operation arguments            | not applicable                     | `set` values in range, `start` names an entry, slot indices below `count` |
+| Exhaustive endings             | not applicable                     | `<on-exit>` covers every variant of `Ending` |
+| Isolation                      | no system names except `std/system-ctx.kix` | no story names except `std/narrative.kix` and entry scenes |
+| Operation arguments            | not applicable                     | `set` values in range, `start` names an entry scene, slot indices below `count` |
 
 ## Context typing
 

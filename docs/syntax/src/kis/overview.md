@@ -17,14 +17,13 @@ A `.kis` file is an XML document describing the story as scenes made of steps.
     <import src="characters.kix" />
     <include src="common/templates.kis" />
 
-    <entry name="main" scene="prologue" />
-
+    <declare-enum name="Ending">...</declare-enum>
     <declare-enum name="Route">...</declare-enum>
     <var-enum name="route" type="Route" init="None" />
 
     <template name="...">...</template>
 
-    <scene name="prologue">...</scene>
+    <scene name="prologue" entry="true">...</scene>
     <scene name="festival_hub">...</scene>
   </game>
 </kagari>
@@ -36,9 +35,9 @@ A `.kis` file is an XML document describing the story as scenes made of steps.
 | `<game>`   | The story                                               | this chapter and the next ones |
 
 `<game>` is a module boundary. Names declared inside it are invisible to the system, except
-through what `<entry>` exports and the standard library's narrative interface. In the other
-direction, game code sees nothing of the system except the standard library's system context. The
-*Kagari STD Book* describes both interfaces.
+through its [entry scenes](./control-flow.md#entry-scenes) and the standard library's narrative
+interface. In the other direction, game code sees nothing of the system except the standard
+library's system context. The *Kagari STD Book* describes both interfaces.
 
 In this book, **top level** means a direct child of `<game>`, or of the root of a file included
 there (see [`<include>`](./reuse.md#include-splice-another-script)). The top-level children are:
@@ -47,7 +46,6 @@ there (see [`<include>`](./reuse.md#include-splice-another-script)). The top-lev
 | ---------------------------------------- | ----------------------------- |
 | `<import>`                               | Use a `.kix` file             |
 | `<include>`                              | Splice another `.kis` file    |
-| `<entry>`                                | Export a starting scene to the system |
 | `<declare-enum>`                         | Enum type                     |
 | `<var-bool>`, `<var-enum>`, `<var-char>`, `<var-int>` | Global variable |
 | `<template>`                             | Reusable script block (macro) |
@@ -101,16 +99,19 @@ was visited. Scenes `stall_b` and `dorm_night` are omitted.
   <game>
     <import src="characters.kix" />
 
-    <entry name="main" scene="day1" />
+    <declare-enum name="Ending">
+      <enum name="Normal" repr="0" />
+    </declare-enum>
 
     <var-bool name="visited_a" init="false" />
     <var-bool name="visited_b" init="false" />
     <var-bool name="visited_c" init="false" />
 
-    <scene name="day1">
+    <scene name="day1" entry="true">
       <s><m who="">The school festival starts today.</m></s>
       <call scene="festival_hub" />
       <call scene="dorm_night" />
+      <return literal="Normal" />
     </scene>
 
     <scene name="festival_hub">
@@ -168,4 +169,5 @@ was visited. Scenes `stall_b` and `dorm_night` are omitted.
 Reaching the end of a scene returns to the caller, so the `Leave` arm needs no body: control
 falls past the `<choice>`, off the end of `festival_hub`, and back into `day1`. The `<match>`
 inside the `<choice>` offers `Leave` only after both stalls were visited (see
-[conditional arms](./steps.md#conditional-arms)).
+[conditional arms](./steps.md#conditional-arms)). `day1` is the entry scene, so it returns the
+story's `Ending` to the system (see [Entry scenes](./control-flow.md#entry-scenes)).

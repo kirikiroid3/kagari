@@ -4,9 +4,11 @@
     <import src="../extension/characters.kix" />
     <import src="../extension/bad.kix" />
 
-    <entry name="main" scene="broken" />
+    <declare-enum name="Ending">
+      <enum name="Normal" repr="0" />
+    </declare-enum>
 
-    <scene name="broken">
+    <scene name="broken" entry="true">
       <s><represent src="../style/bad_signature.kirp" />Wrong signature.</s>
       <s><represent src="../style/no_render.kirp" />No render.</s>
       <s><r>screen.entity(HANAKO).cord.apply_animation(jump(true));</r>Mismatch.</s>
@@ -17,6 +19,7 @@
       <s><r>screen.background().change(BG::ROOF);</r>Unapplied.</s>
       <s><r>let hidden = Hidden;</r>Unresolved.</s>
       <s><m who="Hanako" voice="HANAKO">Hi.</m></s>
+      <return literal="Normal" />
     </scene>
   </game>
 </kagari>

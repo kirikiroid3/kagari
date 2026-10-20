@@ -1,4 +1,4 @@
-//! The front-end pipeline: stages 1-3 plus the termination check.
+//! The front-end pipeline: stages 1-3 plus the termination and missing-return checks.
 
 use rustc_hash::FxHashSet;
 
@@ -6,6 +6,7 @@ use crate::collect::collect;
 use crate::db::Db;
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
 use crate::input::{Program, SourceFile};
+use crate::ir::returns::missing_returns;
 use crate::ir::termination::termination;
 use crate::kis::game_hir;
 use crate::kis::hir::Render;
@@ -43,6 +44,7 @@ pub fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
 
     diags.extend(hir.diagnostics.iter().cloned());
     diags.extend(termination(db, program).iter().cloned());
+    diags.extend(missing_returns(db, program).iter().cloned());
 
     diags.extend(item_scope(db, program).diagnostics.iter().cloned());
     for &file in &collected.kix_files {

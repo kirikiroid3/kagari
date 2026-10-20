@@ -14,8 +14,11 @@ A game is compiled from one entry `.kis` file into one `.kagari` bytecode file.
 2. **Structure check.** The script must be well structured: well-formed XML, tags nested where
    they are allowed, required attributes present, label and scene names unique, every
    `<goto>` and `<call>` target defined, every `<set>` value of the variable's type, every
-   `<match>` exhaustive, and every `<goto>` loop and every cycle of calls passing through a
-   step (see [Termination](./kis/control-flow.md#termination)).
+   `<match>` exhaustive, every returned and assigned value of the scene's `returns` type, every
+   path through a scene with `returns` ending in a `<return>` (see
+   [Returning a value](./kis/control-flow.md#returning-a-value)), and every `<goto>` loop and
+   every cycle of calls passing through a step (see
+   [Termination](./kis/control-flow.md#termination)).
 3. **Represent check.** Every `.kirp` file and every `<r>` block is resolved and type-checked
    against the imported `.kix` definitions, ensuring each represent function is legitimate:
    names exist, argument and return types match, and the result is a `Screen`. Since renders

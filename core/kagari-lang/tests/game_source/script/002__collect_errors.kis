@@ -7,12 +7,15 @@
     <import src="std/ui.kix" />
     <import src="x.kis" />
 
-    <entry name="main" scene="main" />
+    <declare-enum name="Ending">
+      <enum name="Normal" repr="0" />
+    </declare-enum>
 
-    <scene name="main">
+    <scene name="main" entry="true">
       <s>Hello.</s>
       <call scene="from_cycle_a" />
       <call scene="from_cycle_b" />
+      <return literal="Normal" />
     </scene>
   </game>
 </kagari>

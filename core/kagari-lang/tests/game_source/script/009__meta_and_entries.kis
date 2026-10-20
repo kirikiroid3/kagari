@@ -4,39 +4,49 @@
     <meta-enum name="last_route" type="Route" init="None" />
   </system>
   <game>
-    <!-- kis/bad-entry-exit: `cleared` is a bool -->
-    <entry name="main" scene="main" exit="cleared" />
-
     <var-bool name="cleared" init="false" from-meta="cleared_azusa" />
     <!-- kis/meta-type-mismatch -->
     <var-char name="cleared_count" init="0" from-meta="cleared_azusa" />
 
-    <scene name="main">
+    <!-- An entry scene returns `Ending` without saying so. -->
+    <scene name="main" entry="true">
       <s>The end.</s>
       <meta-set var="cleared_azusa" val="true" />
       <!-- kis/meta-enum-unsupported -->
       <meta-set var="last_route" val="None" />
       <!-- kis/unknown-meta -->
       <meta-set var="no_such_meta" val="true" />
+      <return literal="Good" />
     </scene>
 
+    <!-- `Ending` may be declared after the scenes that return it. -->
     <declare-enum name="Ending">
-      <enum name="Uninitialized" repr="0" />
-      <enum name="Good"          repr="1" />
+      <enum name="Good" repr="0" />
+      <enum name="Bad"  repr="1" />
     </declare-enum>
 
-    <!-- A local of the entry scene is visible to `exit`. -->
-    <entry name="after_story" scene="after_story" exit="ending" />
-    <scene name="after_story">
-      <var-enum name="ending" type="Ending" init="Uninitialized" />
+    <!-- Writing `returns="Ending"` is allowed; a local can carry the ending. -->
+    <scene name="after_story" returns="Ending" entry="true">
+      <var-enum name="ending" type="Ending" init="Bad" />
       <s>Afterwards.</s>
       <set var="ending" val="Good" />
+      <return var="ending" />
     </scene>
 
-    <!-- kis/bad-entry-exit: `ending` is local to another scene -->
-    <entry name="epilogue" scene="epilogue" exit="ending" />
-    <scene name="epilogue">
+    <!-- kis/entry-returns: an entry scene cannot return `bool` -->
+    <scene name="epilogue" returns="bool" entry="true">
       <s>Later.</s>
+      <return literal="true" />
+    </scene>
+
+    <!-- `entry="false"` is the same as no `entry`. -->
+    <scene name="side" entry="false">
+      <s>Aside.</s>
+    </scene>
+
+    <!-- kis/bad-value: `entry` is a bool -->
+    <scene name="maybe" entry="sometimes">
+      <s>Perhaps.</s>
     </scene>
   </game>
 </kagari>
