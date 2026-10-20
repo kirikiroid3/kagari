@@ -1,0 +1,5 @@
+fn render(screen: Screen) -> Screen {
+    screen.entity(HANAKO).cord.apply_animation(jump(20));
+    screen.entity(AZUSA).appearance.emotion.change(AZUSA::CLOSE_EYE_SMILE).apply_animation(instant_switch());
+    screen
+}

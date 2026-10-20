@@ -1,0 +1,35 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: "render_diagnostics(&db, diags, Some(&base))"
+input_file: core/kagari-lang/tests/game_source/script/003__structure_errors.kis
+---
+script/003__structure_errors.kis:10:7: error[kis/duplicate-variant]: variant `Hanako` is already declared
+  note: script/003__structure_errors.kis:8:7: first defined here
+script/003__structure_errors.kis:12:31: error[kis/duplicate-repr]: repr 1 is already used by `Hanako`
+  note: script/003__structure_errors.kis:8:7: first defined here
+script/003__structure_errors.kis:18:32: error[kis/bad-value]: `maybe` is not a bool; expected `true` or `false`
+script/003__structure_errors.kis:20:52: error[kis/value-out-of-range]: `9` is outside 0..=5
+script/003__structure_errors.kis:22:35: error[kis/bad-range]: `min` (5) is greater than `max` (0)
+script/003__structure_errors.kis:26:7: error[kis/local-shadows-global]: local variable `met_azusa` shadows a global variable
+  note: script/003__structure_errors.kis:16:5: global declared here
+script/003__structure_errors.kis:29:10: warning[kis/unknown-attribute]: unknown attribute `mood` on `<s>` is ignored
+script/003__structure_errors.kis:31:22: error[kis/element-not-allowed]: `<s>` is not allowed inside `<s>`
+script/003__structure_errors.kis:33:8: warning[kis/unknown-element]: unknown element `<foo>` is ignored
+script/003__structure_errors.kis:36:17: error[kis/bad-name]: `1abc` is not a valid name
+script/003__structure_errors.kis:39:7: error[kis/duplicate-label]: label `top` is already declared in this scene
+  note: script/003__structure_errors.kis:37:7: first defined here
+script/003__structure_errors.kis:48:23: error[kis/label-out-of-scope]: label `in_a` is in a block that does not enclose this `<goto>`
+  note: script/003__structure_errors.kis:43:11: label declared here
+script/003__structure_errors.kis:51:24: error[kis/duplicate-arm-id]: arm id `a` is already used in this choice
+  note: script/003__structure_errors.kis:42:24: first defined here
+script/003__structure_errors.kis:54:18: error[kis/duplicate-choice-id]: choice id `pick` is already used in this scene
+  note: script/003__structure_errors.kis:41:18: first defined here
+script/003__structure_errors.kis:58:8: error[kis/missing-attribute]: `<choice>` requires the `id` attribute
+script/003__structure_errors.kis:63:19: error[kis/unknown-scene]: unknown scene `nowhere`
+script/003__structure_errors.kis:65:19: error[kis/unknown-label]: unknown label `nowhere`
+script/003__structure_errors.kis:67:16: error[kis/unknown-variable]: unknown variable `unknown_var`
+script/003__structure_errors.kis:69:16: error[kis/not-a-counter]: `<add>` needs a `char` or `int` variable, but `met_azusa` has type `bool`
+script/003__structure_errors.kis:72:8: error[kis/var-conflict]: `<match>` needs exactly one of `var` and `vars`
+script/003__structure_errors.kis:81:21: error[kis/pattern-arity]: `true` has 1 pattern(s), but the `<match>` reads 2 variable(s)
+script/003__structure_errors.kis:93:5: error[kis/duplicate-scene]: scene `main` is already declared
+  note: script/003__structure_errors.kis:24:5: first defined here

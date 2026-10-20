@@ -1,0 +1,6 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: "render_diagnostics(&db, diags, Some(&base))"
+input_file: core/kagari-lang/tests/game_source/script/007__represent_ok.kis
+---
+no diagnostics

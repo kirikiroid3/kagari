@@ -1,0 +1,69 @@
+<kagari>
+  <system start="title" />
+  <game>
+    <entry name="main" scene="hub" />
+    <var-bool name="flag" init="true" />
+
+    <!-- stepless-loop: the `false` arm skips the step -->
+    <scene name="hub">
+      <label id="top" />
+      <match var="flag">
+        <cases>
+          <case val="true" />
+          <do>
+            <s>Around we go.</s>
+          </do>
+        </cases>
+        <cases>
+          <case val="false" />
+          <do />
+        </cases>
+      </match>
+      <goto label="top" />
+    </scene>
+
+    <!-- stepless-call-cycle: calls itself before any step -->
+    <scene name="selfish">
+      <call scene="selfish" />
+      <s>Never shown.</s>
+    </scene>
+
+    <!-- stepless-call-cycle: ping → pong → ping before any step -->
+    <scene name="ping">
+      <set var="flag" val="false" />
+      <call scene="pong" />
+      <s>Ping.</s>
+    </scene>
+    <scene name="pong">
+      <call scene="ping" />
+      <s>Pong.</s>
+    </scene>
+
+    <!-- ok: the loop passes through a step -->
+    <scene name="stepping_loop">
+      <label id="again" />
+      <s>Once more.</s>
+      <goto label="again" />
+    </scene>
+
+    <!-- ok: the callee always shows a step -->
+    <scene name="talk">
+      <s>Hello.</s>
+    </scene>
+    <scene name="loop_through_talk">
+      <label id="again" />
+      <call scene="talk" />
+      <goto label="again" />
+    </scene>
+
+    <!-- stepless-loop: the callee may return without a step -->
+    <scene name="quiet">
+      <set var="flag" val="true" />
+    </scene>
+    <scene name="loop_through_quiet">
+      <label id="again" />
+      <call scene="quiet" />
+      <goto label="again" />
+    </scene>
+  </game>
+</kagari>

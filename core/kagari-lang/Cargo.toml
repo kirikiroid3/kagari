@@ -6,3 +6,14 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
+kagari-syntax = { workspace = true }
+kagari-std = { workspace = true }
+rowan = { workspace = true }
+salsa = { workspace = true }
+rustc-hash = { workspace = true }
+smol_str = { workspace = true }
+la-arena = { workspace = true }
+unicode-ident = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }

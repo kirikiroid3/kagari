@@ -1,0 +1,7 @@
+<kagari-game>
+  <include src="cycle_b.kis" />
+
+  <scene name="from_cycle_a">
+    <s>From cycle A.</s>
+  </scene>
+</kagari-game>

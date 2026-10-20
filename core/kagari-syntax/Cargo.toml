@@ -1,6 +1,14 @@
 [package]
 name = "kagari-syntax"
 version = "0.1.0"
+authors.workspace = true
+license.workspace = true
 edition.workspace = true
 
 [dependencies]
+rowan = { workspace = true }
+logos = { workspace = true }
+unicode-ident = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }

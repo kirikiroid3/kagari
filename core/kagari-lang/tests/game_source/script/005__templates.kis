@@ -1,0 +1,58 @@
+<kagari>
+  <system start="title" />
+  <game>
+    <entry name="main" scene="main" />
+
+    <template name="phone_call">
+      <s>The phone rings. It's <slot pos="1" />.</s>
+      <slot pos="2" />
+      <s>The call ends.</s>
+    </template>
+
+    <template name="a">
+      <s>A.</s>
+      <x tpl="b" />
+    </template>
+
+    <template name="b">
+      <s>B.</s>
+      <x tpl="a" />
+    </template>
+
+    <template name="marker">
+      <label id="here" />
+      <s>Marked.</s>
+    </template>
+
+    <template name="greet">
+      <s>Hi, <slot pos="1" />.</s>
+    </template>
+
+    <scene name="main">
+      <x tpl="phone_call">
+        <snip>Hanako</snip>
+        <snip>
+          <s>"Are you coming to the festival?"</s>
+          <s>"I'll be there."</s>
+        </snip>
+      </x>
+
+      <!-- kis/snip-count -->
+      <x tpl="phone_call">
+        <snip>Azusa</snip>
+      </x>
+
+      <!-- kis/template-recursion (b uses a again) -->
+      <x tpl="a" />
+
+      <!-- kis/duplicate-label on the second use -->
+      <x tpl="marker" />
+      <x tpl="marker" />
+
+      <!-- kis/element-not-allowed: the slot sits inside <s> text -->
+      <x tpl="greet">
+        <snip><s>Hanako</s></snip>
+      </x>
+    </scene>
+  </game>
+</kagari>

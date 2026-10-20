@@ -1,0 +1,23 @@
+<kagari>
+  <system start="title">
+    <meta-bool name="cleared_azusa" init="false" />
+    <meta-enum name="last_route" type="Route" init="None" />
+  </system>
+  <game>
+    <!-- kis/bad-entry-exit: `cleared` is a bool -->
+    <entry name="main" scene="main" exit="cleared" />
+
+    <var-bool name="cleared" init="false" from-meta="cleared_azusa" />
+    <!-- kis/meta-type-mismatch -->
+    <var-char name="cleared_count" init="0" from-meta="cleared_azusa" />
+
+    <scene name="main">
+      <s>The end.</s>
+      <meta-set var="cleared_azusa" val="true" />
+      <!-- kis/meta-enum-unsupported -->
+      <meta-set var="last_route" val="None" />
+      <!-- kis/unknown-meta -->
+      <meta-set var="no_such_meta" val="true" />
+    </scene>
+  </game>
+</kagari>

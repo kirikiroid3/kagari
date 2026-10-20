@@ -1,0 +1,5 @@
+// bad_signature.kirp: `render` takes the wrong parameter.
+
+fn render(s: u64) -> Screen {
+    Screen::empty()
+}

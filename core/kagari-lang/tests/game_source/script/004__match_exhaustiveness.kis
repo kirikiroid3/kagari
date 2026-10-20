@@ -1,0 +1,107 @@
+<kagari>
+  <system start="title" />
+  <game>
+    <entry name="main" scene="main" />
+
+    <declare-enum name="Route">
+      <enum name="None" repr="0" />
+      <enum name="Hanako" repr="1" />
+      <enum name="Azusa" repr="2" />
+    </declare-enum>
+
+    <var-bool name="met_a" init="false" />
+    <var-bool name="met_b" init="false" />
+    <var-enum name="route" type="Route" init="None" />
+    <var-int name="affection" min="0" max="5" init="0" />
+    <var-char name="flags" init="0" />
+
+    <scene name="main">
+      <s>Start.</s>
+
+      <!-- missing `false` -->
+      <match var="met_a">
+        <cases>
+          <case val="true" />
+          <do />
+        </cases>
+      </match>
+
+      <!-- missing `Azusa` -->
+      <match var="route">
+        <cases>
+          <case val="None" />
+          <do />
+        </cases>
+        <cases>
+          <case val="Hanako" />
+          <do />
+        </cases>
+      </match>
+
+      <!-- missing `3..=3` -->
+      <match var="affection">
+        <cases>
+          <case val="0..=2" />
+          <do />
+        </cases>
+        <cases>
+          <case val="4..=5" />
+          <do />
+        </cases>
+      </match>
+
+      <!-- missing `false false` -->
+      <match vars="met_a met_b">
+        <cases>
+          <case val="true _" />
+          <do />
+        </cases>
+        <cases>
+          <case val="false true" />
+          <do />
+        </cases>
+      </match>
+
+      <!-- exhaustive: both bools -->
+      <match var="met_a">
+        <cases>
+          <case val="true" />
+          <do>
+            <s>Met A.</s>
+          </do>
+        </cases>
+        <cases>
+          <case val="false" />
+          <do />
+        </cases>
+      </match>
+
+      <!-- exhaustive: alternatives and a wildcard -->
+      <match vars="route affection">
+        <cases>
+          <case val="Hanako 0..=5" />
+          <case val="Azusa 3" />
+          <do />
+        </cases>
+        <cases>
+          <case val="_ _" />
+          <do />
+        </cases>
+      </match>
+
+      <!-- exhaustive: char ranges -->
+      <match var="flags">
+        <cases>
+          <case val="0..=99" />
+          <do />
+        </cases>
+        <cases>
+          <case val="100" />
+          <case val="101..=255" />
+          <do />
+        </cases>
+      </match>
+      <s>End.</s>
+    </scene>
+  </game>
+</kagari>

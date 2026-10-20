@@ -1,0 +1,8 @@
+<kagari>
+  <system start="title" />
+  <game>
+    <scene name="main">
+      <s>Nobody can start this story.</s>
+    </scene>
+  </game>
+</kagari>

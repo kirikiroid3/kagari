@@ -1,0 +1,11 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: "render_diagnostics(&db, diags, Some(&base))"
+input_file: core/kagari-lang/tests/game_source/script/002__collect_errors.kis
+---
+script/002__collect_errors.kis:4:18: error[collect/file-not-found]: file `include/missing.kis` not found
+script/002__collect_errors.kis:6:18: error[collect/include-root]: expected `<kagari-game>`, found `<kagari-system>`
+script/002__collect_errors.kis:7:17: error[collect/import-scope]: `std/ui.kix` belongs to the system scope and cannot be imported into the game scope
+script/002__collect_errors.kis:8:17: error[collect/bad-extension]: expected a `.kix` file
+script/include/cycle_b.kis:2:16: error[collect/include-cycle]: `cycle_a.kis` includes itself
+  note: script/002__collect_errors.kis:5:18: first included here

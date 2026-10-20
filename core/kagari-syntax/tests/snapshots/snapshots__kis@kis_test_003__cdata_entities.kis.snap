@@ -1,0 +1,129 @@
+---
+source: core/kagari-syntax/tests/snapshots.rs
+expression: "render(&input, &script::parse(&input))"
+input_file: core/kagari-syntax/tests/kis/kis_test_003__cdata_entities.kis
+---
+DOCUMENT@0..460
+  XML_DECL@0..38 "<?xml version=\"1.0\" e ..."
+  TEXT@38..39 "\n"
+  COMMENT@39..66 "<!-- A leading commen ..."
+  TEXT@66..67 "\n"
+  ELEMENT@67..430
+    START_TAG@67..75
+      L_ANGLE@67..68 "<"
+      NAME@68..74 "kagari"
+      R_ANGLE@74..75 ">"
+    TEXT@75..78 "\n  "
+    ELEMENT@78..102
+      EMPTY_ELEM_TAG@78..102
+        L_ANGLE@78..79 "<"
+        NAME@79..85 "system"
+        WHITESPACE@85..86 " "
+        ATTRIBUTE@86..99
+          NAME@86..91 "start"
+          EQ@91..92 "="
+          ATTR_VALUE@92..99 "'title'"
+        WHITESPACE@99..100 " "
+        SLASH_R_ANGLE@100..102 "/>"
+    TEXT@102..105 "\n  "
+    ELEMENT@105..420
+      START_TAG@105..111
+        L_ANGLE@105..106 "<"
+        NAME@106..110 "game"
+        R_ANGLE@110..111 ">"
+      TEXT@111..116 "\n    "
+      COMMENT@116..149 "<!-- comments inside  ..."
+      TEXT@149..154 "\n    "
+      ELEMENT@154..410
+        START_TAG@154..175
+          L_ANGLE@154..155 "<"
+          NAME@155..160 "scene"
+          WHITESPACE@160..161 " "
+          ATTRIBUTE@161..173
+            NAME@161..165 "name"
+            EQ@165..166 "="
+            ATTR_VALUE@166..173 "'cdata'"
+          WHITESPACE@173..174 " "
+          R_ANGLE@174..175 ">"
+        TEXT@175..182 "\n      "
+        ELEMENT@182..285
+          START_TAG@182..185
+            L_ANGLE@182..183 "<"
+            NAME@183..184 "s"
+            R_ANGLE@184..185 ">"
+          TEXT@185..194 "\n        "
+          ELEMENT@194..223
+            START_TAG@194..197
+              L_ANGLE@194..195 "<"
+              NAME@195..196 "r"
+              R_ANGLE@196..197 ">"
+            CDATA@197..219 "<![CDATA[a < b && c]]>"
+            END_TAG@219..223
+              L_ANGLE_SLASH@219..221 "</"
+              NAME@221..222 "r"
+              R_ANGLE@222..223 ">"
+          TEXT@223..232 "\n        "
+          ENTITY_REF@232..236 "&lt;"
+          ENTITY_REF@236..241 "&amp;"
+          ENTITY_REF@241..249 "&#12354;"
+          ENTITY_REF@249..257 "&#x3042;"
+          TEXT@257..258 " "
+          ENTITY_REF@258..262 "&gt;"
+          ENTITY_REF@262..268 "&quot;"
+          ENTITY_REF@268..274 "&apos;"
+          TEXT@274..281 "\n      "
+          END_TAG@281..285
+            L_ANGLE_SLASH@281..283 "</"
+            NAME@283..284 "s"
+            R_ANGLE@284..285 ">"
+        TEXT@285..292 "\n      "
+        ELEMENT@292..397
+          START_TAG@292..310
+            L_ANGLE@292..293 "<"
+            NAME@293..299 "choice"
+            WHITESPACE@299..300 " "
+            ATTRIBUTE@300..309
+              NAME@300..302 "id"
+              EQ@302..303 "="
+              ATTR_VALUE@303..309 "\"pick\""
+            R_ANGLE@309..310 ">"
+          TEXT@310..319 "\n        "
+          ELEMENT@319..381
+            EMPTY_ELEM_TAG@319..381
+              L_ANGLE@319..320 "<"
+              NAME@320..330 "choice-arm"
+              WHITESPACE@330..331 " "
+              ATTRIBUTE@331..337
+                NAME@331..333 "id"
+                EQ@333..334 "="
+                ATTR_VALUE@334..337 "\"x\""
+              WHITESPACE@337..338 " "
+              ATTRIBUTE@338..378
+                NAME@338..342 "text"
+                EQ@342..343 "="
+                ATTR_VALUE@343..378 "\"Say &quot;hi&quot; & ..."
+              WHITESPACE@378..379 " "
+              SLASH_R_ANGLE@379..381 "/>"
+          TEXT@381..388 "\n      "
+          END_TAG@388..397
+            L_ANGLE_SLASH@388..390 "</"
+            NAME@390..396 "choice"
+            R_ANGLE@396..397 ">"
+        TEXT@397..402 "\n    "
+        END_TAG@402..410
+          L_ANGLE_SLASH@402..404 "</"
+          NAME@404..409 "scene"
+          R_ANGLE@409..410 ">"
+      TEXT@410..413 "\n  "
+      END_TAG@413..420
+        L_ANGLE_SLASH@413..415 "</"
+        NAME@415..419 "game"
+        R_ANGLE@419..420 ">"
+    TEXT@420..421 "\n"
+    END_TAG@421..430
+      L_ANGLE_SLASH@421..423 "</"
+      NAME@423..429 "kagari"
+      R_ANGLE@429..430 ">"
+  TEXT@430..431 "\n"
+  COMMENT@431..459 "<!-- A trailing comme ..."
+  TEXT@459..460 "\n"

@@ -1,0 +1,12 @@
+<!DOCTYPE x>
+stray text outside the root
+<kagari>
+  <?php echo 1; ?>
+  <a:b/>
+  <system start="title" start="menu" />
+  <game>
+    <scene name="a">
+      <s>Hello&nbsp;world</s>
+      <label id />
+    </game>
+  </x>

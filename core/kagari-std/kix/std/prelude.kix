@@ -1,0 +1,84 @@
+// std/prelude.kix: visible in the game scope without an import.
+// Illustrative shapes taken from the syntax book; the real preset library replaces them.
+
+enum Option<T> {
+    None,
+    Some(T),
+}
+
+type EntityId = u64;
+type ImageId = u64;
+
+struct ImageAsset;
+struct AudioAsset;
+struct VoiceAsset;
+
+struct Screen;
+
+impl Screen {
+    #[builtin]
+    fn empty() -> Screen;
+    #[builtin]
+    fn entity(self, id: EntityId) -> Entity;
+    #[builtin]
+    fn background(self) -> Layer;
+}
+
+struct Entity {
+    cord: Cord,
+    appearance: Appearance,
+}
+
+struct Cord {
+    x: i64,
+    y: i64,
+}
+
+impl Cord {
+    #[builtin]
+    fn apply_animation(self, animation: CordAnimation);
+}
+
+struct Appearance {
+    emotion: Layer,
+}
+
+struct Layer {
+    image: ImageId,
+}
+
+impl Layer {
+    #[builtin]
+    fn change(self, image: ImageId) -> LayerImageChange;
+}
+
+#[must_use]
+struct LayerImageChange {
+    image: ImageId,
+}
+
+impl LayerImageChange {
+    #[builtin]
+    fn apply_animation(self, transition: TransitionAnimation);
+}
+
+struct CordAnimation {
+    height: u64,
+    frames: u64,
+}
+
+struct TransitionAnimation {
+    frames: u64,
+}
+
+fn jump(height: u64) -> CordAnimation {
+    CordAnimation { height, frames: 12 }
+}
+
+fn instant_switch() -> TransitionAnimation {
+    TransitionAnimation { frames: 0 }
+}
+
+fn fade(frames: u64) -> TransitionAnimation {
+    TransitionAnimation { frames }
+}

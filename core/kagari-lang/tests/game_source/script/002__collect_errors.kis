@@ -1,0 +1,18 @@
+<kagari>
+  <system start="title" />
+  <game>
+    <include src="include/missing.kis" />
+    <include src="include/cycle_a.kis" />
+    <include src="include/system_root.kis" />
+    <import src="std/ui.kix" />
+    <import src="x.kis" />
+
+    <entry name="main" scene="main" />
+
+    <scene name="main">
+      <s>Hello.</s>
+      <call scene="from_cycle_a" />
+      <call scene="from_cycle_b" />
+    </scene>
+  </game>
+</kagari>

@@ -14,3 +14,13 @@ license = "Apache-2.0"
 edition = "2024"
 
 [workspace.dependencies]
+kagari-syntax = { path = "core/kagari-syntax" }
+kagari-std = { path = "core/kagari-std" }
+rowan = "0.17"
+salsa = "0.28"
+logos = "0.16"
+unicode-ident = "1.0"
+rustc-hash = "2.1"
+smol_str = "0.3"
+la-arena = "0.3"
+insta = { version = "1.49", features = ["glob"] }

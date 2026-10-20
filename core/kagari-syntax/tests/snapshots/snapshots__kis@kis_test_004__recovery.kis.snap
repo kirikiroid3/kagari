@@ -1,0 +1,103 @@
+---
+source: core/kagari-syntax/tests/snapshots.rs
+expression: "render(&input, &script::parse(&input))"
+input_file: core/kagari-syntax/tests/kis/kis_test_004__recovery.kis
+---
+DOCUMENT@0..216
+  ERROR@0..12
+    DOCTYPE@0..12 "<!DOCTYPE x>"
+  ERROR@12..41
+    TEXT@12..41 "\nstray text outside t ..."
+  ELEMENT@41..216
+    START_TAG@41..49
+      L_ANGLE@41..42 "<"
+      NAME@42..48 "kagari"
+      R_ANGLE@48..49 ">"
+    TEXT@49..52 "\n  "
+    ERROR@52..68
+      PI@52..68 "<?php echo 1; ?>"
+    TEXT@68..71 "\n  "
+    ELEMENT@71..77
+      EMPTY_ELEM_TAG@71..77
+        L_ANGLE@71..72 "<"
+        NAME@72..75 "a:b"
+        SLASH_R_ANGLE@75..77 "/>"
+    TEXT@77..80 "\n  "
+    ELEMENT@80..117
+      EMPTY_ELEM_TAG@80..117
+        L_ANGLE@80..81 "<"
+        NAME@81..87 "system"
+        WHITESPACE@87..88 " "
+        ATTRIBUTE@88..101
+          NAME@88..93 "start"
+          EQ@93..94 "="
+          ATTR_VALUE@94..101 "\"title\""
+        WHITESPACE@101..102 " "
+        ATTRIBUTE@102..114
+          NAME@102..107 "start"
+          EQ@107..108 "="
+          ATTR_VALUE@108..114 "\"menu\""
+        WHITESPACE@114..115 " "
+        SLASH_R_ANGLE@115..117 "/>"
+    TEXT@117..120 "\n  "
+    ELEMENT@120..208
+      START_TAG@120..126
+        L_ANGLE@120..121 "<"
+        NAME@121..125 "game"
+        R_ANGLE@125..126 ">"
+      TEXT@126..131 "\n    "
+      ELEMENT@131..201
+        START_TAG@131..147
+          L_ANGLE@131..132 "<"
+          NAME@132..137 "scene"
+          WHITESPACE@137..138 " "
+          ATTRIBUTE@138..146
+            NAME@138..142 "name"
+            EQ@142..143 "="
+            ATTR_VALUE@143..146 "\"a\""
+          R_ANGLE@146..147 ">"
+        TEXT@147..154 "\n      "
+        ELEMENT@154..177
+          START_TAG@154..157
+            L_ANGLE@154..155 "<"
+            NAME@155..156 "s"
+            R_ANGLE@156..157 ">"
+          TEXT@157..162 "Hello"
+          ENTITY_REF@162..168 "&nbsp;"
+          TEXT@168..173 "world"
+          END_TAG@173..177
+            L_ANGLE_SLASH@173..175 "</"
+            NAME@175..176 "s"
+            R_ANGLE@176..177 ">"
+        TEXT@177..184 "\n      "
+        ELEMENT@184..196
+          EMPTY_ELEM_TAG@184..196
+            L_ANGLE@184..185 "<"
+            NAME@185..190 "label"
+            WHITESPACE@190..191 " "
+            ATTRIBUTE@191..193
+              NAME@191..193 "id"
+            WHITESPACE@193..194 " "
+            SLASH_R_ANGLE@194..196 "/>"
+        TEXT@196..201 "\n    "
+      END_TAG@201..208
+        L_ANGLE_SLASH@201..203 "</"
+        NAME@203..207 "game"
+        R_ANGLE@207..208 ">"
+    TEXT@208..211 "\n  "
+    ERROR@211..215
+      END_TAG@211..215
+        L_ANGLE_SLASH@211..213 "</"
+        NAME@213..214 "x"
+        R_ANGLE@214..215 ">"
+    TEXT@215..216 "\n"
+error 0..12: DOCTYPE declarations are not supported
+error 12..41: text is not allowed outside the root element
+error 42..48: unclosed element `<kagari>`
+error 52..68: processing instructions are not supported
+error 72..75: namespace prefixes are not supported
+error 102..107: duplicate attribute `start`
+error 132..137: unclosed element `<scene>`
+error 162..168: unknown entity `&nbsp;`
+error 191..193: attribute `id` has no value
+error 211..215: unexpected end tag `</x>`

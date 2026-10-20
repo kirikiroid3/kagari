@@ -1,0 +1,7 @@
+// no_render.kirp: no `render`, and an import that belongs in a `.kix` file.
+
+import CG_002 from "cg_002.png" as ImageAsset;
+
+fn helper() -> u64 {
+    1
+}

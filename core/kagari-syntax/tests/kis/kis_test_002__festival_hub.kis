@@ -1,0 +1,66 @@
+<kagari>
+  <system start="title" />
+  <game>
+    <import src="std.kix" />
+    <import src="characters.kix" />
+
+    <var-bool name="visited_a" init="false" />
+    <var-bool name="visited_b" init="false" />
+    <var-bool name="visited_c" init="false" />
+
+    <scene name="day1">
+      <s>The school festival starts today.</s>
+      <call scene="festival_hub" />
+      <call scene="dorm_night" />
+    </scene>
+
+    <scene name="festival_hub">
+      <label id="map" />
+      <choice id="map">
+        <choice-arm id="a" text="Go to stall A">
+          <call scene="stall_a" />
+          <goto label="map" />
+        </choice-arm>
+        <choice-arm id="b" text="Go to stall B">
+          <call scene="stall_b" />
+          <goto label="map" />
+        </choice-arm>
+        <match vars="visited_a visited_b">
+          <cases>
+            <case val="true true" />
+            <do>
+              <choice-arm id="leave" text="Leave" />
+            </do>
+          </cases>
+          <cases>
+            <case val="_ _" />
+            <do />
+          </cases>
+        </match>
+      </choice>
+    </scene>
+
+    <scene name="stall_a">
+      <match var="visited_a">
+        <cases>
+          <case val="true" />
+          <do>
+            <s>The stall is already packing up.</s>
+            <return />
+          </do>
+        </cases>
+        <cases>
+          <case val="false" />
+          <do />
+        </cases>
+      </match>
+      <set var="visited_a" val="true" />
+      <s>
+        <r>screen.entity(HANAKO).cord.apply_animation(jump(20));</r>
+        Welcome to stall A!
+      </s>
+    </scene>
+
+    <!-- stall_b, dorm_night: omitted -->
+  </game>
+</kagari>

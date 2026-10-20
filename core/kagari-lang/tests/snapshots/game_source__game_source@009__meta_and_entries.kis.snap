@@ -1,0 +1,10 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: "render_diagnostics(&db, diags, Some(&base))"
+input_file: core/kagari-lang/tests/game_source/script/009__meta_and_entries.kis
+---
+script/009__meta_and_entries.kis:8:42: error[kis/bad-entry-exit]: `exit` must name a global `<var-enum>`, found `cleared`
+script/009__meta_and_entries.kis:12:55: error[kis/meta-type-mismatch]: meta field `cleared_azusa` has type `bool`, but the variable has type `char`
+  note: script/009__meta_and_entries.kis:3:5: meta field declared here
+script/009__meta_and_entries.kis:18:21: error[kis/meta-enum-unsupported]: meta enum `last_route` cannot be used from the game yet
+script/009__meta_and_entries.kis:20:21: error[kis/unknown-meta]: unknown meta field `no_such_meta`

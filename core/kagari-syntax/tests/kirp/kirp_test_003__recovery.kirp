@@ -1,0 +1,21 @@
+fn missing_semicolon() -> u64 {
+    let x = 1
+    let y = 2;
+    x + y
+}
+
+fn junk() {
+    screen @ $;
+    let z = ;
+}
+
+fn m(&self) -> u64 {
+    1
+}
+
+fn unclosed() -> u64 {
+    let a = (1 + 2;
+
+fn after(screen: Screen) -> Screen {
+    screen
+}

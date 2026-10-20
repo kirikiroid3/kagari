@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A leading comment. -->
+<kagari>
+  <system start='title' />
+  <game>
+    <!-- comments inside elements -->
+    <scene name='cdata' >
+      <s>
+        <r><![CDATA[a < b && c]]></r>
+        &lt;&amp;&#12354;&#x3042; &gt;&quot;&apos;
+      </s>
+      <choice id="pick">
+        <choice-arm id="x" text="Say &quot;hi&quot; &amp; &#x3042;" />
+      </choice>
+    </scene>
+  </game>
+</kagari>
+<!-- A trailing comment. -->

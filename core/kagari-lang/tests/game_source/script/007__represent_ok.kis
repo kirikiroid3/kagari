@@ -1,0 +1,31 @@
+<kagari>
+  <system start="title" />
+  <game>
+    <import src="../extension/characters.kix" />
+    <import src="../extension/presets.kix" />
+    <import src="std/system-ctx.kix" />
+
+    <entry name="main" scene="opening" />
+
+    <scene name="opening">
+      <s>
+        <represent src="../style/opening.kirp" />
+        The opening begins.
+      </s>
+      <s>
+        <r>screen.hud().text_frame.set(Visibility::Hidden);</r>
+        The text frame fades away.
+      </s>
+      <s><m who="Azusa" voice="AZUSA_0072">ぬっ</m></s>
+      <s><m who="">……</m></s>
+      <s>
+        <r><![CDATA[
+          let wide: u64 = 3;
+          let tall = wide < 4 && wide > 0;
+          screen.background().change(BG::ROOF).apply_animation(fade(30));
+        ]]></r>
+        On the roof.
+      </s>
+    </scene>
+  </game>
+</kagari>
