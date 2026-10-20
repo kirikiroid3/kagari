@@ -7,10 +7,11 @@ code.
 
 | Allowed                                              | Not allowed                                  |
 | ---------------------------------------------------- | -------------------------------------------- |
-| Type definitions (`struct`, `type`)                  | `render`                                     |
+| Type definitions (`struct`, `enum`, `type`)          | `render`                                     |
 | Functions and methods, with bodies (`fn`, `impl`)    | Top-level statements                         |
-| Constants with their values                          | References to other files                    |
+| Constants with their values                          | References to other source files             |
 | Modules grouping constants (`mod`)                   | Reading script variables, I/O, clocks, randomness |
+| [Asset imports](#asset-imports) (`import … from …`)  |                                              |
 
 ## Types describe data
 
@@ -31,6 +32,27 @@ allowed in the bundled standard library.
 Since representing code is evaluated at compile time, so is every `.kix` function it calls.
 `.kix` functions are therefore held to the same rules as `render`: they must be **total** and
 **deterministic**, and they cannot read script variables.
+
+## Attributes
+
+| Attribute     | On             | Meaning |
+| ------------- | -------------- | ------- |
+| `#[must_use]` | `struct`, `enum` | A statement that discards a value of this type is reported as the warning `type/unapplied-change` |
+| `#[builtin]`  | `fn`           | Implemented by the engine; the function has no body. Only allowed in the bundled standard library |
+
+Neither takes arguments, and any other attribute is an error.
+
+## Asset imports
+
+```kix
+import CG_001 from "cg_001.png" as ImageAsset;
+import AZUSA_0072 from "voice/azusa_0072.ogg" as VoiceAsset;
+```
+
+An asset import binds a file to a constant. The type after `as` must be `ImageAsset`,
+`AudioAsset` or `VoiceAsset` from the prelude (`kix/bad-asset-type`), and the path must not be
+empty (`kix/bad-asset-path`). The constant is used like any other: for example, the `voice` of an
+[`<m>`](./kis/steps.md#m-message) names a `VoiceAsset` constant such as `AZUSA_0072`.
 
 ## The standard library and studio extensions
 
@@ -68,5 +90,5 @@ mod BG {
 modules in the type namespace, so `AZUSA` is an `EntityId` and `AZUSA::CLOSE_EYE_SMILE` is one of
 her images.
 
-How an `ImageId` is bound to an actual image file is an
-[open question](./open-questions.md#asset-binding).
+The image constants above are plain `ImageId` numbers, which is what the prelude's
+`Layer::change` takes. Files enter the program through [asset imports](#asset-imports).

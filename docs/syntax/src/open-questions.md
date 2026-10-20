@@ -11,20 +11,10 @@ The magic is `....KAGARI..V000`. What are the bytes shown as `.` (for example no
 that detect text-mode transfer corruption, as PNG does)? Is the version only ever `V` plus three
 decimal digits? What follows the header?
 
-## Unapplied changes
-
-A layer change without `apply_animation(TransitionAnimation)` does not happen. Is such a dropped
-pending change a compile error, a warning, or silently allowed?
-
 ## Kirp language subset
 
 Which parts of Rust syntax does `.kirp` have: `let` bindings, `match`, loops, closures, user
 functions besides `render`? Loops must keep `render` total.
-
-## Asset binding
-
-How is an `ImageId` constant bound to an image file? A numeric id in `.kix` plus a separate
-manifest, or a path in the declaration itself?
 
 ## Text markup
 

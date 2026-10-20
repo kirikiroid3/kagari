@@ -82,8 +82,9 @@ as passing a `CordAnimation` to a layer change:
 | `Cord` (coordinates)    | `apply_animation`      | `CordAnimation`       |
 | `LayerImageChange`      | `apply_animation`      | `TransitionAnimation` |
 
-Whether a pending change that is never animated is a compile error or a warning is an
-[open question](./open-questions.md#unapplied-changes).
+A pending change that is discarded is reported as the warning `type/unapplied-change`.
+`LayerImageChange` is marked [`#[must_use]`](./kix.md#attributes), and a statement whose value
+has a `#[must_use]` type, such as `screen.background().change(BG::ROOF);`, is such a discard.
 
 ## Language
 

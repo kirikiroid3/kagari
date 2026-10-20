@@ -46,8 +46,12 @@ struct ButtonStyle {
 
 struct Override {
     patch: Partial<PaintStyle>,
-    enter: TransitionAnimation,
-    leave: TransitionAnimation,
+    enter: StateTransition,
+    leave: StateTransition,
+}
+
+struct StateTransition {
+    frames: u64,
 }
 ```
 
@@ -59,8 +63,8 @@ fn common_btn() -> ButtonStyle {
         base: Style { paint: PAINT_IDLE, box: BOX_BTN, item: Flex(FLEX_FIXED) },
         hover: Some(Override {
             patch: Partial { background: Some(COLOR_HOVER), ..Partial::none() },
-            enter: fade(6),
-            leave: fade(6),
+            enter: StateTransition { frames: 6 },
+            leave: StateTransition { frames: 6 },
         }),
         focus: None,
         pressed: None,
@@ -81,8 +85,11 @@ fn common_btn() -> ButtonStyle {
   padding or size would re-run layout and shift the siblings every time the pointer moves over the
   button. The type rules that out.
 - **Transitions.** Continuous fields (colors, opacity, offsets) are interpolated by `enter` and
-  `leave`. Discrete fields (sprite, font) change like layer images, so the transition chooses how
-  (cross-fade, instant), as in the syntax book's rule that changes need transitions.
+  `leave`. Discrete fields (sprite, font) cross-fade over the same frames, or switch instantly
+  with `frames: 0`.
+- **Own transition type.** `TransitionAnimation`, `fade` and the other animations of the
+  [prelude](./prelude.md) belong to the game scope, so they are not visible here. `std/ui.kix`
+  declares `StateTransition` for the system scope instead.
 
 Every style is constant, so the compiler evaluates every combination of states ahead of time.
 

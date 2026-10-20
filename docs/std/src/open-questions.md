@@ -9,9 +9,10 @@ replay?
 
 ## Shared `.kix` across scopes
 
-A `.kix` file of plain data, such as character constants or animation presets, may be imported in
-both scopes. Is it the same definition in both, or two copies that merely have the same names?
-It matters only if a value ever crosses between the scopes.
+A `.kix` file of plain data, such as character constants, may be imported in both scopes. Is it
+the same definition in both, or two copies that merely have the same names? It matters only if a
+value ever crosses between the scopes. Animations are not such data: they belong to the game
+scope only.
 
 ## Units
 
