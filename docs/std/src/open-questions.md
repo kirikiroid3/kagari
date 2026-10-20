@@ -1,11 +1,5 @@
 # Open Questions
 
-## Settings in system views
-
-System views may read setting values directly, so `Setting<T>` is unnecessary there. Should system
-code see plain `T`, or the same `Setting<T>` with an elimination form, so that one style function
-can be shared by both scopes?
-
 ## Text interpolation
 
 If `<s>` text ever interpolates a story variable, such as a player name, a line is no longer a
