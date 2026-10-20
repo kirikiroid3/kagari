@@ -60,8 +60,8 @@ attributes and an example. In terms of this chapter:
 ### Game mode
 
 `<game-mode>` owns the `Narrative` value. Its `<on-exit>` handler runs when the entry scene
-returns. It matches on the entry's exported `exit` variable and must be exhaustive, like a
-`<match>` in the story.
+returns. It receives the value of the variable named by the entry's `exit` attribute, matches on
+it, and must be exhaustive, like a `<match>` in the story.
 
 ## Operations
 

@@ -156,6 +156,8 @@ struct Lowerer<'db> {
     hir: GameHir,
     enums: FxHashMap<SmolStr, Idx<EnumDecl>>,
     globals: FxHashMap<SmolStr, VarSlot>,
+    /// Each lowered scene's locals, kept so `<entry exit>` can resolve in its scene.
+    scene_locals: FxHashMap<Idx<SceneDecl>, FxHashMap<SmolStr, VarSlot>>,
     metas: FxHashMap<SmolStr, MetaSlot>,
     scenes: FxHashMap<SmolStr, Idx<SceneDecl>>,
     templates: FxHashMap<SmolStr, Template>,
@@ -172,6 +174,7 @@ impl<'db> Lowerer<'db> {
             hir: GameHir::default(),
             enums: FxHashMap::default(),
             globals: FxHashMap::default(),
+            scene_locals: FxHashMap::default(),
             metas: FxHashMap::default(),
             scenes: FxHashMap::default(),
             templates: FxHashMap::default(),
@@ -797,6 +800,7 @@ impl<'db> Lowerer<'db> {
         patch_gotos(&mut body.stmts, &resolved);
 
         let state = std::mem::take(&mut self.sc);
+        self.scene_locals.insert(scene, state.locals);
         let decl = &mut self.hir.scenes[scene];
         decl.locals = locals;
         decl.labels = state.labels;
@@ -1683,16 +1687,25 @@ impl<'db> Lowerer<'db> {
         }
         let scene = attr(element, "scene")
             .and_then(|scene| self.lookup_scene(Span::new(file, scene.range), &scene.text));
+        // `exit` resolves as a variable use in the entry scene: its locals, then the globals.
         let exit = attr(element, "exit").and_then(|exit| {
-            let slot = self.globals.get(exit.text.as_str()).copied();
+            let slot = scene
+                .and_then(|scene| self.scene_locals.get(&scene))
+                .and_then(|locals| locals.get(exit.text.as_str()))
+                .or_else(|| self.globals.get(exit.text.as_str()))
+                .copied();
             let decl = slot.and_then(|slot| slot.decl);
             let is_enum = decl.is_some_and(|d| matches!(self.hir.vars[d].ty, VarType::Enum(_)));
-            if !is_enum && (slot.is_none() || decl.is_some()) {
+            // Stay quiet when the declaration is invalid, or when the name may be a local of a
+            // scene that did not resolve: both are already reported.
+            let wrong_type = decl.is_some() && !is_enum;
+            let unknown = slot.is_none() && scene.is_some();
+            if wrong_type || unknown {
                 self.report(
                     Span::new(file, exit.range),
                     DiagnosticCode::KisBadEntryExit,
                     format!(
-                        "`exit` must name a global `<var-enum>`, found `{}`",
+                        "`exit` must name an enum variable visible in the entry scene, found `{}`",
                         exit.text
                     ),
                     Vec::new(),

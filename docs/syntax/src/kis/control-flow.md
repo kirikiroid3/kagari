@@ -47,21 +47,81 @@ global enum before returning, and the caller branches on it with `<match>`.
 <entry name="after_story" scene="after_story" exit="ending" />
 ```
 
-*Tentative.* An entry is a named starting scene that the system can start (see
-[System Script](./system.md)). Entries are declared at top level, and `<game>` must contain at
-least one.
+An entry is a named starting scene that the system can start (see [System Script](./system.md)).
+Entries are declared at top level, and `<game>` must contain at least one. A program has one
+`<game>`, so extra chapters and after stories are further `<entry>` elements of the same `<game>`.
 
 | Attribute | Required | Meaning                                                                 |
 | --------- | -------- | ----------------------------------------------------------------------- |
 | `name`    | yes      | Name used by `start(…)` in the system                                   |
 | `scene`   | yes      | The scene the narrative starts in                                       |
-| `exit`    | no       | A global `<var-enum>` the system reads when the entry scene returns     |
+| `exit`    | no       | An enum variable whose value is passed to `<on-exit>`                   |
 
-`exit` exports that variable, and only that variable, to the system's
-[`<on-exit>`](./system.md#game-mode-and-on-exit) handler. It is how the story reports how it ended.
+### `exit`: report how the story ended
 
-A program has one `<game>`, so extra chapters and after stories are further `<entry>` elements of
-the same `<game>`.
+When the entry scene returns, the story is over and control goes back to the system. The system
+then decides what comes next, such as rolling the credits or returning to the title, and that
+usually depends on which ending the player reached. `exit` is how the story tells it.
+
+`exit="ending"` means: when the entry scene returns, read the variable `ending` from the game state
+and pass its value to the system's [`<on-exit>`](./system.md#game-mode-and-on-exit) handler. Only
+the value crosses over. The system declares no variable for it and cannot see `ending` itself.
+
+`ending` is an ordinary story variable, declared in `<game>` like any other. It can be a global,
+or a local of the entry scene, since the value is read as that scene returns. It must be an enum,
+because `<on-exit>` matches on the value exhaustively.
+
+A complete program shows where each part lives:
+
+```xml
+<kagari>
+  <system start="title">
+    <game-mode name="game">
+      ...
+      <!-- 4. Receives the value of `ending` and matches on it. -->
+      <on-exit>
+        <case val="AzusaEnd"><meta-set var="cleared_azusa" val="true" /><goto page="credits" /></case>
+        <case val="NormalEnd"><goto page="credits" /></case>
+        <case val="Uninitialized"><goto page="title" /></case>
+      </on-exit>
+    </game-mode>
+  </system>
+
+  <game>
+    <!-- 1. An ordinary story variable. No ending is reached yet. -->
+    <declare-enum name="Ending">
+      <enum name="Uninitialized" repr="0" />
+      <enum name="NormalEnd"     repr="1" />
+      <enum name="AzusaEnd"      repr="2" />
+    </declare-enum>
+    <var-enum name="ending" type="Ending" init="Uninitialized" />
+
+    <!-- 2. The story sets it when it reaches an ending. -->
+    <scene name="main">
+      ...
+      <set var="ending" val="AzusaEnd" />
+    </scene>
+
+    <!-- 3. When `main` returns, the value of `ending` goes to `<on-exit>`. -->
+    <entry name="main" scene="main" exit="ending" />
+  </game>
+</kagari>
+```
+
+The variable starts at `Uninitialized`, not at one of the endings. With `init="NormalEnd"`, a path
+that forgets its `<set>` would silently report the normal ending. With `Uninitialized`, that path
+reports `Uninitialized`, and because `<on-exit>` must be exhaustive, the system has to say what
+happens in that case.
+
+This is the same pattern a scene uses to report to its caller (see [`<call>`](#call-enter-a-scene)),
+with the system as the caller and `<on-exit>` in place of the `<match>`.
+
+- `exit` must name an enum variable visible in the entry scene. A variable of another type is
+  rejected.
+- The value is read when the entry scene returns, whether by reaching its end or by `<return>`.
+- `<on-exit>` must cover every variant of the enum. Adding a variant without handling it in
+  `<on-exit>` is a compile error.
+- Several entries may name the same variable, as `main` and `after_story` do in the first example.
 
 ## `<return>`: leave the scene early
 

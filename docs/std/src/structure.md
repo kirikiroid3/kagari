@@ -13,9 +13,10 @@ exports. In the other direction, game code sees nothing of the system except
 [`std/system-ctx.kix`](./system-ctx.md).
 
 An `<entry>` exports a starting scene, which the system starts with
-[`start(name)`](./modes.md#operations). Its `exit` attribute exports one global enum variable, and
-only that variable, to the `Game` mode's [`<on-exit>`](./modes.md#game-mode) handler. A scene
-reports how it ended by setting that enum before returning.
+[`start(name)`](./modes.md#operations). Its `exit` attribute names an enum variable of the story.
+When the entry scene returns, the value of that variable, and nothing else, is passed to the `Game`
+mode's [`<on-exit>`](./modes.md#game-mode) handler. A scene reports how it ended by setting that
+variable before returning.
 
 A program has one `<game>`. The save format is keyed to one narrative program (its script hash and
 choice ids), so extra chapters and after stories are further `<entry>` elements of the same

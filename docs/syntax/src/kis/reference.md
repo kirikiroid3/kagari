@@ -17,7 +17,7 @@ direct children of `<scene>`.
 | `<kagari-system>`      | –    | root of an included file   | –                 | as `<system>`                    | [Reuse](./reuse.md#include-splice-another-script) |
 | `<include>`            | –    | `<game>`, `<system>`, included roots | `src`   | –                                | [Reuse](./reuse.md#include-splice-another-script) |
 | `<import>`             | –    | `<game>`, `<system>`, included roots | `src`   | –                                | [Reuse](./reuse.md#import-use-extension-definitions) |
-| `<entry>` *(tent.)*    | –    | top level                  | `name`, `scene`, `exit` | –                          | [Control Flow](./control-flow.md#entry-export-a-starting-scene) |
+| `<entry>`              | –    | top level                  | `name`, `scene`, `exit` | –                          | [Control Flow](./control-flow.md#entry-export-a-starting-scene) |
 | `<scene>`              | –    | top level                  | `name`            | scene body                       | [Control Flow](./control-flow.md#scene-scene-declaration) |
 
 ## Steps

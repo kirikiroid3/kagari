@@ -19,5 +19,24 @@
       <!-- kis/unknown-meta -->
       <meta-set var="no_such_meta" val="true" />
     </scene>
+
+    <declare-enum name="Ending">
+      <enum name="Uninitialized" repr="0" />
+      <enum name="Good"          repr="1" />
+    </declare-enum>
+
+    <!-- A local of the entry scene is visible to `exit`. -->
+    <entry name="after_story" scene="after_story" exit="ending" />
+    <scene name="after_story">
+      <var-enum name="ending" type="Ending" init="Uninitialized" />
+      <s>Afterwards.</s>
+      <set var="ending" val="Good" />
+    </scene>
+
+    <!-- kis/bad-entry-exit: `ending` is local to another scene -->
+    <entry name="epilogue" scene="epilogue" exit="ending" />
+    <scene name="epilogue">
+      <s>Later.</s>
+    </scene>
   </game>
 </kagari>
