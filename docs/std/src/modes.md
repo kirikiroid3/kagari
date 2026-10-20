@@ -7,8 +7,7 @@ A **mode** is one screen of the game system. The system machine holds a stack of
 The stack splits as `stack = base :: overlays`:
 
 - The **base** frame is either the `Game` mode or a **root page** (Title, Gallery, Credits).
-- **Overlays** are pages and dialogs pushed on top of the base (Save, Load, Config, Backlog,
-  confirmations).
+- **Overlays** are pages pushed on top of the base (Save, Load, Config, Backlog, confirmations).
 
 Only `goto`, `start` and `load` change the base, and each of them resets the whole stack. This
 gives a simple answer to "which UI goes along with the game":
@@ -20,21 +19,28 @@ gives a simple answer to "which UI goes along with the game":
 | Config, Load                                 | overlays with no requirement         | pushed from anywhere |
 | Save, Backlog                                | overlays with `requires="game"`      | only above a `Game` base |
 
-## Pages, dialogs, layers
+## Pages and layers
 
-| Kind       | Where it lives               | Rendering                         | Input |
-| ---------- | ---------------------------- | --------------------------------- | ----- |
-| **Page**   | a frame, opaque              | hides every frame below           | the top frame gets all input |
-| **Dialog** | a frame, transparent         | drawn over the frames below       | the top frame gets all input |
-| **Layer**  | inside one frame's view      | part of that frame                | routed within the frame |
+| Kind      | Where it lives          | Input |
+| --------- | ----------------------- | ----- |
+| **Page**  | a frame                 | the top frame gets all input |
+| **Layer** | inside one frame's view | routed within the frame |
 
-The engine draws the frames from the topmost opaque one upward, each frame drawing its layers in
-document order. Input goes to the top frame only.
+Input goes to the top frame only, so every frame below the top is blocked, whatever is drawn.
+
+A **dialog** is not a separate kind. It blocks everything under it exactly as a page does, so the
+two are logically the same; the only difference is visual. `<dialog>` is a page whose view is
+drawn over a still image of the frames below it, where `<page>` hides them. Both are `Page` frames
+in the configuration.
 
 - Save, Load and Config are pages. Pushed over `Game`, they pause the narrative but keep it
   alive, which is why Save can read it.
 - "Overwrite this slot?" and an in-game menu over a dimmed game are dialogs.
 - The text frame and the quick menu are layers of `Game`.
+
+While any page or dialog is on top of `Game`, the screen's animations are skipped to their final
+state (see [Overlays and animations](./narrative.md#overlays-and-animations)), so the frames below
+are always still.
 
 *Tentative:* UI above *every* frame, such as a notification toast, is an **ambient layer**
 declared directly in `<system>`. It is the only UI outside the stack discipline, so it should be
@@ -48,7 +54,7 @@ rare.
     <button on-click="start(main)">New Game</button>
     <button on-click="push(load)">Load</button>
     <button on-click="push(config)">Config</button>
-    <button on-click="quit">Quit</button>
+    <button on-click="ask_quit">Quit</button>
   </page>
 
   <game-mode name="game">
@@ -80,13 +86,14 @@ rare.
 
 | Element       | Attributes                 | Meaning |
 | ------------- | -------------------------- | ------- |
-| `<page>`      | `name`, `root`, `requires` | An opaque mode. `root="true"` makes it a base; otherwise it is an overlay |
-| `<dialog>`    | `name`, `requires`         | A transparent overlay |
+| `<page>`      | `name`, `root`, `requires` | A mode. `root="true"` makes it a base; otherwise it is an overlay |
+| `<dialog>`    | `name`, `requires`         | An overlay page drawn over a still image of the frames below |
 | `<game-mode>` | `name`                     | The mode that owns the `Narrative`. One per program |
 | `<layer>`     | `name`                     | A named part of a mode's view |
 | `<game-screen>` | —                        | The narrative's ECS screen, drawn as a layer of `<game-mode>` |
 
-All element and attribute names here are *tentative*.
+All element and attribute names here are *tentative*, except the form of interaction attributes:
+an attribute such as `on-click` holds one operation call, as in `on-click="push(save)"`.
 
 ### Game mode
 
@@ -112,7 +119,12 @@ change state.
 | `revert(i)`     | `game := rewind(game, i)`, then `pop`                | see [Backlog](./backlog.md) |
 | `set(x, v)`     | `settings.x := v`                                    | `v` has the type of setting `x` |
 | `play_voice(v)` | plays a voice line; no state change                  | `v : VoiceId` |
-| `quit`          | terminates                                           | — |
+| `quit`          | terminates the game immediately, with no confirmation | — |
+| `ask_quit`      | `push(quit)`: pushes the quit-confirmation dialog    | — |
+
+`quit` never asks. A button that should confirm uses `ask_quit`, which pushes the dialog named
+`quit`. *Tentative:* `std/ui.kix` provides a default `quit` dialog whose confirm button runs
+`quit`; a studio replaces it by declaring its own `<dialog name="quit">`.
 
 `load(k)` fails when `restore` reports a divergence. The divergence is shown, and the stack is
 unchanged.

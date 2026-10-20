@@ -31,7 +31,8 @@ re-derived after every operation.
 | `on-click` | any interactive element    | runs an operation |
 | `bind`     | `<slider>`, `<toggle>`, `<select>` | reads a setting and writes it with `set` |
 
-*Tentative* names.
+An interaction attribute holds exactly one operation call, written as a call:
+`on-click="push(save)"`. *Tentative:* the attribute names other than `on-click`.
 
 ## Views are full
 
