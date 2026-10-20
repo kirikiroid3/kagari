@@ -5,8 +5,9 @@
 gives the syntax. What the elements mean at runtime (the mode stack, the operations, the checks)
 is described in the *Kagari STD Book*.
 
-All element and attribute names in this chapter are *tentative*, except the form of interaction
-attributes: an attribute such as `on-click` holds one operation call, as in `on-click="push(save)"`.
+All element and attribute names in this chapter are *tentative*, except `<system>` itself and the
+form of interaction attributes: an attribute such as `on-click` holds one operation call, as in
+`on-click="push(save)"`. The `start` attribute of `<system>` is tentative.
 
 ## `<system>`
 

@@ -4,8 +4,7 @@ A `.kis` file is an XML document describing the story as scenes made of steps.
 
 ## Document structure
 
-*Tentative:* the root element is `<kagari>`. It has exactly two children, one `<system>` and one
-`<game>`:
+The root element is `<kagari>`. It has exactly two children, one `<system>` and one `<game>`:
 
 ```xml
 <kagari>

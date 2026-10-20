@@ -10,9 +10,9 @@ direct children of `<scene>`.
 
 | Tag                    | Step | Allowed in                 | Attributes        | Children                         | See |
 | ---------------------- | ---- | -------------------------- | ----------------- | -------------------------------- | --- |
-| `<kagari>` *(tent.)*   | –    | document root              | –                 | `<system>`, `<game>`             | [Overview](./overview.md#document-structure) |
-| `<system>` *(tent.)*   | –    | `<kagari>`                 | `start`           | system declarations and modes    | [System Script](./system.md#system) |
-| `<game>` *(tent.)*     | –    | `<kagari>`                 | –                 | top-level declarations           | [Overview](./overview.md#document-structure) |
+| `<kagari>`             | –    | document root              | –                 | `<system>`, `<game>`             | [Overview](./overview.md#document-structure) |
+| `<system>`             | –    | `<kagari>`                 | `start` *(tent.)* | system declarations and modes    | [System Script](./system.md#system) |
+| `<game>`               | –    | `<kagari>`                 | –                 | top-level declarations           | [Overview](./overview.md#document-structure) |
 | `<kagari-game>`        | –    | root of an included file   | –                 | top-level declarations           | [Reuse](./reuse.md#include-splice-another-script) |
 | `<kagari-system>`      | –    | root of an included file   | –                 | as `<system>`                    | [Reuse](./reuse.md#include-splice-another-script) |
 | `<include>`            | –    | `<game>`, `<system>`, included roots | `src`   | –                                | [Reuse](./reuse.md#include-splice-another-script) |
