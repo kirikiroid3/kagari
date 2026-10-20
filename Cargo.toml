@@ -2,8 +2,10 @@
 resolver = "3"
 members = [
     "core/kagari-bytecode",
-    "core/kagari-lang", "core/kagari-std",
-    "core/kagari-syntax"
+    "core/kagari-lang",
+    "core/kagari-std",
+    "core/kagari-syntax",
+    "tooling/kagari-lsp"
 ]
 
 [workspace.package]

@@ -11,6 +11,10 @@ name = "kagari-lang"
 version = "0.1.0"
 
 [[package]]
+name = "kagari-lsp"
+version = "0.1.0"
+
+[[package]]
 name = "kagari-std"
 version = "0.1.0"
 
