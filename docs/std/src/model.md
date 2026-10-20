@@ -35,7 +35,7 @@ properties follow directly:
 
 ```text
 C     = (stack : NonEmpty<Frame>, settings : Settings, meta : Meta, slots : Slots)
-Frame = Page(name, local) | Dialog(name, local) | Game(n : Narrative, hud : HudState)
+Frame = Page(name, local) | Game(n : Narrative, hud : HudState)
 
 C₀    = ([Page(start, init)], read(config), read(meta), read(slots))
 ```

@@ -46,8 +46,23 @@ truncated trace, so it needs no machinery of its own. It replays from the neares
 before `i` and runs renders from the last keyframe on the path, so it costs no more than a load.
 See [Revert to here](./backlog.md#revert-to-here).
 
-## Pausing
+## Overlays and animations
 
 The narrative only changes on `step`, `restore` and `rewind`. While an overlay is on top of
-`Game`, no input reaches it, so it is paused. *Tentative:* whether the engine also pauses the
-screen's running animations is an [open question](./open-questions.md#paused-animations).
+`Game`, no input reaches it, so it is paused.
+
+The screen's running animations are not paused but **skipped**: when any page or dialog is pushed
+over `Game`, every running animation jumps to its final state. This is well defined because the
+final state of an animation is always deterministic:
+
+- A finite animation ends in the state its last frame describes.
+- An animation that loops forever has as its final state the state *before* the loop: the end of
+  its finite prefix.
+
+The same rule serves fast-forward: skipping through steps skips each step's animations to their
+final states, so the screen after a skip is exactly the screen after watching. It also matches the
+syntax book, where the logical screen of a step is the screen after `render`, not the frames the
+engine draws while animating.
+
+*Tentative:* when the overlay is popped, an infinite loop starts again from the beginning of its
+loop; finite animations stay finished.

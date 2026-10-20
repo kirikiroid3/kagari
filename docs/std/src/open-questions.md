@@ -1,20 +1,5 @@
 # Open Questions
 
-## Paused animations
-
-While an opaque page is on top of `Game`, the narrative receives no input. Should the engine also
-pause the screen's running animations and voice playback, or let them finish behind the page?
-
-## Quit confirmation
-
-Should `quit` from in-game require a confirmation dialog by rule, or is that left to the studio's
-UI?
-
-## Interaction syntax
-
-`on-click="push(save)"` or a dedicated attribute per operation, such as `<button push="save">`?
-The second is easier to validate by schema; the first keeps one attribute per event.
-
 ## Settings in system views
 
 System views may read setting values directly, so `Setting<T>` is unnecessary there. Should system
