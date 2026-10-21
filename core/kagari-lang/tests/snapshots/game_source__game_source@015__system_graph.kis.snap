@@ -1,0 +1,14 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: "render_diagnostics(&db, diags, Some(&base))"
+input_file: core/kagari-lang/tests/game_source/script/015__system_graph.kis
+---
+script/015__system_graph.kis:12:24: error[kis/context-requires]: `interface__call(save)` needs a running game, but `title` can be shown without one
+script/015__system_graph.kis:18:24: error[kis/pop-from-base]: `interface__return` would pop `title`, the base of the stack
+script/015__system_graph.kis:27:7: error[kis/context-requires]: `<for-history>` needs a running game, but `config` can be shown without one
+script/015__system_graph.kis:31:24: error[kis/context-requires]: `metafn__save` needs a running game, but `config` can be shown without one
+  note: script/015__system_graph.kis:6:7: operation here
+script/015__system_graph.kis:36:5: error[kis/trapped-mode]: mode `trap` can never be left: it has no `interface__return` and reaches no `interface__goto`, `metafn__start`, `metafn__load` or `metafn__quit`
+script/015__system_graph.kis:45:24: warning[kis/push-cycle]: modes push each other in a cycle, so the stack can grow without bound: `about`, `help`
+script/015__system_graph.kis:55:24: error[kis/needs-game-mode]: `metafn__advance` acts on the running story, but `ask` is not the game mode
+script/015__system_graph.kis:60:5: warning[kis/unreachable-mode]: mode `orphan` can never be shown

@@ -136,7 +136,7 @@ story tells it.
 An entry scene returns `Ending`, an enum the game declares like any other. `entry="true"` implies
 `returns="Ending"`. Writing `returns="Ending"` as well is allowed; any other `returns` is a compile
 error, and so is an entry scene in a game that declares no `Ending`. The returned value is passed
-to the system's [`<on-exit>`](./system.md#game-mode-and-on-exit) handler. Only the value crosses
+to the system's [`<on-exit>`](./system.md#on-exit) handler. Only the value crosses
 over: the system cannot see story variables.
 
 A complete program shows where each part lives:
@@ -148,8 +148,17 @@ A complete program shows where each part lives:
       ...
       <!-- 3. Receives the returned `Ending` and matches on it. -->
       <on-exit>
-        <case val="AzusaEnd"><meta-set var="cleared_azusa" val="true" /><goto page="credits" /></case>
-        <case val="NormalEnd"><goto page="credits" /></case>
+        <cases>
+          <case val="AzusaEnd" />
+          <do>
+            <meta-set var="cleared_azusa" val="true" />
+            <interface-goto page="credits" />
+          </do>
+        </cases>
+        <cases>
+          <case val="NormalEnd" />
+          <do><interface-goto page="credits" /></do>
+        </cases>
       </on-exit>
     </game-mode>
   </system>

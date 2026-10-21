@@ -75,20 +75,38 @@ direct children of `<scene>`.
 
 | Tag                                  | Allowed in                     | Attributes                   | Children | See |
 | ------------------------------------ | ------------------------------ | ---------------------------- | -------- | --- |
-| `<setting-int>`                      | `<system>`                     | `name`, `min`, `max`, `init` | –        | [System](./system.md#settings-meta-and-save-slots) |
-| `<setting-enum>`                     | `<system>`                     | `name`, `type`, `init`       | –        | [System](./system.md#settings-meta-and-save-slots) |
-| `<meta-bool>`, `<meta-char>`         | `<system>`                     | `name`, `init`               | –        | [System](./system.md#settings-meta-and-save-slots) |
-| `<meta-int>`                         | `<system>`                     | `name`, `min`, `max`, `init` | –        | [System](./system.md#settings-meta-and-save-slots) |
-| `<meta-enum>`                        | `<system>`                     | `name`, `type`, `init`       | –        | [System](./system.md#settings-meta-and-save-slots) |
-| `<save-slots>`                       | `<system>`                     | `count`                      | –        | [System](./system.md#settings-meta-and-save-slots) |
-| `<page>`                             | `<system>`                     | `name`, `root`, `requires`   | UI       | [System](./system.md#modes) |
-| `<dialog>`                           | `<system>`                     | `name`, `requires`           | UI       | [System](./system.md#modes) |
-| `<game-mode>`                        | `<system>`                     | `name`                       | `<game-screen>`, `<layer>`, `<on-exit>` | [System](./system.md#modes) |
-| `<layer>`                            | a mode                         | `name`                       | UI       | [System](./system.md#modes) |
+| `<system>`                           | `<kagari>`                     | `start`                      | declarations, `<sysfn>`, modes | [System](./system.md#system) |
+| `<setting-int>`                      | `<system>`                     | `name`, `min`, `max`, `init` | –        | [System](./system.md#settings) |
+| `<setting-enum>`                     | `<system>`                     | `name`, `type`, `init`       | –        | [System](./system.md#settings) |
+| `<setting-bool>`                     | `<system>`                     | `name`, `init`               | –        | [System](./system.md#settings) |
+| `<meta-bool>`, `<meta-char>`         | `<system>`                     | `name`, `init`               | –        | [System](./system.md#meta-fields) |
+| `<meta-int>`                         | `<system>`                     | `name`, `min`, `max`, `init` | –        | [System](./system.md#meta-fields) |
+| `<meta-enum>`                        | `<system>`                     | `name`, `type`, `init`       | –        | [System](./system.md#meta-fields) |
+| `<save-slots>`                       | `<system>`                     | `count`                      | –        | [System](./system.md#save-slots) |
+| `<sysfn>`                            | `<system>`                     | `name`, `args`, `return`     | locals, sysfn body | [System](./system.md#system-functions) |
+| `<var-i16>`, `<var-vec2>`            | `<sysfn>`                      | `name`, `init`               | –        | [System](./system.md#locals) |
+| `<sysfn-arg>`                        | `<sysfn>` body                 | `position`, `var`            | –        | [System](./system.md#sysfn-arg-and-sysfn-return) |
+| `<sysfn-return>`                     | `<sysfn>` body                 | `val`                        | –        | [System](./system.md#sysfn-arg-and-sysfn-return) |
+| `<sysfn-call>`                       | sysfn body, `<on-exit>` `<do>` | `name`, `save`               | `<sysfn-param>` | [System](./system.md#sysfn-call-and-sysfn-param) |
+| `<sysfn-param>`                      | `<sysfn-call>`                 | `var` or `literal`           | –        | [System](./system.md#sysfn-call-and-sysfn-param) |
+| `<metafn-start>`, `<metafn-load>`, `<metafn-save>`, `<metafn-select>` | sysfn body, `<on-exit>` `<do>` | `param` | – | [System](./system.md#operations) |
+| `<metafn-advance>`, `<metafn-quit>`  | sysfn body, `<on-exit>` `<do>` | –                            | –        | [System](./system.md#operations) |
+| `<interface-call>`, `<interface-goto>` | sysfn body, `<on-exit>` `<do>` | `page`                     | –        | [System](./system.md#operations) |
+| `<interface-return>`, `<interface-focus-activate>` | sysfn body, `<on-exit>` `<do>` | –              | –        | [System](./system.md#operations) |
+| `<interface-focus-move>`             | sysfn body, `<on-exit>` `<do>` | `direction` or `target-idx`  | –        | [System](./system.md#operations) |
+| `<page>`                             | `<system>`                     | `name`, `root`, `requires`, `on-keyboard`, `on-controller` | `<layer>`, UI | [System](./system.md#modes) |
+| `<dialog>`                           | `<system>`                     | `name`, `requires`, `on-keyboard`, `on-controller` | `<layer>`, UI | [System](./system.md#modes) |
+| `<game-mode>`                        | `<system>`                     | `name`, `on-keyboard`, `on-controller` | `<game-screen>`, `<layer>`, `<on-exit>` | [System](./system.md#modes) |
+| `<layer>`                            | a mode                         | `name`, `style`              | UI       | [System](./system.md#modes) |
 | `<game-screen>`                      | `<game-mode>`                  | –                            | –        | [System](./system.md#modes) |
-| `<on-exit>`                          | `<game-mode>`                  | –                            | `<case>` | [System](./system.md#game-mode-and-on-exit) |
-| `<button>`, `<slider>`, `<toggle>`, `<select>`, `<row>`, `<col>`, `<text-frame>`, `<backlog-line>` | UI | `on-click`, `bind`, `style` | UI | [System](./system.md#ui-elements) |
+| `<on-exit>`                          | `<game-mode>`                  | –                            | `<cases>` | [System](./system.md#on-exit) |
+| `<button>`, `<text-frame>`           | UI                             | `style`, `on-click`          | text (`<button>`), – | [System](./system.md#ui-elements) |
+| `<slider>`, `<toggle>`, `<select>`   | UI                             | `style`, `bind`              | –        | [System](./system.md#ui-elements) |
+| `<row>`, `<col>`, `<backlog-line>`   | UI                             | `style`                      | UI (`<row>`, `<col>`) | [System](./system.md#ui-elements) |
 | `<for-slots>`, `<for-history>`, `<for-choices>` | UI                  | –                            | UI       | [System](./system.md#repetition) |
+
+In system function bodies, `<match>`, `<set>`, `<add>`, `<sub>` and `<meta-set>` are also allowed
+(see [System](./system.md#statements)).
 
 "UI" means UI elements and repetition elements. The *Step* column does not apply to system tags.
 

@@ -1,0 +1,84 @@
+<kagari-system>
+  <!-- Input payloads of `on-keyboard` and `on-controller`. Auto-included in the system scope. -->
+  <declare-enum name="Key">
+    <enum name="Enter" repr="0" />
+    <enum name="Escape" repr="1" />
+    <enum name="Space" repr="2" />
+    <enum name="Backspace" repr="3" />
+    <enum name="Tab" repr="4" />
+    <enum name="Up" repr="5" />
+    <enum name="Down" repr="6" />
+    <enum name="Left" repr="7" />
+    <enum name="Right" repr="8" />
+    <enum name="PageUp" repr="9" />
+    <enum name="PageDown" repr="10" />
+    <enum name="Home" repr="11" />
+    <enum name="End" repr="12" />
+    <enum name="Shift" repr="13" />
+    <enum name="Control" repr="14" />
+    <enum name="Alt" repr="15" />
+    <enum name="F1" repr="16" />
+    <enum name="F2" repr="17" />
+    <enum name="F3" repr="18" />
+    <enum name="F4" repr="19" />
+    <enum name="F5" repr="20" />
+    <enum name="F6" repr="21" />
+    <enum name="F7" repr="22" />
+    <enum name="F8" repr="23" />
+    <enum name="F9" repr="24" />
+    <enum name="F10" repr="25" />
+    <enum name="F11" repr="26" />
+    <enum name="F12" repr="27" />
+    <enum name="A" repr="28" />
+    <enum name="B" repr="29" />
+    <enum name="C" repr="30" />
+    <enum name="D" repr="31" />
+    <enum name="E" repr="32" />
+    <enum name="F" repr="33" />
+    <enum name="G" repr="34" />
+    <enum name="H" repr="35" />
+    <enum name="I" repr="36" />
+    <enum name="J" repr="37" />
+    <enum name="K" repr="38" />
+    <enum name="L" repr="39" />
+    <enum name="M" repr="40" />
+    <enum name="N" repr="41" />
+    <enum name="O" repr="42" />
+    <enum name="P" repr="43" />
+    <enum name="Q" repr="44" />
+    <enum name="R" repr="45" />
+    <enum name="S" repr="46" />
+    <enum name="T" repr="47" />
+    <enum name="U" repr="48" />
+    <enum name="V" repr="49" />
+    <enum name="W" repr="50" />
+    <enum name="X" repr="51" />
+    <enum name="Y" repr="52" />
+    <enum name="Z" repr="53" />
+    <enum name="Digit0" repr="54" />
+    <enum name="Digit1" repr="55" />
+    <enum name="Digit2" repr="56" />
+    <enum name="Digit3" repr="57" />
+    <enum name="Digit4" repr="58" />
+    <enum name="Digit5" repr="59" />
+    <enum name="Digit6" repr="60" />
+    <enum name="Digit7" repr="61" />
+    <enum name="Digit8" repr="62" />
+    <enum name="Digit9" repr="63" />
+  </declare-enum>
+  <declare-enum name="PadButton">
+    <enum name="None" repr="0" />
+    <enum name="South" repr="1" />
+    <enum name="East" repr="2" />
+    <enum name="West" repr="3" />
+    <enum name="North" repr="4" />
+    <enum name="LeftShoulder" repr="5" />
+    <enum name="RightShoulder" repr="6" />
+    <enum name="LeftTrigger" repr="7" />
+    <enum name="RightTrigger" repr="8" />
+    <enum name="Start" repr="9" />
+    <enum name="Select" repr="10" />
+    <enum name="LeftStick" repr="11" />
+    <enum name="RightStick" repr="12" />
+  </declare-enum>
+</kagari-system>

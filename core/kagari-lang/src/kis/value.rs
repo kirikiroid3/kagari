@@ -81,6 +81,26 @@ pub fn int_domain(ty: VarType) -> Option<(i32, i32)> {
     }
 }
 
+/// The system type `i16`: an int over the whole `i16` range.
+pub const I16: VarType = VarType::Int {
+    min: i16::MIN,
+    max: i16::MAX,
+};
+
+/// Whether a value of type `src` can flow into `dst`: the same type, or two counter types where
+/// the domain of `src` lies inside the domain of `dst`.
+pub fn int_assignable(src: VarType, dst: VarType) -> bool {
+    if src == dst {
+        return true;
+    }
+    match (int_domain(src), int_domain(dst)) {
+        (Some((src_min, src_max)), Some((dst_min, dst_max))) => {
+            dst_min <= src_min && src_max <= dst_max
+        }
+        _ => false,
+    }
+}
+
 /// Parse a value of type `ty`: `true`/`false`, a variant name, or a decimal number.
 pub fn parse_value(ty: VarType, enums: &Arena<EnumDecl>, text: &str) -> Result<Value, ValueError> {
     match ty {
@@ -160,6 +180,18 @@ pub fn parse_pattern(
         )));
     }
     Ok(Pattern::Range(lo, hi))
+}
+
+/// Parse a `vec2` literal: two `i16` separated by whitespace, such as `0 -1`.
+pub fn parse_vec2(text: &str) -> Result<(i16, i16), ValueError> {
+    let bad = || ValueError::Bad("expected two integers such as `0 -1`".to_owned());
+    let [x, y] = split_list(text)[..] else {
+        return Err(bad());
+    };
+    match (parse_i16(x), parse_i16(y)) {
+        (Ok(x), Ok(y)) => Ok((x, y)),
+        _ => Err(bad()),
+    }
 }
 
 /// Parse an `i16` bound (`min`/`max` of `<var-int>`/`<meta-int>`).
@@ -278,5 +310,35 @@ mod tests {
         assert!(parse_i16("40000").is_err());
         assert_eq!(parse_repr("255"), Ok(255));
         assert!(parse_repr("256").is_err());
+    }
+
+    #[test]
+    fn assignability() {
+        let enum_a = VarType::Enum(Idx::from_raw(la_arena::RawIdx::from(0u32)));
+        let enum_b = VarType::Enum(Idx::from_raw(la_arena::RawIdx::from(1u32)));
+        assert!(int_assignable(VarType::Char, I16));
+        assert!(!int_assignable(I16, VarType::Char));
+        assert!(int_assignable(
+            VarType::Int { min: 0, max: 100 },
+            VarType::Char
+        ));
+        assert!(!int_assignable(
+            VarType::Int { min: -1, max: 5 },
+            VarType::Char
+        ));
+        assert!(int_assignable(VarType::Bool, VarType::Bool));
+        assert!(!int_assignable(VarType::Bool, VarType::Char));
+        assert!(int_assignable(enum_a, enum_a));
+        assert!(!int_assignable(enum_a, enum_b));
+    }
+
+    #[test]
+    fn vec2() {
+        assert_eq!(parse_vec2("0 -1"), Ok((0, -1)));
+        assert_eq!(parse_vec2("  12\t7 "), Ok((12, 7)));
+        assert!(matches!(parse_vec2("1"), Err(ValueError::Bad(_))));
+        assert!(matches!(parse_vec2("1 2 3"), Err(ValueError::Bad(_))));
+        assert!(matches!(parse_vec2("1 40000"), Err(ValueError::Bad(_))));
+        assert!(matches!(parse_vec2("x y"), Err(ValueError::Bad(_))));
     }
 }

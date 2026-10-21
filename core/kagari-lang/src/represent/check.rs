@@ -11,8 +11,8 @@ use smol_str::SmolStr;
 use crate::db::Db;
 use crate::diagnostic::{Diagnostic, DiagnosticCode, Span};
 use crate::input::{FilePath, Program, SourceFile};
-use crate::kis::game_hir;
 use crate::kis::hir::{Block, ChoiceItem, Render, StmtKind};
+use crate::kis::program_hir;
 use crate::kis::value::check_name;
 use crate::parse::parse_kis;
 use crate::represent::infer::{Body, RefEdge};
@@ -484,7 +484,7 @@ pub fn check_inline_renders(db: &dyn Db, program: Program, file: SourceFile) -> 
 
 #[salsa::tracked(returns(ref))]
 pub fn check_voices(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
-    let hir = game_hir(db, program);
+    let hir = program_hir(db, program);
     let tcx = TyCtx::new(db, item_scope(db, program));
     let mut voices: Vec<(String, Span)> = Vec::new();
     for (_, scene) in hir.scenes.iter() {
@@ -587,7 +587,7 @@ fn is_voice(tcx: &TyCtx<'_>, text: &str) -> bool {
 #[salsa::tracked(returns(ref))]
 pub fn check_cycles(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
     let collected = crate::collect::collect(db, program);
-    let hir = game_hir(db, program);
+    let hir = program_hir(db, program);
     let mut checks: Vec<&BodyChecks> = collected
         .kix_files
         .iter()
@@ -681,7 +681,7 @@ fn cycles(db: &dyn Db, edges: &[&RefEdge], code: DiagnosticCode, what: &str) -> 
 }
 
 /// Strongly connected components that contain a cycle (size > 1, or a self-edge).
-fn tarjan(adjacency: &[Vec<usize>]) -> Vec<Vec<usize>> {
+pub(crate) fn tarjan(adjacency: &[Vec<usize>]) -> Vec<Vec<usize>> {
     struct State<'a> {
         adjacency: &'a [Vec<usize>],
         index: Vec<Option<usize>>,

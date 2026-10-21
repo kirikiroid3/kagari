@@ -1,0 +1,86 @@
+<kagari>
+  <system start="title">
+    <save-slots count="3" />
+
+    <sysfn name="quick_save">
+      <metafn-save param="0" />
+    </sysfn>
+
+    <page name="title" root="true">
+      <button on-click="metafn__start(main)">Start</button>
+      <!-- kis/context-requires: `save` requires a running game -->
+      <button on-click="interface__call(save)">Save</button>
+      <button on-click="interface__call(config)">Config</button>
+      <button on-click="interface__call(trap)">Trap</button>
+      <button on-click="interface__call(help)">Help</button>
+      <button on-click="interface__call(ask)">Ask</button>
+      <!-- kis/pop-from-base -->
+      <button on-click="interface__return()">Back</button>
+    </page>
+
+    <page name="save" requires="game">
+      <button on-click="interface__return()">Back</button>
+    </page>
+
+    <page name="config">
+      <!-- kis/context-requires -->
+      <for-history>
+        <backlog-line />
+      </for-history>
+      <!-- kis/context-requires: through `quick_save` -->
+      <button on-click="quick_save()">Quick save</button>
+      <button on-click="interface__return()">Back</button>
+    </page>
+
+    <!-- kis/trapped-mode -->
+    <page name="trap">
+      <button on-click="interface__call(inner)">Deeper</button>
+    </page>
+    <page name="inner">
+      <button on-click="interface__return()">Back</button>
+    </page>
+
+    <page name="help">
+      <!-- kis/push-cycle -->
+      <button on-click="interface__call(about)">About</button>
+      <button on-click="interface__return()">Back</button>
+    </page>
+    <page name="about">
+      <button on-click="interface__call(help)">Help</button>
+      <button on-click="interface__return()">Back</button>
+    </page>
+
+    <dialog name="ask">
+      <!-- kis/needs-game-mode -->
+      <button on-click="metafn__advance()">Advance</button>
+      <button on-click="interface__return()">No</button>
+    </dialog>
+
+    <!-- kis/unreachable-mode -->
+    <page name="orphan">
+      <button on-click="interface__return()">Back</button>
+    </page>
+
+    <game-mode name="game">
+      <game-screen />
+      <layer name="text">
+        <text-frame on-click="metafn__advance()" />
+      </layer>
+      <on-exit>
+        <cases>
+          <case val="_" />
+          <do />
+        </cases>
+      </on-exit>
+    </game-mode>
+  </system>
+  <game>
+    <declare-enum name="Ending">
+      <enum name="Normal" repr="0" />
+    </declare-enum>
+    <scene name="main" entry="true">
+      <s><m who="">The story.</m></s>
+      <return literal="Normal" />
+    </scene>
+  </game>
+</kagari>

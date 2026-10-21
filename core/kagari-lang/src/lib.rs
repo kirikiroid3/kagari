@@ -20,6 +20,7 @@ pub mod ir;
 pub mod kis;
 pub mod parse;
 pub mod represent;
+pub mod system_graph;
 
 pub use db::{Db, FileSystem, OsFileSystem, RootDatabase};
 pub use diagnostic::{Diagnostic, DiagnosticCode, Related, Severity, Span, render_diagnostics};

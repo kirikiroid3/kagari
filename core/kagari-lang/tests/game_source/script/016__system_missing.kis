@@ -1,0 +1,30 @@
+<kagari>
+  <system start="title">
+    <page name="title" root="true">
+      <button on-click="metafn__start(main)">Start</button>
+      <button on-click="interface__call(load)">Load</button>
+    </page>
+    <page name="load">
+      <!-- kis/no-save-slots -->
+      <for-slots>
+        <button on-click="metafn__load(slot.index)">Load</button>
+      </for-slots>
+      <!-- kis/no-save-slots -->
+      <button on-click="metafn__load(0)">Load the first slot</button>
+      <button on-click="interface__return()">Back</button>
+    </page>
+    <!-- kis/missing-on-exit -->
+    <game-mode name="game">
+      <game-screen />
+    </game-mode>
+  </system>
+  <game>
+    <declare-enum name="Ending">
+      <enum name="Normal" repr="0" />
+    </declare-enum>
+    <scene name="main" entry="true">
+      <s><m who="">The story.</m></s>
+      <return literal="Normal" />
+    </scene>
+  </game>
+</kagari>

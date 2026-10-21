@@ -10,6 +10,9 @@
 /// Name of the prelude, visible in the game scope without an import.
 pub const PRELUDE: &str = "prelude.kix";
 
+/// Name of the system prelude: the input enums, auto-included in the system scope.
+pub const SYSTEM_PRELUDE: &str = "input.kis";
+
 /// The program scope a std file may be imported into.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum StdScope {
@@ -24,6 +27,7 @@ pub fn file(name: &str) -> Option<&'static str> {
         "system-ctx.kix" => Some(include_str!("../kix/std/system-ctx.kix")),
         "ui.kix" => Some(include_str!("../kix/std/ui.kix")),
         "narrative.kix" => Some(include_str!("../kix/std/narrative.kix")),
+        "input.kis" => Some(include_str!("../kix/std/input.kis")),
         _ => None,
     }
 }
@@ -35,7 +39,7 @@ pub fn file(name: &str) -> Option<&'static str> {
 pub fn scope(name: &str) -> Option<StdScope> {
     match name {
         "prelude.kix" | "system-ctx.kix" => Some(StdScope::Game),
-        "ui.kix" | "system-setting.kix" | "narrative.kix" => Some(StdScope::System),
+        "ui.kix" | "system-setting.kix" | "narrative.kix" | "input.kis" => Some(StdScope::System),
         _ => None,
     }
 }

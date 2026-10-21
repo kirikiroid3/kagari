@@ -1,5 +1,5 @@
 <kagari>
-  <system start="title">
+  <system start="title"><page name="title" root="true" />
     <meta-bool name="cleared_azusa" init="false" />
     <meta-enum name="last_route" type="Route" init="None" />
   </system>
@@ -12,7 +12,7 @@
     <scene name="main" entry="true">
       <s>The end.</s>
       <meta-set var="cleared_azusa" val="true" />
-      <!-- kis/meta-enum-unsupported -->
+      <!-- ok: meta enums resolve in the shared enum namespace -->
       <meta-set var="last_route" val="None" />
       <!-- kis/unknown-meta -->
       <meta-set var="no_such_meta" val="true" />
@@ -24,6 +24,7 @@
       <enum name="Good" repr="0" />
       <enum name="Bad"  repr="1" />
     </declare-enum>
+    <declare-enum name="Route"><enum name="None" repr="0" /><enum name="Azusa" repr="1" /></declare-enum>
 
     <!-- Writing `returns="Ending"` is allowed; a local can carry the ending. -->
     <scene name="after_story" returns="Ending" entry="true">

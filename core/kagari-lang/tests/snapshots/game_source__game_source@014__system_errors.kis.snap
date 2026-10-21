@@ -1,0 +1,62 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: "render_diagnostics(&db, diags, Some(&base))"
+input_file: core/kagari-lang/tests/game_source/script/014__system_errors.kis
+---
+script/014__system_errors.kis:3:17: error[kis/not-a-root-page]: `menu` is not a root page; `<system start>` needs a `<page root="true">`
+script/014__system_errors.kis:8:5: error[kis/duplicate-setting]: `bgm_volume` is already declared as a setting or meta field
+  note: script/014__system_errors.kis:4:5: first defined here
+script/014__system_errors.kis:11:5: error[kis/duplicate-meta]: `text_speed` is already declared as a setting
+  note: script/014__system_errors.kis:5:5: first defined here
+script/014__system_errors.kis:13:5: error[kis/duplicate-enum]: enum `Ending` is already declared
+  note: script/014__system_errors.kis:146:5: first defined here
+script/014__system_errors.kis:18:5: error[kis/duplicate-sysfn]: system function `dup` is already declared
+  note: script/014__system_errors.kis:16:5: first defined here
+script/014__system_errors.kis:20:17: error[kis/reserved-name]: `metafn__mine` is reserved: names starting with `metafn__` or `interface__` are operations
+script/014__system_errors.kis:22:31: error[kis/bad-sysfn-type]: `int` needs a range; use `i16` or an enum
+script/014__system_errors.kis:24:32: error[kis/unknown-enum]: unknown enum `Nope`
+script/014__system_errors.kis:40:24: error[kis/unknown-sysfn]: unknown system function `nowhere`
+script/014__system_errors.kis:42:8: error[kis/sysfn-arity]: `louder` takes 1 argument(s), but 0 were given
+script/014__system_errors.kis:44:50: error[kis/arg-mismatch]: `flag` has type `bool`, but `i16` is expected
+script/014__system_errors.kis:46:38: error[kis/assign-mismatch]: `louder` returns `i16`, but `small` has type `char`
+  note: script/014__system_errors.kis:26:5: system function declared here
+script/014__system_errors.kis:48:36: error[kis/assign-mismatch]: system function `noop` returns no value to save
+  note: script/014__system_errors.kis:31:5: system function declared here
+script/014__system_errors.kis:50:34: error[kis/var-conflict]: `<sysfn-param>` needs exactly one of `var` and `literal`
+script/014__system_errors.kis:52:16: error[kis/read-only-variable]: meta field `cleared` is read-only here; write it with `<meta-set>`
+script/014__system_errors.kis:54:18: error[kis/not-matchable]: `arg1` has type `vec2`, which `<match>` cannot read
+script/014__system_errors.kis:56:8: error[kis/var-conflict]: `<interface-focus-move>` needs exactly one of `direction` and `target-idx`
+script/014__system_errors.kis:58:8: error[kis/element-not-allowed]: `<s>` is not allowed in a system function body
+script/014__system_errors.kis:64:27: error[kis/value-out-of-range]: argument position 3 is out of range; `one_arg` takes 1 argument(s)
+script/014__system_errors.kis:66:35: error[kis/not-a-local]: `bgm_volume` is not a local of this system function
+script/014__system_errors.kis:71:8: error[kis/return-mismatch]: system function `typed` returns `bool`; `<sysfn-return>` needs `val`
+script/014__system_errors.kis:74:6: error[kis/missing-return]: system function `forgetful` can reach its end without `<sysfn-return>`
+script/014__system_errors.kis:80:24: error[kis/sysfn-recursion]: recursive system functions: `ping`, `pong`
+script/014__system_errors.kis:88:7: error[kis/local-shadows-global]: local variable `cleared` shadows meta field `cleared`
+  note: script/014__system_errors.kis:9:5: meta field declared here
+script/014__system_errors.kis:94:24: error[kis/unknown-sysfn]: unknown system function `nowhere`
+script/014__system_errors.kis:96:24: error[kis/unknown-operation]: unknown operation `metafn__push`
+script/014__system_errors.kis:98:24: error[kis/unknown-mode]: unknown mode `nowhere`
+script/014__system_errors.kis:100:24: error[kis/sysfn-arity]: `louder` takes 1 argument(s), but 0 were given
+script/014__system_errors.kis:102:24: error[kis/value-out-of-range]: `6` is outside 0..=5
+script/014__system_errors.kis:104:24: error[kis/bad-handler]: expected a call such as `f()` or `metafn__save(3)`
+script/014__system_errors.kis:106:24: error[kis/bad-binding]: `metafn__revert` takes `entry.index`
+script/014__system_errors.kis:108:24: error[kis/not-an-overlay]: `title` is a root page; `interface__call` needs a non-root `<page>` or a `<dialog>`
+script/014__system_errors.kis:110:24: error[kis/not-an-entry]: scene `side` is not an entry scene; mark it `entry="true"`
+  note: script/014__system_errors.kis:158:5: scene declared here
+script/014__system_errors.kis:112:20: error[kis/unknown-setting]: `cleared` is a meta field, but `bind` needs a setting
+script/014__system_errors.kis:114:20: error[kis/bind-mismatch]: `<slider>` needs a `<setting-int>`, but `text_speed` is a `<setting-enum>`
+  note: script/014__system_errors.kis:5:5: setting declared here
+script/014__system_errors.kis:116:8: error[kis/element-not-allowed]: `<text-frame>` is not allowed outside a `<layer>` of `<game-mode>`
+script/014__system_errors.kis:120:33: error[kis/handler-signature]: `on-keyboard` must call a system function taking `Key`, not the operation `metafn__quit`
+script/014__system_errors.kis:122:33: error[kis/handler-signature]: `on-keyboard` passes `Key` itself; write `keys()` without arguments
+script/014__system_errors.kis:124:33: error[kis/handler-signature]: `on-keyboard` passes `Key`, but `wrong_keys` takes `i16`
+  note: script/014__system_errors.kis:33:5: system function declared here
+script/014__system_errors.kis:126:34: error[kis/bad-value]: `menu` is not a valid `requires`; expected `game`
+script/014__system_errors.kis:128:44: error[kis/bad-value]: a root page cannot require a running game
+script/014__system_errors.kis:130:5: error[kis/duplicate-mode]: mode `p1` is already declared
+  note: script/014__system_errors.kis:120:5: first defined here
+script/014__system_errors.kis:134:8: error[kis/non-exhaustive-match]: non-exhaustive `<on-exit>`: `Bad` is not covered
+script/014__system_errors.kis:139:14: error[kis/element-not-allowed]: `<sysfn-arg>` is not allowed outside `<sysfn>`
+script/014__system_errors.kis:151:6: error[kis/element-not-allowed]: `<var-i16>` is not allowed at the top level of the game
+script/014__system_errors.kis:154:24: error[kis/sysfn-call-in-game]: system function `noop` can only be called from the system scope

@@ -1,5 +1,5 @@
 <kagari>
-  <system start="title" />
+  <system start="title"><page name="title" root="true" /></system>
   <game>
     <include src="include/missing.kis" />
     <include src="include/cycle_a.kis" />

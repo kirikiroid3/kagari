@@ -37,8 +37,8 @@ VoiceId   = a closed enum, generated from every voice="…" in the program
 `current_line` and each backlog entry are lookups in this table. `who` is display text like
 `text`. Every `voice` must name a `VoiceAsset` constant, which the compiler checks.
 
-Playing a voice from the backlog is the system operation `play_voice(v)`. It only uses the audio
-system and applies the voice volume setting. The narrative is not involved.
+Playing a voice from the backlog is the system operation `metafn__play_voice(entry.voice)`. It
+only uses the audio system and applies the voice volume setting. The narrative is not involved.
 
 This holds only while text is free of story variables. If text ever interpolated a variable, such
 as a player name, `line` would no longer be a function of `StepId`, and each entry would have to
@@ -47,10 +47,10 @@ carry the interpolated values. See [Open Questions](./open-questions.md#text-int
 ## Revert to here
 
 ```text
-revert(i) :  game := rewind(game, i);  pop        -- requires game; the top is the backlog
+metafn__revert(entry.index) :  game := rewind(game, i);  interface__return   -- requires game; the top is the backlog
 ```
 
-`revert(i)` restores the trace prefix up to entry `i` and closes the backlog.
+`metafn__revert(entry.index)` restores the trace prefix up to entry `i` and closes the backlog.
 
 - The target is a prefix of the current trace, so it is reachable by construction.
 - It replays from the nearest choice snapshot before `i` and runs renders from the last keyframe
@@ -64,5 +64,5 @@ revert(i) :  game := rewind(game, i);  pop        -- requires game; the top is t
 
 A backlog page repeats over the history with `<for-history>` and shows each entry's line with
 `<backlog-line>`; the syntax book's *System Script* chapter has a complete example. Its buttons
-use the two operations above: `play_voice(entry.voice)` and `revert(entry.index)`. A voice button
+use the two operations above: `metafn__play_voice(entry.voice)` and `metafn__revert(entry.index)`. A voice button
 for an entry without a voice is not shown.

@@ -1,4 +1,5 @@
-//! The front-end pipeline: stages 1-3 plus the termination and missing-return checks.
+//! The front-end pipeline: stages 1-3 plus the termination, missing-return and mode-graph
+//! checks.
 
 use rustc_hash::FxHashSet;
 
@@ -8,19 +9,20 @@ use crate::diagnostic::{Diagnostic, DiagnosticCode};
 use crate::input::{Program, SourceFile};
 use crate::ir::returns::missing_returns;
 use crate::ir::termination::termination;
-use crate::kis::game_hir;
 use crate::kis::hir::Render;
+use crate::kis::program_hir;
 use crate::parse::{parse_kis, parse_represent};
 use crate::represent::check::{
     check_cycles, check_inline_renders, check_kirp_file, check_kix_file, check_voices,
 };
 use crate::represent::scope::item_scope;
+use crate::system_graph::system_graph;
 
 /// Every diagnostic of the program, sorted by location and deduplicated.
 #[salsa::tracked(returns(ref))]
 pub fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
     let collected = collect(db, program);
-    let hir = game_hir(db, program);
+    let hir = program_hir(db, program);
     let kirp_files: Vec<SourceFile> = {
         let mut seen = FxHashSet::default();
         hir.renders
@@ -45,6 +47,7 @@ pub fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
     diags.extend(hir.diagnostics.iter().cloned());
     diags.extend(termination(db, program).iter().cloned());
     diags.extend(missing_returns(db, program).iter().cloned());
+    diags.extend(system_graph(db, program).iter().cloned());
 
     diags.extend(item_scope(db, program).diagnostics.iter().cloned());
     for &file in &collected.kix_files {

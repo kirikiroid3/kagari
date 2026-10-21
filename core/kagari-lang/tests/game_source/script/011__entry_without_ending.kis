@@ -1,5 +1,5 @@
 <kagari>
-  <system start="title" />
+  <system start="title"><page name="title" root="true" /></system>
   <game>
     <!-- kis/entry-returns: no enum `Ending` is declared -->
     <scene name="main" entry="true">

@@ -7,12 +7,12 @@ use crate::db::Db;
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
 use crate::input::Program;
 use crate::ir::{IrScene, NodeId, Op, narrative_ir};
-use crate::kis::game_hir;
+use crate::kis::program_hir;
 
 #[salsa::tracked(returns(ref))]
 pub fn missing_returns(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
     let ir = narrative_ir(db, program);
-    let hir = game_hir(db, program);
+    let hir = program_hir(db, program);
     let mut diagnostics = Vec::new();
     for scene in ir.scenes.iter().filter(|scene| scene.returns.is_some()) {
         let Some(last) = fall_off(scene) else {

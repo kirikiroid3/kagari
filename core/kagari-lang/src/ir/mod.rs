@@ -19,7 +19,7 @@ pub use lower::narrative_ir;
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct NarrativeIr {
     pub vars: Vec<IrVar>,
-    /// Same order as `GameHir::scenes`.
+    /// Same order as `ProgramHir::scenes`.
     pub scenes: Vec<IrScene>,
     /// The scenes the system can start (`entry="true"`), in scene order.
     pub entries: Vec<SceneId>,

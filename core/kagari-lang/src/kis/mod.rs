@@ -1,8 +1,10 @@
-//! Stage 2: the game scope's schema, names, values and templates, lowered to [`hir::GameHir`].
+//! Stage 2: the schema, names, values and templates of both scopes, lowered to
+//! [`hir::ProgramHir`].
 
 pub mod hir;
 pub mod lower;
 pub mod schema;
+pub mod system_hir;
 pub mod value;
 
-pub use lower::game_hir;
+pub use lower::program_hir;

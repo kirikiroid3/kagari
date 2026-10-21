@@ -1,4 +1,4 @@
-//! CFG construction from [`GameHir`](crate::kis::hir::GameHir).
+//! CFG construction from [`ProgramHir`](crate::kis::hir::ProgramHir).
 //!
 //! Each block is lowered back-to-front with a `next` continuation, so control-flow
 //! joins need no extra nodes: every branch of a `<match>` or `<choice>` targets the
@@ -13,15 +13,15 @@ use crate::ir::{
     Domain, IrArm, IrBranchArm, IrChoiceMatch, IrPattern, IrReturn, IrScene, IrVar, NarrativeIr,
     Node, NodeId, Op, SceneId, VarId,
 };
-use crate::kis::game_hir;
 use crate::kis::hir::{
-    Block, ChoiceItem, GameHir, MatchStmt, ReturnValue, SceneDecl, StmtKind, VarDecl, VarScope,
+    Block, ChoiceItem, MatchStmt, ProgramHir, ReturnValue, SceneDecl, StmtKind, VarDecl, VarScope,
 };
+use crate::kis::program_hir;
 use crate::kis::value::{Pattern, Value, VarType};
 
 #[salsa::tracked(returns(ref))]
 pub fn narrative_ir(db: &dyn Db, program: Program) -> NarrativeIr {
-    let hir = game_hir(db, program);
+    let hir = program_hir(db, program);
     let vars: Vec<IrVar> = hir
         .vars
         .iter()
@@ -60,7 +60,7 @@ fn scene_id(idx: Idx<SceneDecl>) -> SceneId {
     SceneId(raw(idx))
 }
 
-fn domain(hir: &GameHir, ty: VarType) -> Domain {
+fn domain(hir: &ProgramHir, ty: VarType) -> Domain {
     match ty {
         VarType::Bool => Domain::Bool,
         VarType::Enum(e) => Domain::Enum {
@@ -74,7 +74,7 @@ fn domain(hir: &GameHir, ty: VarType) -> Domain {
     }
 }
 
-fn lower_var(hir: &GameHir, idx: Idx<VarDecl>, decl: &VarDecl) -> IrVar {
+fn lower_var(hir: &ProgramHir, idx: Idx<VarDecl>, decl: &VarDecl) -> IrVar {
     let domain = domain(hir, decl.ty);
     IrVar {
         decl: idx,

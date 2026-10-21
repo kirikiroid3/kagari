@@ -9,7 +9,7 @@ The stack splits as `stack = base :: overlays`:
 - The **base** frame is either the `Game` mode or a **root page** (Title, Gallery, Credits).
 - **Overlays** are pages pushed on top of the base (Save, Load, Config, Backlog, confirmations).
 
-Only `goto`, `start` and `load` change the base, and each of them resets the whole stack. This
+Only `interface__goto`, `metafn__start` and `metafn__load` change the base, and each of them resets the whole stack. This
 gives a simple answer to "which UI goes along with the game":
 
 | UI                                           | Is                                   | Lifetime |
@@ -55,57 +55,63 @@ attributes and an example. In terms of this chapter:
 - A `<page root="true">` is a root page. Every other `<page>` and every `<dialog>` is an overlay.
 - `requires="game"` on an overlay is its context requirement, checked as in
   [Context typing](#context-typing).
-- An interaction attribute such as `on-click` holds one of the [operations](#operations).
+- A handler attribute such as `on-click` holds one call: of a system function, or of one of the
+  [operations](#operations) directly. A system function body runs operations as tags such as
+  `<interface-call page="save" />`.
 
 ### Game mode
 
 `<game-mode>` owns the `Narrative` value. Its `<on-exit>` handler runs when the entry scene
 returns. It receives the `Ending` value the entry scene returns, matches on it, and must be
 exhaustive, like a `<match>` in the story.
+If the matching case runs no `interface__goto`, `metafn__start`, `metafn__load` or
+`metafn__quit`, the stack resets to `[start]`, the root page named by `<system start>`.
 
 ## Operations
 
-UI attributes such as `on-click` name one of these operations. There is no other way for the UI to
-change state.
+Handlers call these operations, directly or through system functions. There is no other way for
+the UI to change state. Each operation is written `metafn__x(…)` or `interface__x(…)` in an
+attribute, and as a `<metafn-x>` or `<interface-x>` tag in a system function; the syntax book's
+*System Script* chapter gives both forms.
 
-| Op              | Effect on the configuration                          | Typing condition |
-| --------------- | ---------------------------------------------------- | ---------------- |
-| `push(m)`       | `stack := stack ++ [m]`                              | `m` is an overlay, and `m.requires ⊆ ctx(stack)` |
-| `pop`           | drops the top frame                                  | the top is an overlay, never the base |
-| `goto(m)`       | `stack := [m]`                                       | `m` is a root page |
-| `start(e)`      | `stack := [Game(new(e), hud₀)]`                      | `e` is an entry scene of `<game>` |
-| `load(k)`       | `stack := [Game(restore(slots[k]), hud₀)]`           | none: the same op from Title and from in-game |
-| `save(k)`       | `slots[k] := snapshot(game(stack))`                  | `game ∈ ctx(stack)` |
-| `advance`       | `game := step(game, NextStep)`                       | `game ∈ ctx(stack)`, the top is `Game` |
-| `select(arm)`   | `game := step(game, arm)`                            | as `advance` |
-| `revert(i)`     | `game := rewind(game, i)`, then `pop`                | see [Backlog](./backlog.md) |
-| `set(x, v)`     | `settings.x := v`                                    | `v` has the type of setting `x` |
-| `play_voice(v)` | plays a voice line; no state change                  | `v : VoiceId` |
-| `quit`          | terminates the game immediately, with no confirmation | — |
-| `ask_quit`      | `push(quit)`: pushes the quit-confirmation dialog    | — |
+| Op                                | Effect on the configuration                          | Typing condition |
+| --------------------------------- | ---------------------------------------------------- | ---------------- |
+| `interface__call(m)`              | `stack := stack ++ [m]`                              | `m` is an overlay, and `m.requires ⊆ ctx(stack)` |
+| `interface__return()`             | drops the top frame                                  | the top is an overlay, never the base |
+| `interface__goto(m)`              | `stack := [m]`                                       | `m` is a root page |
+| `metafn__start(e)`                | `stack := [Game(new(e), hud₀)]`                      | `e` is an entry scene of `<game>` |
+| `metafn__load(k)`                 | `stack := [Game(restore(slots[k]), hud₀)]`           | none: the same op from Title and from in-game |
+| `metafn__save(k)`                 | `slots[k] := snapshot(game(stack))`                  | `game ∈ ctx(stack)` |
+| `metafn__advance()`               | `game := step(game, NextStep)`                       | `game ∈ ctx(stack)`, the top is `Game` |
+| `metafn__select(arm)`             | `game := step(game, arm)`                            | as `metafn__advance` |
+| `metafn__revert(entry.index)`     | `game := rewind(game, i)`, then `interface__return`  | see [Backlog](./backlog.md) |
+| `metafn__play_voice(entry.voice)` | plays a voice line; no state change                  | `game ∈ ctx(stack)` |
+| `metafn__quit()`                  | terminates the game immediately, with no confirmation | — |
+| `interface__focus_move(x)`        | moves the focus of the top frame                     | see [UI](./ui.md#focus-and-input) |
+| `interface__focus_activate()`     | activates the focused element                        | — |
 
-`quit` never asks. A button that should confirm uses `ask_quit`, which pushes the dialog named
-`quit`. *Tentative:* `std/ui.kix` provides a default `quit` dialog whose confirm button runs
-`quit`; a studio replaces it by declaring its own `<dialog name="quit">`.
+`metafn__quit` never asks. A button that should confirm calls `interface__call(quit)` on a
+`<dialog name="quit">` the studio declares. Settings are changed with `<set>` in a system
+function, or by a control's `bind`.
 
-`load(k)` fails when `restore` reports a divergence. The divergence is shown, and the stack is
-unchanged.
+`metafn__load(k)` fails when `restore` reports a divergence. The divergence is shown, and the
+stack is unchanged.
 
 ### Context typing
 
 `ctx(stack)` is the **context index** of a stack: `{game}` when the base is `Game`, `{}`
-otherwise. `push` and `pop` never change the base, so `ctx` is invariant along them, and only
-`goto`, `start` and `load` move between contexts.
+otherwise. `interface__call` and `interface__return` never change the base, so `ctx` is invariant
+along them, and only `interface__goto`, `metafn__start` and `metafn__load` move between contexts.
 
 In type terms, modes are indexed by the context:
 
 ```text
 Mode  : Ctx → Type
-push  : Mode c → Stack c → Stack c
-start : Entry → Stack {game}
-load  : Slot  → Stack {game}
-goto  : RootPage → Stack {}
+interface__call : Mode c → Stack c → Stack c
+metafn__start   : Entry → Stack {game}
+metafn__load    : Slot  → Stack {game}
+interface__goto : RootPage → Stack {}
 ```
 
-So `push(save)` from the title page is a compile error: `ctx([title]) = {}`, and `save` requires
-`{game}`.
+So `interface__call(save)` from the title page is a compile error: `ctx([title]) = {}`, and
+`save` requires `{game}`.

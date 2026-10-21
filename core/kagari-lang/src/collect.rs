@@ -1,7 +1,7 @@
 //! Stage 1: follow includes and imports from the entry file and gather the
-//! top-level game elements, the system meta declarations and the kix files.
+//! top-level elements of both scopes and the kix files.
 
-use kagari_std::{PRELUDE, StdScope};
+use kagari_std::{PRELUDE, SYSTEM_PRELUDE, StdScope};
 use kagari_syntax::script::ScriptLanguage;
 use kagari_syntax::script::ast::{Content, Document, Element};
 use kagari_syntax::{TextRange, TextSize};
@@ -45,8 +45,14 @@ pub struct Collected {
     /// The elements whose children form `game_top`: `<game>` and every spliced
     /// `<kagari-game>` root. Stage 2 checks their non-element content.
     pub game_containers: Vec<TopElement>,
-    /// `<meta-*>` elements of the system scope.
-    pub system_meta: Vec<TopElement>,
+    /// The `<system>` element.
+    pub system: Option<TopElement>,
+    /// Top-level system children after include splicing: the system prelude's first, then
+    /// the user's, in document order.
+    pub system_top: Vec<TopElement>,
+    /// The elements whose children form `system_top`: `<system>` and every spliced
+    /// `<kagari-system>` root.
+    pub system_containers: Vec<TopElement>,
     /// The prelude first, then the game imports, deduped, first-seen order.
     pub kix_files: Vec<SourceFile>,
     pub diagnostics: Vec<Diagnostic>,
@@ -66,8 +72,6 @@ impl Scope {
         }
     }
 }
-
-const META_TAGS: [&str; 4] = ["meta-bool", "meta-enum", "meta-char", "meta-int"];
 
 #[salsa::tracked(returns(ref))]
 pub fn collect(db: &dyn Db, program: Program) -> Collected {
@@ -151,6 +155,8 @@ impl Collector<'_> {
             included_at: None,
         });
         if let Some(system) = children.iter().find(|el| el.is("system")) {
+            self.system_prelude();
+            self.out.system = Some(TopElement::new(entry, system));
             self.walk(entry, system, Scope::System);
         }
         if let Some(game) = children.iter().find(|el| el.is("game")) {
@@ -160,13 +166,30 @@ impl Collector<'_> {
         self.stack.pop();
     }
 
+    /// Walk the bundled input enums into the system scope. A missing or malformed prelude is
+    /// an engine bug, so it is not reported.
+    fn system_prelude(&mut self) {
+        let db = self.db;
+        let file = db.source_file(FilePath::Std(SYSTEM_PRELUDE.into()));
+        let root = Document::cast(parse_kis(db, file).syntax_node()).and_then(|d| d.root());
+        let Some(root) = root.filter(|root| root.is("kagari-system")) else {
+            return;
+        };
+        if !self.out.kis_files.contains(&file) {
+            self.out.kis_files.push(file);
+        }
+        self.walk(file, &root, Scope::System);
+    }
+
     /// Walk the direct children of a scope element (`<game>`, `<system>` or an included root).
     fn walk(&mut self, file: SourceFile, parent: &Element, scope: Scope) {
-        if scope == Scope::Game {
-            let container = TopElement::new(file, parent);
-            if !self.out.game_containers.contains(&container) {
-                self.out.game_containers.push(container);
-            }
+        let container = TopElement::new(file, parent);
+        let containers = match scope {
+            Scope::Game => &mut self.out.game_containers,
+            Scope::System => &mut self.out.system_containers,
+        };
+        if !containers.contains(&container) {
+            containers.push(container);
         }
         for child in parent.child_elements() {
             if child.is("include") {
@@ -174,14 +197,11 @@ impl Collector<'_> {
             } else if child.is("import") {
                 self.import(file, &child, scope);
             } else {
-                match scope {
-                    Scope::Game => self.out.game_top.push(TopElement::new(file, &child)),
-                    Scope::System => {
-                        if META_TAGS.iter().any(|tag| child.is(tag)) {
-                            self.out.system_meta.push(TopElement::new(file, &child));
-                        }
-                    }
-                }
+                let top = match scope {
+                    Scope::Game => &mut self.out.game_top,
+                    Scope::System => &mut self.out.system_top,
+                };
+                top.push(TopElement::new(file, &child));
             }
         }
     }

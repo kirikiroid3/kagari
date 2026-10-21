@@ -9,12 +9,12 @@ use crate::db::Db;
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
 use crate::input::Program;
 use crate::ir::{IrScene, NarrativeIr, Node, NodeId, Op, SceneId, narrative_ir};
-use crate::kis::game_hir;
+use crate::kis::program_hir;
 
 #[salsa::tracked(returns(ref))]
 pub fn termination(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
     let ir = narrative_ir(db, program);
-    let hir = game_hir(db, program);
+    let hir = program_hir(db, program);
     let scene_name = |scene: &IrScene| hir.scenes[scene.decl].name.clone();
     let analysis = analyze(ir);
     let mut diagnostics = Vec::new();

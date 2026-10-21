@@ -93,7 +93,7 @@ was visited. Scenes `stall_b` and `dorm_night` are omitted.
 
 ```xml
 <kagari>
-  <system start="title" />
+  <system start="title"><page name="title" root="true" /></system>
 
   <game>
     <import src="characters.kix" />

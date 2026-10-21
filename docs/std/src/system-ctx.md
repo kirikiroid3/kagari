@@ -40,7 +40,8 @@ The rule that makes this sound:
 - `Eq` on `Setting<T>` compares the reference (which setting), not the value.
 
 `Setting<T>` exists only in game scope. System code reads and writes settings as plain values of
-type `T`, with `bind` and `set`, since no analysis depends on system views.
+type `T`, with `bind` and with `<set>` in system functions, since no analysis depends on system
+views.
 
 By parametricity a render cannot depend on the values behind the context. So it is still
 evaluated at compile time, with `ctx` as a free symbol, and two screens are compared as terms.

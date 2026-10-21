@@ -16,6 +16,7 @@ story and the system talk to each other.
 | `std/system-setting.kix` | system | Setting and meta declarations, and their types                 |
 | `std/narrative.kix`      | system | The abstract `Narrative` type: lines, history, save and load   |
 | `std/system-ctx.kix`     | game   | Deferred references to settings, and the `Hud` component      |
+| `std/input.kis`          | system | The `Key` and `PadButton` input enums; included automatically |
 
 ## Design constraints
 

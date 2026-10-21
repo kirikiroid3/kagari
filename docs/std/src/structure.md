@@ -13,7 +13,7 @@ scenes. In the other direction, game code sees nothing of the system except
 [`std/system-ctx.kix`](./system-ctx.md).
 
 An entry scene, a `<scene entry="true">`, is a starting scene that the system starts with
-[`start(name)`](./modes.md#operations), where `name` is the scene's name. An entry scene returns a
+[`metafn__start(name)`](./modes.md#operations), where `name` is the scene's name. An entry scene returns a
 value of the story's `Ending` enum. When it returns, that value, and nothing else, is passed to the
 `Game` mode's [`<on-exit>`](./modes.md#game-mode) handler.
 

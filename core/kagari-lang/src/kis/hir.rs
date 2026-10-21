@@ -1,4 +1,5 @@
-//! The game-scope HIR produced by stage 2.
+//! The HIR of both scopes produced by stage 2: the game's scenes and variables, the shared
+//! enums and meta fields, and the system scope (see [`crate::kis::system_hir`]).
 
 use kagari_syntax::TextRange;
 use la_arena::{Arena, Idx};
@@ -6,15 +7,17 @@ use smol_str::SmolStr;
 
 use crate::diagnostic::{Diagnostic, Span};
 use crate::input::SourceFile;
+use crate::kis::system_hir::SystemHir;
 use crate::kis::value::{Pattern, Value, VarType};
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct GameHir {
+pub struct ProgramHir {
     pub enums: Arena<EnumDecl>,
     pub vars: Arena<VarDecl>,
     pub metas: Arena<MetaDecl>,
     pub scenes: Arena<SceneDecl>,
     pub renders: Arena<Render>,
+    pub system: SystemHir,
     pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -52,19 +55,7 @@ pub enum VarScope {
 pub struct MetaDecl {
     pub name: SmolStr,
     pub span: Span,
-    pub ty: MetaType,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum MetaType {
-    Bool,
-    Char,
-    Int {
-        min: i16,
-        max: i16,
-    },
-    /// The meta's `type` is not resolved; using it from the game is an error for now.
-    Enum,
+    pub ty: VarType,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -157,8 +148,8 @@ pub enum ReturnValue {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MatchStmt<B> {
-    pub vars: Vec<Idx<VarDecl>>,
+pub struct MatchStmt<B, V = Idx<VarDecl>> {
+    pub vars: Vec<V>,
     pub arms: Vec<MatchArm<B>>,
 }
 

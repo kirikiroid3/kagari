@@ -101,12 +101,12 @@ often a sign that its range is too small.
 ```
 
 *Tentative.* Writes a literal value to a meta field declared in `<system>` (see
-[meta declarations](./system.md#settings-meta-and-save-slots)). `<meta-set>` is not a step. `val`
+[meta declarations](./system.md#meta-fields)). `<meta-set>` is not a step. `val`
 is written as for `<set>`, against the type of the meta field.
 
 Meta is write-only from the story: no script element reads a meta field back, except
 `from-meta` when the story starts. The *Kagari STD Book* explains why this keeps every narrative
-analysis unaffected. A `<meta-enum>` field cannot be used from the game yet.
+analysis unaffected.
 
 ## `from-meta`: copy a meta field at start
 

@@ -1,5 +1,5 @@
-//! Lowering of the collected game elements to [`GameHir`]: the schema and content checks,
-//! name resolution, value parsing and template expansion of stage 2.
+//! Lowering of the collected elements of both scopes to [`ProgramHir`]: the schema and content
+//! checks, name resolution, value parsing and template expansion of stage 2.
 
 use kagari_syntax::script::ast::{Content, DecodedText, Element, decode_content};
 use kagari_syntax::{TextRange, TextSize};
@@ -14,31 +14,42 @@ use crate::diagnostic::{Diagnostic, DiagnosticCode, Related, Span};
 use crate::exhaustive::{self, TyKind, Types, Witness};
 use crate::input::{Program, SourceFile, resolve_src};
 use crate::kis::hir::{
-    Block, BlockId, ChoiceArm, ChoiceItem, EnumDecl, GameHir, LabelDecl, MatchArm, MatchStmt,
-    Message, MetaDecl, MetaType, Render, ReturnValue, SceneDecl, Stmt, StmtKind, TextPiece,
-    VarDecl, VarScope, VariantDecl,
+    Block, BlockId, ChoiceArm, ChoiceItem, EnumDecl, LabelDecl, MatchArm, MatchStmt, Message,
+    MetaDecl, ProgramHir, Render, ReturnValue, SceneDecl, Stmt, StmtKind, TextPiece, VarDecl,
+    VarScope, VariantDecl,
 };
 use crate::kis::schema::{Tag, attrs, tag};
+use crate::kis::system_hir::{ModeDecl, SysFnDecl};
 use crate::kis::value::{
-    Pattern, Value, ValueError, VarType, check_name, int_domain, parse_amount, parse_i16,
+    I16, Pattern, Value, ValueError, VarType, check_name, int_domain, parse_amount, parse_i16,
     parse_pattern, parse_repr, parse_value, split_list,
 };
 
-/// Stage 2 for the whole game scope.
+mod system;
+mod ui;
+
+use system::{SettingSlot, SysState, SystemTop};
+
+/// Stage 2 for both scopes.
 #[salsa::tracked(returns(ref))]
-pub fn game_hir(db: &dyn Db, program: Program) -> GameHir {
+pub fn program_hir(db: &dyn Db, program: Program) -> ProgramHir {
     let collected = collect(db, program);
     let mut lowerer = Lowerer::new(db);
     for container in &collected.game_containers {
-        lowerer.container_text(container);
+        lowerer.container_text(container, "at the top level of the game");
+    }
+    for container in &collected.system_containers {
+        lowerer.container_text(container, "inside `<system>`");
     }
     let mut top = TopLevel::default();
     for item in &collected.game_top {
         lowerer.top_element(item, &mut top);
     }
-    for item in &collected.system_meta {
-        lowerer.meta_decl(item);
+    let mut system = SystemTop::default();
+    for item in &collected.system_top {
+        lowerer.system_shell(item, &mut system);
     }
+    lowerer.system_decls(&system);
     for (file, element, tag) in &top.globals {
         lowerer.global_var(*file, element, *tag);
     }
@@ -48,6 +59,10 @@ pub fn game_hir(db: &dyn Db, program: Program) -> GameHir {
     for (scene, file, element) in &top.scenes {
         lowerer.scene(*scene, *file, element);
     }
+    lowerer.system_bodies(&system);
+    lowerer.system_start(collected.system.as_ref());
+    lowerer.sysfn_recursion();
+
     if !lowerer.hir.scenes.iter().any(|(_, scene)| scene.entry)
         && let Some(game) = &collected.game
         && let Some(element) = game.element(db)
@@ -163,7 +178,7 @@ struct Attr {
 
 struct Lowerer<'db> {
     db: &'db dyn Db,
-    hir: GameHir,
+    hir: ProgramHir,
     enums: FxHashMap<SmolStr, Idx<EnumDecl>>,
     globals: FxHashMap<SmolStr, VarSlot>,
     metas: FxHashMap<SmolStr, MetaSlot>,
@@ -173,13 +188,17 @@ struct Lowerer<'db> {
     inline_renders: FxHashMap<(SourceFile, TextRange), Idx<Render>>,
     file_renders: FxHashMap<SourceFile, Idx<Render>>,
     sc: SceneState,
+    settings: FxHashMap<SmolStr, SettingSlot>,
+    sysfns: FxHashMap<SmolStr, Idx<SysFnDecl>>,
+    modes: FxHashMap<SmolStr, Idx<ModeDecl>>,
+    ss: SysState,
 }
 
 impl<'db> Lowerer<'db> {
     fn new(db: &'db dyn Db) -> Self {
         Lowerer {
             db,
-            hir: GameHir::default(),
+            hir: ProgramHir::default(),
             enums: FxHashMap::default(),
             globals: FxHashMap::default(),
             metas: FxHashMap::default(),
@@ -189,6 +208,10 @@ impl<'db> Lowerer<'db> {
             inline_renders: FxHashMap::default(),
             file_renders: FxHashMap::default(),
             sc: SceneState::default(),
+            settings: FxHashMap::default(),
+            sysfns: FxHashMap::default(),
+            modes: FxHashMap::default(),
+            ss: SysState::default(),
         }
     }
 
@@ -355,13 +378,13 @@ impl<'db> Lowerer<'db> {
 
     // ---- top level ------------------------------------------------------------------------
 
-    fn container_text(&mut self, container: &TopElement) {
+    fn container_text(&mut self, container: &TopElement, place: &str) {
         let Some(element) = container.element(self.db) else {
             return;
         };
         for child in children(&element) {
             if let Child::Text(run) = child {
-                self.whitespace_only(container.file, run, "at the top level of the game");
+                self.whitespace_only(container.file, run, place);
             }
         }
     }
@@ -640,37 +663,28 @@ impl<'db> Lowerer<'db> {
         }
     }
 
-    fn meta_decl(&mut self, item: &TopElement) {
-        let file = item.file;
-        let Some(element) = item.element(self.db) else {
-            return;
-        };
-        let Some(tag) = tag(&element.name_text().unwrap_or_default()) else {
-            return;
-        };
-        self.check_attrs(file, &element, tag);
-        self.leaf(file, &element, tag);
-        let Some(name) = self.name_attr(file, &element, "name") else {
+    fn meta_decl(&mut self, file: SourceFile, element: &Element, tag: Tag) {
+        self.check_attrs(file, element, tag);
+        self.leaf(file, element, tag);
+        let Some(name) = self.name_attr(file, element, "name") else {
             return;
         };
         let name = SmolStr::new(&name.text);
-        let span = tag_span(file, &element);
+        let span = tag_span(file, element);
         if let Some(first) = self.metas.get(&name).map(|slot| slot.span) {
             let msg = format!("meta field `{name}` is already declared");
             self.duplicate(span, first, DiagnosticCode::KisDuplicateMeta, msg);
             return;
         }
-        let ty = match tag {
-            Tag::MetaBool => Some(MetaType::Bool),
-            Tag::MetaChar => Some(MetaType::Char),
-            Tag::MetaInt => self
-                .int_bounds(file, &element)
-                .map(|(min, max)| MetaType::Int { min, max }),
-            _ => Some(MetaType::Enum),
-        };
+        if let Some(first) = self.settings.get(&name).map(|slot| slot.span) {
+            let msg = format!("`{name}` is already declared as a setting");
+            self.duplicate(span, first, DiagnosticCode::KisDuplicateMeta, msg);
+            return;
+        }
+        let ty = self.decl_type(file, element, tag);
         let decl = ty.map(|ty| {
-            if let (Some(var_ty), Some(init)) = (meta_var_type(ty), attr(&element, "init"))
-                && let Err(err) = parse_value(var_ty, &self.hir.enums, &init.text)
+            if let Some(init) = attr(element, "init")
+                && let Err(err) = parse_value(ty, &self.hir.enums, &init.text)
             {
                 self.report_value(Span::new(file, init.range), &err);
             }
@@ -681,6 +695,32 @@ impl<'db> Lowerer<'db> {
             })
         });
         self.metas.insert(name, MetaSlot { decl, span });
+    }
+
+    /// The type declared by a `<var-*>`, `<meta-*>` or `<setting-*>` element: fixed by the
+    /// tag, or read from `min`/`max` or the enum named by `type`.
+    fn decl_type(&mut self, file: SourceFile, element: &Element, tag: Tag) -> Option<VarType> {
+        match tag {
+            Tag::VarBool | Tag::MetaBool | Tag::SettingBool => Some(VarType::Bool),
+            Tag::VarChar | Tag::MetaChar => Some(VarType::Char),
+            Tag::VarI16 => Some(I16),
+            Tag::VarInt | Tag::MetaInt | Tag::SettingInt => self
+                .int_bounds(file, element)
+                .map(|(min, max)| VarType::Int { min, max }),
+            _ => {
+                let type_attr = attr(element, "type")?;
+                let found = self.enums.get(type_attr.text.as_str()).copied();
+                if found.is_none() {
+                    self.report(
+                        Span::new(file, type_attr.range),
+                        DiagnosticCode::KisUnknownEnum,
+                        format!("unknown enum `{}`", type_attr.text),
+                        Vec::new(),
+                    );
+                }
+                found.map(VarType::Enum)
+            }
+        }
     }
 
     /// The `min`/`max` of a `<var-int>`/`<meta-int>`.
@@ -741,27 +781,7 @@ impl<'db> Lowerer<'db> {
         scope: VarScope,
     ) -> Option<Idx<VarDecl>> {
         let span = tag_span(file, element);
-        let ty = match tag {
-            Tag::VarBool => VarType::Bool,
-            Tag::VarChar => VarType::Char,
-            Tag::VarInt => {
-                let (min, max) = self.int_bounds(file, element)?;
-                VarType::Int { min, max }
-            }
-            _ => {
-                let type_attr = attr(element, "type")?;
-                let Some(idx) = self.enums.get(type_attr.text.as_str()).copied() else {
-                    self.report(
-                        Span::new(file, type_attr.range),
-                        DiagnosticCode::KisUnknownEnum,
-                        format!("unknown enum `{}`", type_attr.text),
-                        Vec::new(),
-                    );
-                    return None;
-                };
-                VarType::Enum(idx)
-            }
-        };
+        let ty = self.decl_type(file, element, tag)?;
         let init_attr = attr(element, "init")?;
         let init = match parse_value(ty, &self.hir.enums, &init_attr.text) {
             Ok(value) => value,
@@ -789,16 +809,7 @@ impl<'db> Lowerer<'db> {
         let meta_decl = &self.hir.metas[idx];
         let meta_ty = meta_decl.ty;
         let meta_span = meta_decl.span;
-        let Some(meta_var_ty) = meta_var_type(meta_ty) else {
-            self.report(
-                span,
-                DiagnosticCode::KisMetaEnumUnsupported,
-                format!("meta enum `{}` cannot be used from the game yet", meta.text),
-                Vec::new(),
-            );
-            return None;
-        };
-        if meta_var_ty != ty {
+        if meta_ty != ty {
             let note = meta_span.related(self.db, "meta field declared here");
             self.report(
                 span,
@@ -806,7 +817,7 @@ impl<'db> Lowerer<'db> {
                 format!(
                     "meta field `{}` has type {}, but the variable has type {}",
                     meta.text,
-                    self.type_name(meta_var_ty),
+                    self.type_name(meta_ty),
                     self.type_name(ty)
                 ),
                 vec![note],
@@ -835,6 +846,7 @@ impl<'db> Lowerer<'db> {
         match ty {
             VarType::Bool => "`bool`".to_owned(),
             VarType::Char => "`char`".to_owned(),
+            I16 => "`i16`".to_owned(),
             VarType::Int { min, max } => format!("`int` {min}..={max}"),
             VarType::Enum(idx) => format!("enum `{}`", self.hir.enums[idx].name),
         }
@@ -996,8 +1008,12 @@ impl<'db> Lowerer<'db> {
                 Tag::Goto => Some(self.goto(file, &element)),
                 Tag::Call => Some(self.call(file, &element)),
                 Tag::Return => Some(self.return_stmt(file, &element)),
+                Tag::SysfnCall => {
+                    self.game_sysfn_call(file, &element);
+                    None
+                }
                 Tag::Match => self
-                    .match_stmt(file, &element, |this, file, body| {
+                    .match_stmt(file, &element, Self::game_var, |this, file, body| {
                         this.block(file, body, false)
                     })
                     .map(StmtKind::Match),
@@ -1223,11 +1239,12 @@ impl<'db> Lowerer<'db> {
                 }
                 Tag::Match => {
                     let arm_ids = &mut builder.arm_ids;
-                    let lowered = self.match_stmt(file, &element, |this, file, body| {
-                        let mut items = Vec::new();
-                        this.choice_do(file, body, &mut items, arm_ids);
-                        items
-                    });
+                    let lowered =
+                        self.match_stmt(file, &element, Self::game_var, |this, file, body| {
+                            let mut items = Vec::new();
+                            this.choice_do(file, body, &mut items, arm_ids);
+                            items
+                        });
                     builder.items.extend(lowered.map(ChoiceItem::Match));
                 }
                 Tag::R => builder.renders.push(self.inline_render(file, &element)),
@@ -1544,23 +1561,23 @@ impl<'db> Lowerer<'db> {
     }
 
     fn meta_set(&mut self, file: SourceFile, element: &Element) -> Option<StmtKind> {
+        let (meta, value) = self.meta_assignment(file, element)?;
+        Some(StmtKind::MetaSet { meta, value })
+    }
+
+    /// The meta field and value of a `<meta-set>`, in either scope.
+    fn meta_assignment(
+        &mut self,
+        file: SourceFile,
+        element: &Element,
+    ) -> Option<(Idx<MetaDecl>, Value)> {
         self.check_attrs(file, element, Tag::MetaSet);
         self.leaf(file, element, Tag::MetaSet);
         let var = attr(element, "var")?;
         let val = attr(element, "val")?;
-        let span = Span::new(file, var.range);
-        let meta = self.lookup_meta(span, &var.text)?;
-        let Some(ty) = meta_var_type(self.hir.metas[meta].ty) else {
-            self.report(
-                span,
-                DiagnosticCode::KisMetaEnumUnsupported,
-                format!("meta enum `{}` cannot be used from the game yet", var.text),
-                Vec::new(),
-            );
-            return None;
-        };
-        match parse_value(ty, &self.hir.enums, &val.text) {
-            Ok(value) => Some(StmtKind::MetaSet { meta, value }),
+        let meta = self.lookup_meta(Span::new(file, var.range), &var.text)?;
+        match parse_value(self.hir.metas[meta].ty, &self.hir.enums, &val.text) {
+            Ok(value) => Some((meta, value)),
             Err(err) => {
                 self.report_value(Span::new(file, val.range), &err);
                 None
@@ -1570,14 +1587,16 @@ impl<'db> Lowerer<'db> {
 
     // ---- match ----------------------------------------------------------------------------
 
-    /// A `<match>`; `lower_do` lowers each `<do>` body. `None` when the variables, a pattern or
-    /// the structure is invalid (the bodies are still checked).
-    fn match_stmt<B>(
+    /// A `<match>`; `resolve` looks up each matched variable and its type, `lower_do` lowers
+    /// each `<do>` body. `None` when the variables, a pattern or the structure is invalid (the
+    /// bodies are still checked).
+    fn match_stmt<V, B>(
         &mut self,
         file: SourceFile,
         element: &Element,
+        mut resolve: impl FnMut(&mut Self, Span, &str) -> Option<(V, VarType)>,
         mut lower_do: impl FnMut(&mut Self, SourceFile, &Element) -> B,
-    ) -> Option<MatchStmt<B>> {
+    ) -> Option<MatchStmt<B, V>> {
         self.check_attrs(file, element, Tag::Match);
         let mut valid = true;
         let names = match (attr(element, "var"), attr(element, "vars")) {
@@ -1598,7 +1617,7 @@ impl<'db> Lowerer<'db> {
                 None
             }
         };
-        let mut vars: Vec<Idx<VarDecl>> = Vec::new();
+        let mut vars: Vec<V> = Vec::new();
         let tys: Option<Vec<VarType>> = names.and_then(|names| {
             if names.is_empty() {
                 self.report(
@@ -1610,13 +1629,17 @@ impl<'db> Lowerer<'db> {
                 return None;
             }
             let mut ok = true;
+            let mut tys = Vec::new();
             for (name, range) in names {
-                match self.lookup_var(Span::new(file, range), &name) {
-                    Some(var) => vars.push(var),
+                match resolve(self, Span::new(file, range), &name) {
+                    Some((var, ty)) => {
+                        vars.push(var);
+                        tys.push(ty);
+                    }
                     None => ok = false,
                 }
             }
-            ok.then(|| vars.iter().map(|var| self.hir.vars[*var].ty).collect())
+            ok.then_some(tys)
         });
         if tys.is_none() {
             valid = false;
@@ -1656,6 +1679,24 @@ impl<'db> Lowerer<'db> {
             valid = false;
         }
         let tys = tys.filter(|_| valid)?;
+        self.check_exhaustive(name_span(file, element), "`<match>`", &tys, &arms);
+        Some(MatchStmt { vars, arms })
+    }
+
+    /// A game variable and its type, as a `<match>` reads it.
+    fn game_var(&mut self, span: Span, name: &str) -> Option<(Idx<VarDecl>, VarType)> {
+        let var = self.lookup_var(span, name)?;
+        Some((var, self.hir.vars[var].ty))
+    }
+
+    /// Report the first value of `tys` that no arm covers. `what` names the matching element.
+    fn check_exhaustive<B>(
+        &mut self,
+        span: Span,
+        what: &str,
+        tys: &[VarType],
+        arms: &[MatchArm<B>],
+    ) {
         let rows: Vec<Vec<exhaustive::Pat>> = arms
             .iter()
             .flat_map(|arm| arm.rows.iter())
@@ -1664,23 +1705,22 @@ impl<'db> Lowerer<'db> {
         let types = KisTypes {
             enums: &self.hir.enums,
         };
-        if let Some(witness) = exhaustive::missing(&types, &tys, &rows) {
+        if let Some(witness) = exhaustive::missing(&types, tys, &rows) {
             let shown: Vec<String> = tys
                 .iter()
                 .zip(&witness)
                 .map(|(ty, w)| format_witness(&self.hir.enums, *ty, w))
                 .collect();
             self.report(
-                name_span(file, element),
+                span,
                 DiagnosticCode::KisNonExhaustiveMatch,
                 format!(
-                    "non-exhaustive `<match>`: `{}` is not covered",
+                    "non-exhaustive {what}: `{}` is not covered",
                     shown.join(" ")
                 ),
                 Vec::new(),
             );
         }
-        Some(MatchStmt { vars, arms })
     }
 
     /// One `<cases>`: `<case>`… then exactly one `<do>`. `None` when it is malformed or a
@@ -1969,15 +2009,6 @@ fn format_witness(enums: &la_arena::Arena<EnumDecl>, ty: VarType, witness: &Witn
             .get(*index)
             .map_or_else(|| "_".to_owned(), |v| v.name.to_string()),
         _ => "_".to_owned(),
-    }
-}
-
-fn meta_var_type(ty: MetaType) -> Option<VarType> {
-    match ty {
-        MetaType::Bool => Some(VarType::Bool),
-        MetaType::Char => Some(VarType::Char),
-        MetaType::Int { min, max } => Some(VarType::Int { min, max }),
-        MetaType::Enum => None,
     }
 }
 

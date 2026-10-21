@@ -27,7 +27,7 @@ impl FileSystem for MemoryFs {
 fn main_kis(scenes: &str) -> String {
     format!(
         r#"<kagari>
-  <system start="title"/>
+  <system start="title"><page name="title" root="true"/></system>
   <game>
     <import src="a.kix"/>
     <declare-enum name="Ending"><enum name="Normal" repr="0"/></declare-enum>

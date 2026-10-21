@@ -5,7 +5,7 @@ runs. They differ in who may touch them.
 
 | Store    | Examples                                     | Written by            | Read by |
 | -------- | -------------------------------------------- | --------------------- | ------- |
-| Settings | volumes, text speed, window mode, language   | the system (`set`)    | the system; the game only as [`Setting<T>`](./system-ctx.md) |
+| Settings | volumes, text speed, window mode, language   | the system (`<set>` in system functions, `bind`) | the system; the game only as [`Setting<T>`](./system-ctx.md) |
 | Meta     | cleared endings, gallery unlocks, read flags | the system, the narrative (write-only), the engine | the system; the narrative only by opt-in at `start` |
 
 ## Declarations
@@ -49,6 +49,6 @@ written after the save.
 
 ## Read flags
 
-Read-text flags are meta written by the engine on each `advance`, keyed by step id. The narrative
+Read-text flags are meta written by the engine on each `metafn__advance`, keyed by step id. The narrative
 never sees them. The system reads them, for example for skip-read-text and for marking read lines
 in the backlog.

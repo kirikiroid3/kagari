@@ -13,7 +13,7 @@ impl FileSystem for OneFile {
 }
 
 const PROGRAM: &str = r#"<kagari>
-  <system start="title"/>
+  <system start="title"><page name="title" root="true"/></system>
   <game>
     <declare-enum name="Ending">
       <enum name="A" repr="0"/>

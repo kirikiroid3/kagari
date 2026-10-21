@@ -1,5 +1,5 @@
 <kagari>
-  <system start="title" />
+  <system start="title"><page name="title" root="true" /></system>
   <game>
     <scene name="main">
       <s>Nobody can start this story.</s>

@@ -43,10 +43,49 @@ pub enum Tag {
     MetaChar,
     MetaEnum,
     MetaInt,
+    SettingInt,
+    SettingEnum,
+    SettingBool,
+    SaveSlots,
+    Sysfn,
+    SysfnArg,
+    SysfnParam,
+    SysfnReturn,
+    SysfnCall,
+    MetafnStart,
+    MetafnLoad,
+    MetafnSave,
+    MetafnAdvance,
+    MetafnSelect,
+    MetafnQuit,
+    InterfaceCall,
+    InterfaceReturn,
+    InterfaceGoto,
+    InterfaceFocusMove,
+    InterfaceFocusActivate,
+    VarI16,
+    VarVec2,
+    Page,
+    Dialog,
+    GameMode,
+    Layer,
+    GameScreen,
+    OnExit,
+    Button,
+    Slider,
+    Toggle,
+    Select,
+    Row,
+    Col,
+    TextFrame,
+    BacklogLine,
+    ForSlots,
+    ForHistory,
+    ForChoices,
 }
 
 impl Tag {
-    pub const ALL: [Tag; 40] = [
+    pub const ALL: [Tag; 79] = [
         Tag::Kagari,
         Tag::System,
         Tag::Game,
@@ -87,6 +126,45 @@ impl Tag {
         Tag::MetaChar,
         Tag::MetaEnum,
         Tag::MetaInt,
+        Tag::SettingInt,
+        Tag::SettingEnum,
+        Tag::SettingBool,
+        Tag::SaveSlots,
+        Tag::Sysfn,
+        Tag::SysfnArg,
+        Tag::SysfnParam,
+        Tag::SysfnReturn,
+        Tag::SysfnCall,
+        Tag::MetafnStart,
+        Tag::MetafnLoad,
+        Tag::MetafnSave,
+        Tag::MetafnAdvance,
+        Tag::MetafnSelect,
+        Tag::MetafnQuit,
+        Tag::InterfaceCall,
+        Tag::InterfaceReturn,
+        Tag::InterfaceGoto,
+        Tag::InterfaceFocusMove,
+        Tag::InterfaceFocusActivate,
+        Tag::VarI16,
+        Tag::VarVec2,
+        Tag::Page,
+        Tag::Dialog,
+        Tag::GameMode,
+        Tag::Layer,
+        Tag::GameScreen,
+        Tag::OnExit,
+        Tag::Button,
+        Tag::Slider,
+        Tag::Toggle,
+        Tag::Select,
+        Tag::Row,
+        Tag::Col,
+        Tag::TextFrame,
+        Tag::BacklogLine,
+        Tag::ForSlots,
+        Tag::ForHistory,
+        Tag::ForChoices,
     ];
 
     /// The element name as written.
@@ -132,6 +210,45 @@ impl Tag {
             Tag::MetaChar => "meta-char",
             Tag::MetaEnum => "meta-enum",
             Tag::MetaInt => "meta-int",
+            Tag::SettingInt => "setting-int",
+            Tag::SettingEnum => "setting-enum",
+            Tag::SettingBool => "setting-bool",
+            Tag::SaveSlots => "save-slots",
+            Tag::Sysfn => "sysfn",
+            Tag::SysfnArg => "sysfn-arg",
+            Tag::SysfnParam => "sysfn-param",
+            Tag::SysfnReturn => "sysfn-return",
+            Tag::SysfnCall => "sysfn-call",
+            Tag::MetafnStart => "metafn-start",
+            Tag::MetafnLoad => "metafn-load",
+            Tag::MetafnSave => "metafn-save",
+            Tag::MetafnAdvance => "metafn-advance",
+            Tag::MetafnSelect => "metafn-select",
+            Tag::MetafnQuit => "metafn-quit",
+            Tag::InterfaceCall => "interface-call",
+            Tag::InterfaceReturn => "interface-return",
+            Tag::InterfaceGoto => "interface-goto",
+            Tag::InterfaceFocusMove => "interface-focus-move",
+            Tag::InterfaceFocusActivate => "interface-focus-activate",
+            Tag::VarI16 => "var-i16",
+            Tag::VarVec2 => "var-vec2",
+            Tag::Page => "page",
+            Tag::Dialog => "dialog",
+            Tag::GameMode => "game-mode",
+            Tag::Layer => "layer",
+            Tag::GameScreen => "game-screen",
+            Tag::OnExit => "on-exit",
+            Tag::Button => "button",
+            Tag::Slider => "slider",
+            Tag::Toggle => "toggle",
+            Tag::Select => "select",
+            Tag::Row => "row",
+            Tag::Col => "col",
+            Tag::TextFrame => "text-frame",
+            Tag::BacklogLine => "backlog-line",
+            Tag::ForSlots => "for-slots",
+            Tag::ForHistory => "for-history",
+            Tag::ForChoices => "for-choices",
         }
     }
 
@@ -141,6 +258,12 @@ impl Tag {
             self,
             Tag::VarBool | Tag::VarChar | Tag::VarEnum | Tag::VarInt
         )
+    }
+
+    /// Whether the element declares a system function local: a game `<var-*>`, `<var-i16>`
+    /// or `<var-vec2>`.
+    pub fn is_sys_var(self) -> bool {
+        self.is_var() || matches!(self, Tag::VarI16 | Tag::VarVec2)
     }
 
     /// Whether the element declares a meta field (`<meta-*>`, but not `<meta-set>`).
@@ -191,19 +314,65 @@ pub fn attrs(tag: Tag) -> &'static [(&'static str, bool)] {
         Tag::Match => &[("var", false), ("vars", false)],
         Tag::Case => &[("val", true)],
         Tag::Set | Tag::Add | Tag::Sub | Tag::MetaSet => &[("var", true), ("val", true)],
-        Tag::MetaBool | Tag::MetaChar => &[("name", true), ("init", true)],
-        Tag::MetaEnum => &[("name", true), ("type", true), ("init", true)],
-        Tag::MetaInt => &[("name", true), ("min", true), ("max", true), ("init", true)],
+        Tag::MetaBool | Tag::MetaChar | Tag::SettingBool | Tag::VarI16 | Tag::VarVec2 => {
+            &[("name", true), ("init", true)]
+        }
+        Tag::MetaEnum | Tag::SettingEnum => &[("name", true), ("type", true), ("init", true)],
+        Tag::MetaInt | Tag::SettingInt => {
+            &[("name", true), ("min", true), ("max", true), ("init", true)]
+        }
+        Tag::System => &[("start", true)],
+        Tag::SaveSlots => &[("count", true)],
+        Tag::Sysfn => &[("name", true), ("args", false), ("return", false)],
+        Tag::SysfnArg => &[("position", true), ("var", true)],
+        Tag::SysfnParam => &[("var", false), ("literal", false)],
+        Tag::SysfnReturn => &[("val", false)],
+        Tag::SysfnCall => &[("name", true), ("save", false)],
+        Tag::MetafnStart | Tag::MetafnLoad | Tag::MetafnSave | Tag::MetafnSelect => {
+            &[("param", true)]
+        }
+        Tag::InterfaceCall | Tag::InterfaceGoto => &[("page", true)],
+        Tag::InterfaceFocusMove => &[("direction", false), ("target-idx", false)],
+        Tag::Page => &[
+            ("name", true),
+            ("root", false),
+            ("requires", false),
+            ("on-keyboard", false),
+            ("on-controller", false),
+        ],
+        Tag::Dialog => &[
+            ("name", true),
+            ("requires", false),
+            ("on-keyboard", false),
+            ("on-controller", false),
+        ],
+        Tag::GameMode => &[
+            ("name", true),
+            ("on-keyboard", false),
+            ("on-controller", false),
+        ],
+        Tag::Layer => &[("name", true), ("style", false)],
+        Tag::Button | Tag::TextFrame => &[("style", false), ("on-click", false)],
+        Tag::Slider | Tag::Toggle | Tag::Select => &[("style", false), ("bind", true)],
+        Tag::Row | Tag::Col | Tag::BacklogLine => &[("style", false)],
         Tag::Snip
         | Tag::S
         | Tag::R
         | Tag::Cases
         | Tag::Do
         | Tag::Kagari
-        | Tag::System
         | Tag::Game
         | Tag::KagariGame
-        | Tag::KagariSystem => &[],
+        | Tag::KagariSystem
+        | Tag::MetafnAdvance
+        | Tag::MetafnQuit
+        | Tag::InterfaceReturn
+        | Tag::InterfaceFocusActivate
+        | Tag::GameScreen
+        | Tag::OnExit
+        | Tag::ForSlots
+        | Tag::ForHistory
+        | Tag::ForChoices => &[],
     }
 }
 
