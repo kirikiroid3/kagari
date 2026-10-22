@@ -1,0 +1,38 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/script/005__patterns/main.kix
+---
+no diagnostics
+--- resolutions ---
+script/005__patterns/main.kix:3:16 Route -> enum crate::Route
+script/005__patterns/main.kix:3:24 Route::C -> variant crate::Route::C
+script/005__patterns/main.kix:4:12 u64 -> prim u64
+script/005__patterns/main.kix:6:19 u64 -> prim u64
+script/005__patterns/main.kix:6:27 u64 -> prim u64
+script/005__patterns/main.kix:9:9 r -> local r@9:9
+script/005__patterns/main.kix:9:12 Option -> enum std::Option
+script/005__patterns/main.kix:9:19 Route -> enum crate::Route
+script/005__patterns/main.kix:9:27 p -> local p@9:27
+script/005__patterns/main.kix:9:30 Point -> struct crate::Point
+script/005__patterns/main.kix:9:37 n -> local n@9:37
+script/005__patterns/main.kix:9:40 u64 -> prim u64
+script/005__patterns/main.kix:9:48 u64 -> prim u64
+script/005__patterns/main.kix:10:11 r -> local r@9:9
+script/005__patterns/main.kix:11:9 None -> variant std::Option::None
+script/005__patterns/main.kix:12:9 Some -> variant std::Option::Some
+script/005__patterns/main.kix:12:14 x -> local x@12:14
+script/005__patterns/main.kix:13:9 Route::A -> variant crate::Route::A
+script/005__patterns/main.kix:13:20 Route::B -> variant crate::Route::B
+script/005__patterns/main.kix:14:9 CONST_X -> const crate::CONST_X
+script/005__patterns/main.kix:15:9 other -> local other@15:9
+script/005__patterns/main.kix:17:9 Point -> struct crate::Point
+script/005__patterns/main.kix:17:17 x -> local x@17:17
+script/005__patterns/main.kix:17:23 py -> local py@17:23
+script/005__patterns/main.kix:17:30 p -> local p@9:27
+script/005__patterns/main.kix:18:11 n -> local n@9:37
+script/005__patterns/main.kix:19:9 LOW -> const crate::LOW
+script/005__patterns/main.kix:19:20 x -> local x@17:17
+script/005__patterns/main.kix:20:14 py -> local py@17:23
+script/005__patterns/main.kix:22:11 Unit -> struct crate::Unit
+script/005__patterns/main.kix:23:9 Unit -> struct crate::Unit

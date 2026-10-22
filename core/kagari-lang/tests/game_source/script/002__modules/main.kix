@@ -1,0 +1,12 @@
+mod characters;
+mod story;
+mod ui {
+    pub fn f() {}
+}
+
+use characters::{HANAKO, AZUSA};
+
+fn main() {
+    ui::f();
+    let _ids = (HANAKO, AZUSA, self::characters::AZUSA::CLOSE_EYE_SMILE);
+}

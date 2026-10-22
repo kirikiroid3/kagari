@@ -1,0 +1,10 @@
+fn hidden() {}
+pub fn shown() {}
+
+pub mod a {
+    pub const X: u64 = 1;
+}
+
+pub mod b {
+    pub const X: u64 = 2;
+}

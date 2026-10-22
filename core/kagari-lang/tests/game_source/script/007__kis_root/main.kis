@@ -1,0 +1,5 @@
+#[scene]
+pushdown fn Scene() {
+    s!(t!["x"]);
+    push_step(Say { who: None, voice: None, render: None, text: Some("x") });
+}

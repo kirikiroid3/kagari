@@ -1,0 +1,14 @@
+//! Operations that change the system's mode stack.
+
+use crate::system::RootPage;
+
+#[builtin] pub fn call<M>(mode: fn() -> M);
+#[builtin] pub fn back();
+#[builtin] pub fn goto(page: fn() -> RootPage);
+#[builtin] pub fn start<E, A, R>(entry: E, args: A, on_exit: Fn(R));
+#[builtin] pub fn load(slot: u64);
+#[builtin] pub fn save(slot: u64);
+#[builtin] pub fn advance();
+#[builtin] pub fn select<A>(arm: A);
+#[builtin] pub fn rewind(entry: u64);
+#[builtin] pub fn quit();

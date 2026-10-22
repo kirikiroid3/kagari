@@ -1,0 +1,49 @@
+---
+source: core/kagari-syntax/tests/snapshots.rs
+expression: "render(&input, &parse(&input, source_kind(path)))"
+input_file: core/kagari-syntax/tests/parse/kis_005__forms_in_kis.kis
+---
+SOURCE_FILE@0..50
+  FN@0..49
+    ATTR@0..8
+      POUND@0..1 "#"
+      L_BRACK@1..2 "["
+      PATH@2..7
+        PATH_SEGMENT@2..7
+          NAME_REF@2..7
+            IDENT@2..7 "scene"
+      R_BRACK@7..8 "]"
+    WHITESPACE@8..9 "\n"
+    PUSHDOWN_KW@9..17 "pushdown"
+    WHITESPACE@17..18 " "
+    FN_KW@18..20 "fn"
+    WHITESPACE@20..21 " "
+    NAME@21..26
+      IDENT@21..26 "Story"
+    PARAM_LIST@26..28
+      L_PAREN@26..27 "("
+      R_PAREN@27..28 ")"
+    WHITESPACE@28..29 " "
+    BLOCK_EXPR@29..49
+      L_CURLY@29..30 "{"
+      WHITESPACE@30..35 "\n    "
+      EXPR_STMT@35..47
+        FORM_EXPR@35..46
+          NAME_REF@35..36
+            IDENT@35..36 "s"
+          BANG@36..37 "!"
+          L_PAREN@37..38 "("
+          TEXT_FORM@38..45
+            NAME_REF@38..39
+              IDENT@38..39 "t"
+            BANG@39..40 "!"
+            L_BRACK@40..41 "["
+            TEXT_STRING@41..44
+              STRING@41..44 "\"x\""
+            R_BRACK@44..45 "]"
+          R_PAREN@45..46 ")"
+        SEMICOLON@46..47 ";"
+      WHITESPACE@47..48 "\n"
+      R_CURLY@48..49 "}"
+  WHITESPACE@49..50 "\n"
+error 35..46: forms are only allowed in `.kix` files

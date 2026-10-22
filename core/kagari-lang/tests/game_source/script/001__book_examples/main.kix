@@ -1,0 +1,204 @@
+// Examples of the syntax book and the engine proposal; all of them resolve.
+
+const HANAKO: EntityId = 216;
+
+// introduction.md, narrative/overview.md
+
+static mut VISITED_A: bool = false;
+static mut VISITED_B: bool = false;
+static mut VISITED_C: bool = false;
+
+static mut ROUTE: Route = Route::None;
+static mut AFFECTION_MIO: Int<0, 5> = 0;
+static mut MET_MIO: bool = false;
+
+enum Route { None, Hanako, Azusa, Both }
+
+enum Ending { Normal }
+enum Map { A, B, C, Leave }
+
+#[scene]
+#[entry]
+pushdown fn Day1() -> Ending {
+    s!(t!["The school festival starts today."]);
+    FestivalHub();
+    DormNight();
+    Ending::Normal
+}
+
+#[scene]
+pushdown fn FestivalHub() {
+    loop {
+        match choice!{
+            id = "map",
+            t!["Go to stall A"] => Map::A,
+            t!["Go to stall B"] => Map::B,
+            t!["Go to stall C"] => Map::C,
+            t!["Leave"] if VISITED_A && VISITED_B && VISITED_C => Map::Leave,
+        } {
+            Map::A => StallA(),
+            Map::B => StallB(),
+            Map::C => StallC(),
+            Map::Leave => break,
+        }
+    }
+}
+
+#[scene]
+pushdown fn StallA() {
+    if VISITED_A {
+        s!(t!["The stall is already packing up."]);
+        return;
+    }
+    visit(Map::A);
+    s!(who = "Hanako", render = hanako_jumps, t!["Welcome to stall A!"]);
+}
+
+#[scene]
+pushdown fn StallB() {
+    visit(Map::B);
+    s!(t!["これは" ["数多"]("あまた") "の" !["赤い"](emphasis()) "花。"]);
+}
+
+#[scene]
+pushdown fn StallC() {
+    visit(Map::C);
+    s!(t!["Tell me about " !["you"](emphasis()) "."]);
+}
+
+#[scene]
+pushdown fn DormNight() {
+    match (VISITED_A, VISITED_B, VISITED_C) {
+        (true, true, true) => FestivalEnd(),
+        _ => {}
+    }
+}
+
+#[scene]
+pushdown fn FestivalEnd() {
+    s!(t!["The fireworks start."]);
+}
+
+const fn hanako_jumps(mut screen: Screen) -> Screen {
+    screen.entity(HANAKO).cord.apply_animation(jump(20));
+    screen
+}
+
+// narrative/scenes.md
+
+pushdown fn visit(stall: Map) {
+    match stall {
+        Map::A => VISITED_A = true,
+        Map::B => VISITED_B = true,
+        Map::C => VISITED_C = true,
+        Map::Leave => {}
+    }
+}
+
+enum DayEnd { Normal, Hospital }
+
+#[scene]
+pushdown fn Day(day: Int<0, 6>) -> DayEnd {
+    s!(t!["Another day."]);
+    DayEnd::Normal
+}
+
+#[scene]
+pushdown fn Week() {
+    'week: for day in 0..7 {
+        match Day(day) {
+            DayEnd::Normal => continue,
+            DayEnd::Hospital => break 'week,
+        }
+    }
+}
+
+enum Answer { Accepted, Rejected }
+enum Confess { Yes, No }
+
+#[scene]
+pushdown fn Confession() -> Answer {
+    match choice!{
+        id = "confess",
+        t!["Tell her the truth"] => Confess::Yes,
+        t!["Say nothing"] => Confess::No,
+    } {
+        Confess::Yes => Answer::Accepted,
+        Confess::No => Answer::Rejected,
+    }
+}
+
+#[scene]
+pushdown fn Day3() {
+    match Confession() {
+        Answer::Accepted => AzusaRoute(),
+        Answer::Rejected => s!(t!["The wind stopped."]),
+    }
+}
+
+#[scene]
+pushdown fn AzusaRoute() {
+    ROUTE = Route::Azusa;
+    CLEARED_MIO.write(true);
+    twice(|| AFFECTION_MIO += 1);
+}
+
+pushdown fn twice(f: pushdown Fn()) {
+    f();
+    f();
+}
+
+static CLEARED_MIO: Meta<bool> = meta(false);
+
+mod chapter2 {
+    use super::*;
+
+    pub enum Ending { NormalEnd, AzusaEnd }
+
+    #[scene]
+    #[entry]
+    pub pushdown fn Main(cleared_azusa: bool) -> Ending {
+        if cleared_azusa {
+            s!(t!["The rooftop door is unlocked this time."]);
+        }
+        if ROUTE == Route::Azusa {
+            return Ending::AzusaEnd;
+        }
+        Ending::NormalEnd
+    }
+}
+
+// kinds.md
+
+enum Mood { Warm, Polite, Stranger }
+
+const fn mood(affection: Int<0, 5>, met: bool) -> Mood {
+    match (affection, met) {
+        (4..=5, true) => Mood::Warm,
+        (_, true) => Mood::Polite,
+        _ => Mood::Stranger,
+    }
+}
+
+#[scene]
+pushdown fn Greeting() {
+    match mood(AFFECTION_MIO, MET_MIO) {
+        Mood::Warm => s!(t!["\"There you are!\""]),
+        Mood::Polite => s!(t!["\"Hello.\""]),
+        Mood::Stranger => s!(t!["\"…Who are you?\""]),
+    }
+}
+
+// The engine proposal.
+
+mod proposal {
+    enum Route { None, Mio, Haruka, Rin }
+
+    const fn bonus(route: Route, affection: Int<0, 5>) -> Int<0, 2> {
+        match (route, affection) {
+            (Route::Mio, 4..=5) => 2,
+            (Route::Mio, _) | (_, 5) => 1,
+            _ => 0,
+        }
+    }
+}

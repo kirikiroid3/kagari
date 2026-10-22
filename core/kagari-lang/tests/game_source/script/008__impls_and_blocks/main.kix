@@ -1,0 +1,54 @@
+trait Shape {
+    type Area;
+    const SIDES: u64;
+    fn area(&self) -> Self::Area;
+}
+
+struct Square<const N: u64> {
+    side: u64,
+}
+
+type Board = Square<8>;
+
+impl<const N: u64> Square<N> {
+    const CELLS: u64 = N * N;
+
+    fn new() -> Self {
+        Self { side: N }
+    }
+
+    fn cells(&self) -> u64 {
+        self.side * Self::CELLS
+    }
+}
+
+impl<const N: u64> Shape for Square<N> {
+    type Area = u64;
+    const SIDES: u64 = 4;
+
+    fn area(&self) -> Self::Area {
+        self.side * self.side
+    }
+}
+
+fn generic<T: Shape>(shape: T) -> T::Area {
+    shape.area()
+}
+
+fn uses() -> u64 {
+    let board = Board::new();
+    let sides = Square::SIDES;
+    const LOCAL: u64 = 2;
+    fn helper(x: u64) -> u64 {
+        x + LOCAL
+    }
+    use crate::generic as g;
+    {
+        fn inner() -> u64 {
+            helper(1)
+        }
+        inner() + board.cells() + sides
+    }
+}
+
+impl bool {}

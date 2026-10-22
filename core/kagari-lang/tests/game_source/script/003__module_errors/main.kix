@@ -1,0 +1,16 @@
+mod missing;
+mod twice;
+mod other;
+
+use nowhere::x;
+use other::a::*;
+use other::b::*;
+
+fn a() {}
+fn a() {}
+
+fn uses() {
+    other::hidden();
+    other::shown();
+    let _ = X;
+}

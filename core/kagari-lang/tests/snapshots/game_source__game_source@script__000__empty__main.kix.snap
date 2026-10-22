@@ -1,0 +1,7 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/script/000__empty/main.kix
+---
+no diagnostics
+--- resolutions ---

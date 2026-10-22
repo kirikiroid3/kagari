@@ -1,0 +1,11 @@
+//! Text values, and the functions `t![…]` desugars to.
+
+#[builtin] pub struct Text;
+#[builtin] pub struct TextEffect;
+
+#[builtin] pub const fn ruby(base: Text, reading: Text) -> Text;
+#[builtin] pub const fn mono_ruby<const N: usize>(base: Text, readings: [Text; N]) -> Text;
+#[builtin] pub const fn effect(base: Text, effect: TextEffect) -> Text;
+#[builtin] pub const fn concat<const N: usize>(items: [Text; N]) -> Text;
+
+#[builtin] pub const fn emphasis() -> TextEffect;

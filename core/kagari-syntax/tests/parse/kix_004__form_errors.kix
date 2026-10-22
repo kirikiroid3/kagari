@@ -1,0 +1,35 @@
+#[scene]
+pushdown fn Errors() {
+    // unknown form
+    foo!(1);
+    // wrong delimiter
+    s![t!["x"]];
+    // `[]` form with an attribute
+    let c = column![gap = 1, text!(t!["x"])];
+    // attribute after an element
+    s!(t!["x"], who = "A");
+    // duplicate attribute
+    s!(who = "A", who = "B");
+    // arm outside `choice!`
+    s!(t!["x"] => 1);
+    // unknown attribute of `s!`
+    s!(color = 1);
+    // more than one element in `s!`
+    s!(t!["a"], t!["b"]);
+    // element of `s!` that is not `t![…]`
+    s!("x");
+    // unknown attribute of `choice!`
+    choice!{ id = "c1", color = 1, t!["a"] => A::B };
+    // `choice!` without `id`
+    choice!{ t!["a"] => A::B };
+    // `id` that is not a string literal
+    choice!{ id = 3, t!["a"] => A::B };
+    // `choice!` element that is not an arm
+    choice!{ id = "c2", t!["a"] };
+    // `choice!` arm whose text is not `t![…]`
+    choice!{ id = "c3", "a" => A::B };
+    // commas between text items
+    s!(t!["a", "b"]);
+    // not a text item
+    s!(t!["a" x]);
+}

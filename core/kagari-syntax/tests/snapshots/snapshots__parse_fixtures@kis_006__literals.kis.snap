@@ -1,0 +1,189 @@
+---
+source: core/kagari-syntax/tests/snapshots.rs
+expression: "render(&input, &parse(&input, source_kind(path)))"
+input_file: core/kagari-syntax/tests/parse/kis_006__literals.kis
+---
+SOURCE_FILE@0..379
+  CONST@0..100
+    CONST_KW@0..5 "const"
+    WHITESPACE@5..6 " "
+    NAME@6..11
+      IDENT@6..11 "VALID"
+    COLON@11..12 ":"
+    WHITESPACE@12..13 " "
+    ARRAY_TYPE@13..22
+      L_BRACK@13..14 "["
+      PATH_TYPE@14..18
+        PATH@14..18
+          PATH_SEGMENT@14..18
+            NAME_REF@14..18
+              IDENT@14..18 "u128"
+      SEMICOLON@18..19 ";"
+      WHITESPACE@19..20 " "
+      LITERAL@20..21
+        INT_NUMBER@20..21 "5"
+      R_BRACK@21..22 "]"
+    WHITESPACE@22..23 " "
+    EQ@23..24 "="
+    WHITESPACE@24..25 " "
+    ARRAY_EXPR@25..99
+      L_BRACK@25..26 "["
+      LITERAL@26..30
+        INT_NUMBER@26..30 "0x1F"
+      COMMA@30..31 ","
+      WHITESPACE@31..32 " "
+      LITERAL@32..41
+        INT_NUMBER@32..41 "0b1010_u8"
+      COMMA@41..42 ","
+      WHITESPACE@42..43 " "
+      LITERAL@43..51
+        INT_NUMBER@43..51 "1_000i64"
+      COMMA@51..52 ","
+      WHITESPACE@52..53 " "
+      LITERAL@53..57
+        INT_NUMBER@53..57 "0o17"
+      COMMA@57..58 ","
+      WHITESPACE@58..59 " "
+      LITERAL@59..98
+        INT_NUMBER@59..98 "340282366920938463463 ..."
+      R_BRACK@98..99 "]"
+    SEMICOLON@99..100 ";"
+  WHITESPACE@100..101 "\n"
+  CONST@101..130
+    CONST_KW@101..106 "const"
+    WHITESPACE@106..107 " "
+    NAME@107..114
+      IDENT@107..114 "DECIMAL"
+    COLON@114..115 ":"
+    WHITESPACE@115..116 " "
+    PATH_TYPE@116..123
+      PATH@116..123
+        PATH_SEGMENT@116..123
+          NAME_REF@116..123
+            IDENT@116..123 "Decimal"
+    WHITESPACE@123..124 " "
+    EQ@124..125 "="
+    WHITESPACE@125..126 " "
+    LITERAL@126..129
+      DECIMAL_NUMBER@126..129 "1.5"
+    SEMICOLON@129..130 ";"
+  WHITESPACE@130..131 "\n"
+  CONST@131..197
+    CONST_KW@131..136 "const"
+    WHITESPACE@136..137 " "
+    NAME@137..143
+      IDENT@137..143 "STRING"
+    COLON@143..144 ":"
+    WHITESPACE@144..145 " "
+    PATH_TYPE@145..151
+      PATH@145..151
+        PATH_SEGMENT@145..151
+          NAME_REF@145..151
+            IDENT@145..151 "String"
+    WHITESPACE@151..152 " "
+    EQ@152..153 "="
+    WHITESPACE@153..154 " "
+    LITERAL@154..196
+      STRING@154..196 "\"tab\\t quote\\\" unicod ..."
+    SEMICOLON@196..197 ";"
+  WHITESPACE@197..198 "\n"
+  CONST@198..223
+    CONST_KW@198..203 "const"
+    WHITESPACE@203..204 " "
+    NAME@204..213
+      IDENT@204..213 "NO_DIGITS"
+    COLON@213..214 ":"
+    WHITESPACE@214..215 " "
+    PATH_TYPE@215..217
+      PATH@215..217
+        PATH_SEGMENT@215..217
+          NAME_REF@215..217
+            IDENT@215..217 "u8"
+    WHITESPACE@217..218 " "
+    EQ@218..219 "="
+    WHITESPACE@219..220 " "
+    LITERAL@220..222
+      INT_NUMBER@220..222 "0x"
+    SEMICOLON@222..223 ";"
+  WHITESPACE@223..224 "\n"
+  CONST@224..250
+    CONST_KW@224..229 "const"
+    WHITESPACE@229..230 " "
+    NAME@230..239
+      IDENT@230..239 "BAD_DIGIT"
+    COLON@239..240 ":"
+    WHITESPACE@240..241 " "
+    PATH_TYPE@241..243
+      PATH@241..243
+        PATH_SEGMENT@241..243
+          NAME_REF@241..243
+            IDENT@241..243 "u8"
+    WHITESPACE@243..244 " "
+    EQ@244..245 "="
+    WHITESPACE@245..246 " "
+    LITERAL@246..249
+      INT_NUMBER@246..249 "0b2"
+    SEMICOLON@249..250 ";"
+  WHITESPACE@250..251 "\n"
+  CONST@251..280
+    CONST_KW@251..256 "const"
+    WHITESPACE@256..257 " "
+    NAME@257..267
+      IDENT@257..267 "BAD_SUFFIX"
+    COLON@267..268 ":"
+    WHITESPACE@268..269 " "
+    PATH_TYPE@269..271
+      PATH@269..271
+        PATH_SEGMENT@269..271
+          NAME_REF@269..271
+            IDENT@269..271 "u8"
+    WHITESPACE@271..272 " "
+    EQ@272..273 "="
+    WHITESPACE@273..274 " "
+    LITERAL@274..279
+      INT_NUMBER@274..279 "12abc"
+    SEMICOLON@279..280 ";"
+  WHITESPACE@280..281 "\n"
+  CONST@281..345
+    CONST_KW@281..286 "const"
+    WHITESPACE@286..287 " "
+    NAME@287..296
+      IDENT@287..296 "TOO_LARGE"
+    COLON@296..297 ":"
+    WHITESPACE@297..298 " "
+    PATH_TYPE@298..302
+      PATH@298..302
+        PATH_SEGMENT@298..302
+          NAME_REF@298..302
+            IDENT@298..302 "u128"
+    WHITESPACE@302..303 " "
+    EQ@303..304 "="
+    WHITESPACE@304..305 " "
+    LITERAL@305..344
+      INT_NUMBER@305..344 "340282366920938463463 ..."
+    SEMICOLON@344..345 ";"
+  WHITESPACE@345..346 "\n"
+  CONST@346..378
+    CONST_KW@346..351 "const"
+    WHITESPACE@351..352 " "
+    NAME@352..362
+      IDENT@352..362 "BAD_ESCAPE"
+    COLON@362..363 ":"
+    WHITESPACE@363..364 " "
+    PATH_TYPE@364..370
+      PATH@364..370
+        PATH_SEGMENT@364..370
+          NAME_REF@364..370
+            IDENT@364..370 "String"
+    WHITESPACE@370..371 " "
+    EQ@371..372 "="
+    WHITESPACE@372..373 " "
+    LITERAL@373..377
+      STRING@373..377 "\"\\q\""
+    SEMICOLON@377..378 ";"
+  WHITESPACE@378..379 "\n"
+error 220..222: integer literal has no digits
+error 246..249: invalid digit `2` in a binary literal
+error 274..279: invalid suffix `abc` for an integer literal
+error 305..344: integer literal is too large
+error 374..376: unknown character escape `\q`

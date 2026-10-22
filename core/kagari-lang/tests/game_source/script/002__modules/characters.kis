@@ -1,0 +1,6 @@
+pub const HANAKO: EntityId = 216;
+pub const AZUSA: EntityId = 217;
+
+pub mod AZUSA {
+    pub const CLOSE_EYE_SMILE: u64 = 1;
+}

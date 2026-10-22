@@ -1,0 +1,4 @@
+fn before() {}
+
+/* unterminated /* nested */ comment
+fn swallowed() {}

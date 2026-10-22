@@ -1,0 +1,37 @@
+enum Confess { Yes, No }
+
+#[scene]
+pushdown fn Forms(x: Text) {
+    s!(t!["これは" ["数多"]("あまた") "の" ["漢字"]("かん"|"じ") !["赤い"](emphasis()) "花。"]);
+    s!(t![![["数多"]("あまた")](emphasis()) {x}]);
+    s!(who = "Azusa", voice = AZUSA_0072, render = hanako_jumps, t!["ぬっ"]);
+    s!(render = cg_fireworks);
+    s!(
+        render = |mut screen| { screen.background().change(BG::ROOF).apply_animation(fade(30)); screen },
+        t!["The wind on the roof is cold."]
+    );
+    let answer = choice!{
+        id = "confess",
+        render = azusa_smiles,
+        t!["Tell her the truth"] => Confess::Yes,
+        t!["Say nothing"] if MET_MIO => Confess::No,
+    };
+    match choice!{ id = "again", t!["Yes"] => Confess::Yes, t!["No"] => Confess::No } {
+        Confess::Yes => AzusaConfession(),
+        Confess::No => s!(t!["I kept quiet."]),
+    }
+}
+
+fn Config() -> Overlay {
+    let (speed, set_speed) = signal(TEXT_SPEED.get());
+    Overlay(column![
+        text!(t!["Text speed: " {speed()}]),
+        slider!{
+            min = 0,
+            max = 10,
+            value = speed(),
+            on_change = |v| { set_speed(v); TEXT_SPEED.set(v) },
+        },
+        button!{on_click = || nav::back(), t!["Back"]},
+    ])
+}

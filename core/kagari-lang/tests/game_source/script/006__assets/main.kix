@@ -1,0 +1,3 @@
+const CG_001: ImageAsset = asset("cg_001.png");
+const MISSING: ImageAsset = asset("missing.png");
+const EMPTY: ImageAsset = asset("");

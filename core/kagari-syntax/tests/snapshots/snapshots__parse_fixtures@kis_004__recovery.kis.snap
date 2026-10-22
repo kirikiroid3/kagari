@@ -1,0 +1,281 @@
+---
+source: core/kagari-syntax/tests/snapshots.rs
+expression: "render(&input, &parse(&input, source_kind(path)))"
+input_file: core/kagari-syntax/tests/parse/kis_004__recovery.kis
+---
+SOURCE_FILE@0..301
+  FN@0..76
+    FN_KW@0..2 "fn"
+    WHITESPACE@2..3 " "
+    NAME@3..20
+      IDENT@3..20 "missing_semicolon"
+    PARAM_LIST@20..22
+      L_PAREN@20..21 "("
+      R_PAREN@21..22 ")"
+    WHITESPACE@22..23 " "
+    BLOCK_EXPR@23..76
+      L_CURLY@23..24 "{"
+      WHITESPACE@24..29 "\n    "
+      LET_STMT@29..38
+        LET_KW@29..32 "let"
+        WHITESPACE@32..33 " "
+        IDENT_PAT@33..34
+          NAME@33..34
+            IDENT@33..34 "a"
+        WHITESPACE@34..35 " "
+        EQ@35..36 "="
+        WHITESPACE@36..37 " "
+        LITERAL@37..38
+          INT_NUMBER@37..38 "1"
+      WHITESPACE@38..43 "\n    "
+      LET_STMT@43..53
+        LET_KW@43..46 "let"
+        WHITESPACE@46..47 " "
+        IDENT_PAT@47..48
+          NAME@47..48
+            IDENT@47..48 "b"
+        WHITESPACE@48..49 " "
+        EQ@49..50 "="
+        WHITESPACE@50..51 " "
+        LITERAL@51..52
+          INT_NUMBER@51..52 "2"
+        SEMICOLON@52..53 ";"
+      WHITESPACE@53..58 "\n    "
+      EXPR_STMT@58..63
+        CALL_EXPR@58..63
+          PATH_EXPR@58..61
+            PATH@58..61
+              PATH_SEGMENT@58..61
+                NAME_REF@58..61
+                  IDENT@58..61 "foo"
+          ARG_LIST@61..63
+            L_PAREN@61..62 "("
+            R_PAREN@62..63 ")"
+      WHITESPACE@63..68 "\n    "
+      EXPR_STMT@68..74
+        CALL_EXPR@68..73
+          PATH_EXPR@68..71
+            PATH@68..71
+              PATH_SEGMENT@68..71
+                NAME_REF@68..71
+                  IDENT@68..71 "bar"
+          ARG_LIST@71..73
+            L_PAREN@71..72 "("
+            R_PAREN@72..73 ")"
+        SEMICOLON@73..74 ";"
+      WHITESPACE@74..75 "\n"
+      R_CURLY@75..76 "}"
+  WHITESPACE@76..78 "\n\n"
+  FN@78..121
+    FN_KW@78..80 "fn"
+    WHITESPACE@80..81 " "
+    NAME@81..88
+      IDENT@81..88 "garbage"
+    PARAM_LIST@88..90
+      L_PAREN@88..89 "("
+      R_PAREN@89..90 ")"
+    WHITESPACE@90..91 " "
+    BLOCK_EXPR@91..121
+      L_CURLY@91..92 "{"
+      WHITESPACE@92..97 "\n    "
+      LET_STMT@97..106
+        LET_KW@97..100 "let"
+        WHITESPACE@100..101 " "
+        IDENT_PAT@101..102
+          NAME@101..102
+            IDENT@101..102 "x"
+        WHITESPACE@102..103 " "
+        EQ@103..104 "="
+        WHITESPACE@104..105 " "
+        LITERAL@105..106
+          INT_NUMBER@105..106 "1"
+      WHITESPACE@106..107 " "
+      ERROR@107..111
+        ERROR_TOKEN@107..108 "@"
+        WHITESPACE@108..109 " "
+        INT_NUMBER@109..110 "2"
+        SEMICOLON@110..111 ";"
+      WHITESPACE@111..116 "\n    "
+      ERROR@116..117
+        R_PAREN@116..117 ")"
+      WHITESPACE@117..118 " "
+      SEMICOLON@118..119 ";"
+      WHITESPACE@119..120 "\n"
+      R_CURLY@120..121 "}"
+  WHITESPACE@121..123 "\n\n"
+  ERROR@123..126
+    ERROR_TOKEN@123..124 "$"
+    WHITESPACE@124..125 " "
+    ERROR_TOKEN@125..126 "`"
+  WHITESPACE@126..127 " "
+  FN@127..148
+    FN_KW@127..129 "fn"
+    WHITESPACE@129..130 " "
+    NAME@130..143
+      IDENT@130..143 "after_garbage"
+    PARAM_LIST@143..145
+      L_PAREN@143..144 "("
+      R_PAREN@144..145 ")"
+    WHITESPACE@145..146 " "
+    BLOCK_EXPR@146..148
+      L_CURLY@146..147 "{"
+      R_CURLY@147..148 "}"
+  WHITESPACE@148..150 "\n\n"
+  FN@150..207
+    FN_KW@150..152 "fn"
+    WHITESPACE@152..153 " "
+    NAME@153..160
+      IDENT@153..160 "chained"
+    PARAM_LIST@160..181
+      L_PAREN@160..161 "("
+      PARAM@161..166
+        IDENT_PAT@161..162
+          NAME@161..162
+            IDENT@161..162 "a"
+        COLON@162..163 ":"
+        WHITESPACE@163..164 " "
+        PATH_TYPE@164..166
+          PATH@164..166
+            PATH_SEGMENT@164..166
+              NAME_REF@164..166
+                IDENT@164..166 "u8"
+      COMMA@166..167 ","
+      WHITESPACE@167..168 " "
+      PARAM@168..173
+        IDENT_PAT@168..169
+          NAME@168..169
+            IDENT@168..169 "b"
+        COLON@169..170 ":"
+        WHITESPACE@170..171 " "
+        PATH_TYPE@171..173
+          PATH@171..173
+            PATH_SEGMENT@171..173
+              NAME_REF@171..173
+                IDENT@171..173 "u8"
+      COMMA@173..174 ","
+      WHITESPACE@174..175 " "
+      PARAM@175..180
+        IDENT_PAT@175..176
+          NAME@175..176
+            IDENT@175..176 "c"
+        COLON@176..177 ":"
+        WHITESPACE@177..178 " "
+        PATH_TYPE@178..180
+          PATH@178..180
+            PATH_SEGMENT@178..180
+              NAME_REF@178..180
+                IDENT@178..180 "u8"
+      R_PAREN@180..181 ")"
+    WHITESPACE@181..182 " "
+    RET_TYPE@182..189
+      THIN_ARROW@182..184 "->"
+      WHITESPACE@184..185 " "
+      PATH_TYPE@185..189
+        PATH@185..189
+          PATH_SEGMENT@185..189
+            NAME_REF@185..189
+              IDENT@185..189 "bool"
+    WHITESPACE@189..190 " "
+    BLOCK_EXPR@190..207
+      L_CURLY@190..191 "{"
+      WHITESPACE@191..196 "\n    "
+      BIN_EXPR@196..205
+        BIN_EXPR@196..201
+          PATH_EXPR@196..197
+            PATH@196..197
+              PATH_SEGMENT@196..197
+                NAME_REF@196..197
+                  IDENT@196..197 "a"
+          WHITESPACE@197..198 " "
+          L_ANGLE@198..199 "<"
+          WHITESPACE@199..200 " "
+          PATH_EXPR@200..201
+            PATH@200..201
+              PATH_SEGMENT@200..201
+                NAME_REF@200..201
+                  IDENT@200..201 "b"
+        WHITESPACE@201..202 " "
+        L_ANGLE@202..203 "<"
+        WHITESPACE@203..204 " "
+        PATH_EXPR@204..205
+          PATH@204..205
+            PATH_SEGMENT@204..205
+              NAME_REF@204..205
+                IDENT@204..205 "c"
+      WHITESPACE@205..206 "\n"
+      R_CURLY@206..207 "}"
+  WHITESPACE@207..209 "\n\n"
+  FN@209..301
+    FN_KW@209..211 "fn"
+    WHITESPACE@211..212 " "
+    NAME@212..220
+      IDENT@212..220 "unclosed"
+    PARAM_LIST@220..222
+      L_PAREN@220..221 "("
+      R_PAREN@221..222 ")"
+    WHITESPACE@222..223 " "
+    BLOCK_EXPR@223..301
+      L_CURLY@223..224 "{"
+      WHITESPACE@224..229 "\n    "
+      EXPR_STMT@229..250
+        IF_EXPR@229..250
+          IF_KW@229..231 "if"
+          WHITESPACE@231..232 " "
+          PATH_EXPR@232..233
+            PATH@232..233
+              PATH_SEGMENT@232..233
+                NAME_REF@232..233
+                  IDENT@232..233 "x"
+          WHITESPACE@233..234 " "
+          BLOCK_EXPR@234..250
+            L_CURLY@234..235 "{"
+            WHITESPACE@235..244 "\n        "
+            EXPR_STMT@244..248
+              CALL_EXPR@244..247
+                PATH_EXPR@244..245
+                  PATH@244..245
+                    PATH_SEGMENT@244..245
+                      NAME_REF@244..245
+                        IDENT@244..245 "y"
+                ARG_LIST@245..247
+                  L_PAREN@245..246 "("
+                  R_PAREN@246..247 ")"
+              SEMICOLON@247..248 ";"
+            WHITESPACE@248..249 "\n"
+            R_CURLY@249..250 "}"
+      WHITESPACE@250..252 "\n\n"
+      FN@252..301
+        FN_KW@252..254 "fn"
+        WHITESPACE@254..255 " "
+        NAME@255..267
+          IDENT@255..267 "unterminated"
+        PARAM_LIST@267..269
+          L_PAREN@267..268 "("
+          R_PAREN@268..269 ")"
+        WHITESPACE@269..270 " "
+        BLOCK_EXPR@270..301
+          L_CURLY@270..271 "{"
+          WHITESPACE@271..276 "\n    "
+          LET_STMT@276..301
+            LET_KW@276..279 "let"
+            WHITESPACE@279..280 " "
+            IDENT_PAT@280..281
+              NAME@280..281
+                IDENT@280..281 "s"
+            WHITESPACE@281..282 " "
+            EQ@282..283 "="
+            WHITESPACE@283..284 " "
+            LITERAL@284..301
+              STRING@284..301 "\"never closed;\n}\n"
+error 38..38: expected `;`
+error 63..63: expected `;`
+error 106..106: expected `;`
+error 107..108: unexpected character
+error 116..117: expected an expression
+error 123..124: expected an item
+error 123..124: unexpected character
+error 125..126: unexpected character
+error 202..203: comparison operators cannot be chained
+error 284..301: unterminated string literal
+error 301..301: expected `;`
+error 301..301: expected `}`

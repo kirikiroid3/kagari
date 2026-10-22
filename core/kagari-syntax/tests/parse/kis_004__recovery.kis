@@ -1,0 +1,26 @@
+fn missing_semicolon() {
+    let a = 1
+    let b = 2;
+    foo()
+    bar();
+}
+
+fn garbage() {
+    let x = 1 @ 2;
+    ) ;
+}
+
+$ ` fn after_garbage() {}
+
+fn chained(a: u8, b: u8, c: u8) -> bool {
+    a < b < c
+}
+
+fn unclosed() {
+    if x {
+        y();
+}
+
+fn unterminated() {
+    let s = "never closed;
+}

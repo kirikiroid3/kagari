@@ -1,0 +1,48 @@
+//! The screen: an ECS world that renders transform.
+
+#[builtin] pub struct Screen;
+
+impl Screen {
+    #[builtin] pub const fn empty() -> Screen;
+    #[builtin] pub const fn entity(&mut self, id: EntityId) -> &mut Entity;
+    #[builtin] pub const fn background(&mut self) -> &mut Layer;
+    #[builtin] pub const fn hud(&mut self) -> &mut Hud;
+}
+
+pub type EntityId = u64;
+pub type ImageId = u64;
+
+pub struct Entity { pub cord: Cord, pub appearance: Appearance }
+pub struct Cord { pub x: i64, pub y: i64 }
+pub struct Appearance { pub emotion: Layer }
+pub struct Layer { pub image: ImageId }
+
+impl Cord {
+    #[builtin] pub const fn apply_animation(&mut self, animation: CordAnimation);
+}
+
+impl Layer {
+    #[builtin] pub const fn change(&mut self, image: ImageId) -> &mut LayerImageChange;
+}
+
+#[must_use]
+pub struct LayerImageChange { pub image: ImageId }
+
+impl LayerImageChange {
+    #[builtin] pub const fn apply_animation(&mut self, transition: TransitionAnimation);
+}
+
+pub struct CordAnimation { pub height: u64, pub frames: u64 }
+pub struct TransitionAnimation { pub frames: u64 }
+
+pub const fn jump(height: u64) -> CordAnimation { CordAnimation { height, frames: 12 } }
+pub const fn instant_switch() -> TransitionAnimation { TransitionAnimation { frames: 0 } }
+pub const fn fade(frames: u64) -> TransitionAnimation { TransitionAnimation { frames } }
+
+/// A render: the screen before a step to the screen after it.
+pub type Render = const fn(Screen) -> Screen;
+
+pub enum Visibility { Shown, Hidden }
+
+/// A resource component the story uses to ask the system to hide parts of the HUD.
+pub struct Hud { pub text_frame: Visibility, pub quick_menu: Visibility }

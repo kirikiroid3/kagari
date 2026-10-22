@@ -1,0 +1,33 @@
+fn unresolved() {
+    let _ = nothing;
+    let _value: Nothing = 1;
+}
+
+fn labels() {
+    loop {
+        break 'nope;
+    }
+    break;
+    continue;
+}
+
+fn assoc() {
+    Screen::nothing();
+}
+
+fn self_outside() -> Self {}
+
+#[foo]
+fn attribute() {}
+
+#[builtin]
+fn x();
+
+fn y();
+
+fn patterns(p: (u64, u64), o: Option<u64>) {
+    let (x, x) = p;
+    match o {
+        Some(a) | None => {}
+    }
+}

@@ -1,0 +1,8 @@
+const VALID: [u128; 5] = [0x1F, 0b1010_u8, 1_000i64, 0o17, 340282366920938463463374607431768211455];
+const DECIMAL: Decimal = 1.5;
+const STRING: String = "tab\t quote\" unicode\u{1F600} newline\n";
+const NO_DIGITS: u8 = 0x;
+const BAD_DIGIT: u8 = 0b2;
+const BAD_SUFFIX: u8 = 12abc;
+const TOO_LARGE: u128 = 340282366920938463463374607431768211456;
+const BAD_ESCAPE: String = "\q";

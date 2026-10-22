@@ -1,0 +1,33 @@
+//! The Kagari standard library root.
+
+pub mod prelude;
+pub mod screen;
+pub mod narrative;
+pub mod ui;
+pub mod system;
+
+/// An integer in the inclusive range `LO..=HI`.
+#[builtin] pub struct Int<const LO: i128, const HI: i128>;
+#[builtin] pub struct String;
+#[builtin] pub struct Vec<T>;
+#[builtin] pub struct Rat;
+#[builtin] pub struct Decimal;
+
+pub enum Option<T> {
+    None,
+    Some(T),
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+pub trait Eq {}
+
+#[builtin] pub struct ImageAsset;
+#[builtin] pub struct AudioAsset;
+#[builtin] pub struct VoiceAsset;
+
+/// Loads the asset at `path`, relative to the file that names it.
+#[builtin] pub const fn asset<A>(path: narrative::Text) -> A;

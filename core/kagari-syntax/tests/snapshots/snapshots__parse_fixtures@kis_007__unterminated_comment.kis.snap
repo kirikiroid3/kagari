@@ -1,0 +1,21 @@
+---
+source: core/kagari-syntax/tests/snapshots.rs
+expression: "render(&input, &parse(&input, source_kind(path)))"
+input_file: core/kagari-syntax/tests/parse/kis_007__unterminated_comment.kis
+---
+SOURCE_FILE@0..71
+  FN@0..14
+    FN_KW@0..2 "fn"
+    WHITESPACE@2..3 " "
+    NAME@3..9
+      IDENT@3..9 "before"
+    PARAM_LIST@9..11
+      L_PAREN@9..10 "("
+      R_PAREN@10..11 ")"
+    WHITESPACE@11..12 " "
+    BLOCK_EXPR@12..14
+      L_CURLY@12..13 "{"
+      R_CURLY@13..14 "}"
+  WHITESPACE@14..16 "\n\n"
+  BLOCK_COMMENT@16..71 "/* unterminated /* ne ..."
+error 16..71: unterminated block comment

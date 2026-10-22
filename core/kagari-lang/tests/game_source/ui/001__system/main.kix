@@ -1,0 +1,63 @@
+mod story {
+    pub enum Ending { NormalEnd, AzusaEnd }
+
+    #[scene]
+    #[entry]
+    pub pushdown fn Main(cleared_azusa: bool) -> Ending {
+        if cleared_azusa {
+            return Ending::AzusaEnd;
+        }
+        Ending::NormalEnd
+    }
+}
+
+mod ui {
+    pub fn Title() -> RootPage {
+        super::Credits()
+    }
+
+    pub fn GameView() -> Element {
+        GameView()
+    }
+}
+
+static TEXT_SPEED: Setting<Int<0, 10>> = setting(5);
+static BGM_VOLUME: Setting<Int<0, 100>> = setting(80);
+static CLEARED_AZUSA: Meta<bool> = meta(false);
+
+fn main() -> System {
+    System {
+        start: ui::Title,
+        game: ui::GameView,
+        save_slots: 6,
+    }
+}
+
+fn Config() -> Overlay {
+    let (speed, set_speed) = signal(TEXT_SPEED.get());
+    Overlay(column![
+        text!(t!["Text speed: " {speed()}]),
+        slider!{
+            min = 0,
+            max = 10,
+            value = speed(),
+            on_change = |v| { set_speed(v); TEXT_SPEED.set(v) },
+        },
+        button!{on_click = || nav::back(), t!["Back"]},
+    ])
+}
+
+fn Credits() -> RootPage {
+    ui::Title()
+}
+
+fn start_button() -> Element {
+    button!{on_click = || nav::start(story::Main, (CLEARED_AZUSA.get(),), on_ending), t!["Start"]}
+}
+
+fn on_ending(ending: story::Ending) {
+    match ending {
+        story::Ending::AzusaEnd => { CLEARED_AZUSA.set(true); nav::goto(Credits) }
+        story::Ending::NormalEnd => nav::goto(Credits),
+    }
+}

@@ -1,0 +1,686 @@
+---
+source: core/kagari-syntax/tests/snapshots.rs
+expression: "render(&input, &parse(&input, source_kind(path)))"
+input_file: core/kagari-syntax/tests/parse/kix_002__festival_hub.kix
+---
+SOURCE_FILE@0..1128
+  STATIC@0..35
+    STATIC_KW@0..6 "static"
+    WHITESPACE@6..7 " "
+    MUT_KW@7..10 "mut"
+    WHITESPACE@10..11 " "
+    NAME@11..20
+      IDENT@11..20 "VISITED_A"
+    COLON@20..21 ":"
+    WHITESPACE@21..22 " "
+    PATH_TYPE@22..26
+      PATH@22..26
+        PATH_SEGMENT@22..26
+          NAME_REF@22..26
+            IDENT@22..26 "bool"
+    WHITESPACE@26..27 " "
+    EQ@27..28 "="
+    WHITESPACE@28..29 " "
+    LITERAL@29..34
+      FALSE_KW@29..34 "false"
+    SEMICOLON@34..35 ";"
+  WHITESPACE@35..36 "\n"
+  STATIC@36..71
+    STATIC_KW@36..42 "static"
+    WHITESPACE@42..43 " "
+    MUT_KW@43..46 "mut"
+    WHITESPACE@46..47 " "
+    NAME@47..56
+      IDENT@47..56 "VISITED_B"
+    COLON@56..57 ":"
+    WHITESPACE@57..58 " "
+    PATH_TYPE@58..62
+      PATH@58..62
+        PATH_SEGMENT@58..62
+          NAME_REF@58..62
+            IDENT@58..62 "bool"
+    WHITESPACE@62..63 " "
+    EQ@63..64 "="
+    WHITESPACE@64..65 " "
+    LITERAL@65..70
+      FALSE_KW@65..70 "false"
+    SEMICOLON@70..71 ";"
+  WHITESPACE@71..72 "\n"
+  STATIC@72..107
+    STATIC_KW@72..78 "static"
+    WHITESPACE@78..79 " "
+    MUT_KW@79..82 "mut"
+    WHITESPACE@82..83 " "
+    NAME@83..92
+      IDENT@83..92 "VISITED_C"
+    COLON@92..93 ":"
+    WHITESPACE@93..94 " "
+    PATH_TYPE@94..98
+      PATH@94..98
+        PATH_SEGMENT@94..98
+          NAME_REF@94..98
+            IDENT@94..98 "bool"
+    WHITESPACE@98..99 " "
+    EQ@99..100 "="
+    WHITESPACE@100..101 " "
+    LITERAL@101..106
+      FALSE_KW@101..106 "false"
+    SEMICOLON@106..107 ";"
+  WHITESPACE@107..109 "\n\n"
+  ENUM@109..131
+    ENUM_KW@109..113 "enum"
+    WHITESPACE@113..114 " "
+    NAME@114..120
+      IDENT@114..120 "Ending"
+    WHITESPACE@120..121 " "
+    VARIANT_LIST@121..131
+      L_CURLY@121..122 "{"
+      WHITESPACE@122..123 " "
+      VARIANT@123..129
+        NAME@123..129
+          IDENT@123..129 "Normal"
+      WHITESPACE@129..130 " "
+      R_CURLY@130..131 "}"
+  WHITESPACE@131..132 "\n"
+  ENUM@132..159
+    ENUM_KW@132..136 "enum"
+    WHITESPACE@136..137 " "
+    NAME@137..140
+      IDENT@137..140 "Map"
+    WHITESPACE@140..141 " "
+    VARIANT_LIST@141..159
+      L_CURLY@141..142 "{"
+      WHITESPACE@142..143 " "
+      VARIANT@143..144
+        NAME@143..144
+          IDENT@143..144 "A"
+      COMMA@144..145 ","
+      WHITESPACE@145..146 " "
+      VARIANT@146..147
+        NAME@146..147
+          IDENT@146..147 "B"
+      COMMA@147..148 ","
+      WHITESPACE@148..149 " "
+      VARIANT@149..150
+        NAME@149..150
+          IDENT@149..150 "C"
+      COMMA@150..151 ","
+      WHITESPACE@151..152 " "
+      VARIANT@152..157
+        NAME@152..157
+          IDENT@152..157 "Leave"
+      WHITESPACE@157..158 " "
+      R_CURLY@158..159 "}"
+  WHITESPACE@159..161 "\n\n"
+  FN@161..315
+    ATTR@161..169
+      POUND@161..162 "#"
+      L_BRACK@162..163 "["
+      PATH@163..168
+        PATH_SEGMENT@163..168
+          NAME_REF@163..168
+            IDENT@163..168 "scene"
+      R_BRACK@168..169 "]"
+    WHITESPACE@169..170 "\n"
+    ATTR@170..178
+      POUND@170..171 "#"
+      L_BRACK@171..172 "["
+      PATH@172..177
+        PATH_SEGMENT@172..177
+          NAME_REF@172..177
+            IDENT@172..177 "entry"
+      R_BRACK@177..178 "]"
+    WHITESPACE@178..179 "\n"
+    PUSHDOWN_KW@179..187 "pushdown"
+    WHITESPACE@187..188 " "
+    FN_KW@188..190 "fn"
+    WHITESPACE@190..191 " "
+    NAME@191..195
+      IDENT@191..195 "Day1"
+    PARAM_LIST@195..197
+      L_PAREN@195..196 "("
+      R_PAREN@196..197 ")"
+    WHITESPACE@197..198 " "
+    RET_TYPE@198..207
+      THIN_ARROW@198..200 "->"
+      WHITESPACE@200..201 " "
+      PATH_TYPE@201..207
+        PATH@201..207
+          PATH_SEGMENT@201..207
+            NAME_REF@201..207
+              IDENT@201..207 "Ending"
+    WHITESPACE@207..208 " "
+    BLOCK_EXPR@208..315
+      L_CURLY@208..209 "{"
+      WHITESPACE@209..214 "\n    "
+      EXPR_STMT@214..258
+        FORM_EXPR@214..257
+          NAME_REF@214..215
+            IDENT@214..215 "s"
+          BANG@215..216 "!"
+          L_PAREN@216..217 "("
+          TEXT_FORM@217..256
+            NAME_REF@217..218
+              IDENT@217..218 "t"
+            BANG@218..219 "!"
+            L_BRACK@219..220 "["
+            TEXT_STRING@220..255
+              STRING@220..255 "\"The school festival  ..."
+            R_BRACK@255..256 "]"
+          R_PAREN@256..257 ")"
+        SEMICOLON@257..258 ";"
+      WHITESPACE@258..263 "\n    "
+      EXPR_STMT@263..277
+        CALL_EXPR@263..276
+          PATH_EXPR@263..274
+            PATH@263..274
+              PATH_SEGMENT@263..274
+                NAME_REF@263..274
+                  IDENT@263..274 "FestivalHub"
+          ARG_LIST@274..276
+            L_PAREN@274..275 "("
+            R_PAREN@275..276 ")"
+        SEMICOLON@276..277 ";"
+      WHITESPACE@277..282 "\n    "
+      EXPR_STMT@282..294
+        CALL_EXPR@282..293
+          PATH_EXPR@282..291
+            PATH@282..291
+              PATH_SEGMENT@282..291
+                NAME_REF@282..291
+                  IDENT@282..291 "DormNight"
+          ARG_LIST@291..293
+            L_PAREN@291..292 "("
+            R_PAREN@292..293 ")"
+        SEMICOLON@293..294 ";"
+      WHITESPACE@294..299 "\n    "
+      PATH_EXPR@299..313
+        PATH@299..313
+          PATH@299..305
+            PATH_SEGMENT@299..305
+              NAME_REF@299..305
+                IDENT@299..305 "Ending"
+          COLON2@305..307 "::"
+          PATH_SEGMENT@307..313
+            NAME_REF@307..313
+              IDENT@307..313 "Normal"
+      WHITESPACE@313..314 "\n"
+      R_CURLY@314..315 "}"
+  WHITESPACE@315..317 "\n\n"
+  FN@317..777
+    ATTR@317..325
+      POUND@317..318 "#"
+      L_BRACK@318..319 "["
+      PATH@319..324
+        PATH_SEGMENT@319..324
+          NAME_REF@319..324
+            IDENT@319..324 "scene"
+      R_BRACK@324..325 "]"
+    WHITESPACE@325..326 "\n"
+    PUSHDOWN_KW@326..334 "pushdown"
+    WHITESPACE@334..335 " "
+    FN_KW@335..337 "fn"
+    WHITESPACE@337..338 " "
+    NAME@338..349
+      IDENT@338..349 "FestivalHub"
+    PARAM_LIST@349..351
+      L_PAREN@349..350 "("
+      R_PAREN@350..351 ")"
+    WHITESPACE@351..352 " "
+    BLOCK_EXPR@352..777
+      L_CURLY@352..353 "{"
+      WHITESPACE@353..358 "\n    "
+      LOOP_EXPR@358..775
+        LOOP_KW@358..362 "loop"
+        WHITESPACE@362..363 " "
+        BLOCK_EXPR@363..775
+          L_CURLY@363..364 "{"
+          WHITESPACE@364..373 "\n        "
+          MATCH_EXPR@373..769
+            MATCH_KW@373..378 "match"
+            WHITESPACE@378..379 " "
+            FORM_EXPR@379..628
+              NAME_REF@379..385
+                IDENT@379..385 "choice"
+              BANG@385..386 "!"
+              L_CURLY@386..387 "{"
+              WHITESPACE@387..400 "\n            "
+              FORM_ATTR@400..410
+                NAME@400..402
+                  IDENT@400..402 "id"
+                WHITESPACE@402..403 " "
+                EQ@403..404 "="
+                WHITESPACE@404..405 " "
+                LITERAL@405..410
+                  STRING@405..410 "\"map\""
+              COMMA@410..411 ","
+              WHITESPACE@411..424 "\n            "
+              FORM_ARM@424..453
+                TEXT_FORM@424..443
+                  NAME_REF@424..425
+                    IDENT@424..425 "t"
+                  BANG@425..426 "!"
+                  L_BRACK@426..427 "["
+                  TEXT_STRING@427..442
+                    STRING@427..442 "\"Go to stall A\""
+                  R_BRACK@442..443 "]"
+                WHITESPACE@443..444 " "
+                FAT_ARROW@444..446 "=>"
+                WHITESPACE@446..447 " "
+                PATH_EXPR@447..453
+                  PATH@447..453
+                    PATH@447..450
+                      PATH_SEGMENT@447..450
+                        NAME_REF@447..450
+                          IDENT@447..450 "Map"
+                    COLON2@450..452 "::"
+                    PATH_SEGMENT@452..453
+                      NAME_REF@452..453
+                        IDENT@452..453 "A"
+              COMMA@453..454 ","
+              WHITESPACE@454..467 "\n            "
+              FORM_ARM@467..496
+                TEXT_FORM@467..486
+                  NAME_REF@467..468
+                    IDENT@467..468 "t"
+                  BANG@468..469 "!"
+                  L_BRACK@469..470 "["
+                  TEXT_STRING@470..485
+                    STRING@470..485 "\"Go to stall B\""
+                  R_BRACK@485..486 "]"
+                WHITESPACE@486..487 " "
+                FAT_ARROW@487..489 "=>"
+                WHITESPACE@489..490 " "
+                PATH_EXPR@490..496
+                  PATH@490..496
+                    PATH@490..493
+                      PATH_SEGMENT@490..493
+                        NAME_REF@490..493
+                          IDENT@490..493 "Map"
+                    COLON2@493..495 "::"
+                    PATH_SEGMENT@495..496
+                      NAME_REF@495..496
+                        IDENT@495..496 "B"
+              COMMA@496..497 ","
+              WHITESPACE@497..510 "\n            "
+              FORM_ARM@510..539
+                TEXT_FORM@510..529
+                  NAME_REF@510..511
+                    IDENT@510..511 "t"
+                  BANG@511..512 "!"
+                  L_BRACK@512..513 "["
+                  TEXT_STRING@513..528
+                    STRING@513..528 "\"Go to stall C\""
+                  R_BRACK@528..529 "]"
+                WHITESPACE@529..530 " "
+                FAT_ARROW@530..532 "=>"
+                WHITESPACE@532..533 " "
+                PATH_EXPR@533..539
+                  PATH@533..539
+                    PATH@533..536
+                      PATH_SEGMENT@533..536
+                        NAME_REF@533..536
+                          IDENT@533..536 "Map"
+                    COLON2@536..538 "::"
+                    PATH_SEGMENT@538..539
+                      NAME_REF@538..539
+                        IDENT@538..539 "C"
+              COMMA@539..540 ","
+              WHITESPACE@540..553 "\n            "
+              FORM_ARM@553..617
+                TEXT_FORM@553..564
+                  NAME_REF@553..554
+                    IDENT@553..554 "t"
+                  BANG@554..555 "!"
+                  L_BRACK@555..556 "["
+                  TEXT_STRING@556..563
+                    STRING@556..563 "\"Leave\""
+                  R_BRACK@563..564 "]"
+                WHITESPACE@564..565 " "
+                FORM_GUARD@565..603
+                  IF_KW@565..567 "if"
+                  WHITESPACE@567..568 " "
+                  BIN_EXPR@568..603
+                    BIN_EXPR@568..590
+                      PATH_EXPR@568..577
+                        PATH@568..577
+                          PATH_SEGMENT@568..577
+                            NAME_REF@568..577
+                              IDENT@568..577 "VISITED_A"
+                      WHITESPACE@577..578 " "
+                      AMP2@578..580 "&&"
+                      WHITESPACE@580..581 " "
+                      PATH_EXPR@581..590
+                        PATH@581..590
+                          PATH_SEGMENT@581..590
+                            NAME_REF@581..590
+                              IDENT@581..590 "VISITED_B"
+                    WHITESPACE@590..591 " "
+                    AMP2@591..593 "&&"
+                    WHITESPACE@593..594 " "
+                    PATH_EXPR@594..603
+                      PATH@594..603
+                        PATH_SEGMENT@594..603
+                          NAME_REF@594..603
+                            IDENT@594..603 "VISITED_C"
+                WHITESPACE@603..604 " "
+                FAT_ARROW@604..606 "=>"
+                WHITESPACE@606..607 " "
+                PATH_EXPR@607..617
+                  PATH@607..617
+                    PATH@607..610
+                      PATH_SEGMENT@607..610
+                        NAME_REF@607..610
+                          IDENT@607..610 "Map"
+                    COLON2@610..612 "::"
+                    PATH_SEGMENT@612..617
+                      NAME_REF@612..617
+                        IDENT@612..617 "Leave"
+              COMMA@617..618 ","
+              WHITESPACE@618..627 "\n        "
+              R_CURLY@627..628 "}"
+            WHITESPACE@628..629 " "
+            MATCH_ARM_LIST@629..769
+              L_CURLY@629..630 "{"
+              WHITESPACE@630..643 "\n            "
+              MATCH_ARM@643..662
+                PATH_PAT@643..649
+                  PATH@643..649
+                    PATH@643..646
+                      PATH_SEGMENT@643..646
+                        NAME_REF@643..646
+                          IDENT@643..646 "Map"
+                    COLON2@646..648 "::"
+                    PATH_SEGMENT@648..649
+                      NAME_REF@648..649
+                        IDENT@648..649 "A"
+                WHITESPACE@649..650 " "
+                FAT_ARROW@650..652 "=>"
+                WHITESPACE@652..653 " "
+                CALL_EXPR@653..661
+                  PATH_EXPR@653..659
+                    PATH@653..659
+                      PATH_SEGMENT@653..659
+                        NAME_REF@653..659
+                          IDENT@653..659 "StallA"
+                  ARG_LIST@659..661
+                    L_PAREN@659..660 "("
+                    R_PAREN@660..661 ")"
+                COMMA@661..662 ","
+              WHITESPACE@662..675 "\n            "
+              MATCH_ARM@675..694
+                PATH_PAT@675..681
+                  PATH@675..681
+                    PATH@675..678
+                      PATH_SEGMENT@675..678
+                        NAME_REF@675..678
+                          IDENT@675..678 "Map"
+                    COLON2@678..680 "::"
+                    PATH_SEGMENT@680..681
+                      NAME_REF@680..681
+                        IDENT@680..681 "B"
+                WHITESPACE@681..682 " "
+                FAT_ARROW@682..684 "=>"
+                WHITESPACE@684..685 " "
+                CALL_EXPR@685..693
+                  PATH_EXPR@685..691
+                    PATH@685..691
+                      PATH_SEGMENT@685..691
+                        NAME_REF@685..691
+                          IDENT@685..691 "StallB"
+                  ARG_LIST@691..693
+                    L_PAREN@691..692 "("
+                    R_PAREN@692..693 ")"
+                COMMA@693..694 ","
+              WHITESPACE@694..707 "\n            "
+              MATCH_ARM@707..726
+                PATH_PAT@707..713
+                  PATH@707..713
+                    PATH@707..710
+                      PATH_SEGMENT@707..710
+                        NAME_REF@707..710
+                          IDENT@707..710 "Map"
+                    COLON2@710..712 "::"
+                    PATH_SEGMENT@712..713
+                      NAME_REF@712..713
+                        IDENT@712..713 "C"
+                WHITESPACE@713..714 " "
+                FAT_ARROW@714..716 "=>"
+                WHITESPACE@716..717 " "
+                CALL_EXPR@717..725
+                  PATH_EXPR@717..723
+                    PATH@717..723
+                      PATH_SEGMENT@717..723
+                        NAME_REF@717..723
+                          IDENT@717..723 "StallC"
+                  ARG_LIST@723..725
+                    L_PAREN@723..724 "("
+                    R_PAREN@724..725 ")"
+                COMMA@725..726 ","
+              WHITESPACE@726..739 "\n            "
+              MATCH_ARM@739..759
+                PATH_PAT@739..749
+                  PATH@739..749
+                    PATH@739..742
+                      PATH_SEGMENT@739..742
+                        NAME_REF@739..742
+                          IDENT@739..742 "Map"
+                    COLON2@742..744 "::"
+                    PATH_SEGMENT@744..749
+                      NAME_REF@744..749
+                        IDENT@744..749 "Leave"
+                WHITESPACE@749..750 " "
+                FAT_ARROW@750..752 "=>"
+                WHITESPACE@752..753 " "
+                BREAK_EXPR@753..758
+                  BREAK_KW@753..758 "break"
+                COMMA@758..759 ","
+              WHITESPACE@759..768 "\n        "
+              R_CURLY@768..769 "}"
+          WHITESPACE@769..774 "\n    "
+          R_CURLY@774..775 "}"
+      WHITESPACE@775..776 "\n"
+      R_CURLY@776..777 "}"
+  WHITESPACE@777..779 "\n\n"
+  FN@779..1001
+    ATTR@779..787
+      POUND@779..780 "#"
+      L_BRACK@780..781 "["
+      PATH@781..786
+        PATH_SEGMENT@781..786
+          NAME_REF@781..786
+            IDENT@781..786 "scene"
+      R_BRACK@786..787 "]"
+    WHITESPACE@787..788 "\n"
+    PUSHDOWN_KW@788..796 "pushdown"
+    WHITESPACE@796..797 " "
+    FN_KW@797..799 "fn"
+    WHITESPACE@799..800 " "
+    NAME@800..806
+      IDENT@800..806 "StallA"
+    PARAM_LIST@806..808
+      L_PAREN@806..807 "("
+      R_PAREN@807..808 ")"
+    WHITESPACE@808..809 " "
+    BLOCK_EXPR@809..1001
+      L_CURLY@809..810 "{"
+      WHITESPACE@810..815 "\n    "
+      EXPR_STMT@815..903
+        IF_EXPR@815..903
+          IF_KW@815..817 "if"
+          WHITESPACE@817..818 " "
+          PATH_EXPR@818..827
+            PATH@818..827
+              PATH_SEGMENT@818..827
+                NAME_REF@818..827
+                  IDENT@818..827 "VISITED_A"
+          WHITESPACE@827..828 " "
+          BLOCK_EXPR@828..903
+            L_CURLY@828..829 "{"
+            WHITESPACE@829..838 "\n        "
+            EXPR_STMT@838..881
+              FORM_EXPR@838..880
+                NAME_REF@838..839
+                  IDENT@838..839 "s"
+                BANG@839..840 "!"
+                L_PAREN@840..841 "("
+                TEXT_FORM@841..879
+                  NAME_REF@841..842
+                    IDENT@841..842 "t"
+                  BANG@842..843 "!"
+                  L_BRACK@843..844 "["
+                  TEXT_STRING@844..878
+                    STRING@844..878 "\"The stall is already ..."
+                  R_BRACK@878..879 "]"
+                R_PAREN@879..880 ")"
+              SEMICOLON@880..881 ";"
+            WHITESPACE@881..890 "\n        "
+            EXPR_STMT@890..897
+              RETURN_EXPR@890..896
+                RETURN_KW@890..896 "return"
+              SEMICOLON@896..897 ";"
+            WHITESPACE@897..902 "\n    "
+            R_CURLY@902..903 "}"
+      WHITESPACE@903..908 "\n    "
+      EXPR_STMT@908..925
+        BIN_EXPR@908..924
+          PATH_EXPR@908..917
+            PATH@908..917
+              PATH_SEGMENT@908..917
+                NAME_REF@908..917
+                  IDENT@908..917 "VISITED_A"
+          WHITESPACE@917..918 " "
+          EQ@918..919 "="
+          WHITESPACE@919..920 " "
+          LITERAL@920..924
+            TRUE_KW@920..924 "true"
+        SEMICOLON@924..925 ";"
+      WHITESPACE@925..930 "\n    "
+      EXPR_STMT@930..999
+        FORM_EXPR@930..998
+          NAME_REF@930..931
+            IDENT@930..931 "s"
+          BANG@931..932 "!"
+          L_PAREN@932..933 "("
+          FORM_ATTR@933..947
+            NAME@933..936
+              IDENT@933..936 "who"
+            WHITESPACE@936..937 " "
+            EQ@937..938 "="
+            WHITESPACE@938..939 " "
+            LITERAL@939..947
+              STRING@939..947 "\"Hanako\""
+          COMMA@947..948 ","
+          WHITESPACE@948..949 " "
+          FORM_ATTR@949..970
+            NAME@949..955
+              IDENT@949..955 "render"
+            WHITESPACE@955..956 " "
+            EQ@956..957 "="
+            WHITESPACE@957..958 " "
+            PATH_EXPR@958..970
+              PATH@958..970
+                PATH_SEGMENT@958..970
+                  NAME_REF@958..970
+                    IDENT@958..970 "hanako_jumps"
+          COMMA@970..971 ","
+          WHITESPACE@971..972 " "
+          TEXT_FORM@972..997
+            NAME_REF@972..973
+              IDENT@972..973 "t"
+            BANG@973..974 "!"
+            L_BRACK@974..975 "["
+            TEXT_STRING@975..996
+              STRING@975..996 "\"Welcome to stall A!\""
+            R_BRACK@996..997 "]"
+          R_PAREN@997..998 ")"
+        SEMICOLON@998..999 ";"
+      WHITESPACE@999..1000 "\n"
+      R_CURLY@1000..1001 "}"
+  WHITESPACE@1001..1003 "\n\n"
+  FN@1003..1127
+    CONST_KW@1003..1008 "const"
+    WHITESPACE@1008..1009 " "
+    FN_KW@1009..1011 "fn"
+    WHITESPACE@1011..1012 " "
+    NAME@1012..1024
+      IDENT@1012..1024 "hanako_jumps"
+    PARAM_LIST@1024..1044
+      L_PAREN@1024..1025 "("
+      PARAM@1025..1043
+        IDENT_PAT@1025..1035
+          MUT_KW@1025..1028 "mut"
+          WHITESPACE@1028..1029 " "
+          NAME@1029..1035
+            IDENT@1029..1035 "screen"
+        COLON@1035..1036 ":"
+        WHITESPACE@1036..1037 " "
+        PATH_TYPE@1037..1043
+          PATH@1037..1043
+            PATH_SEGMENT@1037..1043
+              NAME_REF@1037..1043
+                IDENT@1037..1043 "Screen"
+      R_PAREN@1043..1044 ")"
+    WHITESPACE@1044..1045 " "
+    RET_TYPE@1045..1054
+      THIN_ARROW@1045..1047 "->"
+      WHITESPACE@1047..1048 " "
+      PATH_TYPE@1048..1054
+        PATH@1048..1054
+          PATH_SEGMENT@1048..1054
+            NAME_REF@1048..1054
+              IDENT@1048..1054 "Screen"
+    WHITESPACE@1054..1055 " "
+    BLOCK_EXPR@1055..1127
+      L_CURLY@1055..1056 "{"
+      WHITESPACE@1056..1061 "\n    "
+      EXPR_STMT@1061..1114
+        METHOD_CALL_EXPR@1061..1113
+          FIELD_EXPR@1061..1087
+            METHOD_CALL_EXPR@1061..1082
+              PATH_EXPR@1061..1067
+                PATH@1061..1067
+                  PATH_SEGMENT@1061..1067
+                    NAME_REF@1061..1067
+                      IDENT@1061..1067 "screen"
+              DOT@1067..1068 "."
+              NAME_REF@1068..1074
+                IDENT@1068..1074 "entity"
+              ARG_LIST@1074..1082
+                L_PAREN@1074..1075 "("
+                PATH_EXPR@1075..1081
+                  PATH@1075..1081
+                    PATH_SEGMENT@1075..1081
+                      NAME_REF@1075..1081
+                        IDENT@1075..1081 "HANAKO"
+                R_PAREN@1081..1082 ")"
+            DOT@1082..1083 "."
+            NAME_REF@1083..1087
+              IDENT@1083..1087 "cord"
+          DOT@1087..1088 "."
+          NAME_REF@1088..1103
+            IDENT@1088..1103 "apply_animation"
+          ARG_LIST@1103..1113
+            L_PAREN@1103..1104 "("
+            CALL_EXPR@1104..1112
+              PATH_EXPR@1104..1108
+                PATH@1104..1108
+                  PATH_SEGMENT@1104..1108
+                    NAME_REF@1104..1108
+                      IDENT@1104..1108 "jump"
+              ARG_LIST@1108..1112
+                L_PAREN@1108..1109 "("
+                LITERAL@1109..1111
+                  INT_NUMBER@1109..1111 "20"
+                R_PAREN@1111..1112 ")"
+            R_PAREN@1112..1113 ")"
+        SEMICOLON@1113..1114 ";"
+      WHITESPACE@1114..1119 "\n    "
+      PATH_EXPR@1119..1125
+        PATH@1119..1125
+          PATH_SEGMENT@1119..1125
+            NAME_REF@1119..1125
+              IDENT@1119..1125 "screen"
+      WHITESPACE@1125..1126 "\n"
+      R_CURLY@1126..1127 "}"
+  WHITESPACE@1127..1128 "\n"

@@ -1,0 +1,65 @@
+//! Every item kind.
+
+use a::{b as c, d::*, self};
+pub use crate::screen::Screen;
+use super::x as _;
+
+mod outer;
+pub mod inline {
+    pub fn f() {}
+    mod deeper {
+        const X: u8 = 1;
+    }
+}
+
+static mut COUNTER: u64 = 0;
+static NAME: &String = "x";
+const LIMIT: usize = 4;
+pub const NEG: i32 = -1;
+
+pub struct Unit;
+pub struct Pair(pub u8, Int<0, 10>);
+pub struct Record<T: Clone + Eq, const N: usize> {
+    pub items: [T; N],
+    count: usize,
+}
+
+enum Shape {
+    Empty,
+    Circle(u32),
+    Rect { w: u32, h: u32 },
+}
+
+type Alias = Vec<u8>;
+type Bounded<T>: Eq = T;
+
+pub trait Step: Eq {
+    type Output;
+    const ID: u32;
+    fn show(&self) -> Self::Output;
+    fn id(&mut self) -> u32 { 0 }
+}
+
+impl<A, const N: usize> Step for Choice<A, N> {
+    type Output = A;
+}
+
+impl Unit {
+    pub const fn new() -> Unit { Unit }
+    fn take(self) {}
+    fn take_mut(mut self) {}
+}
+
+#[builtin]
+pub pushdown fn push_step<S: Step>(s: S) -> S::Output;
+
+fn plain() {}
+const fn pure(x: u8) -> u8 { x }
+pushdown fn story() {}
+
+#[scene]
+#[entry]
+#[must_use]
+pub pushdown fn Main(day: u8, (a, b): (u8, u8)) -> Ending {
+    Ending::Normal
+}

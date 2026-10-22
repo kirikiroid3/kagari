@@ -1,0 +1,21 @@
+use super::super::characters::HANAKO;
+use crate::characters::AZUSA;
+use self::helpers::smile;
+
+mod helpers {
+    pub const fn smile(screen: Screen) -> Screen {
+        super::azusa_smiles(screen)
+    }
+}
+
+const fn azusa_smiles(mut screen: Screen) -> Screen {
+    screen.entity(HANAKO).cord.apply_animation(jump(20));
+    screen.entity(AZUSA).appearance.emotion.change(AZUSA::CLOSE_EYE_SMILE).apply_animation(instant_switch());
+    screen
+}
+
+#[scene]
+pub pushdown fn Start() {
+    s!(who = "Azusa", render = smile, t!["Did you forget again?"]);
+    super::Interlude();
+}

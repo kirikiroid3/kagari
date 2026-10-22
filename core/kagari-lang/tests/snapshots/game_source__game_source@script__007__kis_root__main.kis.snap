@@ -1,0 +1,13 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/script/007__kis_root/main.kis
+---
+script/007__kis_root/main.kis:3:5: error[syntax]: forms are only allowed in `.kix` files
+--- resolutions ---
+script/007__kis_root/main.kis:4:5 push_step -> fn std::narrative::push_step
+script/007__kis_root/main.kis:4:15 Say -> struct std::narrative::Say
+script/007__kis_root/main.kis:4:26 None -> variant std::Option::None
+script/007__kis_root/main.kis:4:39 None -> variant std::Option::None
+script/007__kis_root/main.kis:4:53 None -> variant std::Option::None
+script/007__kis_root/main.kis:4:65 Some -> variant std::Option::Some

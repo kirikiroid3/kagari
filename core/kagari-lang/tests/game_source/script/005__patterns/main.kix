@@ -1,0 +1,25 @@
+enum Route { A, B, C }
+
+const CONST_X: Route = Route::C;
+const LOW: u64 = 1;
+
+struct Point { x: u64, y: u64 }
+struct Unit;
+
+fn pick(r: Option<Route>, p: Point, n: u64) -> u64 {
+    match r {
+        None => 0,
+        Some(x) => 1,
+        Route::A | Route::B => 2,
+        CONST_X => 3,
+        other => 4,
+    }
+    let Point { x, y: py } = p;
+    match n {
+        LOW..=9 => x,
+        _ => py,
+    }
+    match Unit {
+        Unit => 0,
+    }
+}

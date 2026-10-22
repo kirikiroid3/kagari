@@ -1,0 +1,48 @@
+static mut VISITED_A: bool = false;
+static mut VISITED_B: bool = false;
+static mut VISITED_C: bool = false;
+
+enum Ending { Normal }
+enum Map { A, B, C, Leave }
+
+#[scene]
+#[entry]
+pushdown fn Day1() -> Ending {
+    s!(t!["The school festival starts today."]);
+    FestivalHub();
+    DormNight();
+    Ending::Normal
+}
+
+#[scene]
+pushdown fn FestivalHub() {
+    loop {
+        match choice!{
+            id = "map",
+            t!["Go to stall A"] => Map::A,
+            t!["Go to stall B"] => Map::B,
+            t!["Go to stall C"] => Map::C,
+            t!["Leave"] if VISITED_A && VISITED_B && VISITED_C => Map::Leave,
+        } {
+            Map::A => StallA(),
+            Map::B => StallB(),
+            Map::C => StallC(),
+            Map::Leave => break,
+        }
+    }
+}
+
+#[scene]
+pushdown fn StallA() {
+    if VISITED_A {
+        s!(t!["The stall is already packing up."]);
+        return;
+    }
+    VISITED_A = true;
+    s!(who = "Hanako", render = hanako_jumps, t!["Welcome to stall A!"]);
+}
+
+const fn hanako_jumps(mut screen: Screen) -> Screen {
+    screen.entity(HANAKO).cord.apply_animation(jump(20));
+    screen
+}

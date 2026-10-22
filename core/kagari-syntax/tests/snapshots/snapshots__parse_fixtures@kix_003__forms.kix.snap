@@ -1,0 +1,821 @@
+---
+source: core/kagari-syntax/tests/snapshots.rs
+expression: "render(&input, &parse(&input, source_kind(path)))"
+input_file: core/kagari-syntax/tests/parse/kix_003__forms.kix
+---
+SOURCE_FILE@0..1266
+  ENUM@0..24
+    ENUM_KW@0..4 "enum"
+    WHITESPACE@4..5 " "
+    NAME@5..12
+      IDENT@5..12 "Confess"
+    WHITESPACE@12..13 " "
+    VARIANT_LIST@13..24
+      L_CURLY@13..14 "{"
+      WHITESPACE@14..15 " "
+      VARIANT@15..18
+        NAME@15..18
+          IDENT@15..18 "Yes"
+      COMMA@18..19 ","
+      WHITESPACE@19..20 " "
+      VARIANT@20..22
+        NAME@20..22
+          IDENT@20..22 "No"
+      WHITESPACE@22..23 " "
+      R_CURLY@23..24 "}"
+  WHITESPACE@24..26 "\n\n"
+  FN@26..888
+    ATTR@26..34
+      POUND@26..27 "#"
+      L_BRACK@27..28 "["
+      PATH@28..33
+        PATH_SEGMENT@28..33
+          NAME_REF@28..33
+            IDENT@28..33 "scene"
+      R_BRACK@33..34 "]"
+    WHITESPACE@34..35 "\n"
+    PUSHDOWN_KW@35..43 "pushdown"
+    WHITESPACE@43..44 " "
+    FN_KW@44..46 "fn"
+    WHITESPACE@46..47 " "
+    NAME@47..52
+      IDENT@47..52 "Forms"
+    PARAM_LIST@52..61
+      L_PAREN@52..53 "("
+      PARAM@53..60
+        IDENT_PAT@53..54
+          NAME@53..54
+            IDENT@53..54 "x"
+        COLON@54..55 ":"
+        WHITESPACE@55..56 " "
+        PATH_TYPE@56..60
+          PATH@56..60
+            PATH_SEGMENT@56..60
+              NAME_REF@56..60
+                IDENT@56..60 "Text"
+      R_PAREN@60..61 ")"
+    WHITESPACE@61..62 " "
+    BLOCK_EXPR@62..888
+      L_CURLY@62..63 "{"
+      WHITESPACE@63..68 "\n    "
+      EXPR_STMT@68..178
+        FORM_EXPR@68..177
+          NAME_REF@68..69
+            IDENT@68..69 "s"
+          BANG@69..70 "!"
+          L_PAREN@70..71 "("
+          TEXT_FORM@71..176
+            NAME_REF@71..72
+              IDENT@71..72 "t"
+            BANG@72..73 "!"
+            L_BRACK@73..74 "["
+            TEXT_STRING@74..85
+              STRING@74..85 "\"これは\""
+            WHITESPACE@85..86 " "
+            TEXT_RUBY@86..109
+              L_BRACK@86..87 "["
+              STRING@87..95 "\"数多\""
+              R_BRACK@95..96 "]"
+              L_PAREN@96..97 "("
+              RUBY_READINGS@97..108
+                STRING@97..108 "\"あまた\""
+              R_PAREN@108..109 ")"
+            WHITESPACE@109..110 " "
+            TEXT_STRING@110..115
+              STRING@110..115 "\"の\""
+            WHITESPACE@115..116 " "
+            TEXT_RUBY@116..142
+              L_BRACK@116..117 "["
+              STRING@117..125 "\"漢字\""
+              R_BRACK@125..126 "]"
+              L_PAREN@126..127 "("
+              RUBY_READINGS@127..141
+                STRING@127..135 "\"かん\""
+                PIPE@135..136 "|"
+                STRING@136..141 "\"じ\""
+              R_PAREN@141..142 ")"
+            WHITESPACE@142..143 " "
+            TEXT_EFFECT@143..166
+              BANG@143..144 "!"
+              L_BRACK@144..145 "["
+              TEXT_STRING@145..153
+                STRING@145..153 "\"赤い\""
+              R_BRACK@153..154 "]"
+              L_PAREN@154..155 "("
+              CALL_EXPR@155..165
+                PATH_EXPR@155..163
+                  PATH@155..163
+                    PATH_SEGMENT@155..163
+                      NAME_REF@155..163
+                        IDENT@155..163 "emphasis"
+                ARG_LIST@163..165
+                  L_PAREN@163..164 "("
+                  R_PAREN@164..165 ")"
+              R_PAREN@165..166 ")"
+            WHITESPACE@166..167 " "
+            TEXT_STRING@167..175
+              STRING@167..175 "\"花。\""
+            R_BRACK@175..176 "]"
+          R_PAREN@176..177 ")"
+        SEMICOLON@177..178 ";"
+      WHITESPACE@178..183 "\n    "
+      EXPR_STMT@183..234
+        FORM_EXPR@183..233
+          NAME_REF@183..184
+            IDENT@183..184 "s"
+          BANG@184..185 "!"
+          L_PAREN@185..186 "("
+          TEXT_FORM@186..232
+            NAME_REF@186..187
+              IDENT@186..187 "t"
+            BANG@187..188 "!"
+            L_BRACK@188..189 "["
+            TEXT_EFFECT@189..227
+              BANG@189..190 "!"
+              L_BRACK@190..191 "["
+              TEXT_RUBY@191..214
+                L_BRACK@191..192 "["
+                STRING@192..200 "\"数多\""
+                R_BRACK@200..201 "]"
+                L_PAREN@201..202 "("
+                RUBY_READINGS@202..213
+                  STRING@202..213 "\"あまた\""
+                R_PAREN@213..214 ")"
+              R_BRACK@214..215 "]"
+              L_PAREN@215..216 "("
+              CALL_EXPR@216..226
+                PATH_EXPR@216..224
+                  PATH@216..224
+                    PATH_SEGMENT@216..224
+                      NAME_REF@216..224
+                        IDENT@216..224 "emphasis"
+                ARG_LIST@224..226
+                  L_PAREN@224..225 "("
+                  R_PAREN@225..226 ")"
+              R_PAREN@226..227 ")"
+            WHITESPACE@227..228 " "
+            TEXT_INTERP@228..231
+              L_CURLY@228..229 "{"
+              PATH_EXPR@229..230
+                PATH@229..230
+                  PATH_SEGMENT@229..230
+                    NAME_REF@229..230
+                      IDENT@229..230 "x"
+              R_CURLY@230..231 "}"
+            R_BRACK@231..232 "]"
+          R_PAREN@232..233 ")"
+        SEMICOLON@233..234 ";"
+      WHITESPACE@234..239 "\n    "
+      EXPR_STMT@239..314
+        FORM_EXPR@239..313
+          NAME_REF@239..240
+            IDENT@239..240 "s"
+          BANG@240..241 "!"
+          L_PAREN@241..242 "("
+          FORM_ATTR@242..255
+            NAME@242..245
+              IDENT@242..245 "who"
+            WHITESPACE@245..246 " "
+            EQ@246..247 "="
+            WHITESPACE@247..248 " "
+            LITERAL@248..255
+              STRING@248..255 "\"Azusa\""
+          COMMA@255..256 ","
+          WHITESPACE@256..257 " "
+          FORM_ATTR@257..275
+            NAME@257..262
+              IDENT@257..262 "voice"
+            WHITESPACE@262..263 " "
+            EQ@263..264 "="
+            WHITESPACE@264..265 " "
+            PATH_EXPR@265..275
+              PATH@265..275
+                PATH_SEGMENT@265..275
+                  NAME_REF@265..275
+                    IDENT@265..275 "AZUSA_0072"
+          COMMA@275..276 ","
+          WHITESPACE@276..277 " "
+          FORM_ATTR@277..298
+            NAME@277..283
+              IDENT@277..283 "render"
+            WHITESPACE@283..284 " "
+            EQ@284..285 "="
+            WHITESPACE@285..286 " "
+            PATH_EXPR@286..298
+              PATH@286..298
+                PATH_SEGMENT@286..298
+                  NAME_REF@286..298
+                    IDENT@286..298 "hanako_jumps"
+          COMMA@298..299 ","
+          WHITESPACE@299..300 " "
+          TEXT_FORM@300..312
+            NAME_REF@300..301
+              IDENT@300..301 "t"
+            BANG@301..302 "!"
+            L_BRACK@302..303 "["
+            TEXT_STRING@303..311
+              STRING@303..311 "\"ぬっ\""
+            R_BRACK@311..312 "]"
+          R_PAREN@312..313 ")"
+        SEMICOLON@313..314 ";"
+      WHITESPACE@314..319 "\n    "
+      EXPR_STMT@319..345
+        FORM_EXPR@319..344
+          NAME_REF@319..320
+            IDENT@319..320 "s"
+          BANG@320..321 "!"
+          L_PAREN@321..322 "("
+          FORM_ATTR@322..343
+            NAME@322..328
+              IDENT@322..328 "render"
+            WHITESPACE@328..329 " "
+            EQ@329..330 "="
+            WHITESPACE@330..331 " "
+            PATH_EXPR@331..343
+              PATH@331..343
+                PATH_SEGMENT@331..343
+                  NAME_REF@331..343
+                    IDENT@331..343 "cg_fireworks"
+          R_PAREN@343..344 ")"
+        SEMICOLON@344..345 ";"
+      WHITESPACE@345..350 "\n    "
+      EXPR_STMT@350..510
+        FORM_EXPR@350..509
+          NAME_REF@350..351
+            IDENT@350..351 "s"
+          BANG@351..352 "!"
+          L_PAREN@352..353 "("
+          WHITESPACE@353..362 "\n        "
+          FORM_ATTR@362..458
+            NAME@362..368
+              IDENT@362..368 "render"
+            WHITESPACE@368..369 " "
+            EQ@369..370 "="
+            WHITESPACE@370..371 " "
+            CLOSURE_EXPR@371..458
+              PARAM_LIST@371..383
+                PIPE@371..372 "|"
+                PARAM@372..382
+                  IDENT_PAT@372..382
+                    MUT_KW@372..375 "mut"
+                    WHITESPACE@375..376 " "
+                    NAME@376..382
+                      IDENT@376..382 "screen"
+                PIPE@382..383 "|"
+              WHITESPACE@383..384 " "
+              BLOCK_EXPR@384..458
+                L_CURLY@384..385 "{"
+                WHITESPACE@385..386 " "
+                EXPR_STMT@386..449
+                  METHOD_CALL_EXPR@386..448
+                    METHOD_CALL_EXPR@386..422
+                      METHOD_CALL_EXPR@386..405
+                        PATH_EXPR@386..392
+                          PATH@386..392
+                            PATH_SEGMENT@386..392
+                              NAME_REF@386..392
+                                IDENT@386..392 "screen"
+                        DOT@392..393 "."
+                        NAME_REF@393..403
+                          IDENT@393..403 "background"
+                        ARG_LIST@403..405
+                          L_PAREN@403..404 "("
+                          R_PAREN@404..405 ")"
+                      DOT@405..406 "."
+                      NAME_REF@406..412
+                        IDENT@406..412 "change"
+                      ARG_LIST@412..422
+                        L_PAREN@412..413 "("
+                        PATH_EXPR@413..421
+                          PATH@413..421
+                            PATH@413..415
+                              PATH_SEGMENT@413..415
+                                NAME_REF@413..415
+                                  IDENT@413..415 "BG"
+                            COLON2@415..417 "::"
+                            PATH_SEGMENT@417..421
+                              NAME_REF@417..421
+                                IDENT@417..421 "ROOF"
+                        R_PAREN@421..422 ")"
+                    DOT@422..423 "."
+                    NAME_REF@423..438
+                      IDENT@423..438 "apply_animation"
+                    ARG_LIST@438..448
+                      L_PAREN@438..439 "("
+                      CALL_EXPR@439..447
+                        PATH_EXPR@439..443
+                          PATH@439..443
+                            PATH_SEGMENT@439..443
+                              NAME_REF@439..443
+                                IDENT@439..443 "fade"
+                        ARG_LIST@443..447
+                          L_PAREN@443..444 "("
+                          LITERAL@444..446
+                            INT_NUMBER@444..446 "30"
+                          R_PAREN@446..447 ")"
+                      R_PAREN@447..448 ")"
+                  SEMICOLON@448..449 ";"
+                WHITESPACE@449..450 " "
+                PATH_EXPR@450..456
+                  PATH@450..456
+                    PATH_SEGMENT@450..456
+                      NAME_REF@450..456
+                        IDENT@450..456 "screen"
+                WHITESPACE@456..457 " "
+                R_CURLY@457..458 "}"
+          COMMA@458..459 ","
+          WHITESPACE@459..468 "\n        "
+          TEXT_FORM@468..503
+            NAME_REF@468..469
+              IDENT@468..469 "t"
+            BANG@469..470 "!"
+            L_BRACK@470..471 "["
+            TEXT_STRING@471..502
+              STRING@471..502 "\"The wind on the roof ..."
+            R_BRACK@502..503 "]"
+          WHITESPACE@503..508 "\n    "
+          R_PAREN@508..509 ")"
+        SEMICOLON@509..510 ";"
+      WHITESPACE@510..515 "\n    "
+      LET_STMT@515..701
+        LET_KW@515..518 "let"
+        WHITESPACE@518..519 " "
+        IDENT_PAT@519..525
+          NAME@519..525
+            IDENT@519..525 "answer"
+        WHITESPACE@525..526 " "
+        EQ@526..527 "="
+        WHITESPACE@527..528 " "
+        FORM_EXPR@528..700
+          NAME_REF@528..534
+            IDENT@528..534 "choice"
+          BANG@534..535 "!"
+          L_CURLY@535..536 "{"
+          WHITESPACE@536..545 "\n        "
+          FORM_ATTR@545..559
+            NAME@545..547
+              IDENT@545..547 "id"
+            WHITESPACE@547..548 " "
+            EQ@548..549 "="
+            WHITESPACE@549..550 " "
+            LITERAL@550..559
+              STRING@550..559 "\"confess\""
+          COMMA@559..560 ","
+          WHITESPACE@560..569 "\n        "
+          FORM_ATTR@569..590
+            NAME@569..575
+              IDENT@569..575 "render"
+            WHITESPACE@575..576 " "
+            EQ@576..577 "="
+            WHITESPACE@577..578 " "
+            PATH_EXPR@578..590
+              PATH@578..590
+                PATH_SEGMENT@578..590
+                  NAME_REF@578..590
+                    IDENT@578..590 "azusa_smiles"
+          COMMA@590..591 ","
+          WHITESPACE@591..600 "\n        "
+          FORM_ARM@600..640
+            TEXT_FORM@600..624
+              NAME_REF@600..601
+                IDENT@600..601 "t"
+              BANG@601..602 "!"
+              L_BRACK@602..603 "["
+              TEXT_STRING@603..623
+                STRING@603..623 "\"Tell her the truth\""
+              R_BRACK@623..624 "]"
+            WHITESPACE@624..625 " "
+            FAT_ARROW@625..627 "=>"
+            WHITESPACE@627..628 " "
+            PATH_EXPR@628..640
+              PATH@628..640
+                PATH@628..635
+                  PATH_SEGMENT@628..635
+                    NAME_REF@628..635
+                      IDENT@628..635 "Confess"
+                COLON2@635..637 "::"
+                PATH_SEGMENT@637..640
+                  NAME_REF@637..640
+                    IDENT@637..640 "Yes"
+          COMMA@640..641 ","
+          WHITESPACE@641..650 "\n        "
+          FORM_ARM@650..693
+            TEXT_FORM@650..667
+              NAME_REF@650..651
+                IDENT@650..651 "t"
+              BANG@651..652 "!"
+              L_BRACK@652..653 "["
+              TEXT_STRING@653..666
+                STRING@653..666 "\"Say nothing\""
+              R_BRACK@666..667 "]"
+            WHITESPACE@667..668 " "
+            FORM_GUARD@668..678
+              IF_KW@668..670 "if"
+              WHITESPACE@670..671 " "
+              PATH_EXPR@671..678
+                PATH@671..678
+                  PATH_SEGMENT@671..678
+                    NAME_REF@671..678
+                      IDENT@671..678 "MET_MIO"
+            WHITESPACE@678..679 " "
+            FAT_ARROW@679..681 "=>"
+            WHITESPACE@681..682 " "
+            PATH_EXPR@682..693
+              PATH@682..693
+                PATH@682..689
+                  PATH_SEGMENT@682..689
+                    NAME_REF@682..689
+                      IDENT@682..689 "Confess"
+                COLON2@689..691 "::"
+                PATH_SEGMENT@691..693
+                  NAME_REF@691..693
+                    IDENT@691..693 "No"
+          COMMA@693..694 ","
+          WHITESPACE@694..699 "\n    "
+          R_CURLY@699..700 "}"
+        SEMICOLON@700..701 ";"
+      WHITESPACE@701..706 "\n    "
+      MATCH_EXPR@706..886
+        MATCH_KW@706..711 "match"
+        WHITESPACE@711..712 " "
+        FORM_EXPR@712..787
+          NAME_REF@712..718
+            IDENT@712..718 "choice"
+          BANG@718..719 "!"
+          L_CURLY@719..720 "{"
+          WHITESPACE@720..721 " "
+          FORM_ATTR@721..733
+            NAME@721..723
+              IDENT@721..723 "id"
+            WHITESPACE@723..724 " "
+            EQ@724..725 "="
+            WHITESPACE@725..726 " "
+            LITERAL@726..733
+              STRING@726..733 "\"again\""
+          COMMA@733..734 ","
+          WHITESPACE@734..735 " "
+          FORM_ARM@735..760
+            TEXT_FORM@735..744
+              NAME_REF@735..736
+                IDENT@735..736 "t"
+              BANG@736..737 "!"
+              L_BRACK@737..738 "["
+              TEXT_STRING@738..743
+                STRING@738..743 "\"Yes\""
+              R_BRACK@743..744 "]"
+            WHITESPACE@744..745 " "
+            FAT_ARROW@745..747 "=>"
+            WHITESPACE@747..748 " "
+            PATH_EXPR@748..760
+              PATH@748..760
+                PATH@748..755
+                  PATH_SEGMENT@748..755
+                    NAME_REF@748..755
+                      IDENT@748..755 "Confess"
+                COLON2@755..757 "::"
+                PATH_SEGMENT@757..760
+                  NAME_REF@757..760
+                    IDENT@757..760 "Yes"
+          COMMA@760..761 ","
+          WHITESPACE@761..762 " "
+          FORM_ARM@762..785
+            TEXT_FORM@762..770
+              NAME_REF@762..763
+                IDENT@762..763 "t"
+              BANG@763..764 "!"
+              L_BRACK@764..765 "["
+              TEXT_STRING@765..769
+                STRING@765..769 "\"No\""
+              R_BRACK@769..770 "]"
+            WHITESPACE@770..771 " "
+            FAT_ARROW@771..773 "=>"
+            WHITESPACE@773..774 " "
+            PATH_EXPR@774..785
+              PATH@774..785
+                PATH@774..781
+                  PATH_SEGMENT@774..781
+                    NAME_REF@774..781
+                      IDENT@774..781 "Confess"
+                COLON2@781..783 "::"
+                PATH_SEGMENT@783..785
+                  NAME_REF@783..785
+                    IDENT@783..785 "No"
+          WHITESPACE@785..786 " "
+          R_CURLY@786..787 "}"
+        WHITESPACE@787..788 " "
+        MATCH_ARM_LIST@788..886
+          L_CURLY@788..789 "{"
+          WHITESPACE@789..798 "\n        "
+          MATCH_ARM@798..832
+            PATH_PAT@798..810
+              PATH@798..810
+                PATH@798..805
+                  PATH_SEGMENT@798..805
+                    NAME_REF@798..805
+                      IDENT@798..805 "Confess"
+                COLON2@805..807 "::"
+                PATH_SEGMENT@807..810
+                  NAME_REF@807..810
+                    IDENT@807..810 "Yes"
+            WHITESPACE@810..811 " "
+            FAT_ARROW@811..813 "=>"
+            WHITESPACE@813..814 " "
+            CALL_EXPR@814..831
+              PATH_EXPR@814..829
+                PATH@814..829
+                  PATH_SEGMENT@814..829
+                    NAME_REF@814..829
+                      IDENT@814..829 "AzusaConfession"
+              ARG_LIST@829..831
+                L_PAREN@829..830 "("
+                R_PAREN@830..831 ")"
+            COMMA@831..832 ","
+          WHITESPACE@832..841 "\n        "
+          MATCH_ARM@841..880
+            PATH_PAT@841..852
+              PATH@841..852
+                PATH@841..848
+                  PATH_SEGMENT@841..848
+                    NAME_REF@841..848
+                      IDENT@841..848 "Confess"
+                COLON2@848..850 "::"
+                PATH_SEGMENT@850..852
+                  NAME_REF@850..852
+                    IDENT@850..852 "No"
+            WHITESPACE@852..853 " "
+            FAT_ARROW@853..855 "=>"
+            WHITESPACE@855..856 " "
+            FORM_EXPR@856..879
+              NAME_REF@856..857
+                IDENT@856..857 "s"
+              BANG@857..858 "!"
+              L_PAREN@858..859 "("
+              TEXT_FORM@859..878
+                NAME_REF@859..860
+                  IDENT@859..860 "t"
+                BANG@860..861 "!"
+                L_BRACK@861..862 "["
+                TEXT_STRING@862..877
+                  STRING@862..877 "\"I kept quiet.\""
+                R_BRACK@877..878 "]"
+              R_PAREN@878..879 ")"
+            COMMA@879..880 ","
+          WHITESPACE@880..885 "\n    "
+          R_CURLY@885..886 "}"
+      WHITESPACE@886..887 "\n"
+      R_CURLY@887..888 "}"
+  WHITESPACE@888..890 "\n\n"
+  FN@890..1265
+    FN_KW@890..892 "fn"
+    WHITESPACE@892..893 " "
+    NAME@893..899
+      IDENT@893..899 "Config"
+    PARAM_LIST@899..901
+      L_PAREN@899..900 "("
+      R_PAREN@900..901 ")"
+    WHITESPACE@901..902 " "
+    RET_TYPE@902..912
+      THIN_ARROW@902..904 "->"
+      WHITESPACE@904..905 " "
+      PATH_TYPE@905..912
+        PATH@905..912
+          PATH_SEGMENT@905..912
+            NAME_REF@905..912
+              IDENT@905..912 "Overlay"
+    WHITESPACE@912..913 " "
+    BLOCK_EXPR@913..1265
+      L_CURLY@913..914 "{"
+      WHITESPACE@914..919 "\n    "
+      LET_STMT@919..969
+        LET_KW@919..922 "let"
+        WHITESPACE@922..923 " "
+        TUPLE_PAT@923..941
+          L_PAREN@923..924 "("
+          IDENT_PAT@924..929
+            NAME@924..929
+              IDENT@924..929 "speed"
+          COMMA@929..930 ","
+          WHITESPACE@930..931 " "
+          IDENT_PAT@931..940
+            NAME@931..940
+              IDENT@931..940 "set_speed"
+          R_PAREN@940..941 ")"
+        WHITESPACE@941..942 " "
+        EQ@942..943 "="
+        WHITESPACE@943..944 " "
+        CALL_EXPR@944..968
+          PATH_EXPR@944..950
+            PATH@944..950
+              PATH_SEGMENT@944..950
+                NAME_REF@944..950
+                  IDENT@944..950 "signal"
+          ARG_LIST@950..968
+            L_PAREN@950..951 "("
+            METHOD_CALL_EXPR@951..967
+              PATH_EXPR@951..961
+                PATH@951..961
+                  PATH_SEGMENT@951..961
+                    NAME_REF@951..961
+                      IDENT@951..961 "TEXT_SPEED"
+              DOT@961..962 "."
+              NAME_REF@962..965
+                IDENT@962..965 "get"
+              ARG_LIST@965..967
+                L_PAREN@965..966 "("
+                R_PAREN@966..967 ")"
+            R_PAREN@967..968 ")"
+        SEMICOLON@968..969 ";"
+      WHITESPACE@969..974 "\n    "
+      CALL_EXPR@974..1263
+        PATH_EXPR@974..981
+          PATH@974..981
+            PATH_SEGMENT@974..981
+              NAME_REF@974..981
+                IDENT@974..981 "Overlay"
+        ARG_LIST@981..1263
+          L_PAREN@981..982 "("
+          FORM_EXPR@982..1262
+            NAME_REF@982..988
+              IDENT@982..988 "column"
+            BANG@988..989 "!"
+            L_BRACK@989..990 "["
+            WHITESPACE@990..999 "\n        "
+            FORM_EXPR@999..1034
+              NAME_REF@999..1003
+                IDENT@999..1003 "text"
+              BANG@1003..1004 "!"
+              L_PAREN@1004..1005 "("
+              TEXT_FORM@1005..1033
+                NAME_REF@1005..1006
+                  IDENT@1005..1006 "t"
+                BANG@1006..1007 "!"
+                L_BRACK@1007..1008 "["
+                TEXT_STRING@1008..1022
+                  STRING@1008..1022 "\"Text speed: \""
+                WHITESPACE@1022..1023 " "
+                TEXT_INTERP@1023..1032
+                  L_CURLY@1023..1024 "{"
+                  CALL_EXPR@1024..1031
+                    PATH_EXPR@1024..1029
+                      PATH@1024..1029
+                        PATH_SEGMENT@1024..1029
+                          NAME_REF@1024..1029
+                            IDENT@1024..1029 "speed"
+                    ARG_LIST@1029..1031
+                      L_PAREN@1029..1030 "("
+                      R_PAREN@1030..1031 ")"
+                  R_CURLY@1031..1032 "}"
+                R_BRACK@1032..1033 "]"
+              R_PAREN@1033..1034 ")"
+            COMMA@1034..1035 ","
+            WHITESPACE@1035..1044 "\n        "
+            FORM_EXPR@1044..1199
+              NAME_REF@1044..1050
+                IDENT@1044..1050 "slider"
+              BANG@1050..1051 "!"
+              L_CURLY@1051..1052 "{"
+              WHITESPACE@1052..1065 "\n            "
+              FORM_ATTR@1065..1072
+                NAME@1065..1068
+                  IDENT@1065..1068 "min"
+                WHITESPACE@1068..1069 " "
+                EQ@1069..1070 "="
+                WHITESPACE@1070..1071 " "
+                LITERAL@1071..1072
+                  INT_NUMBER@1071..1072 "0"
+              COMMA@1072..1073 ","
+              WHITESPACE@1073..1086 "\n            "
+              FORM_ATTR@1086..1094
+                NAME@1086..1089
+                  IDENT@1086..1089 "max"
+                WHITESPACE@1089..1090 " "
+                EQ@1090..1091 "="
+                WHITESPACE@1091..1092 " "
+                LITERAL@1092..1094
+                  INT_NUMBER@1092..1094 "10"
+              COMMA@1094..1095 ","
+              WHITESPACE@1095..1108 "\n            "
+              FORM_ATTR@1108..1123
+                NAME@1108..1113
+                  IDENT@1108..1113 "value"
+                WHITESPACE@1113..1114 " "
+                EQ@1114..1115 "="
+                WHITESPACE@1115..1116 " "
+                CALL_EXPR@1116..1123
+                  PATH_EXPR@1116..1121
+                    PATH@1116..1121
+                      PATH_SEGMENT@1116..1121
+                        NAME_REF@1116..1121
+                          IDENT@1116..1121 "speed"
+                  ARG_LIST@1121..1123
+                    L_PAREN@1121..1122 "("
+                    R_PAREN@1122..1123 ")"
+              COMMA@1123..1124 ","
+              WHITESPACE@1124..1137 "\n            "
+              FORM_ATTR@1137..1188
+                NAME@1137..1146
+                  IDENT@1137..1146 "on_change"
+                WHITESPACE@1146..1147 " "
+                EQ@1147..1148 "="
+                WHITESPACE@1148..1149 " "
+                CLOSURE_EXPR@1149..1188
+                  PARAM_LIST@1149..1152
+                    PIPE@1149..1150 "|"
+                    PARAM@1150..1151
+                      IDENT_PAT@1150..1151
+                        NAME@1150..1151
+                          IDENT@1150..1151 "v"
+                    PIPE@1151..1152 "|"
+                  WHITESPACE@1152..1153 " "
+                  BLOCK_EXPR@1153..1188
+                    L_CURLY@1153..1154 "{"
+                    WHITESPACE@1154..1155 " "
+                    EXPR_STMT@1155..1168
+                      CALL_EXPR@1155..1167
+                        PATH_EXPR@1155..1164
+                          PATH@1155..1164
+                            PATH_SEGMENT@1155..1164
+                              NAME_REF@1155..1164
+                                IDENT@1155..1164 "set_speed"
+                        ARG_LIST@1164..1167
+                          L_PAREN@1164..1165 "("
+                          PATH_EXPR@1165..1166
+                            PATH@1165..1166
+                              PATH_SEGMENT@1165..1166
+                                NAME_REF@1165..1166
+                                  IDENT@1165..1166 "v"
+                          R_PAREN@1166..1167 ")"
+                      SEMICOLON@1167..1168 ";"
+                    WHITESPACE@1168..1169 " "
+                    METHOD_CALL_EXPR@1169..1186
+                      PATH_EXPR@1169..1179
+                        PATH@1169..1179
+                          PATH_SEGMENT@1169..1179
+                            NAME_REF@1169..1179
+                              IDENT@1169..1179 "TEXT_SPEED"
+                      DOT@1179..1180 "."
+                      NAME_REF@1180..1183
+                        IDENT@1180..1183 "set"
+                      ARG_LIST@1183..1186
+                        L_PAREN@1183..1184 "("
+                        PATH_EXPR@1184..1185
+                          PATH@1184..1185
+                            PATH_SEGMENT@1184..1185
+                              NAME_REF@1184..1185
+                                IDENT@1184..1185 "v"
+                        R_PAREN@1185..1186 ")"
+                    WHITESPACE@1186..1187 " "
+                    R_CURLY@1187..1188 "}"
+              COMMA@1188..1189 ","
+              WHITESPACE@1189..1198 "\n        "
+              R_CURLY@1198..1199 "}"
+            COMMA@1199..1200 ","
+            WHITESPACE@1200..1209 "\n        "
+            FORM_EXPR@1209..1255
+              NAME_REF@1209..1215
+                IDENT@1209..1215 "button"
+              BANG@1215..1216 "!"
+              L_CURLY@1216..1217 "{"
+              FORM_ATTR@1217..1242
+                NAME@1217..1225
+                  IDENT@1217..1225 "on_click"
+                WHITESPACE@1225..1226 " "
+                EQ@1226..1227 "="
+                WHITESPACE@1227..1228 " "
+                CLOSURE_EXPR@1228..1242
+                  PARAM_LIST@1228..1230
+                    PIPE@1228..1229 "|"
+                    PIPE@1229..1230 "|"
+                  WHITESPACE@1230..1231 " "
+                  CALL_EXPR@1231..1242
+                    PATH_EXPR@1231..1240
+                      PATH@1231..1240
+                        PATH@1231..1234
+                          PATH_SEGMENT@1231..1234
+                            NAME_REF@1231..1234
+                              IDENT@1231..1234 "nav"
+                        COLON2@1234..1236 "::"
+                        PATH_SEGMENT@1236..1240
+                          NAME_REF@1236..1240
+                            IDENT@1236..1240 "back"
+                    ARG_LIST@1240..1242
+                      L_PAREN@1240..1241 "("
+                      R_PAREN@1241..1242 ")"
+              COMMA@1242..1243 ","
+              WHITESPACE@1243..1244 " "
+              TEXT_FORM@1244..1254
+                NAME_REF@1244..1245
+                  IDENT@1244..1245 "t"
+                BANG@1245..1246 "!"
+                L_BRACK@1246..1247 "["
+                TEXT_STRING@1247..1253
+                  STRING@1247..1253 "\"Back\""
+                R_BRACK@1253..1254 "]"
+              R_CURLY@1254..1255 "}"
+            COMMA@1255..1256 ","
+            WHITESPACE@1256..1261 "\n    "
+            R_BRACK@1261..1262 "]"
+          R_PAREN@1262..1263 ")"
+      WHITESPACE@1263..1264 "\n"
+      R_CURLY@1264..1265 "}"
+  WHITESPACE@1265..1266 "\n"

@@ -1,0 +1,68 @@
+//! Steps, and the system's view of a running story.
+
+pub mod text;
+
+pub use self::text::{Text, TextEffect};
+use crate::screen::{Render, Screen};
+
+/// A step the story suspends at; resumes with `Output`.
+pub trait Step {
+    type Output;
+}
+
+#[builtin] pub pushdown fn push_step<S: Step>(s: S) -> S::Output;
+
+/// The step written `s!(…)`.
+pub struct Say {
+    pub who: Option<Text>,
+    pub voice: Option<VoiceAsset>,
+    pub render: Option<Render>,
+    pub text: Option<Text>,
+}
+
+impl Step for Say {
+    type Output = ();
+}
+
+/// The step written `choice!{…}`.
+pub struct Choice<A, const N: usize> {
+    pub id: Text,
+    pub render: Option<Render>,
+    pub arms: [ChoiceArm<A>; N],
+}
+
+pub struct ChoiceArm<A> {
+    pub text: Text,
+    pub shown: bool,
+    pub value: A,
+}
+
+impl<A, const N: usize> Step for Choice<A, N> {
+    type Output = A;
+}
+
+/// A persistent global value outside saves.
+#[builtin] pub struct Meta<T>;
+
+#[builtin] pub const fn meta<T>(init: T) -> Meta<T>;
+
+impl<T> Meta<T> {
+    #[builtin] pub fn get(&self) -> T;
+    #[builtin] pub fn set(&self, value: T);
+    #[builtin] pub pushdown fn write(&self, value: T);
+}
+
+#[builtin] pub struct Narrative;
+#[builtin] pub struct Line;
+#[builtin] pub struct Choices;
+#[builtin] pub struct History;
+#[builtin] pub struct Save;
+#[builtin] pub struct Divergence;
+
+#[builtin] pub fn current_line(n: &Narrative) -> Line;
+#[builtin] pub fn choices(n: &Narrative) -> Choices;
+#[builtin] pub fn history(n: &Narrative) -> History;
+#[builtin] pub fn screen(n: &Narrative) -> &Screen;
+#[builtin] pub fn snapshot(n: &Narrative) -> Save;
+#[builtin] pub fn restore(s: Save) -> Result<Narrative, Divergence>;
+#[builtin] pub fn rewind(n: &Narrative, entry: u64) -> Narrative;

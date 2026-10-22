@@ -1,0 +1,5 @@
+//! UI values and signals.
+
+#[builtin] pub struct Element;
+
+#[builtin] pub fn signal<T>(init: T) -> (Fn() -> T, Fn(T));

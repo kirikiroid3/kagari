@@ -1,0 +1,50 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/ui/001__system/main.kix
+---
+ui/001__system/main.kix:38:13: error[lower/ui-form-not-designed]: UI forms are not designed yet
+ui/001__system/main.kix:55:5: error[lower/ui-form-not-designed]: UI forms are not designed yet
+--- resolutions ---
+ui/001__system/main.kix:6:26 cleared_azusa -> local cleared_azusa@6:26
+ui/001__system/main.kix:6:41 bool -> prim bool
+ui/001__system/main.kix:6:50 Ending -> enum crate::story::Ending
+ui/001__system/main.kix:7:12 cleared_azusa -> local cleared_azusa@6:26
+ui/001__system/main.kix:8:20 Ending::AzusaEnd -> variant crate::story::Ending::AzusaEnd
+ui/001__system/main.kix:10:9 Ending::NormalEnd -> variant crate::story::Ending::NormalEnd
+ui/001__system/main.kix:15:23 RootPage -> struct std::system::RootPage
+ui/001__system/main.kix:16:9 super::Credits -> fn crate::Credits
+ui/001__system/main.kix:19:26 Element -> struct std::ui::Element
+ui/001__system/main.kix:20:9 GameView -> fn crate::ui::GameView
+ui/001__system/main.kix:24:20 Setting -> struct std::system::Setting
+ui/001__system/main.kix:24:28 Int -> struct std::Int
+ui/001__system/main.kix:24:42 setting -> fn std::system::setting
+ui/001__system/main.kix:25:20 Setting -> struct std::system::Setting
+ui/001__system/main.kix:25:28 Int -> struct std::Int
+ui/001__system/main.kix:25:43 setting -> fn std::system::setting
+ui/001__system/main.kix:26:23 Meta -> struct std::narrative::Meta
+ui/001__system/main.kix:26:28 bool -> prim bool
+ui/001__system/main.kix:26:36 meta -> fn std::narrative::meta
+ui/001__system/main.kix:28:14 System -> struct std::system::System
+ui/001__system/main.kix:29:5 System -> struct std::system::System
+ui/001__system/main.kix:30:16 ui::Title -> fn crate::ui::Title
+ui/001__system/main.kix:31:15 ui::GameView -> fn crate::ui::GameView
+ui/001__system/main.kix:36:16 Overlay -> struct std::system::Overlay
+ui/001__system/main.kix:37:10 speed -> local speed@37:10
+ui/001__system/main.kix:37:17 set_speed -> local set_speed@37:17
+ui/001__system/main.kix:37:30 signal -> fn std::ui::signal
+ui/001__system/main.kix:37:37 TEXT_SPEED -> static crate::TEXT_SPEED
+ui/001__system/main.kix:38:5 Overlay -> struct std::system::Overlay
+ui/001__system/main.kix:50:17 RootPage -> struct std::system::RootPage
+ui/001__system/main.kix:51:5 ui::Title -> fn crate::ui::Title
+ui/001__system/main.kix:54:22 Element -> struct std::ui::Element
+ui/001__system/main.kix:58:14 ending -> local ending@58:14
+ui/001__system/main.kix:58:22 story::Ending -> enum crate::story::Ending
+ui/001__system/main.kix:59:11 ending -> local ending@58:14
+ui/001__system/main.kix:60:9 story::Ending::AzusaEnd -> variant crate::story::Ending::AzusaEnd
+ui/001__system/main.kix:60:38 CLEARED_AZUSA -> static crate::CLEARED_AZUSA
+ui/001__system/main.kix:60:63 nav::goto -> fn std::system::nav::goto
+ui/001__system/main.kix:60:73 Credits -> fn crate::Credits
+ui/001__system/main.kix:61:9 story::Ending::NormalEnd -> variant crate::story::Ending::NormalEnd
+ui/001__system/main.kix:61:37 nav::goto -> fn std::system::nav::goto
+ui/001__system/main.kix:61:47 Credits -> fn crate::Credits

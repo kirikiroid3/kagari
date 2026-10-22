@@ -1,0 +1,517 @@
+---
+source: core/kagari-syntax/tests/snapshots.rs
+expression: "render(&input, &parse(&input, source_kind(path)))"
+input_file: core/kagari-syntax/tests/parse/kix_004__form_errors.kix
+---
+SOURCE_FILE@0..1030
+  FN@0..1029
+    ATTR@0..8
+      POUND@0..1 "#"
+      L_BRACK@1..2 "["
+      PATH@2..7
+        PATH_SEGMENT@2..7
+          NAME_REF@2..7
+            IDENT@2..7 "scene"
+      R_BRACK@7..8 "]"
+    WHITESPACE@8..9 "\n"
+    PUSHDOWN_KW@9..17 "pushdown"
+    WHITESPACE@17..18 " "
+    FN_KW@18..20 "fn"
+    WHITESPACE@20..21 " "
+    NAME@21..27
+      IDENT@21..27 "Errors"
+    PARAM_LIST@27..29
+      L_PAREN@27..28 "("
+      R_PAREN@28..29 ")"
+    WHITESPACE@29..30 " "
+    BLOCK_EXPR@30..1029
+      L_CURLY@30..31 "{"
+      WHITESPACE@31..36 "\n    "
+      LINE_COMMENT@36..51 "// unknown form"
+      WHITESPACE@51..56 "\n    "
+      EXPR_STMT@56..64
+        FORM_EXPR@56..63
+          NAME_REF@56..59
+            IDENT@56..59 "foo"
+          BANG@59..60 "!"
+          L_PAREN@60..61 "("
+          LITERAL@61..62
+            INT_NUMBER@61..62 "1"
+          R_PAREN@62..63 ")"
+        SEMICOLON@63..64 ";"
+      WHITESPACE@64..69 "\n    "
+      LINE_COMMENT@69..87 "// wrong delimiter"
+      WHITESPACE@87..92 "\n    "
+      EXPR_STMT@92..104
+        FORM_EXPR@92..103
+          NAME_REF@92..93
+            IDENT@92..93 "s"
+          BANG@93..94 "!"
+          L_BRACK@94..95 "["
+          TEXT_FORM@95..102
+            NAME_REF@95..96
+              IDENT@95..96 "t"
+            BANG@96..97 "!"
+            L_BRACK@97..98 "["
+            TEXT_STRING@98..101
+              STRING@98..101 "\"x\""
+            R_BRACK@101..102 "]"
+          R_BRACK@102..103 "]"
+        SEMICOLON@103..104 ";"
+      WHITESPACE@104..109 "\n    "
+      LINE_COMMENT@109..139 "// `[]` form with an  ..."
+      WHITESPACE@139..144 "\n    "
+      LET_STMT@144..185
+        LET_KW@144..147 "let"
+        WHITESPACE@147..148 " "
+        IDENT_PAT@148..149
+          NAME@148..149
+            IDENT@148..149 "c"
+        WHITESPACE@149..150 " "
+        EQ@150..151 "="
+        WHITESPACE@151..152 " "
+        FORM_EXPR@152..184
+          NAME_REF@152..158
+            IDENT@152..158 "column"
+          BANG@158..159 "!"
+          L_BRACK@159..160 "["
+          FORM_ATTR@160..167
+            NAME@160..163
+              IDENT@160..163 "gap"
+            WHITESPACE@163..164 " "
+            EQ@164..165 "="
+            WHITESPACE@165..166 " "
+            LITERAL@166..167
+              INT_NUMBER@166..167 "1"
+          COMMA@167..168 ","
+          WHITESPACE@168..169 " "
+          FORM_EXPR@169..183
+            NAME_REF@169..173
+              IDENT@169..173 "text"
+            BANG@173..174 "!"
+            L_PAREN@174..175 "("
+            TEXT_FORM@175..182
+              NAME_REF@175..176
+                IDENT@175..176 "t"
+              BANG@176..177 "!"
+              L_BRACK@177..178 "["
+              TEXT_STRING@178..181
+                STRING@178..181 "\"x\""
+              R_BRACK@181..182 "]"
+            R_PAREN@182..183 ")"
+          R_BRACK@183..184 "]"
+        SEMICOLON@184..185 ";"
+      WHITESPACE@185..190 "\n    "
+      LINE_COMMENT@190..219 "// attribute after an ..."
+      WHITESPACE@219..224 "\n    "
+      EXPR_STMT@224..247
+        FORM_EXPR@224..246
+          NAME_REF@224..225
+            IDENT@224..225 "s"
+          BANG@225..226 "!"
+          L_PAREN@226..227 "("
+          TEXT_FORM@227..234
+            NAME_REF@227..228
+              IDENT@227..228 "t"
+            BANG@228..229 "!"
+            L_BRACK@229..230 "["
+            TEXT_STRING@230..233
+              STRING@230..233 "\"x\""
+            R_BRACK@233..234 "]"
+          COMMA@234..235 ","
+          WHITESPACE@235..236 " "
+          FORM_ATTR@236..245
+            NAME@236..239
+              IDENT@236..239 "who"
+            WHITESPACE@239..240 " "
+            EQ@240..241 "="
+            WHITESPACE@241..242 " "
+            LITERAL@242..245
+              STRING@242..245 "\"A\""
+          R_PAREN@245..246 ")"
+        SEMICOLON@246..247 ";"
+      WHITESPACE@247..252 "\n    "
+      LINE_COMMENT@252..274 "// duplicate attribute"
+      WHITESPACE@274..279 "\n    "
+      EXPR_STMT@279..304
+        FORM_EXPR@279..303
+          NAME_REF@279..280
+            IDENT@279..280 "s"
+          BANG@280..281 "!"
+          L_PAREN@281..282 "("
+          FORM_ATTR@282..291
+            NAME@282..285
+              IDENT@282..285 "who"
+            WHITESPACE@285..286 " "
+            EQ@286..287 "="
+            WHITESPACE@287..288 " "
+            LITERAL@288..291
+              STRING@288..291 "\"A\""
+          COMMA@291..292 ","
+          WHITESPACE@292..293 " "
+          FORM_ATTR@293..302
+            NAME@293..296
+              IDENT@293..296 "who"
+            WHITESPACE@296..297 " "
+            EQ@297..298 "="
+            WHITESPACE@298..299 " "
+            LITERAL@299..302
+              STRING@299..302 "\"B\""
+          R_PAREN@302..303 ")"
+        SEMICOLON@303..304 ";"
+      WHITESPACE@304..309 "\n    "
+      LINE_COMMENT@309..333 "// arm outside `choice!`"
+      WHITESPACE@333..338 "\n    "
+      EXPR_STMT@338..355
+        FORM_EXPR@338..354
+          NAME_REF@338..339
+            IDENT@338..339 "s"
+          BANG@339..340 "!"
+          L_PAREN@340..341 "("
+          FORM_ARM@341..353
+            TEXT_FORM@341..348
+              NAME_REF@341..342
+                IDENT@341..342 "t"
+              BANG@342..343 "!"
+              L_BRACK@343..344 "["
+              TEXT_STRING@344..347
+                STRING@344..347 "\"x\""
+              R_BRACK@347..348 "]"
+            WHITESPACE@348..349 " "
+            FAT_ARROW@349..351 "=>"
+            WHITESPACE@351..352 " "
+            LITERAL@352..353
+              INT_NUMBER@352..353 "1"
+          R_PAREN@353..354 ")"
+        SEMICOLON@354..355 ";"
+      WHITESPACE@355..360 "\n    "
+      LINE_COMMENT@360..388 "// unknown attribute  ..."
+      WHITESPACE@388..393 "\n    "
+      EXPR_STMT@393..407
+        FORM_EXPR@393..406
+          NAME_REF@393..394
+            IDENT@393..394 "s"
+          BANG@394..395 "!"
+          L_PAREN@395..396 "("
+          FORM_ATTR@396..405
+            NAME@396..401
+              IDENT@396..401 "color"
+            WHITESPACE@401..402 " "
+            EQ@402..403 "="
+            WHITESPACE@403..404 " "
+            LITERAL@404..405
+              INT_NUMBER@404..405 "1"
+          R_PAREN@405..406 ")"
+        SEMICOLON@406..407 ";"
+      WHITESPACE@407..412 "\n    "
+      LINE_COMMENT@412..444 "// more than one elem ..."
+      WHITESPACE@444..449 "\n    "
+      EXPR_STMT@449..470
+        FORM_EXPR@449..469
+          NAME_REF@449..450
+            IDENT@449..450 "s"
+          BANG@450..451 "!"
+          L_PAREN@451..452 "("
+          TEXT_FORM@452..459
+            NAME_REF@452..453
+              IDENT@452..453 "t"
+            BANG@453..454 "!"
+            L_BRACK@454..455 "["
+            TEXT_STRING@455..458
+              STRING@455..458 "\"a\""
+            R_BRACK@458..459 "]"
+          COMMA@459..460 ","
+          WHITESPACE@460..461 " "
+          TEXT_FORM@461..468
+            NAME_REF@461..462
+              IDENT@461..462 "t"
+            BANG@462..463 "!"
+            L_BRACK@463..464 "["
+            TEXT_STRING@464..467
+              STRING@464..467 "\"b\""
+            R_BRACK@467..468 "]"
+          R_PAREN@468..469 ")"
+        SEMICOLON@469..470 ";"
+      WHITESPACE@470..475 "\n    "
+      LINE_COMMENT@475..515 "// element of `s!` th ..."
+      WHITESPACE@515..520 "\n    "
+      EXPR_STMT@520..528
+        FORM_EXPR@520..527
+          NAME_REF@520..521
+            IDENT@520..521 "s"
+          BANG@521..522 "!"
+          L_PAREN@522..523 "("
+          LITERAL@523..526
+            STRING@523..526 "\"x\""
+          R_PAREN@526..527 ")"
+        SEMICOLON@527..528 ";"
+      WHITESPACE@528..533 "\n    "
+      LINE_COMMENT@533..566 "// unknown attribute  ..."
+      WHITESPACE@566..571 "\n    "
+      EXPR_STMT@571..620
+        FORM_EXPR@571..619
+          NAME_REF@571..577
+            IDENT@571..577 "choice"
+          BANG@577..578 "!"
+          L_CURLY@578..579 "{"
+          WHITESPACE@579..580 " "
+          FORM_ATTR@580..589
+            NAME@580..582
+              IDENT@580..582 "id"
+            WHITESPACE@582..583 " "
+            EQ@583..584 "="
+            WHITESPACE@584..585 " "
+            LITERAL@585..589
+              STRING@585..589 "\"c1\""
+          COMMA@589..590 ","
+          WHITESPACE@590..591 " "
+          FORM_ATTR@591..600
+            NAME@591..596
+              IDENT@591..596 "color"
+            WHITESPACE@596..597 " "
+            EQ@597..598 "="
+            WHITESPACE@598..599 " "
+            LITERAL@599..600
+              INT_NUMBER@599..600 "1"
+          COMMA@600..601 ","
+          WHITESPACE@601..602 " "
+          FORM_ARM@602..617
+            TEXT_FORM@602..609
+              NAME_REF@602..603
+                IDENT@602..603 "t"
+              BANG@603..604 "!"
+              L_BRACK@604..605 "["
+              TEXT_STRING@605..608
+                STRING@605..608 "\"a\""
+              R_BRACK@608..609 "]"
+            WHITESPACE@609..610 " "
+            FAT_ARROW@610..612 "=>"
+            WHITESPACE@612..613 " "
+            PATH_EXPR@613..617
+              PATH@613..617
+                PATH@613..614
+                  PATH_SEGMENT@613..614
+                    NAME_REF@613..614
+                      IDENT@613..614 "A"
+                COLON2@614..616 "::"
+                PATH_SEGMENT@616..617
+                  NAME_REF@616..617
+                    IDENT@616..617 "B"
+          WHITESPACE@617..618 " "
+          R_CURLY@618..619 "}"
+        SEMICOLON@619..620 ";"
+      WHITESPACE@620..625 "\n    "
+      LINE_COMMENT@625..650 "// `choice!` without  ..."
+      WHITESPACE@650..655 "\n    "
+      EXPR_STMT@655..682
+        FORM_EXPR@655..681
+          NAME_REF@655..661
+            IDENT@655..661 "choice"
+          BANG@661..662 "!"
+          L_CURLY@662..663 "{"
+          WHITESPACE@663..664 " "
+          FORM_ARM@664..679
+            TEXT_FORM@664..671
+              NAME_REF@664..665
+                IDENT@664..665 "t"
+              BANG@665..666 "!"
+              L_BRACK@666..667 "["
+              TEXT_STRING@667..670
+                STRING@667..670 "\"a\""
+              R_BRACK@670..671 "]"
+            WHITESPACE@671..672 " "
+            FAT_ARROW@672..674 "=>"
+            WHITESPACE@674..675 " "
+            PATH_EXPR@675..679
+              PATH@675..679
+                PATH@675..676
+                  PATH_SEGMENT@675..676
+                    NAME_REF@675..676
+                      IDENT@675..676 "A"
+                COLON2@676..678 "::"
+                PATH_SEGMENT@678..679
+                  NAME_REF@678..679
+                    IDENT@678..679 "B"
+          WHITESPACE@679..680 " "
+          R_CURLY@680..681 "}"
+        SEMICOLON@681..682 ";"
+      WHITESPACE@682..687 "\n    "
+      LINE_COMMENT@687..723 "// `id` that is not a ..."
+      WHITESPACE@723..728 "\n    "
+      EXPR_STMT@728..763
+        FORM_EXPR@728..762
+          NAME_REF@728..734
+            IDENT@728..734 "choice"
+          BANG@734..735 "!"
+          L_CURLY@735..736 "{"
+          WHITESPACE@736..737 " "
+          FORM_ATTR@737..743
+            NAME@737..739
+              IDENT@737..739 "id"
+            WHITESPACE@739..740 " "
+            EQ@740..741 "="
+            WHITESPACE@741..742 " "
+            LITERAL@742..743
+              INT_NUMBER@742..743 "3"
+          COMMA@743..744 ","
+          WHITESPACE@744..745 " "
+          FORM_ARM@745..760
+            TEXT_FORM@745..752
+              NAME_REF@745..746
+                IDENT@745..746 "t"
+              BANG@746..747 "!"
+              L_BRACK@747..748 "["
+              TEXT_STRING@748..751
+                STRING@748..751 "\"a\""
+              R_BRACK@751..752 "]"
+            WHITESPACE@752..753 " "
+            FAT_ARROW@753..755 "=>"
+            WHITESPACE@755..756 " "
+            PATH_EXPR@756..760
+              PATH@756..760
+                PATH@756..757
+                  PATH_SEGMENT@756..757
+                    NAME_REF@756..757
+                      IDENT@756..757 "A"
+                COLON2@757..759 "::"
+                PATH_SEGMENT@759..760
+                  NAME_REF@759..760
+                    IDENT@759..760 "B"
+          WHITESPACE@760..761 " "
+          R_CURLY@761..762 "}"
+        SEMICOLON@762..763 ";"
+      WHITESPACE@763..768 "\n    "
+      LINE_COMMENT@768..807 "// `choice!` element  ..."
+      WHITESPACE@807..812 "\n    "
+      EXPR_STMT@812..842
+        FORM_EXPR@812..841
+          NAME_REF@812..818
+            IDENT@812..818 "choice"
+          BANG@818..819 "!"
+          L_CURLY@819..820 "{"
+          WHITESPACE@820..821 " "
+          FORM_ATTR@821..830
+            NAME@821..823
+              IDENT@821..823 "id"
+            WHITESPACE@823..824 " "
+            EQ@824..825 "="
+            WHITESPACE@825..826 " "
+            LITERAL@826..830
+              STRING@826..830 "\"c2\""
+          COMMA@830..831 ","
+          WHITESPACE@831..832 " "
+          TEXT_FORM@832..839
+            NAME_REF@832..833
+              IDENT@832..833 "t"
+            BANG@833..834 "!"
+            L_BRACK@834..835 "["
+            TEXT_STRING@835..838
+              STRING@835..838 "\"a\""
+            R_BRACK@838..839 "]"
+          WHITESPACE@839..840 " "
+          R_CURLY@840..841 "}"
+        SEMICOLON@841..842 ";"
+      WHITESPACE@842..847 "\n    "
+      LINE_COMMENT@847..891 "// `choice!` arm whos ..."
+      WHITESPACE@891..896 "\n    "
+      EXPR_STMT@896..930
+        FORM_EXPR@896..929
+          NAME_REF@896..902
+            IDENT@896..902 "choice"
+          BANG@902..903 "!"
+          L_CURLY@903..904 "{"
+          WHITESPACE@904..905 " "
+          FORM_ATTR@905..914
+            NAME@905..907
+              IDENT@905..907 "id"
+            WHITESPACE@907..908 " "
+            EQ@908..909 "="
+            WHITESPACE@909..910 " "
+            LITERAL@910..914
+              STRING@910..914 "\"c3\""
+          COMMA@914..915 ","
+          WHITESPACE@915..916 " "
+          FORM_ARM@916..927
+            LITERAL@916..919
+              STRING@916..919 "\"a\""
+            WHITESPACE@919..920 " "
+            FAT_ARROW@920..922 "=>"
+            WHITESPACE@922..923 " "
+            PATH_EXPR@923..927
+              PATH@923..927
+                PATH@923..924
+                  PATH_SEGMENT@923..924
+                    NAME_REF@923..924
+                      IDENT@923..924 "A"
+                COLON2@924..926 "::"
+                PATH_SEGMENT@926..927
+                  NAME_REF@926..927
+                    IDENT@926..927 "B"
+          WHITESPACE@927..928 " "
+          R_CURLY@928..929 "}"
+        SEMICOLON@929..930 ";"
+      WHITESPACE@930..935 "\n    "
+      LINE_COMMENT@935..963 "// commas between tex ..."
+      WHITESPACE@963..968 "\n    "
+      EXPR_STMT@968..985
+        FORM_EXPR@968..984
+          NAME_REF@968..969
+            IDENT@968..969 "s"
+          BANG@969..970 "!"
+          L_PAREN@970..971 "("
+          TEXT_FORM@971..983
+            NAME_REF@971..972
+              IDENT@971..972 "t"
+            BANG@972..973 "!"
+            L_BRACK@973..974 "["
+            TEXT_STRING@974..977
+              STRING@974..977 "\"a\""
+            ERROR@977..978
+              COMMA@977..978 ","
+            WHITESPACE@978..979 " "
+            TEXT_STRING@979..982
+              STRING@979..982 "\"b\""
+            R_BRACK@982..983 "]"
+          R_PAREN@983..984 ")"
+        SEMICOLON@984..985 ";"
+      WHITESPACE@985..990 "\n    "
+      LINE_COMMENT@990..1008 "// not a text item"
+      WHITESPACE@1008..1013 "\n    "
+      EXPR_STMT@1013..1027
+        FORM_EXPR@1013..1026
+          NAME_REF@1013..1014
+            IDENT@1013..1014 "s"
+          BANG@1014..1015 "!"
+          L_PAREN@1015..1016 "("
+          TEXT_FORM@1016..1025
+            NAME_REF@1016..1017
+              IDENT@1016..1017 "t"
+            BANG@1017..1018 "!"
+            L_BRACK@1018..1019 "["
+            TEXT_STRING@1019..1022
+              STRING@1019..1022 "\"a\""
+            WHITESPACE@1022..1023 " "
+            ERROR@1023..1024
+              IDENT@1023..1024 "x"
+            R_BRACK@1024..1025 "]"
+          R_PAREN@1025..1026 ")"
+        SEMICOLON@1026..1027 ";"
+      WHITESPACE@1027..1028 "\n"
+      R_CURLY@1028..1029 "}"
+  WHITESPACE@1029..1030 "\n"
+error 56..59: unknown form `foo!`
+error 92..103: `s!` is written `s!(…)`
+error 160..167: `column![…]` takes no attributes
+error 236..245: attributes must come before elements
+error 293..296: duplicate attribute `who`
+error 341..353: arms are only allowed in `choice!`
+error 396..401: unknown attribute `color` for `s!`
+error 461..468: `s!` takes at most one element
+error 523..526: the element of `s!` must be `t![…]`
+error 591..596: unknown attribute `color` for `choice!`
+error 655..661: `choice!` requires an `id` attribute
+error 742..743: `id` must be a string literal
+error 832..839: a `choice!` element must be an arm `t![…] => Variant`
+error 916..927: a `choice!` element must be an arm `t![…] => Variant`
+error 977..978: items of `t![…]` are juxtaposed, not separated by commas
+error 1023..1024: expected text, ruby `[…](…)`, an effect `![…](…)` or `{…}`

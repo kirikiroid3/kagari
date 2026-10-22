@@ -1,0 +1,24 @@
+static mut VISITED_A: bool = false;
+
+#[scene]
+#[entry]
+pushdown fn Day1() -> Ending {
+    s!(t!["The school festival starts today."]);
+    StallA();
+    Ending::Normal
+}
+
+#[scene]
+pushdown fn StallA() {
+    if VISITED_A {
+        s!(t!["The stall is already packing up."]);
+        return;
+    }
+    VISITED_A = true;
+    s!(who = "Hanako", render = hanako_jumps, t!["Welcome to stall A!"]);
+}
+
+const fn hanako_jumps(mut screen: Screen) -> Screen {
+    screen.entity(HANAKO).cord.apply_animation(jump(20));
+    screen
+}

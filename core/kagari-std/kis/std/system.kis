@@ -1,0 +1,27 @@
+//! The game system: settings, modes and the program description.
+
+pub mod nav;
+
+use crate::ui::Element;
+
+/// A persistent global setting outside saves.
+#[builtin] pub struct Setting<T>;
+
+#[builtin] pub const fn setting<T>(init: T) -> Setting<T>;
+
+impl<T> Setting<T> {
+    #[builtin] pub fn get(&self) -> T;
+    #[builtin] pub fn set(&self, value: T);
+}
+
+pub struct RootPage(pub Element);
+pub struct Overlay(pub Element);
+pub struct GameOverlay(pub Element);
+pub struct Dialog(pub Element);
+
+/// The program, returned by `main`.
+pub struct System {
+    pub start: fn() -> RootPage,
+    pub game: fn() -> Element,
+    pub save_slots: u64,
+}
