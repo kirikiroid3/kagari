@@ -1,42 +1,44 @@
 # Compilation
 
-A game is compiled from one entry `.kis` file into one `.kagari` bytecode file.
+A game is compiled from one root file into one `.kagari` bytecode file.
 
 ## Pipeline
 
 {{#include diagrams/pipeline.svg}}
 
-1. **Collect.** Starting from the entry script, the compiler chases
-   `<include src="foo.kis" />`, `<import src="bar.kix" />` and `<represent src="baz.kirp" />`
-   to obtain the full program text. Includes are spliced in place; imports are hoisted; represent
-   sources are loaded for later checking. *Tentative:* template uses (`<x tpl="…">`) are
-   expanded at the end of this stage, so every later stage sees plain script.
-2. **Structure check.** The script must be well structured: well-formed XML, tags nested where
-   they are allowed, required attributes present, label and scene names unique, every
-   `<goto>` and `<call>` target defined, every `<set>` value of the variable's type, every
-   `<match>` exhaustive, every returned and assigned value of the scene's `returns` type, every
-   path through a scene with `returns` ending in a `<return>` (see
-   [Returning a value](./kis/control-flow.md#returning-a-value)), and every `<goto>` loop and
-   every cycle of calls passing through a step (see
-   [Termination](./kis/control-flow.md#termination)).
-3. **Represent check.** Every `.kirp` file and every `<r>` block is resolved and type-checked
-   against the imported `.kix` definitions, ensuring each represent function is legitimate:
-   names exist, argument and return types match, and the result is a `Screen`. Since renders
-   read only constants and their input screen, each one, together with the `.kix` functions it
-   calls, is evaluated here to a `Screen -> Screen` function known at compile time. Renders that
-   ignore their input are marked as [keyframes](./kirp.md#keyframes).
-4. **High-level checks.** Whole-program properties:
-   - *Consistency.* The screen at a step must not depend on which path reached it unless the
-     author made that dependency explicit (see [Consistency](./kirp.md#consistency)). The
-     analysis tracks, per step, the possible values of each entity's components, with one
-     summary per scene.
-   - *Bounded screens.* A render whose read-modify-write could make the set of screens at a step
-     unbounded is an error (see [Unbounded screens](./kirp.md#unbounded-screens)). Error recovery
-     leaves that render out so the rest of the program is still checked.
-5. **Emit.** The script and the represent functions are compiled into bytecode.
+1. **Parse.** Starting from the root file, the compiler follows `mod` declarations to every `.kis`
+   and `.kix` file of the game. Elements are desugared here: a narrative element becomes a call of
+   `step` or a scene call, a UI element a value (see [Steps and Elements](./narrative/elements.md)
+   and [The Game System](./system.md)), so later stages see ordinary code.
+2. **Resolve.** Modules, `use` declarations and paths are resolved; every name must exist and be
+   visible. Asset paths are checked to exist.
+3. **Type and kind check.** Types, `match` exhaustiveness and return values are checked as in
+   Rust. On top of that:
+   - the [call rules](./kinds.md#call-rules) between `fn`, `pushdown fn` and `const fn`, through
+     pointers and closures too;
+   - [finite types](./kinds.md#finite-types) for everything a `pushdown fn` holds at runtime;
+   - story variables used only from `pushdown fn`;
+   - second-class [references and closures](./values.md);
+   - `#[scene]`, `#[entry]` and `#[component]` rules, scene tag attributes, and the arms of each
+     `<choice>` being distinct variants of one enum.
+4. **Const evaluation.** Constants are evaluated. `const fn` called from the story with finite
+   arguments are [tabulated](./kinds.md#calling-const-fn-from-the-story). Renders are evaluated on
+   the screens that reach their steps; renders that ignore their input are marked as
+   [keyframes](./presentation.md#keyframes).
+5. **Analysis.** Whole-program properties:
+   - *Termination.* Every loop and every cycle of calls passes through a step (see
+     [Termination](./narrative/scenes.md#termination)).
+   - *Stuck choices.* No `<choice>` is reachable with every arm's `when` false.
+   - *Consistency.* The screen at a step does not depend on which path reached it unless the
+     author made that dependency explicit (see [Consistency](./presentation.md#consistency)).
+   - *Bounded screens.* No render makes the set of screens at a step grow past the cap (see
+     [Unbounded screens](./presentation.md#unbounded-screens)).
+   - *Reachability and liveness.* Unreachable steps and story variables that never influence
+     anything are reported.
+   - *System checks.* The [mode-graph checks](./system.md#system-checks).
+6. **Emit.** The story, the renders and the system code are compiled into bytecode.
 
-Stages 1–3 are cheap. Stage 4 is where the analyses described in the proposal
-(reachability, presentation ambiguity, liveness) run.
+Stages 1–4 are cheap. Stage 5 is where the analyses described in the proposal run.
 
 ## `.kagari` header
 

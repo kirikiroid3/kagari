@@ -1,9 +1,0 @@
-<kagari>
-  <system start="title"><page name="title" root="true" /></system>
-  <game>
-    <!-- kis/entry-returns: no enum `Ending` is declared -->
-    <scene name="main" entry="true">
-      <s>There is no ending to report.</s>
-    </scene>
-  </game>
-</kagari>

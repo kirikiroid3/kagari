@@ -1,50 +1,67 @@
-# Source Files
+# Source Files and Modules
 
-## `.kis`: game script
+## `.kis` and `.kix`
 
-The story. An XML document made of scenes, steps, choices, variables and control flow. `.kis` is
-the entry point of compilation: everything else is reached from a `.kis` file.
+A `.kix` file is a `.kis` file that may also contain elements: `<s>…</s>`, `<choice>…</choice>`,
+`<FestivalHub />` and UI elements such as `<button>`. Elements are sugar for ordinary
+expressions (see [Steps and Elements](./narrative/elements.md) and [The Game
+System](./system.md)), so everything written in a `.kix` file can also be written, more verbosely,
+in a `.kis` file.
 
-See [Game Script](./kis/overview.md).
+The extension decides the syntax only. It never decides what code may do: that is the job of
+[function kinds](./kinds.md). Any kind of function may appear in either file. By convention the
+story is written in `.kix` files, and code without elements (types, constants, helpers, renders)
+in `.kis` files.
 
-## `.kirp`: representing code
+## Modules
 
-How the screen changes when a step is entered. The syntax is Rust-like, and a `.kirp` file must
-define exactly one function:
+A game is a tree of modules, as in Rust.
 
-```kirp
-fn render(screen: Screen) -> Screen {
-    // ...
-    screen
-}
+```kis
+// main.kix — the root module
+mod characters;      // characters.kis or characters.kix
+mod story;           // story.kis, story.kix, or story/mod.kis, story/mod.kix
+mod ui;
+
+use characters::{HANAKO, AZUSA};
 ```
 
-`render` receives the screen as it was before the step and returns the screen after it. The
-`<r>` tag in a script is the same thing written inline.
+- The compiler is given one **root file**, `main.kix` by convention. Every other file is reached
+  through `mod` declarations.
+- `mod foo;` loads `foo.kis` or `foo.kix` next to the declaring file, or `foo/mod.kis` or
+  `foo/mod.kix`. More than one candidate existing is an error.
+- `mod foo { … }` declares an inline module.
+- Items are private to their module unless marked `pub`. `use` brings paths into scope; `::`
+  separates path segments; `self`, `super` and `crate` work as in Rust.
+- Constants live in the value namespace and modules in the type namespace, so a constant and a
+  module may share a name: `AZUSA` is an entity id and `AZUSA::CLOSE_EYE_SMILE` one of her images.
 
-See [Representing Code](./kirp.md).
+## The standard library
 
-## `.kix`: extension
+The standard library is the module `std`:
 
-The vocabulary that `.kirp` code is written in: types, methods, functions and constants. The
-syntax is the same as `.kirp`. Its structs describe the data the engine works with, like a
-protobuf schema, and its functions have bodies that the compiler evaluates. A `.kix` file never
-contains a `render` function or any top-level statement.
+| Module          | Contents |
+| --------------- | -------- |
+| `std::screen`   | The screen (an ECS world), components, animations; see [Presentation](./presentation.md) |
+| `std::narrative`| The `step` primitive, `Say`, `Choice`, `Text`, `Meta`; the `Narrative` interface for the system |
+| `std::ui`       | UI elements, signals; see [The Game System](./system.md) |
+| `std::system`   | Navigation, saves, settings; see [The Game System](./system.md) |
 
-The engine ships a standard library of `.kix` files (components, the screen access API, common
-animations), described in the *Kagari STD Book*; a studio extends the engine by writing its own
-`.kix` files.
+A **prelude** is imported into every module automatically. It contains the types and functions
+the examples of this book use without a `use`: `Screen`, `Render`, `Text`, `Int`, `Option`,
+`jump`, `fade`, `instant_switch` and the asset types.
 
-See [Extensions](./kix.md).
+## Assets
 
-## How they reference each other
+```kis
+const CG_001: ImageAsset = asset("cg_001.png");
+const AZUSA_0072: VoiceAsset = asset("voice/azusa_0072.ogg");
+```
 
-| From   | Tag                     | To      | Effect                                              |
-| ------ | ----------------------- | ------- | --------------------------------------------------- |
-| `.kis` | `<include src="…" />`   | `.kis`  | Textual insertion of the other script               |
-| `.kis` | `<import src="…" />`    | `.kix`  | Makes the definitions visible; hoisted per scope    |
-| `.kis` | `<represent src="…" />` | `.kirp` | Runs that file's `render` when the step is entered |
+*Tentative.* `asset` is a built-in `const fn` that binds a file to a constant. The constant's type
+must be `ImageAsset`, `AudioAsset` or `VoiceAsset`, and the path, relative to the declaring file,
+must not be empty. The file is checked to exist at compile time.
 
-`.kirp` and `.kix` files never reference other files themselves. Because `<import>` is hoisted
-to the whole game scope, a `.kirp` file sees every `.kix` definition imported anywhere in
-`<game>`, plus the standard prelude.
+An asset type is a [finite type](./kinds.md#finite-types): its values are exactly the asset
+constants of the program. So the story may choose between assets at runtime, for example a voice
+line by route.

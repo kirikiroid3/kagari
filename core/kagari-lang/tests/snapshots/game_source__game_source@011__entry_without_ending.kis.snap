@@ -1,6 +1,0 @@
----
-source: core/kagari-lang/tests/game_source.rs
-expression: "render_diagnostics(&db, diags, Some(&base))"
-input_file: core/kagari-lang/tests/game_source/script/011__entry_without_ending.kis
----
-script/011__entry_without_ending.kis:5:30: error[kis/entry-returns]: an entry scene returns enum `Ending`, but no enum `Ending` is declared

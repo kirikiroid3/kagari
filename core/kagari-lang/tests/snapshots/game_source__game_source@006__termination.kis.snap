@@ -1,9 +1,0 @@
----
-source: core/kagari-lang/tests/game_source.rs
-expression: "render_diagnostics(&db, diags, Some(&base))"
-input_file: core/kagari-lang/tests/game_source/script/006__termination.kis
----
-script/006__termination.kis:25:7: error[kis/stepless-loop]: this loop in scene `hub` can repeat forever without reaching a step
-script/006__termination.kis:30:7: error[kis/stepless-call-cycle]: scene `selfish` can call itself forever without reaching a step
-script/006__termination.kis:37:7: error[kis/stepless-call-cycle]: scenes `ping`, `pong` can call each other forever without reaching a step
-script/006__termination.kis:69:7: error[kis/stepless-loop]: this loop in scene `loop_through_quiet` can repeat forever without reaching a step
