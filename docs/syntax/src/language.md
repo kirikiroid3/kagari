@@ -25,9 +25,8 @@ Items may be used before their declaration, as in Rust.
 
 | Attribute     | On | Meaning |
 | ------------- | -- | ------- |
-| `#[scene]`    | `pushdown fn` | The function may be used as a tag, `<Name />`; see [Scenes](./narrative/scenes.md#scene-tags) |
-| `#[entry]`    | `pushdown fn` | An entry scene: the system can start the story here; see [Entry scenes](./narrative/scenes.md#entry-scenes) |
-| `#[component]`| `fn` | A UI component, usable as a tag in UI code; see [The Game System](./system.md) |
+| `#[scene]`    | `pushdown fn` | A scene: may run steps and call other scenes; the unit of model checking. See [Scenes](./narrative/scenes.md#scenes-and-instant-procedures) |
+| `#[entry]`    | `#[scene]` function | An entry scene: the system can start the story here; see [Entry scenes](./narrative/scenes.md#entry-scenes) |
 | `#[must_use]` | `struct`, `enum` | Discarding a value of this type is a warning |
 | `#[builtin]`  | function | Implemented by the engine; no body. Only allowed in the standard library |
 
@@ -40,11 +39,11 @@ Any other attribute is an error.
 | Booleans, unit | `bool`, `()` |
 | Bounded integers | `Int<0, 5>`; see [Numbers](./numbers.md) |
 | Rust integers, exact numbers | `u8` … `i128`, `usize`, `isize`, `Rat`, `Decimal`; see [Numbers](./numbers.md) |
-| Text | `Text`: a string constant; `String`: a runtime string |
+| Text | `Text`: constant text, plain (`"Mio"`) or rich (`t![…]`); `String`: a runtime string |
 | Tuples, arrays | `(bool, Route)`, `[Int<0, 3>; 4]` |
 | Structs, enums | user-declared; `Option<T>` from the prelude |
 | Collections | `Vec<T>` |
-| Function pointers | `fn(Int<0, 5>) -> bool`, `pushdown fn() -> Answer`, `const fn(Screen) -> Screen` |
+| Function pointers | `fn(Int<0, 5>) -> bool`, `const fn(Screen) -> Screen`, `pushdown fn() -> Mood`, `scene fn() -> Answer` (*tentative*) |
 | Closures | `Fn(A) -> B`, `pushdown Fn(A) -> B`, `const Fn(A) -> B` (*tentative*) |
 | References | `&T`, `&mut T`, second-class; see [Values, References and Closures](./values.md) |
 
@@ -63,9 +62,9 @@ Literals, operators, blocks, `let` and `let mut`, assignment and compound assign
 `continue`, loop labels (`'map: loop`), `return`, struct and enum literals, tuple and array
 literals, field access, method calls, closures `|x| x + 1`, and ranges `0..4`, `3..=5`.
 
-In `.kix` files, an expression may also be an **element**. In a `pushdown fn` an element is a
-step or a scene call ([Steps and Elements](./narrative/elements.md)); in a `fn` or `const fn` it
-builds a UI value ([The Game System](./system.md)).
+In `.kix` files, an expression may also be a **form** such as `s!(…)`, `choice!{…}` or `t![…]`.
+Forms are fixed syntax for struct expressions and steps; see [Steps and
+Forms](./narrative/forms.md) for the story and [The Game System](./system.md) for UI.
 
 `match` must be exhaustive. Patterns are Rust's: literals, ranges (`3..=5`), `_`, bindings,
 tuples, structs, enum variants, and alternatives with `|`.
@@ -77,7 +76,7 @@ tuples, structs, enum variants, and alternatives with `|`.
 | Lifetimes, borrow checker, moves, `Drop` | Values have value semantics; references are second-class, see [Values, References and Closures](./values.md) |
 | Floats | Screens must be comparable exactly; use `Rat` or `Decimal` |
 | `unsafe`, raw pointers | Not needed |
-| Macros | Functions and scenes cover what templates and includes used to do |
-| Qualified paths `<T as Trait>::f` | `<` at the start of an expression begins an element |
+| Macros | Functions and scenes cover what templates and includes used to do; [forms](./narrative/forms.md) are a fixed set built into the syntax |
+| Qualified paths `<T as Trait>::f` | Only standard traits exist |
 | `async`, threads | The story's suspension is built in; see [Narrative](./narrative/overview.md) |
 | `goto`, labels as positions | Structured control flow only; see [Control flow](./narrative/scenes.md#control-flow) |

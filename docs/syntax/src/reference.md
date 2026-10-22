@@ -5,32 +5,41 @@
 | Kind | Calls | Holds at runtime | Steps | Story variables |
 | ---- | ----- | ---------------- | ----- | --------------- |
 | `fn` | `fn`, `const fn`; starts entry scenes | anything | no | no |
-| `pushdown fn` | `pushdown fn`, `const fn` (constant or finite arguments) | [finite types](./kinds.md#finite-types) | yes | read and write |
+| `#[scene] pushdown fn` | scenes, instant procedures, `const fn` (constant or finite arguments) | [finite types](./kinds.md#finite-types) | yes | read and write |
+| `pushdown fn` (instant procedure) | instant procedures, `const fn`; no recursion, only `for` loops | finite types | no | read and write |
 | `const fn` | `const fn` | anything | no | no |
 
-`pushdown` is a keyword only directly before `fn` or `Fn`.
+`pushdown` is a keyword only directly before `fn` or `Fn`; `scene` only in the pointer type
+`scene fn(…) -> …`.
 
 ## Attributes
 
 | Attribute | On | Meaning |
 | --------- | -- | ------- |
-| `#[scene]` | `pushdown fn` | Usable as a self-closing tag; attributes are parameters by name |
-| `#[entry]` | `pushdown fn` with finite parameters and return type | The system can start the story here |
-| `#[component]` | `fn` | A UI component, usable as a tag in UI code |
+| `#[scene]` | `pushdown fn` | A scene: may run steps and call scenes; a component of the checked state machine |
+| `#[entry]` | `#[scene]` with finite parameters and return type | The system can start the story here |
 | `#[must_use]` | `struct`, `enum` | Discarding or leaving a value pending is a warning |
 | `#[builtin]` | function | Engine-implemented, no body; standard library only |
 
-## Narrative elements
+## Forms (`.kix` only)
 
-| Element | Desugars to | Value | Props | Children |
-| ------- | ----------- | ----- | ----- | -------- |
-| `<s>` | `step(Say { … })` | `()` | `render` | text (narration), `<m>` |
-| `<m>` | `Message { … }` | — | `who`, `voice` | text |
-| `<choice>` | `step(Choice { … })` | the arms' enum | `id` (required), `render` | `<arm>` |
-| `<arm>` | `Arm { … }` | — | `id` (required), `when` | text |
-| `<Name … />` (`#[scene]`) | `Name(…)` | the scene's return value | the scene's parameters | none |
+| Delimiter | Accepts |
+| --------- | ------- |
+| `name!( … )` | attributes, then a fixed number of elements |
+| `name![ … ]` | elements only, any number |
+| `name!{ … }` | attributes, then any number of elements |
 
-Only the outermost element of an element expression is a step; nested elements are data.
+Attributes are `key = expr` and come first. Elements are comma-separated, except the juxtaposed
+items of `t![…]`.
+
+| Form | Desugars to | Value | Attributes | Elements |
+| ---- | ----------- | ----- | ---------- | -------- |
+| `s!(…)` | `push_step(Say { … })` | `()` | `who`, `voice`, `render` | at most one `t![…]` |
+| `choice!{…}` | `push_step(Choice { … })` | the arms' enum | `id` (required), `render` | arms `t![…] => V`, `t![…] if cond => V` |
+| `t![…]` | a `Text` value | `Text` | none | `"…"`, `["基"]("よみ")`, `["漢字"]("かん"\|"じ")`, `!["…"](effect)`, `{expr}` |
+
+`s!` and `choice!` are allowed only in a scene. UI forms are listed in [The Game
+System](./system.md#components-and-signals).
 
 ## Story items
 
@@ -46,10 +55,10 @@ Only the outermost element of an element expression is a step; nested elements a
 
 | Need | Write |
 | ---- | ----- |
-| Call a scene | `<Name a={x} />` or `name(x)` |
+| Call a scene | `Name(x)` |
 | Leave a scene | `return;` / `return value;` |
 | Branch | `if`, `match` (exhaustive, with ranges and tuples) |
-| Hub or repeated choice | `loop { match <choice …> … }` with `break` |
+| Hub or repeated choice | `loop { match choice!{…} { … } }` with `break` |
 | Bounded repetition | `for i in 0..n` |
 | Change a counter | `x += 1;` (saturates) |
 | Write meta | `META_FIELD.write(v);` |

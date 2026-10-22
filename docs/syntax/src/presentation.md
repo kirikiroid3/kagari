@@ -9,10 +9,10 @@ type Render = const fn(Screen) -> Screen;   // in the prelude
 ```
 
 A **render** is a `const fn` from the screen before a step to the screen after it, including the
-animations that lead from one to the other. A step takes it as its `render` prop:
+animations that lead from one to the other. A step takes it as its `render` attribute:
 
 ```kix
-<s render={azusa_smiles}><m who="Azusa">Did you forget again?</m></s>;
+s!(who = "Azusa", render = azusa_smiles, t!["Did you forget again?"]);
 
 const fn azusa_smiles(mut screen: Screen) -> Screen {
     screen.entity(HANAKO).cord.apply_animation(jump(20));
@@ -30,9 +30,10 @@ A closure that captures nothing coerces to a `const fn` pointer, so a short rend
 in place:
 
 ```kix
-<s render={|mut screen| { screen.background().change(BG::ROOF).apply_animation(fade(30)); screen }}>
-    The wind on the roof is cold.
-</s>;
+s!(
+    render = |mut screen| { screen.background().change(BG::ROOF).apply_animation(fade(30)); screen },
+    t!["The wind on the roof is cold."]
+);
 ```
 
 The closure may use constants and call `const fn`, but it captures nothing: a closure that uses a
@@ -110,7 +111,7 @@ A render is a `const fn`, so it is:
   step (see [Consistency](#consistency)), within the evaluation budget. A render that does not
   finish is a compile error, so the engine always reaches the step.
 - **Blind to the story.** Its only input is the screen. A `const fn` cannot read story variables,
-  and a render prop is a function pointer, so it cannot capture any either.
+  and a `render` attribute is a function pointer, so it cannot capture any either.
 
 The story, in turn, never reads the screen: `Screen` is not a [finite
 type](./kinds.md#finite-types), so no `pushdown fn` can hold one. Story state determines
@@ -120,13 +121,13 @@ Presentation that depends on the story is chosen by the story:
 
 ```kix
 match AFFECTION_MIO {
-    3..=5 => <s render={mio_smiles}>"You came."</s>,
-    _ => <s render={mio_neutral}>"Oh. It's you."</s>,
+    3..=5 => s!(who = "Mio", render = mio_smiles, t!["You came."]),
+    _ => s!(who = "Mio", render = mio_neutral, t!["Oh. It's you."]),
 }
 ```
 
 A render pointer is a finite value, so it may also be chosen by an expression,
-`render={if MET_MIO { mio_smiles } else { mio_neutral }}`, and stored in story state; the analyzer
+`render = if MET_MIO { mio_smiles } else { mio_neutral }`, and stored in story state; the analyzer
 sees the choice as part of σ either way.
 
 ## Keyframes
@@ -163,14 +164,15 @@ A render transforms the *previous* screen, so the screen at a step depends on ho
 reached:
 
 ```kix
-match <choice id="where">
-    <arm id={Where::Roof}>Go to the roof</arm>
-    <arm id={Where::Classroom}>Stay in the classroom</arm>
-</choice> {
-    Where::Roof => <s render={roof}>The wind is cold.</s>,
-    Where::Classroom => <s render={classroom}>It's quiet.</s>,
+match choice!{
+    id = "where",
+    t!["Go to the roof"] => Where::Roof,
+    t!["Stay in the classroom"] => Where::Classroom,
+} {
+    Where::Roof => s!(render = roof, t!["The wind is cold."]),
+    Where::Classroom => s!(render = classroom, t!["It's quiet."]),
 }
-<s><m who="Azusa">So, about tomorrow…</m></s>;
+s!(who = "Azusa", t!["So, about tomorrow…"]);
 ```
 
 {{#include diagrams/consistency.svg}}
@@ -241,7 +243,7 @@ the story's output, and as part of the screen it is covered by the consistency a
 screen snapshot.
 
 ```kix
-<s render={|mut screen| { screen.hud().text_frame = Visibility::Hidden; screen }} />;
+s!(render = |mut screen| { screen.hud().text_frame = Visibility::Hidden; screen });
 ```
 
 ## The standard screen API

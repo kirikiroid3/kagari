@@ -5,14 +5,14 @@ the language restricts what code may do.
 
 ```kis
 fn open_config() { nav::call(Config) }                 // Turing-complete, runtime
-pushdown fn Confession() -> Answer { … }               // the story
+#[scene] pushdown fn Confession() -> Answer { … }      // the story
 const fn fade_in(mut screen: Screen) -> Screen { … }   // pure, compile time
 ```
 
 | Kind          | May use | Evaluated |
 | ------------- | ------- | --------- |
 | `fn`          | Everything except story variables | At runtime |
-| `pushdown fn` | [Finite types](#finite-types) at runtime, story variables, steps | At runtime, inside the narrative |
+| `pushdown fn` | [Finite types](#finite-types) at runtime, story variables; steps only in a `#[scene]` | At runtime, inside the narrative |
 | `const fn`    | Every type; no story variables, no settings values, no signals, no I/O | At compile time where needed; may also be called at runtime |
 
 ## Call rules
@@ -22,6 +22,10 @@ const fn fade_in(mut screen: Screen) -> Screen { … }   // pure, compile time
 | `fn`                | yes  | no: it can only [start an entry scene](./narrative/scenes.md#entry-scenes) | yes |
 | `pushdown fn`       | no   | yes | yes, see [below](#calling-const-fn-from-the-story) |
 | `const fn`          | no   | no  | yes |
+
+Inside the story, a further rule separates [scenes from instant
+procedures](./narrative/scenes.md#scenes-and-instant-procedures): only a `#[scene]` may run steps
+or call another scene.
 
 The rules hold through pointers and closures too, because their types carry the kind: a value of
 type `pushdown fn() -> R` can only point to a `pushdown fn`, so the story cannot reach Turing-complete
@@ -36,15 +40,17 @@ A `pushdown fn` is part of the story. It may:
 
 - take, hold and return values of [finite types](#finite-types) only;
 - read and write [story variables](./narrative/overview.md#story-variables);
-- run [steps](./narrative/elements.md), which suspend the story until the player gives input;
-- call other `pushdown fn`, including itself, and `const fn`.
+- call other `pushdown fn` and `const fn`.
 
-Every loop and every cycle of calls must pass through a step (see
-[Termination](./narrative/scenes.md#termination)), so the code between two inputs always finishes.
+A `pushdown fn` marked `#[scene]` is a **scene**. Only a scene may run
+[steps](./narrative/forms.md), which suspend the story until the player gives input, and call other
+scenes, including itself. Every loop and every cycle of calls in a scene must pass through a step
+(see [Termination](./narrative/scenes.md#termination)). A `pushdown fn` without `#[scene]` is an
+**instant procedure**: it never steps, never recurses and has only bounded loops, so it always
+finishes without input. Either way, the code between two inputs always finishes.
 
-Pushdown functions call each other directly, like Kotlin's `suspend` functions: there is no
-`.await`. A step anywhere below a call suspends the whole story, and input resumes it at the same
-point.
+Scenes call each other directly, like Kotlin's `suspend` functions: there is no `.await`. A step
+anywhere below a call suspends the whole story, and input resumes it at the same point.
 
 ## `const fn`
 
@@ -78,11 +84,12 @@ const fn mood(affection: Int<0, 5>, met: bool) -> Mood {
     }
 }
 
+#[scene]
 pushdown fn Greeting() {
     match mood(AFFECTION_MIO, MET_MIO) {   // tabulated: 6 × 2 entries
-        Mood::Warm => <s>"There you are!"</s>,
-        Mood::Polite => <s>"Hello."</s>,
-        Mood::Stranger => <s>"…Who are you?"</s>,
+        Mood::Warm => s!(t!["\"There you are!\""]),
+        Mood::Polite => s!(t!["\"Hello.\""]),
+        Mood::Stranger => s!(t!["\"…Who are you?\""]),
     }
 }
 ```
@@ -106,9 +113,9 @@ finite:
 | Enums whose variants carry only finite data | `Screen` |
 | Structs, tuples and arrays `[T; N]` of finite types | First-class closures |
 | `Option<T>` of a finite `T` | Signals, settings and meta values |
-| `Text` (its values are the string literals of the program) | |
+| `Text` (its values are the constant texts of the program) | |
 | Asset types (their values are the asset constants of the program) | |
-| `pushdown fn` and `const fn` pointers (their values are the named functions of the program) | |
+| `pushdown fn`, `scene fn` and `const fn` pointers (their values are the named functions of the program) | |
 | `&T`, `&mut T` of a finite `T`, as parameters | |
 
 A constant expression of any type may still appear in a `pushdown fn`, since it is folded at
@@ -122,7 +129,9 @@ over finite data, and the kinds make the story exactly that:
 
 - **The story is closed.** A `pushdown fn` can only call `pushdown fn` and `const fn`, and a
   `const fn` called from the story is either a constant or a finite table. So everything that runs
-  between the start of the story and any step is pushdown code over finite data.
+  between the start of the story and any step is pushdown code over finite data. Scenes are the
+  components of the recursive state machine the analyzer checks; instant procedures are single
+  transitions inside them.
 - **The only door is the entry.** Turing-complete code enters the story only by starting an entry
   scene, with arguments of finite types that the save records and the analyzer quantifies over.
   It gets back only the entry scene's return value, plus meta the story writes and never reads.

@@ -7,8 +7,8 @@ A game is compiled from one root file into one `.kagari` bytecode file.
 {{#include diagrams/pipeline.svg}}
 
 1. **Parse.** Starting from the root file, the compiler follows `mod` declarations to every `.kis`
-   and `.kix` file of the game. Elements are desugared here: a narrative element becomes a call of
-   `step` or a scene call, a UI element a value (see [Steps and Elements](./narrative/elements.md)
+   and `.kix` file of the game. Forms are desugared here: `s!` and `choice!` become calls of
+   `push_step`, `t!` a text value, a UI form a value (see [Steps and Forms](./narrative/forms.md)
    and [The Game System](./system.md)), so later stages see ordinary code.
 2. **Resolve.** Modules, `use` declarations and paths are resolved; every name must exist and be
    visible. Asset paths are checked to exist.
@@ -19,8 +19,9 @@ A game is compiled from one root file into one `.kagari` bytecode file.
    - [finite types](./kinds.md#finite-types) for everything a `pushdown fn` holds at runtime;
    - story variables used only from `pushdown fn`;
    - second-class [references and closures](./values.md);
-   - `#[scene]`, `#[entry]` and `#[component]` rules, scene tag attributes, and the arms of each
-     `<choice>` being distinct variants of one enum.
+   - `#[scene]` and `#[entry]` rules: steps and scene calls only in scenes; instant procedures
+     without recursion or unbounded loops; the arms of each `choice!` being distinct variants of
+     one enum; ruby readings matching their base text.
 4. **Const evaluation.** Constants are evaluated. `const fn` called from the story with finite
    arguments are [tabulated](./kinds.md#calling-const-fn-from-the-story). Renders are evaluated on
    the screens that reach their steps; renders that ignore their input are marked as
@@ -28,7 +29,7 @@ A game is compiled from one root file into one `.kagari` bytecode file.
 5. **Analysis.** Whole-program properties:
    - *Termination.* Every loop and every cycle of calls passes through a step (see
      [Termination](./narrative/scenes.md#termination)).
-   - *Stuck choices.* No `<choice>` is reachable with every arm's `when` false.
+   - *Stuck choices.* No `choice!` is reachable with every arm's guard false.
    - *Consistency.* The screen at a step does not depend on which path reached it unless the
      author made that dependency explicit (see [Consistency](./presentation.md#consistency)).
    - *Bounded screens.* No render makes the set of screens at a step grow past the cap (see

@@ -36,15 +36,11 @@ The proposal keeps a deterministic PRNG whose state is in σ. What is the API: a
 draws an `Int<lo, hi>`? The analyzer would treat each draw as a free choice of a value in the
 range.
 
-## Text whitespace
+## Text effects
 
-The [tentative rule](./narrative/elements.md#text) joins lines with a space except between CJK
-characters. Is that right for mixed Japanese and English text, or should every line break be
-written explicitly?
-
-## Text markup
-
-What markup does message text support besides plain text: ruby, line breaks, emphasis?
+[Text effects](./narrative/forms.md#text-effects) are values of type `TextEffect` (tentative
+name). Which effects does the standard library provide (colour, emphasis, size, shake), and may an
+effect animate?
 
 ## Text interpolation
 
@@ -71,9 +67,9 @@ variable, or both?
 
 ## Game system
 
-[The Game System](./system.md) is a sketch. Its element names, the mode types, the operations, UI
-props, styling and focus rules are all open, and so is the design resolution (one fixed resolution
-per game, or several with a rule for choosing).
+[The Game System](./system.md) is a sketch. The names and attributes of its UI forms, the mode
+types, the operations, styling and focus rules are all open, and so is the design resolution (one
+fixed resolution per game, or several with a rule for choosing).
 
 ## Diagnostics
 

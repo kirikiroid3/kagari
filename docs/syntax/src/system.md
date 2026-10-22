@@ -1,7 +1,7 @@
 # The Game System
 
 *Tentative.* This whole chapter is a sketch. The model (two nested machines, the narrative
-interface, saves as witnesses) is settled; the names of types, elements and functions are not.
+interface, saves as witnesses) is settled; the names of types, forms and functions are not.
 
 The game system is everything around the story: the title screen, save and load pages, settings,
 the backlog, the in-game UI. It is written as `fn` and `const fn` code, with no restriction beyond
@@ -55,34 +55,39 @@ The number of save slots is fixed, so the slot list in the UI is finite.
 
 ## Components and signals
 
-UI is written with elements in `fn` code, with the semantics of SolidJS:
+UI is written with the UI forms of `std::ui` in `fn` code, with the semantics of SolidJS:
 
 ```kix
-#[component]
 fn Config() -> Overlay {
     let (speed, set_speed) = signal(TEXT_SPEED.get());
-    Overlay(
-        <column>
-            <text>Text speed: {speed()}</text>
-            <slider min={0} max={10} value={speed()} on_change={|v| { set_speed(v); TEXT_SPEED.set(v) }} />
-            <button on_click={|| nav::back()}>Back</button>
-        </column>
-    )
+    Overlay(column![
+        text!(t!["Text speed: " {speed()}]),
+        slider!{
+            min = 0,
+            max = 10,
+            value = speed(),
+            on_change = |v| { set_speed(v); TEXT_SPEED.set(v) },
+        },
+        button!{on_click = || nav::back(), t!["Back"]},
+    ])
 }
 ```
 
-- A `#[component] fn` runs **once**, when its mode is shown, and returns a UI value. It may be used
-  as a capitalized tag in other UI code.
-- In `fn` and `const fn` code an element is a **value** (of type `Element`), not a step.
+- UI forms follow the same [delimiter rules](./narrative/forms.md#delimiters) as the narrative
+  forms. In `fn` and `const fn` code they build **values** (of type `Element`); they are never
+  steps.
+- A **component** is a plain `fn` that returns a UI value. It runs **once**, when its mode is
+  shown, and is called like any function, or passed as a pointer to `nav::call(Config)`.
 - `signal(init)` returns a getter and a setter. Signals are first-class in `fn` code and are not
   available to the story or to `const fn`.
-- An `{expr}` in an element is **reactive**: it is re-evaluated whenever a signal it reads
-  changes. Code outside elements runs once.
+- An attribute value or element that reads a signal is **reactive**: it is re-evaluated whenever
+  the signal changes. Other code of a component runs once.
 - Handlers such as `on_click` are first-class [closures](./values.md#closures).
 
-Intrinsic UI elements come from `std::ui`: layout (`<column>`, `<row>`, `<layer>`), content
-(`<text>`, `<image>`, `<game-screen>`), and controls (`<button>`, `<slider>`, `<toggle>`,
-`<select>`). Their props, styling and focus rules are not designed yet.
+UI forms come from `std::ui`: layout (`column![…]`, `row![…]`, `layer![…]`), content
+(`text!(…)`, `image!(…)`, `game_screen!()`), and controls (`button!{…}`, `slider!{…}`,
+`toggle!{…}`, `select!{…}`). Their names, attributes, styling and focus rules are not designed
+yet.
 
 ## Modes
 
@@ -121,7 +126,7 @@ UI changes the system only through these operations in `std::system` (names tent
 ## Starting the story
 
 ```kix
-<button on_click={|| nav::start(story::Main, (CLEARED_AZUSA.get(),), on_ending)}>Start</button>
+button!{on_click = || nav::start(story::Main, (CLEARED_AZUSA.get(),), on_ending), t!["Start"]}
 
 fn on_ending(ending: story::Ending) {
     match ending {
@@ -172,10 +177,10 @@ does can affect the narrative analyses.
 
 ```kis
 // std::narrative, fn-only, engine built-ins
-fn current_line(n: &Narrative) -> Line;        // the current <s>
-fn choices(n: &Narrative) -> Choices;          // the arms offered at the current <choice>
+fn current_line(n: &Narrative) -> Line;        // the current s! step
+fn choices(n: &Narrative) -> Choices;          // the arms shown at the current choice!
 fn history(n: &Narrative) -> History;          // the steps passed, for the backlog
-fn screen(n: &Narrative) -> &Screen;           // drawn by <game-screen>, read for the Hud
+fn screen(n: &Narrative) -> &Screen;           // drawn by game_screen!(), read for the Hud
 fn snapshot(n: &Narrative) -> Save;
 fn restore(s: Save) -> Result<Narrative, Divergence>;
 fn rewind(n: &Narrative, entry: u64) -> Narrative;
@@ -186,7 +191,7 @@ fn rewind(n: &Narrative, entry: u64) -> Narrative;
 A save is the proposal's save format:
 
 - the **trace**: the entry scene's path and arguments, the [stable choice
-  IDs](./narrative/elements.md#stable-choice-ids) of every selection, the step count after the last
+  IDs](./narrative/forms.md#stable-choice-ids) of every selection, the step count after the last
   choice, the script hash and the PRNG seed;
 - a **snapshot** of σ and the screen, used as a cache. Function pointers in σ are stored by path.
 

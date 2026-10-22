@@ -22,7 +22,7 @@ Source files come in two flavours that differ only in syntax:
 | Extension | Syntax |
 | --------- | ------ |
 | `.kis`    | The Rust-like language |
-| `.kix`    | `.kis` plus elements (`<s>…</s>`, `<FestivalHub />`) inside expressions, as `.tsx` is to `.ts` |
+| `.kix`    | `.kis` plus [forms](./narrative/forms.md) such as `s!(…)`, `choice!{…}` and `t![…]`, short ways to write steps, text and UI |
 
 All files of a game are compiled together into a single `.kagari` bytecode file.
 
@@ -36,21 +36,22 @@ to the language and records what changed from the first design.
 ```kix
 static mut VISITED_A: bool = false;
 
+#[scene]
 #[entry]
 pushdown fn Day1() -> Ending {
-    <s>The school festival starts today.</s>;
-    <StallA />;
+    s!(t!["The school festival starts today."]);
+    StallA();
     Ending::Normal
 }
 
 #[scene]
 pushdown fn StallA() {
     if VISITED_A {
-        <s>The stall is already packing up.</s>;
+        s!(t!["The stall is already packing up."]);
         return;
     }
     VISITED_A = true;
-    <s render={hanako_jumps}><m who="Hanako">Welcome to stall A!</m></s>;
+    s!(who = "Hanako", render = hanako_jumps, t!["Welcome to stall A!"]);
 }
 
 const fn hanako_jumps(mut screen: Screen) -> Screen {
@@ -61,8 +62,9 @@ const fn hanako_jumps(mut screen: Screen) -> Screen {
 
 - `Day1` is an [entry scene](./narrative/scenes.md#entry-scenes): the system starts the story
   there, and its return value tells the system which ending was reached.
-- Each `<s>` is a **step**, a point where the engine stops and waits for the player.
-- `<StallA />` calls the scene `StallA` and continues when it returns.
+- Each `s!` is a **step**, a point where the engine stops and waits for the player. `t![…]` is its
+  text.
+- `StallA()` calls the scene `StallA` and continues when it returns.
 - `hanako_jumps` is a [render function](./presentation.md): it says how the screen changes when
   the step is entered.
 
@@ -71,6 +73,6 @@ const fn hanako_jumps(mut screen: Screen) -> Screen {
 - *Tentative* marks syntax that this book fills in where the design is not settled yet: names,
   defaults, and edge-case rules. Each tentative item is either harmless to rename or is listed in
   [Open Questions](./open-questions.md).
-- Code blocks tagged `kis` are plain Rust-like code; blocks tagged `kix` use elements.
+- Code blocks tagged `kis` are plain Rust-like code; blocks tagged `kix` use forms.
 - "Step" always means a point where the engine waits for player input.
 - σ ("sigma") is the narrative state: position, call stack and story variables.

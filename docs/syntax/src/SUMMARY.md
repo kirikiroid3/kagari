@@ -8,7 +8,7 @@
   - [Numbers](./numbers.md)
 - [Function Kinds](./kinds.md)
 - [Narrative](./narrative/overview.md)
-  - [Steps and Elements](./narrative/elements.md)
+  - [Steps and Forms](./narrative/forms.md)
   - [Scenes and Control Flow](./narrative/scenes.md)
 - [Presentation](./presentation.md)
 - [The Game System](./system.md)

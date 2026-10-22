@@ -56,9 +56,9 @@ What may be done with a closure depends on the kind of the function that creates
 
 | Kind          | Closures are | May be |
 | ------------- | ------------ | ------ |
-| `fn`          | first-class  | stored, returned, put into elements (UI handlers) |
+| `fn`          | first-class  | stored, returned, put into UI values (handlers) |
 | `const fn`    | first-class  | stored, returned |
-| `pushdown fn` | second-class | passed as an argument and called; never stored, returned or captured |
+| `pushdown fn` | second-class | passed as an argument and called; never stored, returned or captured. A closure in the story is an instant procedure: it cannot run a step or call a scene |
 
 A first-class closure in the story would let story state contain closures that contain closures,
 without bound. That is a higher-order pushdown system: still decidable, but the cost of analysis
@@ -72,7 +72,9 @@ Function pointer types and closure types carry the [kind](./kinds.md) of the cod
 
 | Type | Holds |
 | ---- | ----- |
-| `fn(A) -> B`, `pushdown fn(A) -> B`, `const fn(A) -> B` | A named function of that kind |
+| `fn(A) -> B`, `const fn(A) -> B` | A named function of that kind |
+| `pushdown fn(A) -> B` | A named instant procedure |
+| `scene fn(A) -> B` | A named [scene](./narrative/scenes.md#scenes-and-instant-procedures) (*tentative* syntax; `scene` is a keyword only here) |
 | `Fn(A) -> B`, `pushdown Fn(A) -> B`, `const Fn(A) -> B` | A closure or function of that kind (*tentative* syntax) |
 
 A closure that captures nothing coerces to a function pointer of the same kind; this is how a

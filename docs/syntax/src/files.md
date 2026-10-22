@@ -2,16 +2,16 @@
 
 ## `.kis` and `.kix`
 
-A `.kix` file is a `.kis` file that may also contain elements: `<s>…</s>`, `<choice>…</choice>`,
-`<FestivalHub />` and UI elements such as `<button>`. Elements are sugar for ordinary
-expressions (see [Steps and Elements](./narrative/elements.md) and [The Game
-System](./system.md)), so everything written in a `.kix` file can also be written, more verbosely,
-in a `.kis` file.
+A `.kix` file is a `.kis` file that may also contain **forms**: `s!(…)`, `choice!{…}`, `t![…]`
+and the UI forms such as `button!{…}`. Forms are fixed syntax that desugars to ordinary
+expressions (see [Steps and Forms](./narrative/forms.md) and [The Game System](./system.md)), so
+everything written in a `.kix` file can also be written, more verbosely, in a `.kis` file. They
+are not macros: there are no macros, and the set of forms is fixed by the language.
 
 The extension decides the syntax only. It never decides what code may do: that is the job of
 [function kinds](./kinds.md). Any kind of function may appear in either file. By convention the
-story is written in `.kix` files, and code without elements (types, constants, helpers, renders)
-in `.kis` files.
+story is written in `.kix` files, and code without forms (types, constants, helpers, renders) in
+`.kis` files.
 
 ## Modules
 
@@ -43,8 +43,8 @@ The standard library is the module `std`:
 | Module          | Contents |
 | --------------- | -------- |
 | `std::screen`   | The screen (an ECS world), components, animations; see [Presentation](./presentation.md) |
-| `std::narrative`| The `step` primitive, `Say`, `Choice`, `Text`, `Meta`; the `Narrative` interface for the system |
-| `std::ui`       | UI elements, signals; see [The Game System](./system.md) |
+| `std::narrative`| The `push_step` primitive, `Say`, `Choice`, `Text`, `TextEffect`, `Meta`; the `Narrative` interface for the system |
+| `std::ui`       | UI forms, signals; see [The Game System](./system.md) |
 | `std::system`   | Navigation, saves, settings; see [The Game System](./system.md) |
 
 A **prelude** is imported into every module automatically. It contains the types and functions

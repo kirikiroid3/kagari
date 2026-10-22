@@ -1,43 +1,67 @@
 # Scenes and Control Flow
 
-A **scene** is a `pushdown fn`. Scenes call each other and return; within a scene, control flow is
-Rust's. There is no `goto`.
+The story is made of **scenes**, `pushdown fn` marked `#[scene]`, and **instant procedures**, the
+other `pushdown fn`. Scenes call each other and return; within a scene, control flow is Rust's.
+There is no `goto`.
 
 ## Calls
 
 ```kix
-<FestivalHub />;          // a scene tag
-festival_hub_helper();    // an ordinary call
+FestivalHub();                // call a scene
+let answer = Confession();    // a scene that returns a value
+visit(Map::A);                // call an instant procedure
 ```
 
-A call pushes a frame holding the return point and the callee's locals, then runs the callee.
-When the callee returns, its frame is popped and the caller continues. Calls may be recursive.
+All calls use ordinary call syntax. A call pushes a frame holding the return point and the
+callee's locals, then runs the callee. When the callee returns, its frame is popped and the caller
+continues.
 
-## Scene tags
+## Scenes and instant procedures
 
 ```kix
 #[scene]
-pushdown fn Stall(which: Which, owner: Text) -> bool { … }
+pushdown fn StallA() {
+    if VISITED_A {
+        s!(t!["The stall is already packing up."]);
+        return;
+    }
+    visit(Map::A);
+    s!(who = "Hanako", t!["Welcome to stall A!"]);
+}
 
-let bought = <Stall which={Which::A} owner="Hanako" />;
+pushdown fn visit(stall: Map) {
+    match stall {
+        Map::A => VISITED_A = true,
+        Map::B => VISITED_B = true,
+        Map::C => VISITED_C = true,
+        Map::Leave => {}
+    }
+}
 ```
 
-`#[scene]` lets a `pushdown fn` be written as a tag. The tag is sugar for a call:
+`#[scene]` marks a `pushdown fn` as a **scene**, the unit the story is checked in:
 
-- `<Name a={x} b="text" />` is `Name(x, "text")`, with attributes matched to parameters **by
-  name**. Every parameter must be given; an unknown or repeated attribute is an error. A string
-  attribute `b="text"` is a `Text` literal.
-- The tag evaluates to the scene's return value, so `let bought = <Stall … />;` binds it.
-- A scene tag is always self-closing. Children would be a block of story code handed to the callee
-  to run later, which is a closure that captures the caller's state; scenes take explicit
-  parameters instead.
-- The tag name is the function name. Scene functions are named in PascalCase, and the
-  snake_case lint does not apply to them. There is no conversion between `snake_case` and
-  `PascalCase`.
+- Only a scene may call [`push_step`](./forms.md#steps-are-calls-of-push_step), that is, run
+  `s!` and `choice!`, because a step is not pure: it suspends the story.
+- Only a scene may call another scene. Scenes may be recursive.
+- Each scene is one component of the recursive state machine the analyzer checks, and each call of
+  a scene is a box in it. The analyses summarize each scene once, so a scene called from many
+  places is not re-analyzed per caller.
 
-`#[scene]` changes only the syntax. It is an error on a function that is not a `pushdown fn`. A
-lowercase tag is always an intrinsic element (`<s>`, `<choice>`), so scene names never collide
-with them.
+A `pushdown fn` without `#[scene]` is an **instant procedure**:
+
+- It holds finite types, may read and write story variables, and may call other instant
+  procedures and `const fn`.
+- It never runs a step and never calls a scene.
+- It is not recursive: the calls among instant procedures form no cycle. Its only loops are `for`
+  over a constant range or array; `loop` and `while` are errors.
+
+So an instant procedure always finishes without input, and the analyzer treats a call of one as a
+single transition inside the calling scene.
+
+`#[scene]` is an error on a function that is not a `pushdown fn`. Scenes are named in PascalCase,
+which tells them apart from instant procedures at the call site; the snake_case lint does not
+apply to them.
 
 ## Control flow
 
@@ -48,7 +72,7 @@ The story uses Rust's control flow: `if`, `if let`, `match`, `loop`, `while`, `f
 #[scene]
 pushdown fn Week() {
     'week: for day in 0..7 {
-        match <Day day={day} /> {
+        match Day(day) {
             DayEnd::Normal => continue,
             DayEnd::Hospital => break 'week,
         }
@@ -71,7 +95,7 @@ Conditions are ordinary boolean expressions, and several variables are matched a
 
 ```kix
 match (VISITED_A, VISITED_B, VISITED_C) {
-    (true, true, true) => <FestivalEnd />,
+    (true, true, true) => FestivalEnd(),
     _ => {}
 }
 ```
@@ -83,10 +107,11 @@ enum Answer { Accepted, Rejected }
 
 #[scene]
 pushdown fn Confession() -> Answer {
-    match <choice id="confess">
-        <arm id={Confess::Yes}>Tell her the truth</arm>
-        <arm id={Confess::No}>Say nothing</arm>
-    </choice> {
+    match choice!{
+        id = "confess",
+        t!["Tell her the truth"] => Confess::Yes,
+        t!["Say nothing"] => Confess::No,
+    } {
         Confess::Yes => Answer::Accepted,
         Confess::No => Answer::Rejected,
     }
@@ -94,9 +119,9 @@ pushdown fn Confession() -> Answer {
 
 #[scene]
 pushdown fn Day3() {
-    match <Confession /> {
-        Answer::Accepted => <AzusaRoute />,
-        Answer::Rejected => <s>The wind stopped.</s>,
+    match Confession() {
+        Answer::Accepted => AzusaRoute(),
+        Answer::Rejected => s!(t!["The wind stopped."]),
     }
 }
 ```
@@ -116,9 +141,10 @@ Everything between two steps runs instantly, so it must always finish. The compi
 `for` over a constant range or array is bounded and needs no step. Every branch counts as possible:
 the check does not try to prove that a stepless path is never taken.
 
-The check is interprocedural. For each `pushdown fn` the compiler computes whether it *may return
-without passing a step*; a call to such a function counts as stepless. The computation is a least
-fixpoint over the call graph, linear in the size of the program.
+The check is interprocedural. For each scene the compiler computes whether it *may return without
+passing a step*; a call to such a scene counts as stepless, and so does every call of an instant
+procedure. The computation is a least fixpoint over the call graph, linear in the size of the
+program.
 
 A story that runs in a cycle, such as a day loop, is a `loop` in one driver scene that calls each
 day in turn. Scenes that call each other in a ring and never return grow the call stack on every
@@ -129,6 +155,7 @@ lap.
 ```kix
 enum Ending { NormalEnd, AzusaEnd }
 
+#[scene]
 #[entry]
 pushdown fn Main(cleared_azusa: bool) -> Ending {
     …
@@ -139,13 +166,14 @@ pushdown fn Main(cleared_azusa: bool) -> Ending {
 }
 ```
 
-An **entry scene** is a `pushdown fn` marked `#[entry]`. It is where the system can start the
-story, and it is the only door from Turing-complete code into the story.
+An **entry scene** is a scene also marked `#[entry]`. It is where the system can start the story,
+and it is the only door from Turing-complete code into the story.
 
 - A game has at least one entry scene. Extra chapters and after stories are further entry scenes.
 - Its parameters and return type are finite. The system passes the arguments when it starts the
   story (see [Starting the story](../system.md#starting-the-story)).
-- An entry scene is an ordinary scene otherwise: it may also be called, or carry `#[scene]`.
+- `#[entry]` is an error without `#[scene]`. An entry scene is an ordinary scene otherwise: other
+  scenes may also call it.
 - Entry scenes are the roots of every narrative analysis.
 
 ### Arguments
@@ -180,20 +208,20 @@ unaffected. Writes are not reverted by load or rewind: unlocks stay unlocked.
 
 ## Closures in the story
 
-A `pushdown fn` may take a closure parameter and call it, which is useful for small reusable
-patterns:
+A `pushdown fn` may take a closure parameter and call it:
 
 ```kix
-pushdown fn twice(scene: pushdown Fn()) {
-    scene();
-    scene();
+pushdown fn twice(f: pushdown Fn()) {
+    f();
+    f();
 }
 
-twice(|| <PhoneRings />);
+twice(|| AFFECTION_MIO += 1);
 ```
 
 Closures in the story are [second-class](../values.md#closures): they can be passed and called, but
-not stored, returned or captured.
+not stored, returned or captured. A closure is an instant procedure: it cannot run a step or call
+a scene.
 
 ## Randomness
 

@@ -53,8 +53,8 @@ Patterns match `Int` values with literals and ranges, which is how thresholds ar
 
 ```kis
 match AFFECTION_MIO {
-    3..=5 => <MioSmiles />,
-    _ => <MioShrugs />,
+    3..=5 => MioSmiles(),
+    _ => MioShrugs(),
 }
 ```
 

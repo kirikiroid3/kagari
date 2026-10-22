@@ -9,13 +9,13 @@ and records what changed from the first design.
 | Proposal | Language |
 | -------- | -------- |
 | Pushdown control over finite data | `pushdown fn` holding only [finite types](./kinds.md#finite-types) |
-| Call/return between scenes, recursion allowed | Calls of `pushdown fn`, plain or as [scene tags](./narrative/scenes.md#scene-tags) |
+| Call/return between scenes, recursion allowed | Calls of `#[scene]` functions; each scene is a component of the checked state machine |
 | Jumps only within the current scene | Structured control flow; no `goto` at all |
 | Every loop and call cycle passes through an input point | [Termination](./narrative/scenes.md#termination), checked interprocedurally |
 | Integers in a declared range | `Int<lo, hi>`, saturating compound assignment |
-| Computed call over a finite enum of scenes | `pushdown fn` pointers: there are finitely many named functions |
+| Computed call over a finite enum of scenes | `scene fn` pointers: there are finitely many named functions |
 | No closures in the narrative core | Closures in `pushdown fn` are [second-class](./values.md#closures) |
-| Input points | Steps: [`step`](./narrative/elements.md#elements-are-sugar), written `<s>` and `<choice>` |
+| Input points | Steps: [`push_step`](./narrative/forms.md#steps-are-calls-of-push_step), written `s!(…)` and `choice!{…}`, only in scenes |
 | Stable choice identifiers, not line numbers | Function path + choice `id` + variant of an author-declared enum |
 | The narrative core never reads presentation state | `Screen` is not a finite type; no `pushdown fn` can hold one |
 | Presentation never reads σ | Renders are `const fn(Screen) -> Screen` passed as function pointers |
@@ -32,14 +32,14 @@ The first design had three file kinds and two scopes:
 | ------------ | --- |
 | `.kis`: XML story script, plus a separate XML system scope (`<system>`, `<sysfn>`) | `.kis`/`.kix`: one Rust-like language; story and system are functions of different kinds |
 | `.kirp`: Rust-like render files, `<r>` inline renders | `const fn` renders, inline as non-capturing closures |
-| `.kix`: Rust-like extension definitions | Ordinary modules; `.kix` now means "with elements" |
-| `<scene>`, `<call>`, `<return>`, `<goto>`, `<label>` | `pushdown fn`, calls and scene tags, `return`, loops |
+| `.kix`: Rust-like extension definitions | Ordinary modules; `.kix` now means "with forms" (`s!`, `choice!`, `t!`, UI forms) |
+| `<scene>`, `<call>`, `<return>`, `<goto>`, `<label>` | `#[scene] pushdown fn`, calls, `return`, loops |
 | `<match var>` / `<match vars>`, no `if` | Rust's `if` and `match` over any finite expression |
 | `<var-*>` declarations, `<set>`, `<add>`, `<sub>` | `static mut`, `let mut`, assignment, saturating `+=` |
-| `<choice-arm>` with code bodies | `<arm>` as data; the choice returns a variant, then `match` |
+| `<choice-arm>` with code bodies | Arms `t![…] => V` as data; the choice returns a variant, then `match` |
 | `<template>`, `<include>` | Functions and modules |
 | `from-meta`, `<meta-set>` | Entry arguments, `Meta::write` |
-| System functions, `<on-exit>`, handler attribute strings | `fn` code, an exit handler closure, closures in UI elements |
+| System functions, `<on-exit>`, handler attribute strings | `fn` code, an exit handler closure, closures in UI forms |
 
 ### Why one language with kinds
 
@@ -58,7 +58,7 @@ that runs from the start of the story to any step is a `pushdown fn` or a tabula
 The first design chose XML because every tool could parse it and a schema could check it, and
 because a node editor could round-trip it. The story is now code: tools need Kagari's parser, and a
 node editor can still show scenes as graphs (each scene is a component of a recursive state
-machine, each scene tag a box) but can no longer edit every construct in place. The text still
+machine, each call of a scene a box) but can no longer edit every construct in place. The text still
 diffs and merges as text.
 
 ## What preview costs
