@@ -8,16 +8,21 @@ pub mod narrative;
 pub mod ui;
 pub mod system;
 
-/// An integer in the inclusive range `LO..=HI`.
-#[builtin] pub struct Int<const LO: i128, const HI: i128>;
 /// A runtime string, built by `fn` code.
 #[builtin] pub struct String;
 /// A growable list; out-of-range writes are evaluation errors.
 #[builtin] pub struct Vec<T>;
 /// An exact rational number.
 #[builtin] pub struct Rat;
-/// An exact decimal number, written `0.5`.
+/// An exact decimal number, written `0.5`: the exact replacement for floats.
 #[builtin] pub struct Decimal;
+
+/// `start..end` (`inclusive` false) or `start..=end` (`inclusive` true).
+pub struct Range<T> {
+    pub start: T,
+    pub end: T,
+    pub inclusive: bool,
+}
 
 impl<T> Vec<T> {
     /// An empty list.
@@ -46,10 +51,43 @@ pub enum Result<T, E> {
     Err(E),
 }
 
-/// Types with structural equality.
-pub trait Eq {}
+/// Types with structural equality. Automatic for structs and enums whose fields are all `Eq`.
+#[builtin] pub trait Eq {}
+impl Eq for String {}
+impl<T: Eq> Eq for Vec<T> {}
+impl Eq for Rat {}
+impl Eq for Decimal {}
+impl Eq for ImageAsset {}
+impl Eq for AudioAsset {}
+impl Eq for VoiceAsset {}
+impl Eq for VideoAsset {}
+impl Eq for FontAsset {}
+impl Eq for narrative::Text {}
+impl Eq for screen::Screen {}
+
+/// The integer types: `Int<lo, hi>` and Rust's integers.
+#[builtin] pub trait Integer {
+    /// This value as `T`; a compile error unless every value of `Self` fits in `T`.
+    const fn into<T: Integer>(self) -> T;
+    /// This value clamped to the range of `T`.
+    const fn saturate<T: Integer>(self) -> T;
+}
+impl Integer for u8 {}
+impl Integer for u16 {}
+impl Integer for u32 {}
+impl Integer for u64 {}
+impl Integer for u128 {}
+impl Integer for i8 {}
+impl Integer for i16 {}
+impl Integer for i32 {}
+impl Integer for i64 {}
+impl Integer for i128 {}
+impl Integer for usize {}
+impl Integer for isize {}
+impl<const LO: i64, const HI: i64> Integer for Int<LO, HI> {}
+
 /// Types whose values are exactly the asset constants of the program.
-pub trait Asset {}
+#[builtin] pub trait Asset {}
 
 /// An image file: PNG, JPEG or WebP.
 #[builtin] pub struct ImageAsset;

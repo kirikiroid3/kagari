@@ -1,0 +1,19 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/script/009__trait_errors/main.kix
+---
+script/009__trait_errors/main.kix:1:7: error[item/trait-outside-std]: traits are only declared in the standard library
+script/009__trait_errors/main.kix:9:6: error[resolve/trait-impl-outside-std]: only the standard library implements traits; `Eq` is automatic for structs and enums whose fields are all `Eq`
+script/009__trait_errors/main.kix:11:6: error[resolve/trait-impl-outside-std]: only the standard library implements traits
+script/009__trait_errors/main.kix:17:6: error[resolve/trait-impl-outside-std]: only the standard library implements traits
+--- resolutions ---
+script/009__trait_errors/main.kix:2:24 u64 -> prim u64
+script/009__trait_errors/main.kix:6:11 u64 -> prim u64
+script/009__trait_errors/main.kix:9:6 Eq -> trait std::Eq
+script/009__trait_errors/main.kix:9:13 Square -> struct crate::Square
+script/009__trait_errors/main.kix:11:6 Shape -> trait crate::Shape
+script/009__trait_errors/main.kix:11:16 Square -> struct crate::Square
+script/009__trait_errors/main.kix:12:24 u64 -> prim u64
+script/009__trait_errors/main.kix:17:6 std::narrative::text::ToText -> trait std::narrative::text::ToText
+script/009__trait_errors/main.kix:17:39 Square -> struct crate::Square

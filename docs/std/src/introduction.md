@@ -56,17 +56,19 @@ Every item of the library follows these rules.
    helpers and constant data. [`std::stage`](./stage.md) is the reference of such a layer.
 7. **Type-checkable without overloading or coercion.** Asset-typed functions use a trait bound.
    Interpolation uses a trait bound. Special signatures are listed in [Checks](./checks.md)
-   (`nav::start`). User traits remain an open question; the std traits are `Eq`, `Step`, `Asset`
-   and `ToText`, and users never implement them.
-8. **References** cannot be bound to locals or stored. Std bodies and examples repeat the
-   projection chain per statement (`screen.entity(ID).opacity()…;`).
+   (`nav::start`). Only `std` declares traits, all `#[builtin]`: `Eq`, `Integer`, `Step`, `Asset`
+   and `ToText`. Users never implement them; `Eq` is automatic.
+8. **References** are shared pointers. In `const fn` and `fn` code they may be bound to locals,
+   so a render names an entity once and changes it in several statements. In a `pushdown fn` they
+   are parameters only.
 
-Rule 8 shapes every example in this book:
+For example:
 
 ```kis
 const fn hanako_appears(mut screen: Screen) -> Screen {
-    screen.entity(HANAKO).image().change(HANAKO::SMILE).apply_animation(cut());
-    screen.entity(HANAKO).opacity().change(1.0).apply_animation(tween(ms(300)));
+    let hanako = screen.entity(HANAKO);
+    hanako.image().change(HANAKO::SMILE).apply_animation(cut());
+    hanako.opacity().change(1.0).apply_animation(tween(ms(300)));
     screen
 }
 ```
@@ -75,7 +77,7 @@ const fn hanako_appears(mut screen: Screen) -> Screen {
 
 |Module|Contents|Kind|Chapter|
 |---|---|---|---|
-|`std`|`Int`, `String`, `Vec`, `Rat`, `Decimal`, `Option`, `Result`, `Eq`, `Asset`, the asset types, `asset`|`const fn`|[Core Types](./core.md)|
+|`std`|`String`, `Vec`, `Range`, `Rat`, `Decimal`, `Option`, `Result`, `Eq`, `Integer`, `Asset`, the asset types, `asset`|`const fn`|[Core Types](./core.md)|
 |`std::time`|`Duration`, `ms`, `secs`|`const fn`|[Core Types](./core.md#time)|
 |`std::narrative`|`Step`, `push_step`, `Say`, `Choice`, `Meta`, `Narrative`|`pushdown fn` (`push_step`, `Meta::write`); `fn` (`Narrative`, `Meta::get`/`set`); `const fn` (`meta`)|[Narrative](./narrative.md)|
 |`std::narrative::text`|`Text`, text effects, `ToText`, `TextStyle`|`const fn`|[Text](./text.md)|
@@ -95,7 +97,7 @@ Every module imports the prelude implicitly. A name declared in the module, or i
 takes precedence over a prelude name.
 
 ```kis
-pub use crate::{Int, String, Vec, Rat, Decimal, Option, Result, Eq, ImageAsset, AudioAsset, VoiceAsset, VideoAsset, FontAsset, asset};
+pub use crate::{String, Vec, Rat, Decimal, Range, Option, Result, Eq, Integer, ImageAsset, AudioAsset, VoiceAsset, VideoAsset, FontAsset, asset};
 pub use crate::Option::{None, Some};
 pub use crate::Result::{Err, Ok};
 pub use crate::time::{Duration, ms, secs};

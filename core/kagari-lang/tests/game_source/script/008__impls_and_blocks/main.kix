@@ -1,14 +1,9 @@
-trait Shape {
-    type Area;
-    const SIDES: u64;
-    fn area(&self) -> Self::Area;
-}
-
 struct Square<const N: u64> {
     side: u64,
 }
 
 type Board = Square<8>;
+type Said = Say::Output;
 
 impl<const N: u64> Square<N> {
     const CELLS: u64 = N * N;
@@ -20,34 +15,37 @@ impl<const N: u64> Square<N> {
     fn cells(&self) -> u64 {
         self.side * Self::CELLS
     }
-}
 
-impl<const N: u64> Shape for Square<N> {
-    type Area = u64;
-    const SIDES: u64 = 4;
-
-    fn area(&self) -> Self::Area {
-        self.side * self.side
+    fn span(&self) -> Range<u64> {
+        Range { start: 0, end: self.cells(), inclusive: false }
     }
 }
 
-fn generic<T: Shape>(shape: T) -> T::Area {
-    shape.area()
+fn same<T: Eq>(a: T, b: T) -> bool {
+    a == b
+}
+
+fn widen<T: Integer>(value: T) -> u64 {
+    Integer::into(value)
+}
+
+fn run<S: std::narrative::Step>(step: S) -> S::Output {
+    push_step(step)
 }
 
 fn uses() -> u64 {
     let board = Board::new();
-    let sides = Square::SIDES;
+    let level: Int<0, 5> = 3;
     const LOCAL: u64 = 2;
     fn helper(x: u64) -> u64 {
         x + LOCAL
     }
-    use crate::generic as g;
+    use crate::widen as w;
     {
         fn inner() -> u64 {
             helper(1)
         }
-        inner() + board.cells() + sides
+        inner() + board.cells() + w(level)
     }
 }
 

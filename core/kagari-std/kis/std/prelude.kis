@@ -1,6 +1,6 @@
 //! Names imported into every module.
 
-pub use crate::{Int, String, Vec, Rat, Decimal, Option, Result, Eq, ImageAsset, AudioAsset, VoiceAsset, VideoAsset, FontAsset, asset};
+pub use crate::{String, Vec, Rat, Decimal, Range, Option, Result, Eq, Integer, ImageAsset, AudioAsset, VoiceAsset, VideoAsset, FontAsset, asset};
 pub use crate::Option::{None, Some};
 pub use crate::Result::{Err, Ok};
 pub use crate::time::{Duration, ms, secs};

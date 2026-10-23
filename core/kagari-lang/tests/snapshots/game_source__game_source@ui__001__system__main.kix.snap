@@ -56,7 +56,7 @@ ui/001__system/main.kix:37:24 Setting -> struct std::system::Setting
 ui/001__system/main.kix:37:32 bool -> prim bool
 ui/001__system/main.kix:37:40 setting -> fn std::system::setting
 ui/001__system/main.kix:38:24 Setting -> struct std::system::Setting
-ui/001__system/main.kix:38:32 Int -> struct std::Int
+ui/001__system/main.kix:38:32 Int -> prim Int
 ui/001__system/main.kix:38:47 setting -> fn std::system::setting
 ui/001__system/main.kix:39:20 Setting -> struct std::system::Setting
 ui/001__system/main.kix:39:28 bool -> prim bool

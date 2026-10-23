@@ -46,7 +46,7 @@ The target point is always `at + offset`.
 |`hide_all`|`hide` for every id in `screen.entities(Plane::Stage)`|
 |`side_face`|`Some(f)`: `hud().side_image().change(f)`; `None`: `.clear()`; either way with `transition`|
 
-Every body repeats the projection chain per statement (design rule 8):
+Each body is plain `const fn` code on the screen:
 
 ```kis
 pub const fn move_to(self, screen: &mut Screen, at: Point, tween: Tween) {

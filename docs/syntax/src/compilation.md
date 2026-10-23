@@ -18,7 +18,9 @@ A game is compiled from one root file into one `.kagari` bytecode file.
      pointers and closures too;
    - [finite types](./kinds.md#finite-types) for everything a `pushdown fn` holds at runtime;
    - story variables used only from `pushdown fn`;
-   - second-class [references and closures](./values.md);
+   - [references and closures](./values.md): mutability, and second-class use in `pushdown fn`;
+   - user code declaring no traits and implementing none, `Eq` derived from fields, and the
+     explicit [integer conversions](./numbers.md#conversions);
    - `#[scene]` and `#[entry]` rules: steps and scene calls only in scenes; instant procedures
      without recursion or unbounded loops; the arms of each `choice!` being distinct variants of
      one enum; ruby readings matching their base text.

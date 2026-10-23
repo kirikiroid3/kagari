@@ -28,7 +28,7 @@ Items may be used before their declaration, as in Rust.
 | `#[scene]`    | `pushdown fn` | A scene: may run steps and call other scenes; the unit of model checking. See [Scenes](./narrative/scenes.md#scenes-and-instant-procedures) |
 | `#[entry]`    | `#[scene]` function | An entry scene: the system can start the story here; see [Entry scenes](./narrative/scenes.md#entry-scenes) |
 | `#[must_use]` | `struct`, `enum` | Discarding a value of this type is a warning |
-| `#[builtin]`  | function, `struct` | Implemented by the engine: a function has no body, a type has no visible fields. Only allowed in the standard library |
+| `#[builtin]`  | function, `struct`, `trait` | Implemented by the engine: a function has no body, a type has no visible fields. Only allowed in the standard library |
 
 Any other attribute is an error.
 
@@ -37,23 +37,69 @@ Any other attribute is an error.
 | Type | Example |
 | ---- | ------- |
 | Booleans, unit | `bool`, `()` |
-| Bounded integers | `Int<0, 5>`; see [Numbers](./numbers.md) |
+| Bounded integers | `Int<0, 5>`, a primitive; see [Numbers](./numbers.md) |
 | Rust integers, exact numbers | `u8` … `i128`, `usize`, `isize`, `Rat`, `Decimal`; see [Numbers](./numbers.md) |
 | Text | `Text`: constant text, plain (`"Mio"`) or rich (`t![…]`); string literals have type `Text`. `String`: a runtime string |
 | Tuples, arrays | `(bool, Route)`, `[Int<0, 3>; 4]` |
-| Structs, enums | user-declared; `Option<T>` from the prelude |
+| Structs, enums | user-declared, generic or not; `Option<T>` and `Result<T, E>` from the prelude |
+| Ranges | `Range<T>`, the type of `0..4` and `3..=5` |
 | Collections | `Vec<T>` |
 | Function pointers | `fn(Int<0, 5>) -> bool`, `const fn(Screen) -> Screen`, `pushdown fn() -> Mood`, `scene fn() -> Answer` (*tentative*) |
 | Closures | `Fn(A) -> B`, `pushdown Fn(A) -> B`, `const Fn(A) -> B` (*tentative*) |
-| References | `&T`, `&mut T`, second-class; see [Values, References and Closures](./values.md) |
+| References | `&T`, `&mut T`; see [Values, References and Closures](./values.md) |
 
 Which types the story may hold is restricted to [finite types](./kinds.md#finite-types).
 
-Every type built without closures has structural equality: two values are equal when they are
-built the same way. There is no `derive`. Function pointers compare by identity, and closures
-cannot be compared. *Tentative:* the standard traits `Eq`, `Step`, `Asset` and `ToText` are the
-only traits; user traits and user generics are an [open question](./open-questions.md#traits-and-generics).
-Const generic arguments exist for `Int<lo, hi>` and standard library types.
+### Generics and traits
+
+Functions, structs, enums and impls may be generic over types and over constants:
+`struct Pair<T> { a: T, b: T }`, `fn first<T, const N: usize>(items: [T; N]) -> T`. A bound may name
+a standard trait (`T: Eq`). In a `pushdown fn`, every type argument must be a [finite
+type](./kinds.md#finite-types); generic code is monomorphized, so the story stays a finite program.
+
+Traits are not part of the user language. The standard library declares a fixed set of `#[builtin]`
+traits, and only the standard library implements them:
+
+| Trait | Implemented by |
+| ----- | -------------- |
+| `Eq` | Every type with structural equality, see below |
+| `Integer` | `Int<lo, hi>` and the Rust integers; gives `into` and `saturate`, see [Numbers](./numbers.md#conversions) |
+| `Asset` | The asset types |
+| `Step` | The steps `Say` and `Choice` |
+| `ToText` | The types `{expr}` in `t![…]` may interpolate |
+
+A `trait` item or an `impl Trait for T` outside the standard library is an error.
+
+### Equality
+
+There is no `derive`. `Eq` is implemented automatically:
+
+- by `bool`, `()`, `Int<lo, hi>`, the Rust integers, `Rat` and `Decimal`;
+- by a struct, enum, tuple or array when every field or element is `Eq`, comparing structurally:
+  two values are equal when they are built the same way;
+- by function pointers, which compare by identity;
+- by `&T` and `&mut T` when `T` is `Eq`, comparing the values they point to;
+- by the standard library's `#[builtin]` types that say so, such as `Text`, `String`, `Vec<T>` and
+  `Screen`.
+
+Closures are never `Eq`. `==` and `!=` need `Eq` on both sides.
+
+### Constant expressions
+
+A constant expression is an expression the compiler computes at compile time:
+
+- literals, paths to `const` items, unit structs, enum variants and named functions;
+- an immutable `let` local whose initializer is a constant expression;
+- struct, enum, tuple, array and range literals, operators, field accesses, blocks, `if` and
+  `match` whose operands are all constant expressions;
+- a call of a `const fn` whose arguments are all constant expressions; its result is a constant
+  expression;
+- `asset::<A>("…")`.
+
+Story variables, parameters and the results of `fn` and `pushdown fn` calls are never constant.
+The initializer of a `const` item, a story variable or a handle must be a constant expression, and a
+constant expression of any type may appear in a `pushdown fn` (see [Finite
+types](./kinds.md#finite-types)).
 
 ## Expressions and statements
 
@@ -73,8 +119,10 @@ tuples, structs, enum variants, and alternatives with `|`.
 
 | Rust feature | Why not, or what instead |
 | ------------ | ------------------------ |
-| Lifetimes, borrow checker, moves, `Drop` | Values have value semantics; references are second-class, see [Values, References and Closures](./values.md) |
-| Floats | Screens must be comparable exactly; use `Rat` or `Decimal` |
+| Lifetimes, borrow checker, moves, `Drop` | Values are copied; references are shared pointers, see [Values, References and Closures](./values.md) |
+| Floats | Floats are not `Eq`, and screens must compare exactly; use `Decimal` (`0.5`) or `Rat` |
+| `as` casts | `x.into()` and `x.saturate()`, see [Conversions](./numbers.md#conversions) |
+| User traits, `derive` | Only the standard `#[builtin]` traits exist; `Eq` is automatic |
 | `unsafe`, raw pointers | Not needed |
 | Macros | Functions and scenes cover what templates and includes used to do; [forms](./narrative/forms.md) are a fixed set built into the syntax |
 | Qualified paths `<T as Trait>::f` | Only standard traits exist |

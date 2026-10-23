@@ -182,12 +182,12 @@ pub struct ButtonProps<const N: usize> {
     pub style: Option<Fn() -> ButtonStyle>, pub children: [Fn() -> Element; N],
 }
 #[builtin] pub fn button<const N: usize>(props: ButtonProps<N>) -> Element;
-pub struct SliderProps<const LO: i128, const HI: i128> {
+pub struct SliderProps<const LO: i64, const HI: i64> {
     pub value: Fn() -> Int<LO, HI>, pub on_change: Option<Fn(Int<LO, HI>)>,
     pub step: Option<Fn() -> u32>, pub disabled: Option<Fn() -> bool>,
     pub style: Option<Fn() -> SliderStyle>,
 }
-#[builtin] pub fn slider<const LO: i128, const HI: i128>(props: SliderProps<LO, HI>) -> Element;
+#[builtin] pub fn slider<const LO: i64, const HI: i64>(props: SliderProps<LO, HI>) -> Element;
 pub struct ToggleProps<const N: usize> {
     pub value: Fn() -> bool, pub on_change: Option<Fn(bool)>, pub disabled: Option<Fn() -> bool>,
     pub style: Option<Fn() -> ButtonStyle>, pub children: [Fn() -> Element; N],

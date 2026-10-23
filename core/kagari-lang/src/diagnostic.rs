@@ -137,6 +137,8 @@ codes! {
     ItemBuiltinWithBody = "item/builtin-with-body";
     ItemMissingBody = "item/missing-body";
     ItemMissingValue = "item/missing-value";
+    ItemTraitOutsideStd = "item/trait-outside-std";
+    ItemTraitNotBuiltin = "item/trait-not-builtin";
 
     LowerUiForm = "lower/ui-form-not-implemented";
 
@@ -149,6 +151,7 @@ codes! {
     ResolveOutsideLoop = "resolve/outside-loop";
     ResolveSelfOutsideImpl = "resolve/self-outside-impl";
     ResolveBadImplTarget = "resolve/bad-impl-target";
+    ResolveTraitImplOutsideStd = "resolve/trait-impl-outside-std";
     ResolveDuplicateBinding = "resolve/duplicate-binding";
     ResolveInconsistentBinding = "resolve/inconsistent-binding";
     ResolveMissingStdItem = "resolve/missing-std-item";

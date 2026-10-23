@@ -3,53 +3,63 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/script/008__impls_and_blocks/main.kix
 ---
-script/008__impls_and_blocks/main.kix:54:6: error[resolve/bad-impl-target]: inherent impls on primitive types are only allowed in the standard library
+script/008__impls_and_blocks/main.kix:52:6: error[resolve/bad-impl-target]: inherent impls on primitive types are only allowed in the standard library
 --- resolutions ---
-script/008__impls_and_blocks/main.kix:3:18 u64 -> prim u64
-script/008__impls_and_blocks/main.kix:4:23 Self::Area -> deferred Self::Area
-script/008__impls_and_blocks/main.kix:7:24 u64 -> prim u64
-script/008__impls_and_blocks/main.kix:8:11 u64 -> prim u64
-script/008__impls_and_blocks/main.kix:11:14 Square -> struct crate::Square
-script/008__impls_and_blocks/main.kix:13:15 u64 -> prim u64
-script/008__impls_and_blocks/main.kix:13:20 Square -> struct crate::Square
-script/008__impls_and_blocks/main.kix:13:27 N -> generic N
-script/008__impls_and_blocks/main.kix:14:18 u64 -> prim u64
-script/008__impls_and_blocks/main.kix:14:24 N -> generic N
-script/008__impls_and_blocks/main.kix:14:28 N -> generic N
-script/008__impls_and_blocks/main.kix:16:17 Self -> Self
-script/008__impls_and_blocks/main.kix:17:9 Self -> Self
-script/008__impls_and_blocks/main.kix:17:22 N -> generic N
-script/008__impls_and_blocks/main.kix:20:24 u64 -> prim u64
-script/008__impls_and_blocks/main.kix:21:9 self -> local self
-script/008__impls_and_blocks/main.kix:21:21 Self::CELLS -> const crate::Square::CELLS
-script/008__impls_and_blocks/main.kix:25:15 u64 -> prim u64
-script/008__impls_and_blocks/main.kix:25:20 Shape -> trait crate::Shape
-script/008__impls_and_blocks/main.kix:25:30 Square -> struct crate::Square
-script/008__impls_and_blocks/main.kix:25:37 N -> generic N
-script/008__impls_and_blocks/main.kix:26:17 u64 -> prim u64
-script/008__impls_and_blocks/main.kix:27:18 u64 -> prim u64
-script/008__impls_and_blocks/main.kix:29:23 Self::Area -> type crate::Square::Area
-script/008__impls_and_blocks/main.kix:30:9 self -> local self
-script/008__impls_and_blocks/main.kix:30:21 self -> local self
-script/008__impls_and_blocks/main.kix:34:15 Shape -> trait crate::Shape
-script/008__impls_and_blocks/main.kix:34:22 shape -> local shape@34:22
-script/008__impls_and_blocks/main.kix:34:29 T -> generic T
-script/008__impls_and_blocks/main.kix:34:35 T::Area -> deferred T::Area
-script/008__impls_and_blocks/main.kix:35:5 shape -> local shape@34:22
-script/008__impls_and_blocks/main.kix:38:14 u64 -> prim u64
-script/008__impls_and_blocks/main.kix:39:9 board -> local board@39:9
-script/008__impls_and_blocks/main.kix:39:17 Board::new -> fn crate::Square::new
-script/008__impls_and_blocks/main.kix:40:9 sides -> local sides@40:9
-script/008__impls_and_blocks/main.kix:40:17 Square::SIDES -> const crate::Square::SIDES
-script/008__impls_and_blocks/main.kix:41:18 u64 -> prim u64
-script/008__impls_and_blocks/main.kix:42:15 x -> local x@42:15
-script/008__impls_and_blocks/main.kix:42:18 u64 -> prim u64
-script/008__impls_and_blocks/main.kix:42:26 u64 -> prim u64
-script/008__impls_and_blocks/main.kix:43:9 x -> local x@42:15
-script/008__impls_and_blocks/main.kix:43:13 LOCAL -> const crate::{block}::LOCAL
-script/008__impls_and_blocks/main.kix:47:23 u64 -> prim u64
-script/008__impls_and_blocks/main.kix:48:13 helper -> fn crate::{block}::helper
-script/008__impls_and_blocks/main.kix:50:9 inner -> fn crate::{block}::{block}::inner
-script/008__impls_and_blocks/main.kix:50:19 board -> local board@39:9
-script/008__impls_and_blocks/main.kix:50:35 sides -> local sides@40:9
-script/008__impls_and_blocks/main.kix:54:6 bool -> prim bool
+script/008__impls_and_blocks/main.kix:1:24 u64 -> prim u64
+script/008__impls_and_blocks/main.kix:2:11 u64 -> prim u64
+script/008__impls_and_blocks/main.kix:5:14 Square -> struct crate::Square
+script/008__impls_and_blocks/main.kix:6:13 Say::Output -> type std::narrative::Say::Output
+script/008__impls_and_blocks/main.kix:8:15 u64 -> prim u64
+script/008__impls_and_blocks/main.kix:8:20 Square -> struct crate::Square
+script/008__impls_and_blocks/main.kix:8:27 N -> generic N
+script/008__impls_and_blocks/main.kix:9:18 u64 -> prim u64
+script/008__impls_and_blocks/main.kix:9:24 N -> generic N
+script/008__impls_and_blocks/main.kix:9:28 N -> generic N
+script/008__impls_and_blocks/main.kix:11:17 Self -> Self
+script/008__impls_and_blocks/main.kix:12:9 Self -> Self
+script/008__impls_and_blocks/main.kix:12:22 N -> generic N
+script/008__impls_and_blocks/main.kix:15:24 u64 -> prim u64
+script/008__impls_and_blocks/main.kix:16:9 self -> local self
+script/008__impls_and_blocks/main.kix:16:21 Self::CELLS -> const crate::Square::CELLS
+script/008__impls_and_blocks/main.kix:19:23 Range -> struct std::Range
+script/008__impls_and_blocks/main.kix:19:29 u64 -> prim u64
+script/008__impls_and_blocks/main.kix:20:9 Range -> struct std::Range
+script/008__impls_and_blocks/main.kix:20:32 self -> local self
+script/008__impls_and_blocks/main.kix:24:12 Eq -> trait std::Eq
+script/008__impls_and_blocks/main.kix:24:16 a -> local a@24:16
+script/008__impls_and_blocks/main.kix:24:19 T -> generic T
+script/008__impls_and_blocks/main.kix:24:22 b -> local b@24:22
+script/008__impls_and_blocks/main.kix:24:25 T -> generic T
+script/008__impls_and_blocks/main.kix:24:31 bool -> prim bool
+script/008__impls_and_blocks/main.kix:25:5 a -> local a@24:16
+script/008__impls_and_blocks/main.kix:25:10 b -> local b@24:22
+script/008__impls_and_blocks/main.kix:28:13 Integer -> trait std::Integer
+script/008__impls_and_blocks/main.kix:28:22 value -> local value@28:22
+script/008__impls_and_blocks/main.kix:28:29 T -> generic T
+script/008__impls_and_blocks/main.kix:28:35 u64 -> prim u64
+script/008__impls_and_blocks/main.kix:29:5 Integer::into -> fn std::Integer::into
+script/008__impls_and_blocks/main.kix:29:19 value -> local value@28:22
+script/008__impls_and_blocks/main.kix:32:11 std::narrative::Step -> trait std::narrative::Step
+script/008__impls_and_blocks/main.kix:32:33 step -> local step@32:33
+script/008__impls_and_blocks/main.kix:32:39 S -> generic S
+script/008__impls_and_blocks/main.kix:32:45 S::Output -> deferred S::Output
+script/008__impls_and_blocks/main.kix:33:5 push_step -> fn std::narrative::push_step
+script/008__impls_and_blocks/main.kix:33:15 step -> local step@32:33
+script/008__impls_and_blocks/main.kix:36:14 u64 -> prim u64
+script/008__impls_and_blocks/main.kix:37:9 board -> local board@37:9
+script/008__impls_and_blocks/main.kix:37:17 Board::new -> fn crate::Square::new
+script/008__impls_and_blocks/main.kix:38:9 level -> local level@38:9
+script/008__impls_and_blocks/main.kix:38:16 Int -> prim Int
+script/008__impls_and_blocks/main.kix:39:18 u64 -> prim u64
+script/008__impls_and_blocks/main.kix:40:15 x -> local x@40:15
+script/008__impls_and_blocks/main.kix:40:18 u64 -> prim u64
+script/008__impls_and_blocks/main.kix:40:26 u64 -> prim u64
+script/008__impls_and_blocks/main.kix:41:9 x -> local x@40:15
+script/008__impls_and_blocks/main.kix:41:13 LOCAL -> const crate::{block}::LOCAL
+script/008__impls_and_blocks/main.kix:45:23 u64 -> prim u64
+script/008__impls_and_blocks/main.kix:46:13 helper -> fn crate::{block}::helper
+script/008__impls_and_blocks/main.kix:48:9 inner -> fn crate::{block}::{block}::inner
+script/008__impls_and_blocks/main.kix:48:19 board -> local board@37:9
+script/008__impls_and_blocks/main.kix:48:35 w -> fn crate::widen
+script/008__impls_and_blocks/main.kix:48:37 level -> local level@38:9
+script/008__impls_and_blocks/main.kix:52:6 bool -> prim bool

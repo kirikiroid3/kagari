@@ -40,7 +40,8 @@ static mut MET_MIO: bool = false;
 A `static mut` is a **story variable**: global narrative state that lives for one run of the
 story.
 
-- Its type must be [finite](../kinds.md#finite-types), and its initializer a constant expression.
+- Its type must be [finite](../kinds.md#finite-types), and its initializer a [constant
+  expression](../language.md#constant-expressions).
   Every run starts from the initializer, so a read can never see an unset variable.
 - Only a `pushdown fn` may read or write it. `fn` and `const fn` code naming a story variable is
   an error, which is what keeps the system from reading the story.

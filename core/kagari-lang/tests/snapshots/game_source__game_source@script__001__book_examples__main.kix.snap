@@ -12,7 +12,7 @@ script/001__book_examples/main.kix:8:23 bool -> prim bool
 script/001__book_examples/main.kix:9:23 bool -> prim bool
 script/001__book_examples/main.kix:11:19 Route -> enum crate::Route
 script/001__book_examples/main.kix:11:27 Route::None -> variant crate::Route::None
-script/001__book_examples/main.kix:12:27 Int -> struct std::Int
+script/001__book_examples/main.kix:12:27 Int -> prim Int
 script/001__book_examples/main.kix:13:21 bool -> prim bool
 script/001__book_examples/main.kix:22:23 Ending -> enum crate::Ending
 script/001__book_examples/main.kix:24:5 FestivalHub -> fn crate::FestivalHub
@@ -66,7 +66,7 @@ script/001__book_examples/main.kix:93:9 Map::C -> variant crate::Map::C
 script/001__book_examples/main.kix:93:19 VISITED_C -> static crate::VISITED_C
 script/001__book_examples/main.kix:94:9 Map::Leave -> variant crate::Map::Leave
 script/001__book_examples/main.kix:101:17 day -> local day@101:17
-script/001__book_examples/main.kix:101:22 Int -> struct std::Int
+script/001__book_examples/main.kix:101:22 Int -> prim Int
 script/001__book_examples/main.kix:101:36 DayEnd -> enum crate::DayEnd
 script/001__book_examples/main.kix:103:5 DayEnd::Normal -> variant crate::DayEnd::Normal
 script/001__book_examples/main.kix:108:16 day -> local day@108:16
@@ -107,7 +107,7 @@ script/001__book_examples/main.kix:164:21 Route::Azusa -> variant crate::Route::
 script/001__book_examples/main.kix:165:20 Ending::AzusaEnd -> variant crate::chapter2::Ending::AzusaEnd
 script/001__book_examples/main.kix:167:9 Ending::NormalEnd -> variant crate::chapter2::Ending::NormalEnd
 script/001__book_examples/main.kix:175:15 affection -> local affection@175:15
-script/001__book_examples/main.kix:175:26 Int -> struct std::Int
+script/001__book_examples/main.kix:175:26 Int -> prim Int
 script/001__book_examples/main.kix:175:37 met -> local met@175:37
 script/001__book_examples/main.kix:175:42 bool -> prim bool
 script/001__book_examples/main.kix:175:51 Mood -> enum crate::Mood
@@ -125,8 +125,8 @@ script/001__book_examples/main.kix:188:9 Mood::Stranger -> variant crate::Mood::
 script/001__book_examples/main.kix:197:20 route -> local route@197:20
 script/001__book_examples/main.kix:197:27 Route -> enum crate::proposal::Route
 script/001__book_examples/main.kix:197:34 affection -> local affection@197:34
-script/001__book_examples/main.kix:197:45 Int -> struct std::Int
-script/001__book_examples/main.kix:197:59 Int -> struct std::Int
+script/001__book_examples/main.kix:197:45 Int -> prim Int
+script/001__book_examples/main.kix:197:59 Int -> prim Int
 script/001__book_examples/main.kix:198:16 route -> local route@197:20
 script/001__book_examples/main.kix:198:23 affection -> local affection@197:34
 script/001__book_examples/main.kix:199:14 Route::Mio -> variant crate::proposal::Route::Mio

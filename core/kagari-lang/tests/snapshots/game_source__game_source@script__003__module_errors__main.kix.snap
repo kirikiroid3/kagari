@@ -12,9 +12,16 @@ script/003__module_errors/main.kix:13:12: error[resolve/private-item]: `hidden` 
 script/003__module_errors/main.kix:15:13: error[resolve/ambiguous-name]: `X` is ambiguous
   note: script/003__module_errors/main.kix:6:5: `X` could refer to the item imported here
   note: script/003__module_errors/main.kix:7:5: `X` could refer to the item imported here
+script/003__module_errors/main.kix:28:18: error[resolve/private-item]: `SECRET` is private
 --- resolutions ---
 script/003__module_errors/main.kix:13:5 other::hidden -> fn crate::other::hidden
 script/003__module_errors/main.kix:14:5 other::shown -> fn crate::other::shown
 script/003__module_errors/main.kix:15:13 X -> const crate::other::a::X
+script/003__module_errors/main.kix:21:10 Dot -> struct crate::shapes::Dot
+script/003__module_errors/main.kix:22:23 u64 -> prim u64
+script/003__module_errors/main.kix:23:25 u64 -> prim u64
+script/003__module_errors/main.kix:27:20 u64 -> prim u64
+script/003__module_errors/main.kix:28:5 shapes::Dot::SECRET -> const crate::shapes::Dot::SECRET
+script/003__module_errors/main.kix:28:27 shapes::Dot::OPEN -> const crate::shapes::Dot::OPEN
 script/003__module_errors/other.kis:5:18 u64 -> prim u64
 script/003__module_errors/other.kis:9:18 u64 -> prim u64

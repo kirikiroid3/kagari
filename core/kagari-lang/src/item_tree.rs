@@ -335,7 +335,22 @@ impl Ctx {
             ast::Item::Static(it) => ItemKind::Static {
                 mutable: it.mut_token().is_some(),
             },
-            ast::Item::Trait(_) => ItemKind::Trait { items: Vec::new() },
+            ast::Item::Trait(_) => {
+                if !self.in_std {
+                    self.diag(
+                        name_range,
+                        DiagnosticCode::ItemTraitOutsideStd,
+                        "traits are only declared in the standard library".to_owned(),
+                    );
+                } else if !builtin {
+                    self.diag(
+                        name_range,
+                        DiagnosticCode::ItemTraitNotBuiltin,
+                        format!("standard library trait `{shown}` must be `#[builtin]`"),
+                    );
+                }
+                ItemKind::Trait { items: Vec::new() }
+            }
             ast::Item::Impl(it) => ItemKind::Impl {
                 items: Vec::new(),
                 has_trait: it.trait_type().is_some(),

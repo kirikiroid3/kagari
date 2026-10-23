@@ -333,7 +333,7 @@ style/002__studio/main.kix:181:33 Screen -> struct std::screen::Screen
 style/002__studio/main.kix:181:44 Screen -> struct std::screen::Screen
 style/002__studio/main.kix:182:5 screen -> local screen@181:21
 style/002__studio/main.kix:183:5 screen -> local screen@181:21
-style/002__studio/main.kix:188:17 Int -> struct std::Int
+style/002__studio/main.kix:188:17 Int -> prim Int
 style/002__studio/main.kix:195:17 chapter_card -> fn crate::chapter_card
 style/002__studio/main.kix:196:33 opening -> fn crate::opening
 style/002__studio/main.kix:197:33 hanako_smiles -> fn crate::hanako_smiles

@@ -1,7 +1,7 @@
 # Values, References and Closures
 
 *Tentative.* This chapter fixes the memory model. It is simpler than Rust's on purpose: no
-lifetimes and no borrow checker, at the price of references that cannot be stored.
+lifetimes, no borrow checker and no moves.
 
 ## Value semantics
 
@@ -11,10 +11,10 @@ the program cannot observe it.
 
 There are no moves and no destructors. A value is gone when nothing holds it.
 
-## References are second-class
+## References
 
-`&T` and `&mut T` exist so that a function can read or change a value the caller owns without a
-copy, as `render` functions do with the screen:
+`&T` and `&mut T` let code read or change a value without copying it, as `render` functions do
+with the screen:
 
 ```kis
 const fn hanako_appears(mut screen: Screen) -> Screen {
@@ -23,25 +23,35 @@ const fn hanako_appears(mut screen: Screen) -> Screen {
 }
 ```
 
-A reference is **second-class**: it can be passed down, never kept.
+A reference is a shared pointer to a place: a local, a field, an element, or a story variable.
+Under the hood every place is reference-counted, so a reference keeps its place alive, and copying
+a reference copies the pointer, not the value.
+
+- In `fn` and `const fn` code, references are ordinary values: they may be bound to locals,
+  stored in fields and collections, returned, and captured by closures.
+- Writes through one reference are visible through every other reference to the same place. There
+  is no borrow checker: two `&mut` to one place may coexist. The engine runs in a VM, so this can
+  only surprise the program, never corrupt memory.
+- **Mutability.** `&mut x` and assignment to `x` need a mutable place: a `let mut` local or a `mut`
+  parameter, a story variable, a field or element of one, or a place reached through `&mut`. A
+  place reached through `&T` is read-only.
+- The type of a `const` item, a story variable or a handle cannot contain a reference.
+
+### References in the story
+
+In a `pushdown fn`, references are second-class: they can be passed down, never kept.
 
 - A reference type may appear only as the type of a parameter, including a method receiver
-  (`&self`, `&mut self`).
-- A function may return a reference only if its receiver is a reference. The result is a
-  *projection* of the receiver, a part of it, and lives until the end of the statement that
-  produced it. This is what makes `screen.entity(HANAKO).opacity().change(1.0).apply_animation(…)`
-  work: `entity` projects an entity out of the screen, `opacity` a property out of the entity,
-  `change` a pending change out of the property, and `apply_animation` completes it in place.
-- A reference cannot be stored in a field, a local, a static or a collection, and cannot be
-  captured by a closure. Code that changes the same entity twice repeats the projection chain in
-  each statement.
+  (`&self`, `&mut self`). A function may return a reference only if its receiver is one; the
+  result lives until the end of the statement that produced it.
 - **Exclusivity.** In one call, a place passed as `&mut` may not also be passed as any other
   argument, so two parameters never alias when one of them can change.
 
-Because a reference can never outlive the call it was passed to, a function that takes `&mut x`
-behaves exactly as if it received a copy of `x` and the caller stored the result back on return.
-This is what keeps references harmless for the [narrative analyses](./kinds.md#why-this-works):
-a `&mut` argument of a `pushdown fn` is an in-out parameter of a finite type.
+Because a reference can never outlive the call it was passed to, and never aliases another one,
+a `pushdown fn` that takes `&mut x` behaves exactly as if it received a copy of `x` and the caller
+stored the result back on return. This is what keeps references harmless for the [narrative
+analyses](./kinds.md#why-this-works): a `&mut` argument of a `pushdown fn` is an in-out parameter
+of a finite type, and story state never holds a pointer.
 
 ## Closures
 
@@ -51,7 +61,8 @@ let open_config = || nav::call(Config);
 
 A closure captures by value: it copies the variables it uses when it is created. Changing a
 captured copy inside the closure does not change the original; shared mutable state goes through
-`&mut` parameters, story variables, or [signals](./system.md#components-and-signals).
+references, story variables, or [signals](./system.md#components-and-signals). Capturing a
+reference copies the pointer, so writes through it reach the original place.
 
 What may be done with a closure depends on the kind of the function that creates it:
 

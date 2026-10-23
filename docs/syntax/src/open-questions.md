@@ -1,20 +1,12 @@
 # Open Questions
 
-## Traits and generics
-
-The standard library uses generics (`Option<T>`, `push_step<S: Step>`) and the traits `Eq`,
-`Step`, `Asset` and `ToText`.
-May studios declare their own generic functions and traits? In a `pushdown fn`, every type
-parameter would have to be instantiated with a finite type, and monomorphization keeps the story a
-finite program; in `fn` and `const fn` there is no such constraint.
-
 ## Numbers
 
-- Literal syntax for `Rat` and `Decimal`: is `0.5` a `Decimal`, and how is `1/3` written as a
-  `Rat`?
+- Literal syntax for `Rat`: how is `1/3` written? (`0.5` is a `Decimal`.)
 - Precision: is `Rat` arbitrary-precision, and how many digits does `Decimal` keep?
 - Overflow of Rust integers at runtime in `fn` code: wrap, saturate, or stop with an error?
-- Conversions between Rust integers, `Int<lo, hi>`, `Rat` and `Decimal`.
+- Conversions between integers and `Rat` or `Decimal`, and between `Rat` and `Decimal`. (Integer
+  conversions are [explicit](./numbers.md#conversions).)
 
 ## Default integer ranges
 

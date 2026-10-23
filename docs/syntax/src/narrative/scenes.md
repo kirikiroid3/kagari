@@ -80,8 +80,9 @@ pushdown fn Week() {
 }
 ```
 
-In a `pushdown fn`, the variable of `for` over a range has the matching `Int` type: `day` in
-`for day in 0..7` is an `Int<0, 6>`.
+`0..7` is a `Range<T>` from the standard library. In a `pushdown fn`, `for` loops only over a
+range whose bounds are constant expressions, or over an array, and the loop variable has the
+matching `Int` type: `day` in `for day in 0..7` is an `Int<0, 6>`.
 
 There is no `goto` and no labelled position to jump to. A hub is a `loop`, a scene that ends
 early `return`s, and a branch is an `if` or a `match`. Two consequences:

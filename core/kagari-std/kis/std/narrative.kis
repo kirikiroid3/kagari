@@ -7,7 +7,7 @@ use crate::screen::{Render, VAlign, Visibility};
 use crate::system::{GameOverlay, saves::SaveSlot};
 
 /// A step the story suspends at; resumes with `Output`.
-pub trait Step {
+#[builtin] pub trait Step {
     type Output;
 }
 

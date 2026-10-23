@@ -50,10 +50,10 @@ t!["Day " {DAY} ": " !["the festival"](emphasis())]
 
 ```kis
 /// Types a `{expr}` item of `t![…]` may interpolate.
-pub trait ToText {}
+#[builtin] pub trait ToText {}
 impl ToText for Text {}
 impl ToText for String {}
-impl<const LO: i128, const HI: i128> ToText for Int<LO, HI> {}
+impl<const LO: i64, const HI: i64> ToText for Int<LO, HI> {}
 impl ToText for u8 {}
 impl ToText for u16 {}
 impl ToText for u32 {}

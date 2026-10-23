@@ -1,0 +1,17 @@
+trait Shape {
+    fn sides(&self) -> u64;
+}
+
+struct Square {
+    side: u64,
+}
+
+impl Eq for Square {}
+
+impl Shape for Square {
+    fn sides(&self) -> u64 {
+        4
+    }
+}
+
+impl std::narrative::text::ToText for Square {}

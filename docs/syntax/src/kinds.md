@@ -65,8 +65,8 @@ that needed the value. A `const fn` called from `fn` code at runtime is an ordin
 
 ### Calling `const fn` from the story
 
-A `pushdown fn` may call a `const fn` when every argument is either a constant expression or of a
-finite type:
+A `pushdown fn` may call a `const fn` when every argument is either a [constant
+expression](./language.md#constant-expressions) or of a finite type:
 
 - **All arguments constant.** The call is evaluated at compile time and replaced by its value,
   which may be of any type. `fade(ms(500))` is such a call.

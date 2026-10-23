@@ -1,12 +1,11 @@
 # Core Types
 
-The crate root `std` declares the builtin types, the generic sums `Option` and `Result`, the
-traits, and the asset types. `std::time` declares `Duration`.
+The crate root `std` declares the builtin types, `Range`, the generic sums `Option` and `Result`,
+the traits, and the asset types. `std::time` declares `Duration`.
 
 ## Builtin types
 
 ```kis
-#[builtin] pub struct Int<const LO: i128, const HI: i128>;
 #[builtin] pub struct String;
 #[builtin] pub struct Vec<T>;
 #[builtin] pub struct Rat;
@@ -15,15 +14,28 @@ traits, and the asset types. `std::time` declares `Duration`.
 
 |Type|Values|
 |---|---|
-|`Int<LO, HI>`|The integers `LO..=HI`; the finite integer type of the story|
 |`String`|Runtime strings, for `fn` code|
 |`Vec<T>`|Growable sequences|
 |`Rat`|Exact rationals|
-|`Decimal`|Exact decimals, written as literals like `0.5`; the type of every fraction in `std`|
+|`Decimal`|Exact decimals, written as literals like `0.5`; the replacement for floats and the type of every fraction in `std`|
 
-The Rust primitive integers (`u8` … `u128`, `i8` … `i128`, `usize`, `isize`) and `bool` are
-language types, not std items. The syntax reference describes the numeric types and their
-arithmetic.
+`Int<lo, hi>`, the Rust primitive integers (`u8` … `u128`, `i8` … `i128`, `usize`, `isize`) and
+`bool` are language types, not std items. `Int<lo, hi>` holds the integers `lo..=hi` and is the
+only integer type the story may hold at runtime. The syntax reference describes the numeric types
+and their arithmetic.
+
+## `Range`
+
+```kis
+pub struct Range<T> {
+    pub start: T,
+    pub end: T,
+    pub inclusive: bool,
+}
+```
+
+`start..end` is a `Range` with `inclusive` false, `start..=end` one with `inclusive` true. `for`
+over a range is a language rule (see [Checks](./checks.md#for-loops)).
 
 ## `Vec`
 
@@ -58,18 +70,48 @@ The prelude also imports the variants: `None`, `Some`, `Ok`, `Err`.
 |Trait|Declared in|Meaning|
 |---|---|---|
 |`Eq`|`std`|Types whose values compare with `==`; the bound of `ui::select`|
+|`Integer`|`std`|`Int<lo, hi>` and the Rust integers; the conversions `into` and `saturate`|
 |`Asset`|`std`|Types whose values are exactly the asset constants of the program|
 |`Step`|`std::narrative`|Types that `push_step` can suspend on; see [Narrative](./narrative.md)|
 |`ToText`|`std::narrative::text`|Types a `{expr}` item of `t![…]` may interpolate; see [Text](./text.md#interpolation)|
 
 ```kis
-pub trait Eq {}
+/// Types with structural equality.
+#[builtin] pub trait Eq {}
+impl Eq for String {}
+impl<T: Eq> Eq for Vec<T> {}
+impl Eq for Rat {}
+impl Eq for Decimal {}
+impl Eq for ImageAsset {}
+impl Eq for AudioAsset {}
+impl Eq for VoiceAsset {}
+impl Eq for VideoAsset {}
+impl Eq for FontAsset {}
+impl Eq for narrative::Text {}
+impl Eq for screen::Screen {}
+
+/// The integer types: `Int<lo, hi>` and Rust's integers.
+#[builtin] pub trait Integer {
+    /// This value as `T`; a compile error unless every value of `Self` fits in `T`.
+    const fn into<T: Integer>(self) -> T;
+    /// This value clamped to the range of `T`.
+    const fn saturate<T: Integer>(self) -> T;
+}
 /// Types whose values are exactly the asset constants of the program.
-pub trait Asset {}
+#[builtin] pub trait Asset {}
 ```
 
-The std traits exist so that std signatures type-check without overloading or coercion. Users
-never implement them; user traits are an open question of the language.
+Every trait is `#[builtin]`, and only `std` declares or implements traits. The std traits exist so
+that std signatures type-check without overloading or coercion.
+
+`Eq` is automatic for structs, enums, tuples and arrays whose fields are all `Eq`, and for the
+language's primitive types. A `#[builtin]` type has no visible fields, so `std` states it
+explicitly: `String`, `Vec<T>` of an `Eq` `T`, `Rat`, `Decimal`, the asset types, `Text` and
+`Screen` are `Eq`. Handles and pending changes (`Setting`, `Meta`, `Narrative`, `Entity`, `Prop`,
+`Change`, the layers, `Swap`, `Channel`, `ChannelChange`, `Element`, …) are not.
+
+`into` is lossless: `Int<0, 5>` converts to `u8` or `Int<0, 10>`, but `u8` into `Int<0, 5>` is a
+compile error. `saturate` clamps, so `300u32.saturate()` into `u8` is `255`.
 
 ## Assets
 

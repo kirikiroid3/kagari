@@ -56,16 +56,22 @@ screen.entity(AZUSA).image().change(AZUSA::CLOSE_EYE_SMILE).apply_animation(cut(
 ```
 
 1. `screen.entity(AZUSA)` selects the entity whose id is `AZUSA`, say `EntityId(217)`, and spawns
-   it if the screen has none. It is a [projection](./values.md#references-are-second-class) of the
+   it if the screen has none. It is a [reference](./values.md#references) into the
    screen: changing it changes the screen.
 2. `.image()` is the entity's main `ImageLayer`. `.change(AZUSA::CLOSE_EYE_SMILE)` asks to swap
-   that layer to the image `AZUSA::CLOSE_EYE_SMILE`. The result is a `Swap`, a pending change: a
-   projection of the layer that lives until the end of the statement.
+   that layer to the image `AZUSA::CLOSE_EYE_SMILE`. The result is a `&mut Swap`, a pending
+   change: a reference into the layer.
 3. Because this swaps a layer, it needs a `Transition`. Without one the change does not happen.
 4. `.apply_animation(cut())` switches the image at once, and the change takes effect.
 
-A projection cannot be bound to a local, so a render that changes the same entity several times
-repeats the chain in each statement.
+References may be bound to locals, so a render that changes the same entity several times can name
+it once:
+
+```kis
+let azusa = screen.entity(AZUSA);
+azusa.image().change(AZUSA::CLOSE_EYE_SMILE).apply_animation(cut());
+azusa.opacity().change(1.0).apply_animation(tween(ms(300)));
+```
 
 ## The screen is an ECS world
 
@@ -78,7 +84,7 @@ repeats the chain in each statement.
 | Resources | `std::screen`, a fixed set | Data of the screen itself: the Hud, the choice menu, the camera, the screen filter, the audio channels |
 | Systems | the engine | Process entities at runtime, for example advancing animations frame by frame |
 
-Every component type has [structural equality](./language.md#types), so two screens can always be
+Every component type is [`Eq`](./language.md#equality), so two screens can always be
 compared. Systems are not written in Kagari and are not part of the logical screen: the screen a
 step shows is the set of entities and their components after its render, not the frames the
 engine draws while an animation plays.

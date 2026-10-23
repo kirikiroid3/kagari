@@ -43,7 +43,7 @@ lists the modules and the book chapter of each:
 
 | Module               | Contents | Standard library book |
 | -------------------- | -------- | --------------------- |
-| `std`                | `Int`, `String`, `Vec`, `Rat`, `Decimal`, `Option`, `Result`, the traits `Eq` and `Asset`, the asset types and `asset` | *Core Types* |
+| `std`                | `String`, `Vec`, `Range`, `Rat`, `Decimal`, `Option`, `Result`, the traits `Eq`, `Integer` and `Asset`, the asset types and `asset` | *Core Types* |
 | `std::time`          | `Duration` (whole milliseconds), `ms`, `secs` | *Core Types* |
 | `std::screen`        | The screen: entities, properties, layers, Hud, camera, filters; see [Presentation](./presentation.md) | *Screen* |
 | `std::screen::anim`  | `Tween`, `Transition`, `Motion`, easings and the motion presets | *Animation* |
@@ -58,8 +58,8 @@ lists the modules and the book chapter of each:
 
 A **prelude** is imported into every module automatically. It contains:
 
-- from `std`: `Int`, `String`, `Vec`, `Rat`, `Decimal`, `Option` with `None` and `Some`, `Result`
-  with `Ok` and `Err`, `Eq`, the asset types and `asset`;
+- from `std`: `String`, `Vec`, `Range`, `Rat`, `Decimal`, `Option` with `None` and `Some`,
+  `Result` with `Ok` and `Err`, `Eq`, `Integer`, the asset types and `asset`;
 - from `std::time`: `Duration`, `ms`, `secs`;
 - from `std::screen`: `Screen`, `Render`, `EntityId`, `Part`, `Point`, `Offset`, `Size`, `Anchor`,
   `Color`, `Plane`, `Visibility`, `point`, `offset`, `rgb`, `hex`, `BLACK`, `WHITE`,

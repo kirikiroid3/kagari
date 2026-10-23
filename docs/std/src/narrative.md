@@ -11,7 +11,7 @@ pub use self::text::{Mark, Text, TextEffect};
 ## `push_step`
 
 ```kis
-pub trait Step { type Output; }
+#[builtin] pub trait Step { type Output; }
 #[builtin] pub pushdown fn push_step<S: Step>(s: S) -> S::Output;
 ```
 

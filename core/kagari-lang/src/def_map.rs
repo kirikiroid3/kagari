@@ -133,6 +133,8 @@ pub enum PrimType {
     I128,
     Usize,
     Isize,
+    /// `Int<LO, HI>`: an integer in the inclusive range `LO..=HI`, with `i64` bounds.
+    Int,
 }
 
 impl PrimType {
@@ -151,6 +153,7 @@ impl PrimType {
             "i128" => PrimType::I128,
             "usize" => PrimType::Usize,
             "isize" => PrimType::Isize,
+            "Int" => PrimType::Int,
             _ => return None,
         })
     }
@@ -170,6 +173,7 @@ impl PrimType {
             PrimType::I128 => "i128",
             PrimType::Usize => "usize",
             PrimType::Isize => "isize",
+            PrimType::Int => "Int",
         }
     }
 }
@@ -223,6 +227,9 @@ pub struct DefMaps {
     pub trait_impls: FxHashMap<TypeKey, Vec<ItemId>>,
     /// The type each impl is for.
     pub impl_keys: FxHashMap<ItemId, TypeKey>,
+    /// The trait each trait impl implements, when it resolves. Items of a
+    /// trait impl take the trait's visibility.
+    pub impl_traits: FxHashMap<ItemId, ItemId>,
     pub prelude: Option<ModuleId>,
     pub diagnostics: Vec<Diagnostic>,
 }
@@ -363,6 +370,7 @@ pub fn def_maps(db: &dyn Db, program: Program) -> DefMaps {
             inherent: FxHashMap::default(),
             trait_impls: FxHashMap::default(),
             impl_keys: FxHashMap::default(),
+            impl_traits: FxHashMap::default(),
             prelude: None,
             diagnostics: Vec::new(),
         },
@@ -950,6 +958,15 @@ impl Collector<'_> {
         changed
     }
 
+    /// Whether `item` is the standard library's `Eq` trait.
+    fn is_std_eq(&self, item: ItemId) -> bool {
+        self.maps.module_of_item(self.db, item) == self.maps.std_root()
+            && item_tree(self.db, item.file)
+                .item(item.index)
+                .and_then(|data| data.name.as_deref())
+                == Some("Eq")
+    }
+
     fn collect_impls(&mut self) {
         let impls = std::mem::take(&mut self.impls);
         for (impl_id, module) in impls {
@@ -961,6 +978,40 @@ impl Collector<'_> {
                 continue;
             };
             let path = self.maps.module_file(module).path(self.db).clone();
+            // Unresolved traits are reported by name resolution.
+            let trait_item = trait_ref.and_then(|trait_ref| {
+                let TypeRef::Path(trait_path) = signature.store.type_ref(trait_ref) else {
+                    return None;
+                };
+                match resolve_module_path(
+                    &self.maps,
+                    self.db,
+                    module,
+                    trait_path,
+                    Namespace::Types,
+                )
+                .resolved
+                {
+                    Some(Resolution::Def(Def::Item(item))) => Some(item),
+                    _ => None,
+                }
+            });
+            if let Some(trait_ref) = trait_ref
+                && module.krate == CrateId::Game
+            {
+                let message = if trait_item.is_some_and(|item| self.is_std_eq(item)) {
+                    "only the standard library implements traits; `Eq` is automatic for structs \
+                     and enums whose fields are all `Eq`"
+                } else {
+                    "only the standard library implements traits"
+                };
+                self.maps.diagnostics.push(Diagnostic::new(
+                    path.clone(),
+                    signature.store.type_range(*trait_ref),
+                    DiagnosticCode::ResolveTraitImplOutsideStd,
+                    message,
+                ));
+            }
             let range = signature.store.type_range(*self_ty);
             let key = match signature.store.type_ref(*self_ty) {
                 TypeRef::Path(type_path) => {
@@ -1002,6 +1053,9 @@ impl Collector<'_> {
             };
             self.maps.impl_keys.insert(impl_id, key);
             if trait_ref.is_some() {
+                if let Some(trait_item) = trait_item {
+                    self.maps.impl_traits.insert(impl_id, trait_item);
+                }
                 self.maps.trait_impls.entry(key).or_default().push(impl_id);
                 continue;
             }
@@ -1517,10 +1571,14 @@ fn assoc_lookup(
     result: &mut PathResolution,
     prefix: &str,
 ) -> Option<Resolution> {
+    // Inherent items carry their own visibility; items of a trait impl are
+    // visible wherever the trait is. An impl whose trait failed to resolve
+    // has already been reported, so its items are not checked again.
     let found = key.and_then(|key| {
         maps.inherent
             .get(&key)
             .and_then(|items| items.get(name).copied())
+            .map(|assoc| (assoc, Some(assoc)))
             .or_else(|| {
                 maps.trait_impls.get(&key).and_then(|impls| {
                     impls.iter().find_map(|impl_id| {
@@ -1530,25 +1588,27 @@ fn assoc_lookup(
                         else {
                             return None;
                         };
-                        items
-                            .iter()
-                            .copied()
-                            .find(|&assoc| {
-                                tree.item(assoc).and_then(|i| i.name.as_ref()) == Some(name)
-                            })
-                            .map(|index| ItemId {
-                                file: impl_id.file,
-                                index,
-                            })
+                        let index = items.iter().copied().find(|&assoc| {
+                            tree.item(assoc).and_then(|i| i.name.as_ref()) == Some(name)
+                        })?;
+                        let assoc = ItemId {
+                            file: impl_id.file,
+                            index,
+                        };
+                        Some((assoc, maps.impl_traits.get(impl_id).copied()))
                     })
                 })
             })
     });
     match found {
-        Some(assoc) => {
-            let vis = maps.item_visibility(db, assoc);
-            let defined_in = maps.module_of_item(db, assoc);
-            if !maps.is_visible(vis, defined_in, from) {
+        Some((assoc, vis_item)) => {
+            if let Some(vis_item) = vis_item
+                && !maps.is_visible(
+                    maps.item_visibility(db, vis_item),
+                    maps.module_of_item(db, vis_item),
+                    from,
+                )
+            {
                 result.diagnostics.push(Diagnostic::new(
                     file.clone(),
                     segment.range,

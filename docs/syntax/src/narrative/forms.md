@@ -29,7 +29,7 @@ Each form has exactly one delimiter, and the delimiter says what it accepts:
 There is one primitive that suspends the story, in `std::narrative`:
 
 ```kis
-pub trait Step { type Output; }
+#[builtin] pub trait Step { type Output; }
 
 #[builtin]
 pub pushdown fn push_step<S: Step>(s: S) -> S::Output;
