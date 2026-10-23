@@ -27,8 +27,6 @@ fn Config() -> Overlay {
     Overlay(column![
         text!(t!["Text speed: " {speed()}]),
         slider!{
-            min = 0,
-            max = 10,
             value = speed(),
             on_change = |v| { set_speed(v); TEXT_SPEED.set(v) },
         },

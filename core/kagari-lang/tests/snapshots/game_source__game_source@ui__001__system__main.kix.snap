@@ -3,9 +3,7 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/ui/001__system/main.kix
 ---
-ui/001__system/main.kix:24:9: error[lower/ui-form-not-implemented]: UI form lowering is not implemented yet
-ui/001__system/main.kix:74:13: error[lower/ui-form-not-implemented]: UI form lowering is not implemented yet
-ui/001__system/main.kix:89:5: error[lower/ui-form-not-implemented]: UI form lowering is not implemented yet
+no diagnostics
 --- resolutions ---
 ui/001__system/main.kix:10:26 cleared_azusa -> local cleared_azusa@10:26
 ui/001__system/main.kix:10:41 bool -> prim bool
@@ -18,6 +16,7 @@ ui/001__system/main.kix:20:9 super::Credits -> fn crate::Credits
 ui/001__system/main.kix:23:21 game -> local game@23:21
 ui/001__system/main.kix:23:27 Narrative -> struct std::narrative::Narrative
 ui/001__system/main.kix:23:41 Element -> struct std::ui::Element
+ui/001__system/main.kix:24:29 game -> local game@23:21
 ui/001__system/main.kix:28:20 Setting -> struct std::system::Setting
 ui/001__system/main.kix:28:28 Duration -> struct std::time::Duration
 ui/001__system/main.kix:28:40 setting -> fn std::system::setting
@@ -95,9 +94,25 @@ ui/001__system/main.kix:73:17 set_music -> local set_music@73:17
 ui/001__system/main.kix:73:30 signal -> fn std::ui::signal
 ui/001__system/main.kix:73:37 MUSIC -> static crate::MUSIC
 ui/001__system/main.kix:74:5 Overlay -> struct std::system::Overlay
+ui/001__system/main.kix:75:29 music -> local music@73:10
+ui/001__system/main.kix:77:21 music -> local music@73:10
+ui/001__system/main.kix:78:26 v -> local v@78:26
+ui/001__system/main.kix:78:35 vol -> local vol@78:35
+ui/001__system/main.kix:78:41 Volume -> struct std::system::Volume
+ui/001__system/main.kix:78:57 v -> local v@78:26
+ui/001__system/main.kix:78:67 music -> local music@73:10
+ui/001__system/main.kix:78:84 set_music -> local set_music@73:17
+ui/001__system/main.kix:78:94 vol -> local vol@78:35
+ui/001__system/main.kix:78:100 MUSIC -> static crate::MUSIC
+ui/001__system/main.kix:78:110 vol -> local vol@78:35
+ui/001__system/main.kix:80:31 nav::back -> fn std::system::nav::back
 ui/001__system/main.kix:84:17 RootPage -> struct std::system::RootPage
 ui/001__system/main.kix:85:5 ui::Title -> fn crate::ui::Title
 ui/001__system/main.kix:88:22 Element -> struct std::ui::Element
+ui/001__system/main.kix:89:27 nav::start -> fn std::system::nav::start
+ui/001__system/main.kix:89:38 story::Main -> fn crate::story::Main
+ui/001__system/main.kix:89:52 CLEARED_AZUSA -> static crate::CLEARED_AZUSA
+ui/001__system/main.kix:89:75 on_ending -> fn crate::on_ending
 ui/001__system/main.kix:92:14 ending -> local ending@92:14
 ui/001__system/main.kix:92:22 story::Ending -> enum crate::story::Ending
 ui/001__system/main.kix:93:11 ending -> local ending@92:14

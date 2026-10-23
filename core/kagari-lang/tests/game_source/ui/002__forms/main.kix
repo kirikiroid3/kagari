@@ -1,0 +1,31 @@
+use std::narrative::text::text_style;
+use std::ui;
+use std::ui::option;
+
+enum Speed {
+    Slow,
+    Fast,
+}
+
+fn menu(game: Narrative) -> Element {
+    let (level, set_level) = signal(3);
+    let (speed, set_speed) = signal(Speed::Slow);
+    let (muted, set_muted) = signal(false);
+    column![
+        t!["Menu"],
+        text!(style = text_style(28, WHITE), t!["Level " {level()}]),
+        game_screen!(game = game),
+        row![
+            button!{on_click = || nav::bakc(), disabled = muted(), t!["Back"]},
+            toggle!{value = muted(), on_change = |on| set_muted(on), t!["Mute"]},
+        ],
+        slider!{value = level(), on_change = |v| set_level(v), step = 1},
+        select!{
+            value = speed(),
+            on_change = |s| set_speed(s),
+            option(Speed::Slow, ui::label(t!["Slow"])),
+            option(Speed::Fast, ui::label(t!["Fast"])),
+        },
+        layer![menu_bakground().cover()],
+    ]
+}

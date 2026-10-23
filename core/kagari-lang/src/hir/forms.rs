@@ -1,26 +1,72 @@
 //! Desugaring of forms: `s!(…)` and `choice!{…}` become `push_step` calls, `t![…]` becomes
 //! calls of the `std::narrative::text` builtins (`ruby`, `mono_ruby`, `effect`, `concat`, and
-//! `to_text` for each `{expr}`). Synthesized nodes get the whole form's range.
+//! `to_text` for each `{expr}`), and UI forms become calls of the `std::ui` functions (see
+//! "UI form desugaring" in the std book). Synthesized nodes get the whole form's range.
 
 use kagari_syntax::TextRange;
-use kagari_syntax::ast::{self, AstNode, HasName};
+use kagari_syntax::ast::{self, AstNode, HasName, UiElements};
 
 use super::lower::Lowerer;
 use super::{ArrayExpr, Expr, ExprId, LangItem, Literal, Name, Path};
-use crate::diagnostic::DiagnosticCode;
 
-const UI_FORMS: &[&str] = &[
-    "column",
-    "row",
-    "layer",
-    "text",
-    "image",
-    "game_screen",
-    "button",
-    "slider",
-    "toggle",
-    "select",
-];
+/// The std items a UI form desugars to.
+struct UiTarget {
+    function: LangItem,
+    /// The props struct and the field holding the elements. `None` when the elements are the
+    /// function's argument.
+    props: Option<(LangItem, Option<&'static str>)>,
+    /// Whether a `t![…]` element becomes `ui::label(t![…])`.
+    labels: bool,
+}
+
+fn ui_target(name: &str) -> Option<UiTarget> {
+    let (function, props, labels) = match name {
+        "column" => (LangItem::UiColumn, None, true),
+        "row" => (LangItem::UiRow, None, true),
+        "layer" => (LangItem::UiLayer, None, false),
+        "text" => (
+            LangItem::UiText,
+            Some((LangItem::UiTextProps, Some("content"))),
+            false,
+        ),
+        "image" => (
+            LangItem::UiImage,
+            Some((LangItem::UiImageProps, Some("source"))),
+            false,
+        ),
+        "game_screen" => (
+            LangItem::UiGameScreen,
+            Some((LangItem::UiGameScreenProps, None)),
+            false,
+        ),
+        "button" => (
+            LangItem::UiButton,
+            Some((LangItem::UiButtonProps, Some("children"))),
+            true,
+        ),
+        "slider" => (
+            LangItem::UiSlider,
+            Some((LangItem::UiSliderProps, None)),
+            false,
+        ),
+        "toggle" => (
+            LangItem::UiToggle,
+            Some((LangItem::UiToggleProps, Some("children"))),
+            true,
+        ),
+        "select" => (
+            LangItem::UiSelect,
+            Some((LangItem::UiSelectProps, Some("options"))),
+            false,
+        ),
+        _ => return None,
+    };
+    Some(UiTarget {
+        function,
+        props,
+        labels,
+    })
+}
 
 /// The attributes and elements of a form, in source order.
 struct Entries {
@@ -80,16 +126,84 @@ impl Lowerer<'_> {
         match name.as_str() {
             "s" => self.lower_say(form, range),
             "choice" => self.lower_choice(form, range),
-            name if UI_FORMS.contains(&name) => {
-                self.diag(
-                    range,
-                    DiagnosticCode::LowerUiForm,
-                    "UI form lowering is not implemented yet".to_owned(),
-                );
-                self.missing(range)
-            }
-            _ => self.missing(range),
+            name => match (ast::ui_form_named(name), ui_target(name)) {
+                (Some(spec), Some(target)) => self.lower_ui_form(form, spec, &target, range),
+                _ => self.missing(range),
+            },
         }
+    }
+
+    /// `|| body`
+    fn thunk(&mut self, body: ExprId, range: TextRange) -> ExprId {
+        self.alloc(
+            Expr::Closure {
+                params: Vec::new(),
+                ret: None,
+                body,
+            },
+            range,
+        )
+    }
+
+    /// Missing required attributes, unknown attributes and wrong element counts are syntax
+    /// errors; here they lower to `Missing` or are dropped.
+    fn lower_ui_form(
+        &mut self,
+        form: &ast::FormExpr,
+        spec: &ast::UiForm,
+        target: &UiTarget,
+        range: TextRange,
+    ) -> ExprId {
+        let entries = entries(form);
+        let mut elements = Vec::new();
+        for element in &entries.elements {
+            let value = self.lower_expr(element.clone());
+            let value = if target.labels && matches!(element, ast::Expr::TextForm(_)) {
+                self.lang_call(LangItem::UiLabel, vec![value], range)
+            } else {
+                value
+            };
+            elements.push(self.thunk(value, range));
+        }
+        let Some((props, element_field)) = target.props else {
+            let array = self.alloc(Expr::Array(ArrayExpr::List(elements)), range);
+            return self.lang_call(target.function, vec![array], range);
+        };
+        let mut fields = Vec::new();
+        for &(key, required) in spec.attrs {
+            let value = self.attr(&entries, key, range);
+            let value = if key.starts_with("on_") {
+                value
+            } else {
+                value.map(|value| self.thunk(value, range))
+            };
+            let value = match (required, value) {
+                (true, Some(value)) => value,
+                (true, None) => self.missing(range),
+                (false, value) => self.optional(value, range),
+            };
+            fields.push((Name::new_static(key), value));
+        }
+        if let Some(field) = element_field {
+            let value = match spec.elements {
+                UiElements::One => elements
+                    .first()
+                    .copied()
+                    .unwrap_or_else(|| self.missing(range)),
+                UiElements::Many | UiElements::None => {
+                    self.alloc(Expr::Array(ArrayExpr::List(elements)), range)
+                }
+            };
+            fields.push((Name::new_static(field), value));
+        }
+        let props = self.alloc(
+            Expr::Record {
+                path: Path::lang(props),
+                fields,
+            },
+            range,
+        );
+        self.lang_call(target.function, vec![props], range)
     }
 
     fn lower_say(&mut self, form: &ast::FormExpr, range: TextRange) -> ExprId {

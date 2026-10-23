@@ -7,9 +7,6 @@
 pub mod style;
 ```
 
-*Status:* the UI forms are designed here; their lowering is not implemented yet, and the compiler
-reports each UI form with `lower/ui-form-not-implemented`.
-
 ## Elements
 
 ```kis
@@ -208,13 +205,14 @@ elements.
 
 ### UI form desugaring
 
-The lowering is not implemented yet; this table is the contract for it. Rules:
+Rules:
 
 - **Reactive attributes** become `key: Some(|| expr)`, or `key: || expr` when the attribute is
   required.
 - **Handler attributes** (`on_*`) become `key: Some(expr)`.
-- **Absent optional attributes** become `None`. A missing required attribute, or an unknown
-  attribute, is a lowering error.
+- **Absent optional attributes** become `None`. A missing required attribute, an unknown
+  attribute, or the wrong number of elements (`text!` and `image!` take exactly one,
+  `game_screen!` and `slider!` none) is a syntax error.
 - **Elements.** Each element `e` becomes `|| e`. Inside `column!`, `row!`, `button!` and
   `toggle!`, an element that is syntactically `t![…]` becomes `|| ui::label(t![…])`.
 

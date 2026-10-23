@@ -983,14 +983,8 @@ impl Collector<'_> {
                 let TypeRef::Path(trait_path) = signature.store.type_ref(trait_ref) else {
                     return None;
                 };
-                match resolve_module_path(
-                    &self.maps,
-                    self.db,
-                    module,
-                    trait_path,
-                    Namespace::Types,
-                )
-                .resolved
+                match resolve_module_path(&self.maps, self.db, module, trait_path, Namespace::Types)
+                    .resolved
                 {
                     Some(Resolution::Def(Def::Item(item))) => Some(item),
                     _ => None,

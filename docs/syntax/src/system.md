@@ -152,7 +152,7 @@ UI forms come from `std::ui`: layout (`column![…]`, `row![…]`, `layer![…]`
 `toggle!{…}`, `select!{…}`). Each form desugars to a call of a `std::ui` function with a props
 struct: reactive attributes become closures, handlers stay as they are, and each element becomes a
 closure. The full desugaring table, layout, interaction looks and focus rules are in the standard
-library book, chapter *UI*. The lowering of UI forms is not implemented yet.
+library book, chapter *UI*.
 
 ## Modes
 

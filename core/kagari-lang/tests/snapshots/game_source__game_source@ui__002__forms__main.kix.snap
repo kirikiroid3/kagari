@@ -1,0 +1,46 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/ui/002__forms/main.kix
+---
+ui/002__forms/main.kix:19:40: error[resolve/unresolved-name]: cannot find `bakc` in `nav`
+ui/002__forms/main.kix:29:16: error[resolve/unresolved-name]: cannot find value `menu_bakground` in this scope
+--- resolutions ---
+ui/002__forms/main.kix:10:9 game -> local game@10:9
+ui/002__forms/main.kix:10:15 Narrative -> struct std::narrative::Narrative
+ui/002__forms/main.kix:10:29 Element -> struct std::ui::Element
+ui/002__forms/main.kix:11:10 level -> local level@11:10
+ui/002__forms/main.kix:11:17 set_level -> local set_level@11:17
+ui/002__forms/main.kix:11:30 signal -> fn std::ui::signal
+ui/002__forms/main.kix:12:10 speed -> local speed@12:10
+ui/002__forms/main.kix:12:17 set_speed -> local set_speed@12:17
+ui/002__forms/main.kix:12:30 signal -> fn std::ui::signal
+ui/002__forms/main.kix:12:37 Speed::Slow -> variant crate::Speed::Slow
+ui/002__forms/main.kix:13:10 muted -> local muted@13:10
+ui/002__forms/main.kix:13:17 set_muted -> local set_muted@13:17
+ui/002__forms/main.kix:13:30 signal -> fn std::ui::signal
+ui/002__forms/main.kix:16:23 text_style -> fn std::narrative::text::text_style
+ui/002__forms/main.kix:16:38 WHITE -> const std::screen::WHITE
+ui/002__forms/main.kix:16:59 level -> local level@11:10
+ui/002__forms/main.kix:17:29 game -> local game@10:9
+ui/002__forms/main.kix:19:35 nav::bakc -> unresolved
+ui/002__forms/main.kix:19:59 muted -> local muted@13:10
+ui/002__forms/main.kix:20:29 muted -> local muted@13:10
+ui/002__forms/main.kix:20:51 on -> local on@20:51
+ui/002__forms/main.kix:20:55 set_muted -> local set_muted@13:17
+ui/002__forms/main.kix:20:65 on -> local on@20:51
+ui/002__forms/main.kix:22:25 level -> local level@11:10
+ui/002__forms/main.kix:22:47 v -> local v@22:47
+ui/002__forms/main.kix:22:50 set_level -> local set_level@11:17
+ui/002__forms/main.kix:22:60 v -> local v@22:47
+ui/002__forms/main.kix:24:21 speed -> local speed@12:10
+ui/002__forms/main.kix:25:26 s -> local s@25:26
+ui/002__forms/main.kix:25:29 set_speed -> local set_speed@12:17
+ui/002__forms/main.kix:25:39 s -> local s@25:26
+ui/002__forms/main.kix:26:13 option -> fn std::ui::option
+ui/002__forms/main.kix:26:20 Speed::Slow -> variant crate::Speed::Slow
+ui/002__forms/main.kix:26:33 ui::label -> fn std::ui::label
+ui/002__forms/main.kix:27:13 option -> fn std::ui::option
+ui/002__forms/main.kix:27:20 Speed::Fast -> variant crate::Speed::Fast
+ui/002__forms/main.kix:27:33 ui::label -> fn std::ui::label
+ui/002__forms/main.kix:29:16 menu_bakground -> unresolved

@@ -7,21 +7,11 @@ use crate::ast::{self, FormDelimiter, FormEntry, HasName, unescape_string};
 use crate::cst::{SyntaxKind, SyntaxNode};
 use crate::{SourceKind, SyntaxError};
 
-/// The known forms and their delimiters.
+/// The non-UI forms and their delimiters; UI forms come from `ast::UI_FORMS`.
 const FORMS: &[(&str, FormDelimiter)] = &[
     ("s", FormDelimiter::Paren),
     ("choice", FormDelimiter::Brace),
     ("t", FormDelimiter::Bracket),
-    ("column", FormDelimiter::Bracket),
-    ("row", FormDelimiter::Bracket),
-    ("layer", FormDelimiter::Bracket),
-    ("text", FormDelimiter::Paren),
-    ("image", FormDelimiter::Paren),
-    ("game_screen", FormDelimiter::Paren),
-    ("button", FormDelimiter::Brace),
-    ("slider", FormDelimiter::Brace),
-    ("toggle", FormDelimiter::Brace),
-    ("select", FormDelimiter::Brace),
 ];
 
 fn is_form(kind: SyntaxKind) -> bool {
@@ -74,7 +64,12 @@ fn validate_form(node: &SyntaxNode, kind: SourceKind, errors: &mut Vec<SyntaxErr
     };
     let name = name_ref.text();
     let name_range = name_ref.syntax().text_range();
-    let Some(&(_, expected)) = FORMS.iter().find(|(known, _)| *known == name) else {
+    let expected = FORMS
+        .iter()
+        .find(|(known, _)| *known == name)
+        .map(|&(_, delimiter)| delimiter)
+        .or_else(|| ast::ui_form_named(&name).map(|form| form.delimiter));
+    let Some(expected) = expected else {
         errors.push(SyntaxError::new(
             format!("unknown form `{name}!`"),
             name_range,
@@ -194,7 +189,54 @@ fn validate_form(node: &SyntaxNode, kind: SourceKind, errors: &mut Vec<SyntaxErr
                 }
             }
         }
-        _ => {}
+        _ => {
+            if let Some(form) = ast::ui_form_named(&name) {
+                validate_ui_form(form, name_range, &keys, &elements, errors);
+            }
+        }
+    }
+}
+
+fn validate_ui_form(
+    form: &ast::UiForm,
+    name_range: TextRange,
+    keys: &[(String, TextRange, Option<ast::Expr>)],
+    elements: &[FormEntry],
+    errors: &mut Vec<SyntaxError>,
+) {
+    let name = form.name;
+    let allowed: Vec<&str> = form.attrs.iter().map(|&(key, _)| key).collect();
+    check_keys(name, keys, &allowed, errors);
+    for &(key, required) in form.attrs {
+        if required && !keys.iter().any(|(k, _, _)| k == key) {
+            errors.push(SyntaxError::new(
+                format!("`{name}!` requires a `{key}` attribute"),
+                name_range,
+            ));
+        }
+    }
+    // Arms are already reported.
+    let mut exprs = elements
+        .iter()
+        .filter(|element| matches!(element, FormEntry::Expr(_)));
+    let message = match form.elements {
+        ast::UiElements::None => "takes no elements",
+        ast::UiElements::One => {
+            if exprs.next().is_none() {
+                errors.push(SyntaxError::new(
+                    format!("`{name}!` takes exactly one element"),
+                    name_range,
+                ));
+            }
+            "takes exactly one element"
+        }
+        ast::UiElements::Many => return,
+    };
+    for element in exprs {
+        errors.push(SyntaxError::new(
+            format!("`{name}!` {message}"),
+            element.syntax().text_range(),
+        ));
     }
 }
 

@@ -32,4 +32,14 @@ pushdown fn Errors() {
     s!(t!["a", "b"]);
     // not a text item
     s!(t!["a" x]);
+    // UI forms without a required attribute
+    let g = game_screen!();
+    let s = slider!{};
+    // unknown attribute of a UI form
+    let b = button!{color = 1, t!["x"]};
+    // `text!` with no element, and with two
+    let t0 = text!();
+    let t2 = text!(t!["a"], t!["b"]);
+    // element of a UI form that takes none
+    let s2 = slider!{value = 1, t!["x"]};
 }

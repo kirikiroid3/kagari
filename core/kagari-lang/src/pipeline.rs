@@ -3,7 +3,6 @@
 use crate::db::Db;
 use crate::def_map::def_maps;
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
-use crate::hir::file_hir;
 use crate::input::Program;
 use crate::item_tree::item_tree;
 use crate::parse_query::parse;
@@ -27,13 +26,14 @@ pub fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
                 )
             }));
         }
-        let local = item_tree(db, file)
-            .diagnostics
-            .iter()
-            .chain(&file_hir(db, file).diagnostics);
-        diags.extend(local.map(|(range, code, message)| {
-            Diagnostic::new(path.clone(), *range, *code, message.clone())
-        }));
+        diags.extend(
+            item_tree(db, file)
+                .diagnostics
+                .iter()
+                .map(|(range, code, message)| {
+                    Diagnostic::new(path.clone(), *range, *code, message.clone())
+                }),
+        );
         diags.extend(
             file_resolution(db, program, file)
                 .diagnostics

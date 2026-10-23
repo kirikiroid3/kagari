@@ -3,7 +3,7 @@ source: core/kagari-syntax/tests/snapshots.rs
 expression: "render(&input, &parse(&input, source_kind(path)))"
 input_file: core/kagari-syntax/tests/parse/kix_003__forms.kix
 ---
-SOURCE_FILE@0..1266
+SOURCE_FILE@0..1223
   ENUM@0..24
     ENUM_KW@0..4 "enum"
     WHITESPACE@4..5 " "
@@ -565,7 +565,7 @@ SOURCE_FILE@0..1266
       WHITESPACE@886..887 "\n"
       R_CURLY@887..888 "}"
   WHITESPACE@888..890 "\n\n"
-  FN@890..1265
+  FN@890..1222
     FN_KW@890..892 "fn"
     WHITESPACE@892..893 " "
     NAME@893..899
@@ -583,7 +583,7 @@ SOURCE_FILE@0..1266
             NAME_REF@905..912
               IDENT@905..912 "Overlay"
     WHITESPACE@912..913 " "
-    BLOCK_EXPR@913..1265
+    BLOCK_EXPR@913..1222
       L_CURLY@913..914 "{"
       WHITESPACE@914..919 "\n    "
       LET_STMT@919..969
@@ -626,15 +626,15 @@ SOURCE_FILE@0..1266
             R_PAREN@967..968 ")"
         SEMICOLON@968..969 ";"
       WHITESPACE@969..974 "\n    "
-      CALL_EXPR@974..1263
+      CALL_EXPR@974..1220
         PATH_EXPR@974..981
           PATH@974..981
             PATH_SEGMENT@974..981
               NAME_REF@974..981
                 IDENT@974..981 "Overlay"
-        ARG_LIST@981..1263
+        ARG_LIST@981..1220
           L_PAREN@981..982 "("
-          FORM_EXPR@982..1262
+          FORM_EXPR@982..1219
             NAME_REF@982..988
               IDENT@982..988 "column"
             BANG@988..989 "!"
@@ -669,153 +669,133 @@ SOURCE_FILE@0..1266
               R_PAREN@1033..1034 ")"
             COMMA@1034..1035 ","
             WHITESPACE@1035..1044 "\n        "
-            FORM_EXPR@1044..1199
+            FORM_EXPR@1044..1156
               NAME_REF@1044..1050
                 IDENT@1044..1050 "slider"
               BANG@1050..1051 "!"
               L_CURLY@1051..1052 "{"
               WHITESPACE@1052..1065 "\n            "
-              FORM_ATTR@1065..1072
-                NAME@1065..1068
-                  IDENT@1065..1068 "min"
-                WHITESPACE@1068..1069 " "
-                EQ@1069..1070 "="
+              FORM_ATTR@1065..1080
+                NAME@1065..1070
+                  IDENT@1065..1070 "value"
                 WHITESPACE@1070..1071 " "
-                LITERAL@1071..1072
-                  INT_NUMBER@1071..1072 "0"
-              COMMA@1072..1073 ","
-              WHITESPACE@1073..1086 "\n            "
-              FORM_ATTR@1086..1094
-                NAME@1086..1089
-                  IDENT@1086..1089 "max"
-                WHITESPACE@1089..1090 " "
-                EQ@1090..1091 "="
-                WHITESPACE@1091..1092 " "
-                LITERAL@1092..1094
-                  INT_NUMBER@1092..1094 "10"
-              COMMA@1094..1095 ","
-              WHITESPACE@1095..1108 "\n            "
-              FORM_ATTR@1108..1123
-                NAME@1108..1113
-                  IDENT@1108..1113 "value"
-                WHITESPACE@1113..1114 " "
-                EQ@1114..1115 "="
-                WHITESPACE@1115..1116 " "
-                CALL_EXPR@1116..1123
-                  PATH_EXPR@1116..1121
-                    PATH@1116..1121
-                      PATH_SEGMENT@1116..1121
-                        NAME_REF@1116..1121
-                          IDENT@1116..1121 "speed"
-                  ARG_LIST@1121..1123
-                    L_PAREN@1121..1122 "("
-                    R_PAREN@1122..1123 ")"
-              COMMA@1123..1124 ","
-              WHITESPACE@1124..1137 "\n            "
-              FORM_ATTR@1137..1188
-                NAME@1137..1146
-                  IDENT@1137..1146 "on_change"
-                WHITESPACE@1146..1147 " "
-                EQ@1147..1148 "="
-                WHITESPACE@1148..1149 " "
-                CLOSURE_EXPR@1149..1188
-                  PARAM_LIST@1149..1152
-                    PIPE@1149..1150 "|"
-                    PARAM@1150..1151
-                      IDENT_PAT@1150..1151
-                        NAME@1150..1151
-                          IDENT@1150..1151 "v"
-                    PIPE@1151..1152 "|"
-                  WHITESPACE@1152..1153 " "
-                  BLOCK_EXPR@1153..1188
-                    L_CURLY@1153..1154 "{"
-                    WHITESPACE@1154..1155 " "
-                    EXPR_STMT@1155..1168
-                      CALL_EXPR@1155..1167
-                        PATH_EXPR@1155..1164
-                          PATH@1155..1164
-                            PATH_SEGMENT@1155..1164
-                              NAME_REF@1155..1164
-                                IDENT@1155..1164 "set_speed"
-                        ARG_LIST@1164..1167
-                          L_PAREN@1164..1165 "("
-                          PATH_EXPR@1165..1166
-                            PATH@1165..1166
-                              PATH_SEGMENT@1165..1166
-                                NAME_REF@1165..1166
-                                  IDENT@1165..1166 "v"
-                          R_PAREN@1166..1167 ")"
-                      SEMICOLON@1167..1168 ";"
-                    WHITESPACE@1168..1169 " "
-                    METHOD_CALL_EXPR@1169..1186
-                      PATH_EXPR@1169..1179
-                        PATH@1169..1179
-                          PATH_SEGMENT@1169..1179
-                            NAME_REF@1169..1179
-                              IDENT@1169..1179 "TEXT_SPEED"
-                      DOT@1179..1180 "."
-                      NAME_REF@1180..1183
-                        IDENT@1180..1183 "set"
-                      ARG_LIST@1183..1186
-                        L_PAREN@1183..1184 "("
-                        PATH_EXPR@1184..1185
-                          PATH@1184..1185
-                            PATH_SEGMENT@1184..1185
-                              NAME_REF@1184..1185
-                                IDENT@1184..1185 "v"
-                        R_PAREN@1185..1186 ")"
-                    WHITESPACE@1186..1187 " "
-                    R_CURLY@1187..1188 "}"
-              COMMA@1188..1189 ","
-              WHITESPACE@1189..1198 "\n        "
-              R_CURLY@1198..1199 "}"
-            COMMA@1199..1200 ","
-            WHITESPACE@1200..1209 "\n        "
-            FORM_EXPR@1209..1255
-              NAME_REF@1209..1215
-                IDENT@1209..1215 "button"
-              BANG@1215..1216 "!"
-              L_CURLY@1216..1217 "{"
-              FORM_ATTR@1217..1242
-                NAME@1217..1225
-                  IDENT@1217..1225 "on_click"
-                WHITESPACE@1225..1226 " "
-                EQ@1226..1227 "="
-                WHITESPACE@1227..1228 " "
-                CLOSURE_EXPR@1228..1242
-                  PARAM_LIST@1228..1230
-                    PIPE@1228..1229 "|"
-                    PIPE@1229..1230 "|"
-                  WHITESPACE@1230..1231 " "
-                  CALL_EXPR@1231..1242
-                    PATH_EXPR@1231..1240
-                      PATH@1231..1240
-                        PATH@1231..1234
-                          PATH_SEGMENT@1231..1234
-                            NAME_REF@1231..1234
-                              IDENT@1231..1234 "nav"
-                        COLON2@1234..1236 "::"
-                        PATH_SEGMENT@1236..1240
-                          NAME_REF@1236..1240
-                            IDENT@1236..1240 "back"
-                    ARG_LIST@1240..1242
-                      L_PAREN@1240..1241 "("
-                      R_PAREN@1241..1242 ")"
-              COMMA@1242..1243 ","
-              WHITESPACE@1243..1244 " "
-              TEXT_FORM@1244..1254
-                NAME_REF@1244..1245
-                  IDENT@1244..1245 "t"
-                BANG@1245..1246 "!"
-                L_BRACK@1246..1247 "["
-                TEXT_STRING@1247..1253
-                  STRING@1247..1253 "\"Back\""
-                R_BRACK@1253..1254 "]"
-              R_CURLY@1254..1255 "}"
-            COMMA@1255..1256 ","
-            WHITESPACE@1256..1261 "\n    "
-            R_BRACK@1261..1262 "]"
-          R_PAREN@1262..1263 ")"
-      WHITESPACE@1263..1264 "\n"
-      R_CURLY@1264..1265 "}"
-  WHITESPACE@1265..1266 "\n"
+                EQ@1071..1072 "="
+                WHITESPACE@1072..1073 " "
+                CALL_EXPR@1073..1080
+                  PATH_EXPR@1073..1078
+                    PATH@1073..1078
+                      PATH_SEGMENT@1073..1078
+                        NAME_REF@1073..1078
+                          IDENT@1073..1078 "speed"
+                  ARG_LIST@1078..1080
+                    L_PAREN@1078..1079 "("
+                    R_PAREN@1079..1080 ")"
+              COMMA@1080..1081 ","
+              WHITESPACE@1081..1094 "\n            "
+              FORM_ATTR@1094..1145
+                NAME@1094..1103
+                  IDENT@1094..1103 "on_change"
+                WHITESPACE@1103..1104 " "
+                EQ@1104..1105 "="
+                WHITESPACE@1105..1106 " "
+                CLOSURE_EXPR@1106..1145
+                  PARAM_LIST@1106..1109
+                    PIPE@1106..1107 "|"
+                    PARAM@1107..1108
+                      IDENT_PAT@1107..1108
+                        NAME@1107..1108
+                          IDENT@1107..1108 "v"
+                    PIPE@1108..1109 "|"
+                  WHITESPACE@1109..1110 " "
+                  BLOCK_EXPR@1110..1145
+                    L_CURLY@1110..1111 "{"
+                    WHITESPACE@1111..1112 " "
+                    EXPR_STMT@1112..1125
+                      CALL_EXPR@1112..1124
+                        PATH_EXPR@1112..1121
+                          PATH@1112..1121
+                            PATH_SEGMENT@1112..1121
+                              NAME_REF@1112..1121
+                                IDENT@1112..1121 "set_speed"
+                        ARG_LIST@1121..1124
+                          L_PAREN@1121..1122 "("
+                          PATH_EXPR@1122..1123
+                            PATH@1122..1123
+                              PATH_SEGMENT@1122..1123
+                                NAME_REF@1122..1123
+                                  IDENT@1122..1123 "v"
+                          R_PAREN@1123..1124 ")"
+                      SEMICOLON@1124..1125 ";"
+                    WHITESPACE@1125..1126 " "
+                    METHOD_CALL_EXPR@1126..1143
+                      PATH_EXPR@1126..1136
+                        PATH@1126..1136
+                          PATH_SEGMENT@1126..1136
+                            NAME_REF@1126..1136
+                              IDENT@1126..1136 "TEXT_SPEED"
+                      DOT@1136..1137 "."
+                      NAME_REF@1137..1140
+                        IDENT@1137..1140 "set"
+                      ARG_LIST@1140..1143
+                        L_PAREN@1140..1141 "("
+                        PATH_EXPR@1141..1142
+                          PATH@1141..1142
+                            PATH_SEGMENT@1141..1142
+                              NAME_REF@1141..1142
+                                IDENT@1141..1142 "v"
+                        R_PAREN@1142..1143 ")"
+                    WHITESPACE@1143..1144 " "
+                    R_CURLY@1144..1145 "}"
+              COMMA@1145..1146 ","
+              WHITESPACE@1146..1155 "\n        "
+              R_CURLY@1155..1156 "}"
+            COMMA@1156..1157 ","
+            WHITESPACE@1157..1166 "\n        "
+            FORM_EXPR@1166..1212
+              NAME_REF@1166..1172
+                IDENT@1166..1172 "button"
+              BANG@1172..1173 "!"
+              L_CURLY@1173..1174 "{"
+              FORM_ATTR@1174..1199
+                NAME@1174..1182
+                  IDENT@1174..1182 "on_click"
+                WHITESPACE@1182..1183 " "
+                EQ@1183..1184 "="
+                WHITESPACE@1184..1185 " "
+                CLOSURE_EXPR@1185..1199
+                  PARAM_LIST@1185..1187
+                    PIPE@1185..1186 "|"
+                    PIPE@1186..1187 "|"
+                  WHITESPACE@1187..1188 " "
+                  CALL_EXPR@1188..1199
+                    PATH_EXPR@1188..1197
+                      PATH@1188..1197
+                        PATH@1188..1191
+                          PATH_SEGMENT@1188..1191
+                            NAME_REF@1188..1191
+                              IDENT@1188..1191 "nav"
+                        COLON2@1191..1193 "::"
+                        PATH_SEGMENT@1193..1197
+                          NAME_REF@1193..1197
+                            IDENT@1193..1197 "back"
+                    ARG_LIST@1197..1199
+                      L_PAREN@1197..1198 "("
+                      R_PAREN@1198..1199 ")"
+              COMMA@1199..1200 ","
+              WHITESPACE@1200..1201 " "
+              TEXT_FORM@1201..1211
+                NAME_REF@1201..1202
+                  IDENT@1201..1202 "t"
+                BANG@1202..1203 "!"
+                L_BRACK@1203..1204 "["
+                TEXT_STRING@1204..1210
+                  STRING@1204..1210 "\"Back\""
+                R_BRACK@1210..1211 "]"
+              R_CURLY@1211..1212 "}"
+            COMMA@1212..1213 ","
+            WHITESPACE@1213..1218 "\n    "
+            R_BRACK@1218..1219 "]"
+          R_PAREN@1219..1220 ")"
+      WHITESPACE@1220..1221 "\n"
+      R_CURLY@1221..1222 "}"
+  WHITESPACE@1222..1223 "\n"

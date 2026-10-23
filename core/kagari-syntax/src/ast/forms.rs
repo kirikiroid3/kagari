@@ -98,6 +98,105 @@ impl FormDelimiter {
     }
 }
 
+/// How many elements a UI form takes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UiElements {
+    None,
+    One,
+    Many,
+}
+
+/// The syntax of a UI form, shared by validation and lowering.
+#[derive(Clone, Copy, Debug)]
+pub struct UiForm {
+    pub name: &'static str,
+    pub delimiter: FormDelimiter,
+    /// `(key, required)`, in the order of the props struct's fields. `on_*` keys are handlers.
+    pub attrs: &'static [(&'static str, bool)],
+    pub elements: UiElements,
+}
+
+/// The UI forms of `std::ui`.
+pub const UI_FORMS: &[UiForm] = &[
+    ui_form("column", FormDelimiter::Bracket, &[], UiElements::Many),
+    ui_form("row", FormDelimiter::Bracket, &[], UiElements::Many),
+    ui_form("layer", FormDelimiter::Bracket, &[], UiElements::Many),
+    ui_form(
+        "text",
+        FormDelimiter::Paren,
+        &[("style", false)],
+        UiElements::One,
+    ),
+    ui_form(
+        "image",
+        FormDelimiter::Paren,
+        &[("fit", false)],
+        UiElements::One,
+    ),
+    ui_form(
+        "game_screen",
+        FormDelimiter::Paren,
+        &[("game", true)],
+        UiElements::None,
+    ),
+    ui_form(
+        "button",
+        FormDelimiter::Brace,
+        &[("on_click", false), ("disabled", false), ("style", false)],
+        UiElements::Many,
+    ),
+    ui_form(
+        "slider",
+        FormDelimiter::Brace,
+        &[
+            ("value", true),
+            ("on_change", false),
+            ("step", false),
+            ("disabled", false),
+            ("style", false),
+        ],
+        UiElements::None,
+    ),
+    ui_form(
+        "toggle",
+        FormDelimiter::Brace,
+        VALUE_ATTRS,
+        UiElements::Many,
+    ),
+    ui_form(
+        "select",
+        FormDelimiter::Brace,
+        VALUE_ATTRS,
+        UiElements::Many,
+    ),
+];
+
+const VALUE_ATTRS: &[(&str, bool)] = &[
+    ("value", true),
+    ("on_change", false),
+    ("disabled", false),
+    ("style", false),
+];
+
+const fn ui_form(
+    name: &'static str,
+    delimiter: FormDelimiter,
+    attrs: &'static [(&'static str, bool)],
+    elements: UiElements,
+) -> UiForm {
+    UiForm {
+        name,
+        delimiter,
+        attrs,
+        elements,
+    }
+}
+
+/// The UI form called `name`.
+pub fn ui_form_named(name: &str) -> Option<&'static UiForm> {
+    UI_FORMS.iter().find(|form| form.name == name)
+}
+
 /// The delimiter right after the `!` of a form node.
 fn form_delimiter(node: &SyntaxNode) -> Option<FormDelimiter> {
     node.children_with_tokens()

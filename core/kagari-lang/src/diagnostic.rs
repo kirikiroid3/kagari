@@ -140,8 +140,6 @@ codes! {
     ItemTraitOutsideStd = "item/trait-outside-std";
     ItemTraitNotBuiltin = "item/trait-not-builtin";
 
-    LowerUiForm = "lower/ui-form-not-implemented";
-
     ResolveDuplicate = "resolve/duplicate-definition";
     ResolveUnresolvedImport = "resolve/unresolved-import";
     ResolveUnresolvedName = "resolve/unresolved-name";

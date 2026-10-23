@@ -3,8 +3,8 @@ source: core/kagari-syntax/tests/snapshots.rs
 expression: "render(&input, &parse(&input, source_kind(path)))"
 input_file: core/kagari-syntax/tests/parse/kix_004__form_errors.kix
 ---
-SOURCE_FILE@0..1030
-  FN@0..1029
+SOURCE_FILE@0..1396
+  FN@0..1395
     ATTR@0..8
       POUND@0..1 "#"
       L_BRACK@1..2 "["
@@ -24,7 +24,7 @@ SOURCE_FILE@0..1030
       L_PAREN@27..28 "("
       R_PAREN@28..29 ")"
     WHITESPACE@29..30 " "
-    BLOCK_EXPR@30..1029
+    BLOCK_EXPR@30..1395
       L_CURLY@30..31 "{"
       WHITESPACE@31..36 "\n    "
       LINE_COMMENT@36..51 "// unknown form"
@@ -496,9 +496,173 @@ SOURCE_FILE@0..1030
             R_BRACK@1024..1025 "]"
           R_PAREN@1025..1026 ")"
         SEMICOLON@1026..1027 ";"
-      WHITESPACE@1027..1028 "\n"
-      R_CURLY@1028..1029 "}"
-  WHITESPACE@1029..1030 "\n"
+      WHITESPACE@1027..1032 "\n    "
+      LINE_COMMENT@1032..1072 "// UI forms without a ..."
+      WHITESPACE@1072..1077 "\n    "
+      LET_STMT@1077..1100
+        LET_KW@1077..1080 "let"
+        WHITESPACE@1080..1081 " "
+        IDENT_PAT@1081..1082
+          NAME@1081..1082
+            IDENT@1081..1082 "g"
+        WHITESPACE@1082..1083 " "
+        EQ@1083..1084 "="
+        WHITESPACE@1084..1085 " "
+        FORM_EXPR@1085..1099
+          NAME_REF@1085..1096
+            IDENT@1085..1096 "game_screen"
+          BANG@1096..1097 "!"
+          L_PAREN@1097..1098 "("
+          R_PAREN@1098..1099 ")"
+        SEMICOLON@1099..1100 ";"
+      WHITESPACE@1100..1105 "\n    "
+      LET_STMT@1105..1123
+        LET_KW@1105..1108 "let"
+        WHITESPACE@1108..1109 " "
+        IDENT_PAT@1109..1110
+          NAME@1109..1110
+            IDENT@1109..1110 "s"
+        WHITESPACE@1110..1111 " "
+        EQ@1111..1112 "="
+        WHITESPACE@1112..1113 " "
+        FORM_EXPR@1113..1122
+          NAME_REF@1113..1119
+            IDENT@1113..1119 "slider"
+          BANG@1119..1120 "!"
+          L_CURLY@1120..1121 "{"
+          R_CURLY@1121..1122 "}"
+        SEMICOLON@1122..1123 ";"
+      WHITESPACE@1123..1128 "\n    "
+      LINE_COMMENT@1128..1161 "// unknown attribute  ..."
+      WHITESPACE@1161..1166 "\n    "
+      LET_STMT@1166..1202
+        LET_KW@1166..1169 "let"
+        WHITESPACE@1169..1170 " "
+        IDENT_PAT@1170..1171
+          NAME@1170..1171
+            IDENT@1170..1171 "b"
+        WHITESPACE@1171..1172 " "
+        EQ@1172..1173 "="
+        WHITESPACE@1173..1174 " "
+        FORM_EXPR@1174..1201
+          NAME_REF@1174..1180
+            IDENT@1174..1180 "button"
+          BANG@1180..1181 "!"
+          L_CURLY@1181..1182 "{"
+          FORM_ATTR@1182..1191
+            NAME@1182..1187
+              IDENT@1182..1187 "color"
+            WHITESPACE@1187..1188 " "
+            EQ@1188..1189 "="
+            WHITESPACE@1189..1190 " "
+            LITERAL@1190..1191
+              INT_NUMBER@1190..1191 "1"
+          COMMA@1191..1192 ","
+          WHITESPACE@1192..1193 " "
+          TEXT_FORM@1193..1200
+            NAME_REF@1193..1194
+              IDENT@1193..1194 "t"
+            BANG@1194..1195 "!"
+            L_BRACK@1195..1196 "["
+            TEXT_STRING@1196..1199
+              STRING@1196..1199 "\"x\""
+            R_BRACK@1199..1200 "]"
+          R_CURLY@1200..1201 "}"
+        SEMICOLON@1201..1202 ";"
+      WHITESPACE@1202..1207 "\n    "
+      LINE_COMMENT@1207..1247 "// `text!` with no el ..."
+      WHITESPACE@1247..1252 "\n    "
+      LET_STMT@1252..1269
+        LET_KW@1252..1255 "let"
+        WHITESPACE@1255..1256 " "
+        IDENT_PAT@1256..1258
+          NAME@1256..1258
+            IDENT@1256..1258 "t0"
+        WHITESPACE@1258..1259 " "
+        EQ@1259..1260 "="
+        WHITESPACE@1260..1261 " "
+        FORM_EXPR@1261..1268
+          NAME_REF@1261..1265
+            IDENT@1261..1265 "text"
+          BANG@1265..1266 "!"
+          L_PAREN@1266..1267 "("
+          R_PAREN@1267..1268 ")"
+        SEMICOLON@1268..1269 ";"
+      WHITESPACE@1269..1274 "\n    "
+      LET_STMT@1274..1307
+        LET_KW@1274..1277 "let"
+        WHITESPACE@1277..1278 " "
+        IDENT_PAT@1278..1280
+          NAME@1278..1280
+            IDENT@1278..1280 "t2"
+        WHITESPACE@1280..1281 " "
+        EQ@1281..1282 "="
+        WHITESPACE@1282..1283 " "
+        FORM_EXPR@1283..1306
+          NAME_REF@1283..1287
+            IDENT@1283..1287 "text"
+          BANG@1287..1288 "!"
+          L_PAREN@1288..1289 "("
+          TEXT_FORM@1289..1296
+            NAME_REF@1289..1290
+              IDENT@1289..1290 "t"
+            BANG@1290..1291 "!"
+            L_BRACK@1291..1292 "["
+            TEXT_STRING@1292..1295
+              STRING@1292..1295 "\"a\""
+            R_BRACK@1295..1296 "]"
+          COMMA@1296..1297 ","
+          WHITESPACE@1297..1298 " "
+          TEXT_FORM@1298..1305
+            NAME_REF@1298..1299
+              IDENT@1298..1299 "t"
+            BANG@1299..1300 "!"
+            L_BRACK@1300..1301 "["
+            TEXT_STRING@1301..1304
+              STRING@1301..1304 "\"b\""
+            R_BRACK@1304..1305 "]"
+          R_PAREN@1305..1306 ")"
+        SEMICOLON@1306..1307 ";"
+      WHITESPACE@1307..1312 "\n    "
+      LINE_COMMENT@1312..1351 "// element of a UI fo ..."
+      WHITESPACE@1351..1356 "\n    "
+      LET_STMT@1356..1393
+        LET_KW@1356..1359 "let"
+        WHITESPACE@1359..1360 " "
+        IDENT_PAT@1360..1362
+          NAME@1360..1362
+            IDENT@1360..1362 "s2"
+        WHITESPACE@1362..1363 " "
+        EQ@1363..1364 "="
+        WHITESPACE@1364..1365 " "
+        FORM_EXPR@1365..1392
+          NAME_REF@1365..1371
+            IDENT@1365..1371 "slider"
+          BANG@1371..1372 "!"
+          L_CURLY@1372..1373 "{"
+          FORM_ATTR@1373..1382
+            NAME@1373..1378
+              IDENT@1373..1378 "value"
+            WHITESPACE@1378..1379 " "
+            EQ@1379..1380 "="
+            WHITESPACE@1380..1381 " "
+            LITERAL@1381..1382
+              INT_NUMBER@1381..1382 "1"
+          COMMA@1382..1383 ","
+          WHITESPACE@1383..1384 " "
+          TEXT_FORM@1384..1391
+            NAME_REF@1384..1385
+              IDENT@1384..1385 "t"
+            BANG@1385..1386 "!"
+            L_BRACK@1386..1387 "["
+            TEXT_STRING@1387..1390
+              STRING@1387..1390 "\"x\""
+            R_BRACK@1390..1391 "]"
+          R_CURLY@1391..1392 "}"
+        SEMICOLON@1392..1393 ";"
+      WHITESPACE@1393..1394 "\n"
+      R_CURLY@1394..1395 "}"
+  WHITESPACE@1395..1396 "\n"
 error 56..59: unknown form `foo!`
 error 92..103: `s!` is written `s!(…)`
 error 160..167: `column![…]` takes no attributes
@@ -515,3 +679,9 @@ error 832..839: a `choice!` element must be an arm `t![…] => Variant`
 error 916..927: a `choice!` element must be an arm `t![…] => Variant`
 error 977..978: items of `t![…]` are juxtaposed, not separated by commas
 error 1023..1024: expected text, ruby `[…](…)`, an effect `![…](…)` or `{…}`
+error 1085..1096: `game_screen!` requires a `game` attribute
+error 1113..1119: `slider!` requires a `value` attribute
+error 1182..1187: unknown attribute `color` for `button!`
+error 1261..1265: `text!` takes exactly one element
+error 1298..1305: `text!` takes exactly one element
+error 1384..1391: `slider!` takes no elements

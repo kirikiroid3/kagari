@@ -11,7 +11,6 @@ use super::{
 };
 use super::{Expr, ExprId};
 use crate::db::Db;
-use crate::diagnostic::DiagnosticCode;
 use crate::input::SourceFile;
 use crate::item_tree::{ItemId, ItemTree, item_tree, name_text};
 use crate::parse_query::parse;
@@ -21,7 +20,6 @@ use crate::parse_query::parse;
 pub struct FileHir {
     pub signatures: Vec<Option<Signature>>,
     pub bodies: Vec<Option<Body>>,
-    pub diagnostics: Vec<(TextRange, DiagnosticCode, String)>,
 }
 
 #[salsa::tracked(returns(ref))]
@@ -35,27 +33,20 @@ pub fn file_hir(db: &dyn Db, file: SourceFile) -> FileHir {
             file,
             tree,
             store: ExprStore::default(),
-            diagnostics: &mut out.diagnostics,
         };
         let signature = lowerer.lower_signature(&node);
-        let body = lower_body(file, tree, &node, &mut out.diagnostics);
+        let body = lower_body(file, tree, &node);
         out.signatures.push(signature);
         out.bodies.push(body);
     }
     out
 }
 
-fn lower_body(
-    file: SourceFile,
-    tree: &ItemTree,
-    node: &SyntaxNode,
-    diagnostics: &mut Vec<(TextRange, DiagnosticCode, String)>,
-) -> Option<Body> {
+fn lower_body(file: SourceFile, tree: &ItemTree, node: &SyntaxNode) -> Option<Body> {
     let mut lowerer = Lowerer {
         file,
         tree,
         store: ExprStore::default(),
-        diagnostics,
     };
     let (params, has_self, value) = if let Some(it) = ast::Fn::cast(node.clone()) {
         let body = it.body()?;
@@ -95,7 +86,6 @@ pub(super) struct Lowerer<'a> {
     pub(super) file: SourceFile,
     pub(super) tree: &'a ItemTree,
     pub(super) store: ExprStore,
-    pub(super) diagnostics: &'a mut Vec<(TextRange, DiagnosticCode, String)>,
 }
 
 fn range_of(node: &impl AstNode) -> TextRange {
@@ -166,10 +156,6 @@ pub(crate) fn lower_path(
 }
 
 impl Lowerer<'_> {
-    pub(super) fn diag(&mut self, range: TextRange, code: DiagnosticCode, message: String) {
-        self.diagnostics.push((range, code, message));
-    }
-
     pub(super) fn alloc(&mut self, expr: Expr, range: TextRange) -> ExprId {
         self.store.alloc_expr(expr, range)
     }

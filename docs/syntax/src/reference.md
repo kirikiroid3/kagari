@@ -40,7 +40,7 @@ items of `t![…]`.
 | UI forms | calls of `std::ui` functions with props structs | `Element` | see the standard library book, chapter *UI* | see the standard library book, chapter *UI* |
 
 `s!` and `choice!` are allowed only in a scene. UI forms are introduced in [The Game
-System](./system.md#components-and-signals); their lowering is not implemented yet.
+System](./system.md#components-and-signals).
 
 ## Story items
 
