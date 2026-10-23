@@ -1,0 +1,96 @@
+//! Looks of UI controls.
+
+use crate::narrative::text::TextStyle;
+use crate::screen::{Color, Insets, Size};
+use crate::screen::anim::{Tween, instant};
+use crate::screen::audio::Sound;
+
+/// What fills a box.
+pub enum Paint {
+    None,
+    Color(Color),
+    Image(ImageAsset),
+    /// An image whose corners stay unscaled; `insets` are the corner sizes.
+    NineSlice { image: ImageAsset, insets: Insets },
+}
+/// A background and a text style.
+pub struct Look {
+    pub background: Paint,
+    pub text: TextStyle,
+}
+/// The looks of a button-like control in each interaction state.
+pub struct ButtonStyle {
+    pub idle: Look,
+    pub hover: Option<Look>,
+    pub focus: Option<Look>,
+    pub pressed: Option<Look>,
+    /// Replaces every other look while the control is disabled.
+    pub disabled: Option<Look>,
+    /// How look changes animate.
+    pub change: Tween,
+    pub hover_sound: Option<Sound>,
+    pub click_sound: Option<Sound>,
+}
+/// A style with only the idle look, instant changes and no sounds.
+pub const fn button_style(idle: Look) -> ButtonStyle {
+    ButtonStyle {
+        idle,
+        hover: None,
+        focus: None,
+        pressed: None,
+        disabled: None,
+        change: instant(),
+        hover_sound: None,
+        click_sound: None,
+    }
+}
+impl ButtonStyle {
+    /// This style with a hover look.
+    pub const fn hover(mut self, look: Look) -> ButtonStyle {
+        self.hover = Some(look);
+        self
+    }
+
+    /// This style with a focus look.
+    pub const fn focus(mut self, look: Look) -> ButtonStyle {
+        self.focus = Some(look);
+        self
+    }
+
+    /// This style with a pressed look.
+    pub const fn pressed(mut self, look: Look) -> ButtonStyle {
+        self.pressed = Some(look);
+        self
+    }
+
+    /// This style with a disabled look.
+    pub const fn disabled(mut self, look: Look) -> ButtonStyle {
+        self.disabled = Some(look);
+        self
+    }
+
+    /// This style with look changes animated by `tween`.
+    pub const fn change(mut self, tween: Tween) -> ButtonStyle {
+        self.change = tween;
+        self
+    }
+
+    /// This style playing `sound` on hover.
+    pub const fn hover_sound(mut self, sound: Sound) -> ButtonStyle {
+        self.hover_sound = Some(sound);
+        self
+    }
+
+    /// This style playing `sound` on click.
+    pub const fn click_sound(mut self, sound: Sound) -> ButtonStyle {
+        self.click_sound = Some(sound);
+        self
+    }
+}
+/// The paints of a slider.
+pub struct SliderStyle {
+    pub track: Paint,
+    pub fill: Paint,
+    pub thumb: Paint,
+    pub thumb_size: Size,
+}

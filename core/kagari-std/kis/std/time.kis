@@ -1,0 +1,36 @@
+//! Durations in whole milliseconds.
+
+/// A length of time in whole milliseconds.
+pub struct Duration {
+    pub ms: u32,
+}
+
+/// No time at all.
+pub const ZERO: Duration = Duration { ms: 0 };
+
+/// `n` milliseconds.
+pub const fn ms(n: u32) -> Duration {
+    Duration { ms: n }
+}
+
+/// `n` seconds.
+pub const fn secs(n: u32) -> Duration {
+    Duration { ms: n * 1000 }
+}
+
+impl Duration {
+    /// The sum of two durations.
+    pub const fn plus(self, other: Duration) -> Duration {
+        Duration { ms: self.ms + other.ms }
+    }
+
+    /// This duration `n` times.
+    pub const fn times(self, n: u32) -> Duration {
+        Duration { ms: self.ms * n }
+    }
+
+    /// This duration divided by `n`, rounded down.
+    pub const fn div(self, n: u32) -> Duration {
+        Duration { ms: self.ms / n }
+    }
+}

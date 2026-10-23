@@ -1,33 +1,71 @@
 //! The Kagari standard library root.
 
 pub mod prelude;
+pub mod time;
 pub mod screen;
+pub mod stage;
 pub mod narrative;
 pub mod ui;
 pub mod system;
 
 /// An integer in the inclusive range `LO..=HI`.
 #[builtin] pub struct Int<const LO: i128, const HI: i128>;
+/// A runtime string, built by `fn` code.
 #[builtin] pub struct String;
+/// A growable list; out-of-range writes are evaluation errors.
 #[builtin] pub struct Vec<T>;
+/// An exact rational number.
 #[builtin] pub struct Rat;
+/// An exact decimal number, written `0.5`.
 #[builtin] pub struct Decimal;
 
+impl<T> Vec<T> {
+    /// An empty list.
+    #[builtin] pub const fn new() -> Vec<T>;
+    /// The number of elements.
+    #[builtin] pub const fn len(&self) -> usize;
+    /// Whether the list has no elements.
+    #[builtin] pub const fn is_empty(&self) -> bool;
+    /// The element at `index`, or `None` when out of range.
+    #[builtin] pub const fn get(&self, index: usize) -> Option<T>;
+    /// Replaces the element at `index`; out of range is an evaluation error.
+    #[builtin] pub const fn set(&mut self, index: usize, value: T);
+    /// Appends `value` at the end.
+    #[builtin] pub const fn push(&mut self, value: T);
+}
+
+/// An optional value.
 pub enum Option<T> {
     None,
     Some(T),
 }
 
+/// A success value or an error value.
 pub enum Result<T, E> {
     Ok(T),
     Err(E),
 }
 
+/// Types with structural equality.
 pub trait Eq {}
+/// Types whose values are exactly the asset constants of the program.
+pub trait Asset {}
 
+/// An image file: PNG, JPEG or WebP.
 #[builtin] pub struct ImageAsset;
+/// A music or sound file.
 #[builtin] pub struct AudioAsset;
+/// A voice file, bound to a line.
 #[builtin] pub struct VoiceAsset;
+/// A movie file.
+#[builtin] pub struct VideoAsset;
+/// A font file.
+#[builtin] pub struct FontAsset;
+impl Asset for ImageAsset {}
+impl Asset for AudioAsset {}
+impl Asset for VoiceAsset {}
+impl Asset for VideoAsset {}
+impl Asset for FontAsset {}
 
-/// Loads the asset at `path`, relative to the file that names it.
-#[builtin] pub const fn asset<A>(path: narrative::Text) -> A;
+/// Loads the asset at `path`, a string literal relative to the file that names it.
+#[builtin] pub const fn asset<A: Asset>(path: narrative::Text) -> A;

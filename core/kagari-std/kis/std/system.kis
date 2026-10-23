@@ -1,27 +1,232 @@
-//! The game system: settings, modes and the program description.
+//! The game system: the program description, settings, seen sets and input bindings.
 
 pub mod nav;
+pub mod saves;
 
+use crate::narrative::{Narrative, Text};
+use crate::narrative::text::TextStyle;
+use crate::screen::Size;
+use crate::time::Duration;
 use crate::ui::Element;
 
 /// A persistent global setting outside saves.
 #[builtin] pub struct Setting<T>;
 
+/// A setting starting at `init`.
 #[builtin] pub const fn setting<T>(init: T) -> Setting<T>;
 
 impl<T> Setting<T> {
+    /// The current value; reactive.
     #[builtin] pub fn get(&self) -> T;
+    /// Sets the value.
     #[builtin] pub fn set(&self, value: T);
 }
 
+/// A volume setting.
+pub struct Volume {
+    pub level: Int<0, 100>,
+    pub muted: bool,
+}
+/// An unmuted volume at `level`.
+pub const fn volume(level: Int<0, 100>) -> Volume {
+    Volume { level, muted: false }
+}
+
+/// The settings the engine reads.
+pub struct Settings {
+    /// Per character; `ZERO` is instant.
+    pub text_speed: Setting<Duration>,
+    /// The wait after a line in auto mode.
+    pub auto_delay: Setting<Duration>,
+    /// Added to `auto_delay` per character of the line.
+    pub auto_delay_per_char: Setting<Duration>,
+    /// Whether skip mode also skips unread text.
+    pub skip_unread: Setting<bool>,
+    pub master: Setting<Volume>,
+    pub music: Setting<Volume>,
+    pub sound: Setting<Volume>,
+    pub voice: Setting<Volume>,
+    /// Whether a voice keeps playing into the next step.
+    pub voice_sustain: Setting<bool>,
+    /// Whether auto mode waits for the voice.
+    pub wait_for_voice: Setting<bool>,
+    pub window_opacity: Setting<Int<0, 100>>,
+    pub fullscreen: Setting<bool>,
+    /// `false`: every duration counts as 0.
+    pub animations: Setting<bool>,
+}
+
+/// A base page of the mode stack.
 pub struct RootPage(pub Element);
+/// A mode pushed over any mode.
 pub struct Overlay(pub Element);
+/// A mode pushed over the game, with a `Narrative` handle.
 pub struct GameOverlay(pub Element);
+/// A modal mode.
 pub struct Dialog(pub Element);
 
 /// The program, returned by `main`.
 pub struct System {
+    pub title: Text,
+    /// The design resolution every pixel value refers to.
+    pub resolution: Size,
     pub start: fn() -> RootPage,
-    pub game: fn() -> Element,
-    pub save_slots: u64,
+    pub game: fn(Narrative) -> Element,
+    pub save_slots: u32,
+    pub auto_slots: u32,
+    /// The maximum number of backlog entries.
+    pub backlog: u32,
+    /// The default style of `ui::label` and `text!`.
+    pub text: TextStyle,
+    pub settings: Settings,
+    pub bindings: Vec<Binding>,
+}
+
+/// Whether `image` has ever been on a step's logical screen.
+#[builtin] pub fn seen_image(image: ImageAsset) -> bool;
+/// Whether `audio` has ever played in a channel or as a one-shot.
+#[builtin] pub fn heard(audio: AudioAsset) -> bool;
+/// Whether `video` has ever played.
+#[builtin] pub fn watched(video: VideoAsset) -> bool;
+
+/// A keyboard key.
+pub enum Key {
+    Enter,
+    Escape,
+    Space,
+    Backspace,
+    Tab,
+    Up,
+    Down,
+    Left,
+    Right,
+    PageUp,
+    PageDown,
+    Home,
+    End,
+    Shift,
+    Control,
+    Alt,
+    F1,
+    F2,
+    F3,
+    F4,
+    F5,
+    F6,
+    F7,
+    F8,
+    F9,
+    F10,
+    F11,
+    F12,
+    A,
+    B,
+    C,
+    D,
+    E,
+    F,
+    G,
+    H,
+    I,
+    J,
+    K,
+    L,
+    M,
+    N,
+    O,
+    P,
+    Q,
+    R,
+    S,
+    T,
+    U,
+    V,
+    W,
+    X,
+    Y,
+    Z,
+    Digit0,
+    Digit1,
+    Digit2,
+    Digit3,
+    Digit4,
+    Digit5,
+    Digit6,
+    Digit7,
+    Digit8,
+    Digit9,
+}
+/// A mouse button or wheel direction.
+pub enum MouseButton {
+    Left,
+    Right,
+    Middle,
+    Back,
+    Forward,
+    WheelUp,
+    WheelDown,
+}
+/// A gamepad button, by position.
+pub enum PadButton {
+    South,
+    East,
+    West,
+    North,
+    LeftShoulder,
+    RightShoulder,
+    LeftTrigger,
+    RightTrigger,
+    Start,
+    Select,
+    LeftStick,
+    RightStick,
+    DpadUp,
+    DpadDown,
+    DpadLeft,
+    DpadRight,
+}
+/// An input that can be bound.
+pub enum Input {
+    Key(Key),
+    Mouse(MouseButton),
+    Pad(PadButton),
+}
+/// What a binding does.
+pub enum Action {
+    Advance,
+    HoldSkip,
+    ToggleSkip,
+    ToggleAuto,
+    HideWindow,
+    QuickSave,
+    QuickLoad,
+    Back,
+    Open(fn() -> Overlay),
+    OpenInGame(fn(Narrative) -> GameOverlay),
+}
+/// An input bound to an action.
+pub struct Binding {
+    pub input: Input,
+    pub action: Action,
+}
+/// `input` bound to `action`.
+pub const fn bind(input: Input, action: Action) -> Binding {
+    Binding { input, action }
+}
+/// Enter, Space, MouseLeft, WheelDown, PadSouth → Advance; Control, PadRightTrigger → HoldSkip;
+/// MouseRight, PadNorth → HideWindow; Escape, PadEast → Back.
+pub const fn default_bindings() -> Vec<Binding> {
+    let mut bindings = Vec::new();
+    bindings.push(bind(Input::Key(Key::Enter), Action::Advance));
+    bindings.push(bind(Input::Key(Key::Space), Action::Advance));
+    bindings.push(bind(Input::Mouse(MouseButton::Left), Action::Advance));
+    bindings.push(bind(Input::Mouse(MouseButton::WheelDown), Action::Advance));
+    bindings.push(bind(Input::Pad(PadButton::South), Action::Advance));
+    bindings.push(bind(Input::Key(Key::Control), Action::HoldSkip));
+    bindings.push(bind(Input::Pad(PadButton::RightTrigger), Action::HoldSkip));
+    bindings.push(bind(Input::Mouse(MouseButton::Right), Action::HideWindow));
+    bindings.push(bind(Input::Pad(PadButton::North), Action::HideWindow));
+    bindings.push(bind(Input::Key(Key::Escape), Action::Back));
+    bindings.push(bind(Input::Pad(PadButton::East), Action::Back));
+    bindings
 }

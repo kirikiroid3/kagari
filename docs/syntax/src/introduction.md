@@ -55,7 +55,7 @@ pushdown fn StallA() {
 }
 
 const fn hanako_jumps(mut screen: Screen) -> Screen {
-    screen.entity(HANAKO).cord.apply_animation(jump(20));
+    screen.entity(HANAKO).apply_animation(jump(20, ms(300)));
     screen
 }
 ```

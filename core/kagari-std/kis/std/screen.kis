@@ -1,48 +1,403 @@
-//! The screen: an ECS world that renders transform.
+//! The screen: entities with components, the Hud, the camera, the screen filter and the audio
+//! channels, changed by renders through animations.
 
-#[builtin] pub struct Screen;
+pub mod anim;
+pub mod audio;
 
-impl Screen {
-    #[builtin] pub const fn empty() -> Screen;
-    #[builtin] pub const fn entity(&mut self, id: EntityId) -> &mut Entity;
-    #[builtin] pub const fn background(&mut self) -> &mut Layer;
-    #[builtin] pub const fn hud(&mut self) -> &mut Hud;
-}
-
-pub type EntityId = u64;
-pub type ImageId = u64;
-
-pub struct Entity { pub cord: Cord, pub appearance: Appearance }
-pub struct Cord { pub x: i64, pub y: i64 }
-pub struct Appearance { pub emotion: Layer }
-pub struct Layer { pub image: ImageId }
-
-impl Cord {
-    #[builtin] pub const fn apply_animation(&mut self, animation: CordAnimation);
-}
-
-impl Layer {
-    #[builtin] pub const fn change(&mut self, image: ImageId) -> &mut LayerImageChange;
-}
-
-#[must_use]
-pub struct LayerImageChange { pub image: ImageId }
-
-impl LayerImageChange {
-    #[builtin] pub const fn apply_animation(&mut self, transition: TransitionAnimation);
-}
-
-pub struct CordAnimation { pub height: u64, pub frames: u64 }
-pub struct TransitionAnimation { pub frames: u64 }
-
-pub const fn jump(height: u64) -> CordAnimation { CordAnimation { height, frames: 12 } }
-pub const fn instant_switch() -> TransitionAnimation { TransitionAnimation { frames: 0 } }
-pub const fn fade(frames: u64) -> TransitionAnimation { TransitionAnimation { frames } }
+use crate::narrative::text::{Mark, Text, TextStyle};
+use crate::system::Setting;
+use crate::time::Duration;
 
 /// A render: the screen before a step to the screen after it.
 pub type Render = const fn(Screen) -> Screen;
 
-pub enum Visibility { Shown, Hidden }
+/// The identity of an entity.
+pub struct EntityId(pub u32);
+/// Reserved for the background entity of `Screen::empty()`; studio ids start at 1.
+pub const BACKGROUND: EntityId = EntityId(0);
+/// An image layer of an entity; parts draw in ascending order.
+pub struct Part(pub u8);
+/// The main part, which gives the entity its size.
+pub const MAIN: Part = Part(0);
 
-/// A resource component the story uses to ask the system to hide parts of the HUD.
-pub struct Hud { pub text_frame: Visibility, pub quick_menu: Visibility }
+/// A point in design-resolution pixels.
+pub struct Point {
+    pub x: i32,
+    pub y: i32,
+}
+/// The point `(x, y)`.
+pub const fn point(x: i32, y: i32) -> Point {
+    Point { x, y }
+}
+/// A displacement in pixels.
+pub struct Offset {
+    pub dx: i32,
+    pub dy: i32,
+}
+/// The displacement `(dx, dy)`.
+pub const fn offset(dx: i32, dy: i32) -> Offset {
+    Offset { dx, dy }
+}
+/// A size in pixels.
+pub struct Size {
+    pub w: u32,
+    pub h: u32,
+}
+/// The size `w × h`.
+pub const fn size(w: u32, h: u32) -> Size {
+    Size { w, h }
+}
+/// Distances from the four edges of a box, in pixels.
+pub struct Insets {
+    pub top: i32,
+    pub right: i32,
+    pub bottom: i32,
+    pub left: i32,
+}
+/// Insets in CSS order: top, right, bottom, left.
+pub const fn insets(top: i32, right: i32, bottom: i32, left: i32) -> Insets {
+    Insets { top, right, bottom, left }
+}
+/// The same inset on every edge.
+pub const fn uniform(n: i32) -> Insets {
+    Insets { top: n, right: n, bottom: n, left: n }
+}
+/// Fractions of the entity's own size, 0.0..=1.0.
+pub struct Anchor {
+    pub x: Decimal,
+    pub y: Decimal,
+}
+/// The top-left corner.
+pub const TOP_LEFT: Anchor = Anchor { x: 0.0, y: 0.0 };
+/// The centre.
+pub const CENTER: Anchor = Anchor { x: 0.5, y: 0.5 };
+/// The middle of the bottom edge.
+pub const BOTTOM_CENTER: Anchor = Anchor { x: 0.5, y: 1.0 };
+/// A rotation, clockwise.
+pub struct Angle {
+    pub degrees: Decimal,
+}
+/// A rotation of `d` degrees.
+pub const fn degrees(d: Decimal) -> Angle {
+    Angle { degrees: d }
+}
+
+/// An sRGB colour with alpha.
+pub struct Color {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
+/// An opaque colour.
+pub const fn rgb(r: u8, g: u8, b: u8) -> Color {
+    Color { r, g, b, a: 255 }
+}
+/// A colour with alpha.
+pub const fn rgba(r: u8, g: u8, b: u8, a: u8) -> Color {
+    Color { r, g, b, a }
+}
+/// The opaque colour `0xRRGGBB`; bits above `0xFFFFFF` are ignored.
+pub const fn hex(rgb: u32) -> Color {
+    Color {
+        r: ((rgb >> 16) & 255) as u8,
+        g: ((rgb >> 8) & 255) as u8,
+        b: (rgb & 255) as u8,
+        a: 255,
+    }
+}
+/// Opaque black.
+pub const BLACK: Color = Color { r: 0, g: 0, b: 0, a: 255 };
+/// Opaque white.
+pub const WHITE: Color = Color { r: 255, g: 255, b: 255, a: 255 };
+/// Fully transparent.
+pub const TRANSPARENT: Color = Color { r: 0, g: 0, b: 0, a: 0 };
+
+/// A drawing plane; the text window sits between `Front` and `OverWindow`.
+pub enum Plane {
+    Background,
+    Stage,
+    Front,
+    OverWindow,
+}
+/// Whether a Hud part is shown; changes interpolate as a fade.
+pub enum Visibility {
+    Shown,
+    Hidden,
+}
+/// A mirror of an entity's drawing.
+pub enum Flip {
+    None,
+    Horizontal,
+    Vertical,
+    Both,
+}
+/// Vertical placement.
+pub enum VAlign {
+    Top,
+    Middle,
+    Bottom,
+}
+/// How an entity is composited over what is below it (CSS blend modes).
+pub enum BlendMode {
+    Normal,
+    Add,
+    Multiply,
+    Screen,
+    Overlay,
+    Darken,
+    Lighten,
+    ColorDodge,
+    ColorBurn,
+    HardLight,
+    SoftLight,
+    Difference,
+    Exclusion,
+    Hue,
+    Saturation,
+    Color,
+    Luminosity,
+}
+/// Colour filters (CSS filter functions); amounts are fractions, `blur` is pixels.
+pub struct Filter {
+    pub grayscale: Decimal,
+    pub sepia: Decimal,
+    pub brightness: Decimal,
+    pub contrast: Decimal,
+    pub saturation: Decimal,
+    pub blur: u32,
+}
+/// The filter that changes nothing.
+pub const NO_FILTER: Filter = Filter {
+    grayscale: 0.0,
+    sepia: 0.0,
+    brightness: 1.0,
+    contrast: 1.0,
+    saturation: 1.0,
+    blur: 0,
+};
+impl Filter {
+    /// This filter with grayscale `amount`, 0.0..=1.0.
+    pub const fn grayscale(mut self, amount: Decimal) -> Filter {
+        self.grayscale = amount;
+        self
+    }
+
+    /// This filter with sepia `amount`, 0.0..=1.0.
+    pub const fn sepia(mut self, amount: Decimal) -> Filter {
+        self.sepia = amount;
+        self
+    }
+
+    /// This filter with brightness `amount`; 1.0 is unchanged.
+    pub const fn brightness(mut self, amount: Decimal) -> Filter {
+        self.brightness = amount;
+        self
+    }
+
+    /// This filter with contrast `amount`; 1.0 is unchanged.
+    pub const fn contrast(mut self, amount: Decimal) -> Filter {
+        self.contrast = amount;
+        self
+    }
+
+    /// This filter with saturation `amount`; 1.0 is unchanged.
+    pub const fn saturation(mut self, amount: Decimal) -> Filter {
+        self.saturation = amount;
+        self
+    }
+
+    /// This filter with a blur radius of `px` pixels.
+    pub const fn blur(mut self, px: u32) -> Filter {
+        self.blur = px;
+        self
+    }
+}
+
+/// The screen a step shows, and the step's timeline.
+#[builtin] pub struct Screen;
+impl Screen {
+    /// A screen with only the opaque `BACKGROUND` entity, the default Hud and camera, no filter
+    /// and silent channels.
+    #[builtin] pub const fn empty() -> Screen;
+    /// The entity `id`, spawned invisible with default components if it is absent.
+    #[builtin] pub const fn entity(&mut self, id: EntityId) -> &mut Entity;
+    /// Whether entity `id` is on the logical screen.
+    #[builtin] pub const fn contains(&self, id: EntityId) -> bool;
+    /// The ids on `plane`, ascending.
+    #[builtin] pub const fn entities(&self, plane: Plane) -> Vec<EntityId>;
+    /// Removes entity `id` from the logical screen; it is drawn until its animations end.
+    #[builtin] pub const fn despawn(&mut self, id: EntityId);
+    /// The main image of the `BACKGROUND` entity.
+    pub const fn background(&mut self) -> &mut ImageLayer {
+        self.entity(BACKGROUND).image()
+    }
+    /// The Hud the game view draws.
+    #[builtin] pub const fn hud(&mut self) -> &mut Hud;
+    /// The choice menu of this step.
+    #[builtin] pub const fn choice_menu(&mut self) -> &mut ChoiceMenu;
+    /// The camera over the `Background`, `Stage` and `Front` planes.
+    #[builtin] pub const fn camera(&mut self) -> &mut Camera;
+    /// The filter over the `Background`, `Stage` and `Front` planes.
+    #[builtin] pub const fn filter(&mut self) -> &mut Prop<Filter>;
+    /// The music channel.
+    #[builtin] pub const fn music(&mut self) -> &mut audio::Channel;
+    /// Ambience channel `channel`.
+    #[builtin] pub const fn ambience(&mut self, channel: Int<0, 3>) -> &mut audio::Channel;
+    /// Plays a one-shot sound at the cursor plus its delay.
+    #[builtin] pub const fn play(&mut self, sound: audio::Sound);
+    /// Fades out every one-shot sound playing at the cursor.
+    #[builtin] pub const fn stop_sounds(&mut self, fade_out: Duration);
+    /// Advances the cursor by `duration`.
+    #[builtin] pub const fn wait(&mut self, duration: Duration);
+    /// Moves the cursor to the end of everything scheduled so far.
+    #[builtin] pub const fn barrier(&mut self);
+    /// Moves the cursor to the time the text reaches `mark`.
+    #[builtin] pub const fn at_mark(&mut self, mark: Mark);
+    /// Moves the cursor back to the step entry.
+    #[builtin] pub const fn at_entry(&mut self);
+    /// Starts the text reveal and the voice at the cursor.
+    #[builtin] pub const fn begin_text(&mut self);
+}
+
+/// A thing on the screen: a transform, an opacity, a filter, a fill and layers.
+#[builtin] pub struct Entity;
+impl Entity {
+    /// Where the anchor point sits.
+    #[builtin] pub const fn position(&mut self) -> &mut Prop<Point>;
+    /// The scale around the anchor.
+    #[builtin] pub const fn scale(&mut self) -> &mut Prop<Decimal>;
+    /// The rotation around the anchor.
+    #[builtin] pub const fn rotation(&mut self) -> &mut Prop<Angle>;
+    /// The opacity, 0.0..=1.0; spawned entities start at 0.0.
+    #[builtin] pub const fn opacity(&mut self) -> &mut Prop<Decimal>;
+    /// The entity's colour filter.
+    #[builtin] pub const fn filter(&mut self) -> &mut Prop<Filter>;
+    /// A colour drawn below the parts, over the fill size.
+    #[builtin] pub const fn fill(&mut self) -> &mut Prop<Color>;
+    /// The image layer `part`.
+    #[builtin] pub const fn part(&mut self, part: Part) -> &mut ImageLayer;
+    /// The `MAIN` image layer.
+    pub const fn image(&mut self) -> &mut ImageLayer {
+        self.part(MAIN)
+    }
+    /// The text layer, drawn above the parts and the movie.
+    #[builtin] pub const fn label(&mut self) -> &mut LabelLayer;
+    /// The movie layer, drawn above the parts.
+    #[builtin] pub const fn movie(&mut self) -> &mut MovieLayer;
+    /// Moves the entity to `plane`.
+    #[builtin] pub const fn set_plane(&mut self, plane: Plane);
+    /// Sets the order inside the plane; higher draws later.
+    #[builtin] pub const fn set_z(&mut self, z: i32);
+    /// Sets the point of the entity that sits at its position.
+    #[builtin] pub const fn set_anchor(&mut self, anchor: Anchor);
+    /// Mirrors the drawing.
+    #[builtin] pub const fn set_flip(&mut self, flip: Flip);
+    /// Sets how the entity composites over what is below it.
+    #[builtin] pub const fn set_blend(&mut self, blend: BlendMode);
+    /// Sets the fill's size; `None` covers the whole screen.
+    #[builtin] pub const fn set_fill_size(&mut self, size: Option<Size>);
+    /// Draws the entity only while setting `setting` is true; `None` always draws it.
+    #[builtin] pub const fn gate(&mut self, setting: Option<Setting<bool>>);
+    /// Plays a relative motion that ends where it started.
+    #[builtin] pub const fn apply_animation(&mut self, motion: anim::Motion);
+}
+
+/// An interpolated property.
+#[builtin] pub struct Prop<T>;
+impl<T> Prop<T> {
+    /// The logical value.
+    #[builtin] pub const fn get(&self) -> T;
+    /// Sets the logical value at once; the change happens once it is given a tween.
+    #[builtin] pub const fn change(&mut self, value: T) -> &mut Change<T>;
+}
+/// A pending property change; it happens only through `apply_animation`.
+#[must_use] #[builtin] pub struct Change<T>;
+impl<T> Change<T> {
+    /// Interpolates from the value at the cursor plus the delay to the new value.
+    #[builtin] pub const fn apply_animation(&mut self, tween: anim::Tween);
+}
+
+/// An image layer of an entity.
+#[builtin] pub struct ImageLayer;
+impl ImageLayer {
+    /// The image shown, if any.
+    #[builtin] pub const fn get(&self) -> Option<ImageAsset>;
+    /// Swaps the image for `image`.
+    #[builtin] pub const fn change(&mut self, image: ImageAsset) -> &mut Swap;
+    /// Swaps the image for nothing.
+    #[builtin] pub const fn clear(&mut self) -> &mut Swap;
+}
+/// The text layer of an entity.
+#[builtin] pub struct LabelLayer;
+impl LabelLayer {
+    /// Swaps the text for `text`.
+    #[builtin] pub const fn change(&mut self, text: Text) -> &mut Swap;
+    /// Swaps the text for nothing.
+    #[builtin] pub const fn clear(&mut self) -> &mut Swap;
+    /// Sets the text style.
+    #[builtin] pub const fn set_style(&mut self, style: TextStyle);
+    /// Sets the wrapping width; `None` does not wrap.
+    #[builtin] pub const fn set_width(&mut self, width: Option<u32>);
+}
+/// A movie and whether it loops.
+pub struct Movie {
+    pub video: VideoAsset,
+    pub looping: bool,
+}
+/// `video`, played once.
+pub const fn movie(video: VideoAsset) -> Movie {
+    Movie { video, looping: false }
+}
+impl Movie {
+    /// This movie, looping.
+    pub const fn looping(mut self) -> Movie {
+        self.looping = true;
+        self
+    }
+}
+/// The movie layer of an entity.
+#[builtin] pub struct MovieLayer;
+impl MovieLayer {
+    /// Swaps the movie for `movie`.
+    #[builtin] pub const fn change(&mut self, movie: Movie) -> &mut Swap;
+    /// Swaps the movie for nothing.
+    #[builtin] pub const fn clear(&mut self) -> &mut Swap;
+}
+/// A pending layer swap; it happens only through `apply_animation`.
+#[must_use] #[builtin] pub struct Swap;
+impl Swap {
+    /// Swaps from the old content to the new one with `transition`.
+    #[builtin] pub const fn apply_animation(&mut self, transition: anim::Transition);
+}
+
+/// What the story asks of the game view's chrome.
+#[builtin] pub struct Hud;
+impl Hud {
+    /// Whether the text window is shown.
+    #[builtin] pub const fn text_window(&mut self) -> &mut Prop<Visibility>;
+    /// Whether the quick menu is shown.
+    #[builtin] pub const fn quick_menu(&mut self) -> &mut Prop<Visibility>;
+    /// The side image next to the text window.
+    #[builtin] pub const fn side_image(&mut self) -> &mut ImageLayer;
+}
+/// The presentation of the choice a step shows.
+#[builtin] pub struct ChoiceMenu;
+impl ChoiceMenu {
+    /// A display-only arm, shown disabled at position `at` of the shown list (clamped).
+    #[builtin] pub const fn disabled_arm(&mut self, at: u32, text: Text);
+    /// Sets where the menu sits.
+    #[builtin] pub const fn set_align(&mut self, align: VAlign);
+}
+/// The camera over the `Background`, `Stage` and `Front` planes.
+#[builtin] pub struct Camera;
+impl Camera {
+    /// The translation.
+    #[builtin] pub const fn offset(&mut self) -> &mut Prop<Offset>;
+    /// The zoom around the screen centre.
+    #[builtin] pub const fn zoom(&mut self) -> &mut Prop<Decimal>;
+    /// The rotation around the screen centre.
+    #[builtin] pub const fn rotation(&mut self) -> &mut Prop<Angle>;
+    /// Plays a relative motion that ends where it started.
+    #[builtin] pub const fn apply_animation(&mut self, motion: anim::Motion);
+}

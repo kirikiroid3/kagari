@@ -1,0 +1,38 @@
+//! Save slots and their metadata.
+
+use crate::narrative::Text;
+
+/// A save slot.
+pub enum SaveSlot {
+    /// Manual slot `k`, below `System::save_slots`.
+    Manual(u32),
+    /// The quick slot.
+    Quick,
+    /// Autosave slot `k`, below `System::auto_slots`.
+    Auto(u32),
+}
+/// A local date and time.
+pub struct Timestamp {
+    pub year: u16,
+    pub month: u8,
+    pub day: u8,
+    pub hour: u8,
+    pub minute: u8,
+    pub second: u8,
+}
+/// What a slot shows: when it was saved and the line at that time.
+pub struct SaveInfo {
+    pub time: Timestamp,
+    pub who: Option<Text>,
+    pub text: Option<Text>,
+}
+/// Why a save no longer fits the program.
+#[builtin] pub struct Divergence;
+impl Divergence {
+    /// A description for the player.
+    #[builtin] pub fn describe(&self) -> Text;
+}
+/// The slot's metadata, or `None` if it is empty or out of range; reactive.
+#[builtin] pub fn info(slot: SaveSlot) -> Option<SaveInfo>;
+/// Empties the slot.
+#[builtin] pub fn delete(slot: SaveSlot);

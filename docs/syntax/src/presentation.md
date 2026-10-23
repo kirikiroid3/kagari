@@ -15,8 +15,8 @@ animations that lead from one to the other. A step takes it as its `render` attr
 s!(who = "Azusa", render = azusa_smiles, t!["Did you forget again?"]);
 
 const fn azusa_smiles(mut screen: Screen) -> Screen {
-    screen.entity(HANAKO).cord.apply_animation(jump(20));
-    screen.entity(AZUSA).appearance.emotion.change(AZUSA::CLOSE_EYE_SMILE).apply_animation(instant_switch());
+    screen.entity(HANAKO).apply_animation(jump(20, ms(300)));
+    screen.entity(AZUSA).image().change(AZUSA::CLOSE_EYE_SMILE).apply_animation(cut());
     screen
 }
 ```
@@ -31,7 +31,7 @@ in place:
 
 ```kix
 s!(
-    render = |mut screen| { screen.background().change(BG::ROOF).apply_animation(fade(30)); screen },
+    render = |mut screen| { screen.background().change(BG::ROOF).apply_animation(fade(ms(500))); screen },
     t!["The wind on the roof is cold."]
 );
 ```
@@ -52,19 +52,20 @@ const fn roof_scene(screen: Screen) -> Screen {
 ## Walkthrough
 
 ```kis
-screen.entity(AZUSA).appearance.emotion.change(AZUSA::CLOSE_EYE_SMILE).apply_animation(instant_switch());
+screen.entity(AZUSA).image().change(AZUSA::CLOSE_EYE_SMILE).apply_animation(cut());
 ```
 
-1. `screen.entity(AZUSA)` selects the entity whose id is `AZUSA`, say `217`. It is a
-   [projection](./values.md#references-are-second-class) of the screen: changing it changes the
-   screen.
-2. `.appearance.emotion` is a `Layer`. `.change(AZUSA::CLOSE_EYE_SMILE)` asks to change that layer
-   to the image `AZUSA::CLOSE_EYE_SMILE`. The result is a `LayerImageChange`, a pending change: a
+1. `screen.entity(AZUSA)` selects the entity whose id is `AZUSA`, say `EntityId(217)`, and spawns
+   it if the screen has none. It is a [projection](./values.md#references-are-second-class) of the
+   screen: changing it changes the screen.
+2. `.image()` is the entity's main `ImageLayer`. `.change(AZUSA::CLOSE_EYE_SMILE)` asks to swap
+   that layer to the image `AZUSA::CLOSE_EYE_SMILE`. The result is a `Swap`, a pending change: a
    projection of the layer that lives until the end of the statement.
-3. Because this *changes* a layer, it needs a `TransitionAnimation`. Without one the change does
-   not happen.
-4. `.apply_animation(instant_switch())` switches the image without any animation, and the change
-   takes effect.
+3. Because this swaps a layer, it needs a `Transition`. Without one the change does not happen.
+4. `.apply_animation(cut())` switches the image at once, and the change takes effect.
+
+A projection cannot be bound to a local, so a render that changes the same entity several times
+repeats the chain in each statement.
 
 ## The screen is an ECS world
 
@@ -72,8 +73,9 @@ screen.entity(AZUSA).appearance.emotion.change(AZUSA::CLOSE_EYE_SMILE).apply_ani
 
 | Part | Defined in | Role |
 | ---- | ---------- | ---- |
-| Entities | render functions | Spawned, changed and despawned by renders |
-| Components | structs in `std::screen` and studio modules | Data attached to entities: position, appearance, animation |
+| Entities | render functions | Spawned, changed and despawned by renders; identified by an `EntityId` constant |
+| Components | `std::screen`, a fixed set | Data attached to entities: plane, z, position, anchor, scale, rotation, opacity, filter, fill, image parts, label, movie, flip, blend |
+| Resources | `std::screen`, a fixed set | Data of the screen itself: the Hud, the choice menu, the camera, the screen filter, the audio channels |
 | Systems | the engine | Process entities at runtime, for example advancing animations frame by frame |
 
 Every component type has [structural equality](./language.md#types), so two screens can always be
@@ -81,25 +83,59 @@ compared. Systems are not written in Kagari and are not part of the logical scre
 step shows is the set of entities and their components after its render, not the frames the
 engine draws while an animation plays.
 
-A studio adds components, animations and helper functions as ordinary structs and `const fn` in
-its own modules. The compiler type-checks renders against them like against the standard library.
+The component set is fixed: a studio adds no components. It extends the library with `const fn`
+helpers and constant data in its own modules, such as character slots, face images and recipes
+like a dip to black. `std::stage` is the standard example of such a layer: its characters are
+plain `const fn` over `std::screen`. The compiler type-checks studio helpers like any other code.
 
-## Changes need transitions
+## Changes need animations
 
-Changing what a layer shows produces a pending change, and only `apply_animation` with a
-`TransitionAnimation` turns it into an actual change on the screen. Every visible change therefore
-states how it is animated, even if the answer is "instantly".
+A change of anything visible produces a pending change, and only `apply_animation` turns it into
+an actual change on the screen. Every visible change therefore states how it is animated, even if
+the answer is "instantly".
 
-Different properties take different animation types, so the type checker catches mismatches such
-as passing a `CordAnimation` to a layer change:
+Different targets take different animation types, so the type checker catches mismatches such as
+passing a `Transition` to a position change:
 
-| Target | Method | Animation type |
-| ------ | ------ | -------------- |
-| `Cord` (coordinates) | `apply_animation` | `CordAnimation` |
-| `LayerImageChange` | `apply_animation` | `TransitionAnimation` |
+| Target | Changed with | Animation type |
+| ------ | ------------ | -------------- |
+| A property `Prop<T>`: position, scale, rotation, opacity, filter, fill; Hud visibilities; camera offset, zoom and rotation; channel volume | `.change(v)`, giving a `Change<T>` | `Tween`: duration, easing, delay |
+| A layer: `ImageLayer` (including the background and the side image), `LabelLayer`, `MovieLayer` | `.change(x)` or `.clear()`, giving a `Swap` | `Transition`: cut, crossfade, rule, wipe, blinds, through a colour |
+| An entity or the camera as a whole | `.apply_animation(m)` directly | `Motion`: a relative path that returns to where it started |
+| A music or ambience channel | `.change(track)` or `.stop()`, giving a `ChannelChange` | `AudioFade` |
 
-`LayerImageChange` is `#[must_use]`, so a statement that ends with a change still pending, such as
-`screen.background().change(BG::ROOF);`, is a warning.
+```kis
+const fn mio_enters(mut screen: Screen) -> Screen {
+    screen.entity(MIO).position().change(point(640, 80)).apply_animation(instant());
+    screen.entity(MIO).image().change(MIO::NEUTRAL).apply_animation(cut());
+    screen.entity(MIO).opacity().change(1.0).apply_animation(tween(ms(300)).ease(Easing::OutQuad));
+    screen
+}
+```
+
+A spawned entity starts invisible, with opacity 0.0, so every appearance states its animation.
+
+`Change<T>`, `Swap` and `ChannelChange` are `#[must_use]`, so a statement that ends with a change
+still pending, such as `screen.background().change(BG::ROOF);`, is a warning. Only layout
+settings that cannot be interpolated are set directly: `set_plane`, `set_z`, `set_anchor`,
+`set_flip`, `set_blend`, `set_fill_size` and `gate`.
+
+### Animations never change the logical screen
+
+The **logical screen** of a step is the persistent state after its render: the entities with
+their components, and the Hud, camera, screen filter and audio channels. Snapshots, screen
+equality and the [consistency check](#consistency) use only the logical screen, and animations
+never change it:
+
+- A `Tween` or a `Transition` always runs from the old value to the value set by `change`. The
+  logical value is the new one from the moment `change` runs.
+- A `Motion` is a relative path that must end where it started. A motion that does not is a
+  compile error.
+- The step's timeline, its scheduled animations, one-shot sounds and the choice menu belong to the
+  step only and are not part of the logical screen.
+
+So a click, which completes the step's animations, skip mode, or the player turning animations
+off can never change the logical screen.
 
 ## Renders are blind to the story
 
@@ -135,13 +171,14 @@ sees the choice as part of σ either way.
 A render whose output does not depend on its input screen is a **keyframe**: it declares the
 complete screen. The compiler detects keyframes itself; no annotation is required.
 
-*Tentative:* `Screen::empty()` returns a screen with no entities, so a keyframe can be written
-explicitly:
+`Screen::empty()` returns a screen with only the background entity, `BACKGROUND`, with no image:
+the Hud shows the text window and the quick menu, the camera and the screen filter are neutral,
+and every audio channel is silent. A keyframe can therefore be written explicitly:
 
 ```kis
 const fn roof_evening(_screen: Screen) -> Screen {
     let mut screen = Screen::empty();
-    screen.background().change(BG::ROOF_EVENING).apply_animation(fade(30));
+    screen.background().change(BG::ROOF_EVENING).apply_animation(fade(ms(500)));
     screen
 }
 ```
@@ -212,86 +249,71 @@ render that is bounded only above the cap. The cap is an [open question](./open-
 
 ## Settings in renders
 
-A render sometimes needs a setting, for example to show text at the player's chosen speed. It
-cannot read the setting's value: the value is only known at runtime, the screen at a step would
-then depend on the settings, and a snapshot taken under one setting would be wrong under another.
+A render sometimes needs a setting, for example to draw a decorative effect only when the player
+enabled it. It cannot read the setting's value: the value is only known at runtime, the screen at
+a step would then depend on the settings, and a snapshot taken under one setting would be wrong
+under another.
 
-A render uses a **deferred reference** instead. `BGM_VOLUME` in `static BGM_VOLUME: Setting<…>`
+A render uses a **deferred reference** instead. `PETALS_ON` in `static PETALS_ON: Setting<bool>`
 is a handle to a setting, not its value (see [Settings and meta](./system.md#settings-and-meta)).
 In a `const fn` the handle has no way to read the value: no `.get()`, no `match`, no arithmetic. A
-render can only store it in a component, and the engine's systems read the value at draw time.
-Equality on handles compares which setting they refer to, so a render using one is still a
-function of its input screen, and screens are still comparable.
+render can only pass it to `Entity::gate`, and the engine reads the value at draw time: the entity
+is drawn only while the setting is true.
 
-## The `Hud` component
+```kis
+static PETALS_ON: Setting<bool> = setting(true);
+const PETALS: EntityId = EntityId(40);
+const PETALS_IMAGE: ImageAsset = asset("petals.png");
 
-A story sometimes wants to hide the text frame, for example during a CG. That is a request from
+const fn petals(mut screen: Screen) -> Screen {
+    screen.entity(PETALS).set_plane(Plane::Front);
+    screen.entity(PETALS).gate(Some(PETALS_ON));
+    screen.entity(PETALS).image().change(PETALS_IMAGE).apply_animation(cut());
+    screen.entity(PETALS).opacity().change(1.0).apply_animation(tween(ms(500)));
+    screen
+}
+```
+
+The handle is part of the logical screen. Equality on handles compares which setting they refer
+to, so a render using one is still a function of its input screen, and screens are still
+comparable.
+
+## The `Hud`
+
+A story sometimes wants to hide the text window, for example during a CG. That is a request from
 the story to the system. It goes through the screen, keeping the flow one-way:
 
 ```kis
-enum Visibility { Shown, Hidden }
+pub enum Visibility { Shown, Hidden }
 
-struct Hud {
-    text_frame: Visibility,
-    quick_menu: Visibility,
+impl Hud {
+    #[builtin] pub const fn text_window(&mut self) -> &mut Prop<Visibility>;
+    #[builtin] pub const fn quick_menu(&mut self) -> &mut Prop<Visibility>;
+    #[builtin] pub const fn side_image(&mut self) -> &mut ImageLayer;
 }
 ```
 
-`Hud` is a resource component of the screen. A render sets it like any other component, and the
-game view of the system reads it from the screen. The story never reads the HUD, the HUD reads
-the story's output, and as part of the screen it is covered by the consistency analysis and the
-screen snapshot.
+`Hud` is a resource of the screen, reached with `screen.hud()`. A render changes it like any other
+property or layer, and the game view of the system reads it through the `Narrative` handle. The
+story never reads the HUD, the HUD reads the story's output, and as part of the logical screen it
+is covered by the consistency analysis and the screen snapshot.
 
 ```kix
-s!(render = |mut screen| { screen.hud().text_frame = Visibility::Hidden; screen });
+s!(render = |mut screen| { screen.hud().text_window().change(Visibility::Hidden).apply_animation(instant()); screen });
 ```
+
+A `Prop<Visibility>` interpolates as a fade, so `tween(ms(300))` instead of `instant()` fades the
+window out. The side image is the speaker's face shown next to the text, swapped with a
+`Transition` like any layer.
 
 ## The standard screen API
 
-*Tentative.* The shapes below are the ones this book's examples use; the real library replaces
-them.
-
-```kis
-// std::screen
-pub struct Screen;
-
-impl Screen {
-    #[builtin] pub const fn empty() -> Screen;
-    #[builtin] pub const fn entity(&mut self, id: EntityId) -> &mut Entity;
-    #[builtin] pub const fn background(&mut self) -> &mut Layer;
-    #[builtin] pub const fn hud(&mut self) -> &mut Hud;
-}
-
-pub type EntityId = u64;
-pub type ImageId = u64;
-
-pub struct Entity { pub cord: Cord, pub appearance: Appearance }
-pub struct Cord { pub x: i64, pub y: i64 }
-pub struct Appearance { pub emotion: Layer }
-pub struct Layer { pub image: ImageId }
-
-impl Cord {
-    #[builtin] pub const fn apply_animation(&mut self, animation: CordAnimation);
-}
-
-impl Layer {
-    #[builtin] pub const fn change(&mut self, image: ImageId) -> &mut LayerImageChange;
-}
-
-#[must_use]
-pub struct LayerImageChange { pub image: ImageId }
-
-impl LayerImageChange {
-    #[builtin] pub const fn apply_animation(&mut self, transition: TransitionAnimation);
-}
-
-pub struct CordAnimation { pub height: u64, pub frames: u64 }
-pub struct TransitionAnimation { pub frames: u64 }
-
-pub const fn jump(height: u64) -> CordAnimation { CordAnimation { height, frames: 12 } }
-pub const fn instant_switch() -> TransitionAnimation { TransitionAnimation { frames: 0 } }
-pub const fn fade(frames: u64) -> TransitionAnimation { TransitionAnimation { frames } }
-```
+The screen API is defined by the standard library book. Chapter *Screen* covers geometry and
+colours, planes and drawing order, entities with their spawn defaults and despawning, properties
+and layers, the Hud, the choice menu, the camera, filters and blend modes. Chapter *Animation*
+covers the step's timeline (`wait`, `barrier`, `at_mark`, `begin_text`), what a click and skip
+mode do to it, easings, tweens, transitions and motions with their presets. Chapter *Audio* covers
+channels, loops and one-shot sounds, and chapter *Stage* the character layer built on top.
 
 `#[builtin]` functions have no body: the engine implements them, as the interface to the ECS
 world of the screen. Everything else is ordinary `const fn` code, evaluated by the compiler like

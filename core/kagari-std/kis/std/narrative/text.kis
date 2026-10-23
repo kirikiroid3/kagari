@@ -1,11 +1,361 @@
-//! Text values, and the functions `t![…]` desugars to.
+//! Text values, text effects and styles, and the functions `t![…]` desugars to.
 
+use crate::screen::{Color, Offset};
+use crate::time::Duration;
+
+/// Constant text: plain (`"Mio"`) or rich (`t![…]`).
 #[builtin] pub struct Text;
-#[builtin] pub struct TextEffect;
-
+/// `base` with `reading` set over it as ruby.
 #[builtin] pub const fn ruby(base: Text, reading: Text) -> Text;
+/// `base` with one ruby reading per character.
 #[builtin] pub const fn mono_ruby<const N: usize>(base: Text, readings: [Text; N]) -> Text;
+/// `base` with `effect` applied to it.
 #[builtin] pub const fn effect(base: Text, effect: TextEffect) -> Text;
+/// The items one after another.
 #[builtin] pub const fn concat<const N: usize>(items: [Text; N]) -> Text;
 
-#[builtin] pub const fn emphasis() -> TextEffect;
+/// Types a `{expr}` item of `t![…]` may interpolate.
+pub trait ToText {}
+impl ToText for Text {}
+impl ToText for String {}
+impl<const LO: i128, const HI: i128> ToText for Int<LO, HI> {}
+impl ToText for u8 {}
+impl ToText for u16 {}
+impl ToText for u32 {}
+impl ToText for u64 {}
+impl ToText for u128 {}
+impl ToText for i8 {}
+impl ToText for i16 {}
+impl ToText for i32 {}
+impl ToText for i64 {}
+impl ToText for i128 {}
+impl ToText for usize {}
+impl ToText for isize {}
+impl ToText for Rat {}
+impl ToText for Decimal {}
+/// `value` as text; what `{expr}` in `t![…]` desugars to.
+#[builtin] pub const fn to_text<T: ToText>(value: T) -> Text;
+
+/// A named point in a text's reveal, which renders can anchor the timeline on.
+pub struct Mark(pub u8);
+/// Font weight.
+pub enum Weight {
+    Regular,
+    Bold,
+}
+/// How emphasized text is drawn.
+pub enum Emphasis {
+    /// The window's `TextStyle::emphasis`.
+    Styled,
+    /// Emphasis dots over every character.
+    Dots,
+}
+/// How fast text appears.
+pub enum Reveal {
+    /// The `text_speed` setting.
+    Player,
+    /// An absolute time per character.
+    PerChar(Duration),
+    /// The player's speed times a factor greater than 0.
+    Scaled(Decimal),
+    /// All at once.
+    Instant,
+}
+/// A stop in the reveal before the effect's base.
+pub enum Pause {
+    /// Stops for a time.
+    Time(Duration),
+    /// Stops until a click, which continues the text.
+    Click,
+}
+/// A text outline.
+pub struct Outline {
+    pub color: Color,
+    pub width: u32,
+}
+/// A text shadow.
+pub struct Shadow {
+    pub color: Color,
+    pub offset: Offset,
+    pub blur: u32,
+}
+
+/// Styles and cues applied to a piece of text; `None` fields inherit.
+pub struct TextEffect {
+    pub color: Option<Color>,
+    /// A scale of the window's text size.
+    pub size: Option<Decimal>,
+    pub weight: Option<Weight>,
+    pub italic: Option<bool>,
+    pub font: Option<FontAsset>,
+    pub outline: Option<Outline>,
+    pub shadow: Option<Shadow>,
+    pub emphasis: Option<Emphasis>,
+    pub reveal: Option<Reveal>,
+    pub pause: Option<Pause>,
+    pub mark: Option<Mark>,
+}
+
+/// The effect that changes nothing.
+pub const PLAIN: TextEffect = TextEffect {
+    color: None,
+    size: None,
+    weight: None,
+    italic: None,
+    font: None,
+    outline: None,
+    shadow: None,
+    emphasis: None,
+    reveal: None,
+    pause: None,
+    mark: None,
+};
+
+/// `right` if it is set, else `left`.
+const fn either<T>(left: Option<T>, right: Option<T>) -> Option<T> {
+    match right {
+        Some(value) => Some(value),
+        None => left,
+    }
+}
+
+impl TextEffect {
+    /// Right-biased merge: fields set in `other` win.
+    pub const fn and(self, other: TextEffect) -> TextEffect {
+        TextEffect {
+            color: either(self.color, other.color),
+            size: either(self.size, other.size),
+            weight: either(self.weight, other.weight),
+            italic: either(self.italic, other.italic),
+            font: either(self.font, other.font),
+            outline: either(self.outline, other.outline),
+            shadow: either(self.shadow, other.shadow),
+            emphasis: either(self.emphasis, other.emphasis),
+            reveal: either(self.reveal, other.reveal),
+            pause: either(self.pause, other.pause),
+            mark: either(self.mark, other.mark),
+        }
+    }
+}
+
+/// Text in `color`.
+pub const fn color_text(color: Color) -> TextEffect {
+    let mut effect = PLAIN;
+    effect.color = Some(color);
+    effect
+}
+
+/// Text at `scale` times the window's text size.
+pub const fn size(scale: Decimal) -> TextEffect {
+    let mut effect = PLAIN;
+    effect.size = Some(scale);
+    effect
+}
+
+/// Bold text.
+pub const fn bold() -> TextEffect {
+    let mut effect = PLAIN;
+    effect.weight = Some(Weight::Bold);
+    effect
+}
+
+/// Italic text.
+pub const fn italic() -> TextEffect {
+    let mut effect = PLAIN;
+    effect.italic = Some(true);
+    effect
+}
+
+/// Text in `font`.
+pub const fn font(font: FontAsset) -> TextEffect {
+    let mut effect = PLAIN;
+    effect.font = Some(font);
+    effect
+}
+
+/// Text with an outline.
+pub const fn outline(color: Color, width: u32) -> TextEffect {
+    let mut effect = PLAIN;
+    effect.outline = Some(Outline { color, width });
+    effect
+}
+
+/// Text with a shadow.
+pub const fn shadow(color: Color, offset: Offset, blur: u32) -> TextEffect {
+    let mut effect = PLAIN;
+    effect.shadow = Some(Shadow { color, offset, blur });
+    effect
+}
+
+/// Emphasized text, drawn with the window's emphasis style.
+pub const fn emphasis() -> TextEffect {
+    let mut effect = PLAIN;
+    effect.emphasis = Some(Emphasis::Styled);
+    effect
+}
+
+/// Text with emphasis dots (bouten) over every character.
+pub const fn dots() -> TextEffect {
+    let mut effect = PLAIN;
+    effect.emphasis = Some(Emphasis::Dots);
+    effect
+}
+
+/// Text revealed at `per_char` per character.
+pub const fn speed(per_char: Duration) -> TextEffect {
+    let mut effect = PLAIN;
+    effect.reveal = Some(Reveal::PerChar(per_char));
+    effect
+}
+
+/// Text revealed at the player's speed times `scale`.
+pub const fn speed_scale(scale: Decimal) -> TextEffect {
+    let mut effect = PLAIN;
+    effect.reveal = Some(Reveal::Scaled(scale));
+    effect
+}
+
+/// Text shown at once.
+pub const fn reveal_instant() -> TextEffect {
+    let mut effect = PLAIN;
+    effect.reveal = Some(Reveal::Instant);
+    effect
+}
+
+/// A stop of `duration` in the reveal before the base.
+pub const fn pause(duration: Duration) -> TextEffect {
+    let mut effect = PLAIN;
+    effect.pause = Some(Pause::Time(duration));
+    effect
+}
+
+/// A stop in the reveal until a click; the click continues the text.
+pub const fn click_wait() -> TextEffect {
+    let mut effect = PLAIN;
+    effect.pause = Some(Pause::Click);
+    effect
+}
+
+/// Mark `n`: the time the reveal reaches this point.
+pub const fn mark(n: u8) -> TextEffect {
+    let mut effect = PLAIN;
+    effect.mark = Some(Mark(n));
+    effect
+}
+
+/// Horizontal text alignment.
+pub enum TextAlign {
+    Start,
+    Center,
+    End,
+}
+/// How `Emphasis::Styled` text is drawn.
+pub enum EmphasisStyle {
+    Dots,
+    Bold,
+    Italic,
+}
+
+/// The style of a text box.
+pub struct TextStyle {
+    /// `None`: the engine's default font.
+    pub font: Option<FontAsset>,
+    /// Pixels.
+    pub size: u32,
+    pub color: Color,
+    /// A multiple of `size`.
+    pub line_height: Decimal,
+    /// Pixels between characters.
+    pub letter_spacing: i32,
+    pub align: TextAlign,
+    pub outline: Option<Outline>,
+    pub shadow: Option<Shadow>,
+    /// Pixels.
+    pub ruby_size: u32,
+    pub emphasis: EmphasisStyle,
+    /// Wrapped lines of a line that starts with an opening bracket indent by the bracket's width.
+    pub hanging_indent: bool,
+    /// Vertical writing.
+    pub vertical: bool,
+}
+
+/// A style with font None, line_height 1.5, letter_spacing 0, Start, no outline or shadow,
+/// ruby_size = size / 2, emphasis Dots, hanging_indent false and vertical false.
+pub const fn text_style(size: u32, color: Color) -> TextStyle {
+    TextStyle {
+        font: None,
+        size,
+        color,
+        line_height: 1.5,
+        letter_spacing: 0,
+        align: TextAlign::Start,
+        outline: None,
+        shadow: None,
+        ruby_size: size / 2,
+        emphasis: EmphasisStyle::Dots,
+        hanging_indent: false,
+        vertical: false,
+    }
+}
+
+impl TextStyle {
+    /// This style in `font`.
+    pub const fn font(mut self, font: FontAsset) -> TextStyle {
+        self.font = Some(font);
+        self
+    }
+
+    /// This style with line height `value` times the size.
+    pub const fn line_height(mut self, value: Decimal) -> TextStyle {
+        self.line_height = value;
+        self
+    }
+
+    /// This style with `value` pixels between characters.
+    pub const fn letter_spacing(mut self, value: i32) -> TextStyle {
+        self.letter_spacing = value;
+        self
+    }
+
+    /// This style aligned to `value`.
+    pub const fn align(mut self, value: TextAlign) -> TextStyle {
+        self.align = value;
+        self
+    }
+
+    /// This style with an outline.
+    pub const fn outline(mut self, value: Outline) -> TextStyle {
+        self.outline = Some(value);
+        self
+    }
+
+    /// This style with a shadow.
+    pub const fn shadow(mut self, value: Shadow) -> TextStyle {
+        self.shadow = Some(value);
+        self
+    }
+
+    /// This style with ruby at `value` pixels.
+    pub const fn ruby_size(mut self, value: u32) -> TextStyle {
+        self.ruby_size = value;
+        self
+    }
+
+    /// This style drawing `Emphasis::Styled` text as `value`.
+    pub const fn emphasis(mut self, value: EmphasisStyle) -> TextStyle {
+        self.emphasis = value;
+        self
+    }
+
+    /// This style with or without hanging indent.
+    pub const fn hanging_indent(mut self, value: bool) -> TextStyle {
+        self.hanging_indent = value;
+        self
+    }
+
+    /// This style written vertically or horizontally.
+    pub const fn vertical(mut self, value: bool) -> TextStyle {
+        self.vertical = value;
+        self
+    }
+}

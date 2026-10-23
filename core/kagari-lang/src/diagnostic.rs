@@ -138,7 +138,7 @@ codes! {
     ItemMissingBody = "item/missing-body";
     ItemMissingValue = "item/missing-value";
 
-    LowerUiForm = "lower/ui-form-not-designed";
+    LowerUiForm = "lower/ui-form-not-implemented";
 
     ResolveDuplicate = "resolve/duplicate-definition";
     ResolveUnresolvedImport = "resolve/unresolved-import";

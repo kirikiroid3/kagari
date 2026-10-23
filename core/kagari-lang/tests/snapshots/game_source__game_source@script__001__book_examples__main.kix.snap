@@ -5,7 +5,8 @@ input_file: core/kagari-lang/tests/game_source/script/001__book_examples/main.ki
 ---
 no diagnostics
 --- resolutions ---
-script/001__book_examples/main.kix:3:15 EntityId -> type std::screen::EntityId
+script/001__book_examples/main.kix:3:15 EntityId -> struct std::screen::EntityId
+script/001__book_examples/main.kix:3:26 EntityId -> struct std::screen::EntityId
 script/001__book_examples/main.kix:7:23 bool -> prim bool
 script/001__book_examples/main.kix:8:23 bool -> prim bool
 script/001__book_examples/main.kix:9:23 bool -> prim bool
@@ -51,7 +52,8 @@ script/001__book_examples/main.kix:82:35 Screen -> struct std::screen::Screen
 script/001__book_examples/main.kix:82:46 Screen -> struct std::screen::Screen
 script/001__book_examples/main.kix:83:5 screen -> local screen@82:23
 script/001__book_examples/main.kix:83:19 HANAKO -> const crate::HANAKO
-script/001__book_examples/main.kix:83:48 jump -> fn std::screen::jump
+script/001__book_examples/main.kix:83:43 jump -> fn std::screen::anim::jump
+script/001__book_examples/main.kix:83:52 ms -> fn std::time::ms
 script/001__book_examples/main.kix:84:5 screen -> local screen@82:23
 script/001__book_examples/main.kix:89:19 stall -> local stall@89:19
 script/001__book_examples/main.kix:89:26 Map -> enum crate::Map

@@ -1,23 +1,23 @@
-const HANAKO: EntityId = 216;
-const AZUSA: EntityId = 217;
+const HANAKO: EntityId = EntityId(216);
+const AZUSA: EntityId = EntityId(217);
 
 mod AZUSA {
-    pub const CLOSE_EYE_SMILE: ImageId = 10;
+    pub const CLOSE_EYE_SMILE: ImageAsset = asset("azusa_close_eye_smile.png");
 }
 
 mod BG {
-    pub const ROOF: ImageId = 1;
-    pub const ROOF_EVENING: ImageId = 2;
+    pub const ROOF: ImageAsset = asset("bg_roof.png");
+    pub const ROOF_EVENING: ImageAsset = asset("bg_roof_evening.png");
 }
 
 const fn azusa_smiles(mut screen: Screen) -> Screen {
-    screen.entity(HANAKO).cord.apply_animation(jump(20));
-    screen.entity(AZUSA).appearance.emotion.change(AZUSA::CLOSE_EYE_SMILE).apply_animation(instant_switch());
+    screen.entity(HANAKO).apply_animation(jump(20, ms(300)));
+    screen.entity(AZUSA).image().change(AZUSA::CLOSE_EYE_SMILE).apply_animation(cut());
     screen
 }
 
 const fn roof_background(mut screen: Screen) -> Screen {
-    screen.background().change(BG::ROOF).apply_animation(fade(30));
+    screen.background().change(BG::ROOF).apply_animation(fade(ms(500)));
     screen
 }
 
@@ -27,7 +27,7 @@ const fn roof_scene(screen: Screen) -> Screen {
 
 const fn roof_evening(_screen: Screen) -> Screen {
     let mut screen = Screen::empty();
-    screen.background().change(BG::ROOF_EVENING).apply_animation(fade(30));
+    screen.background().change(BG::ROOF_EVENING).apply_animation(fade(ms(500)));
     screen
 }
 
@@ -35,10 +35,10 @@ const fn roof_evening(_screen: Screen) -> Screen {
 pushdown fn Roof() {
     s!(who = "Azusa", render = azusa_smiles, t!["Did you forget again?"]);
     s!(
-        render = |mut screen| { screen.background().change(BG::ROOF).apply_animation(fade(30)); screen },
+        render = |mut screen| { screen.background().change(BG::ROOF).apply_animation(fade(ms(500))); screen },
         t!["The wind on the roof is cold."]
     );
-    s!(render = |mut screen| { screen.hud().text_frame = Visibility::Hidden; screen });
+    s!(render = |mut screen| { screen.hud().text_window().change(Visibility::Hidden).apply_animation(instant()); screen });
     s!(render = roof_scene);
     s!(render = roof_evening);
 }

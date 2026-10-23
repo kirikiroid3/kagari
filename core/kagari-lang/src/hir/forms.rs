@@ -1,5 +1,6 @@
 //! Desugaring of forms: `s!(…)` and `choice!{…}` become `push_step` calls, `t![…]` becomes
-//! calls of the `std::narrative::text` builtins. Synthesized nodes get the whole form's range.
+//! calls of the `std::narrative::text` builtins (`ruby`, `mono_ruby`, `effect`, `concat`, and
+//! `to_text` for each `{expr}`). Synthesized nodes get the whole form's range.
 
 use kagari_syntax::TextRange;
 use kagari_syntax::ast::{self, AstNode, HasName};
@@ -83,7 +84,7 @@ impl Lowerer<'_> {
                 self.diag(
                     range,
                     DiagnosticCode::LowerUiForm,
-                    "UI forms are not designed yet".to_owned(),
+                    "UI form lowering is not implemented yet".to_owned(),
                 );
                 self.missing(range)
             }
@@ -177,7 +178,10 @@ impl Lowerer<'_> {
                     let effect = self.lower_expr_opt(it.effect(), range);
                     self.lang_call(LangItem::Effect, vec![base, effect], range)
                 }
-                ast::TextItem::TextInterp(it) => self.lower_expr_opt(it.expr(), range),
+                ast::TextItem::TextInterp(it) => {
+                    let value = self.lower_expr_opt(it.expr(), range);
+                    self.lang_call(LangItem::ToText, vec![value], range)
+                }
             };
             items.push(lowered);
         }

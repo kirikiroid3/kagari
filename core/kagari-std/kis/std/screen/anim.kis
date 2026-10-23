@@ -1,0 +1,245 @@
+//! Animation values: easings, tweens for properties, transitions for layers, and relative
+//! motions.
+
+use crate::screen::{Angle, Color, Offset, degrees, offset};
+use crate::time::{Duration, ZERO, ms};
+
+/// A timing curve (easings.net); `In` means a slow start.
+pub enum Easing {
+    Linear,
+    InQuad,
+    OutQuad,
+    InOutQuad,
+    InCubic,
+    OutCubic,
+    InOutCubic,
+    InQuart,
+    OutQuart,
+    InOutQuart,
+    InQuint,
+    OutQuint,
+    InOutQuint,
+    InSine,
+    OutSine,
+    InOutSine,
+    InExpo,
+    OutExpo,
+    InOutExpo,
+    InCirc,
+    OutCirc,
+    InOutCirc,
+    InBack,
+    OutBack,
+    InOutBack,
+    InElastic,
+    OutElastic,
+    InOutElastic,
+    InBounce,
+    OutBounce,
+    InOutBounce,
+    /// CSS `cubic-bezier(x1, y1, x2, y2)`; `x1` and `x2` must lie in 0.0..=1.0.
+    CubicBezier(Decimal, Decimal, Decimal, Decimal),
+    /// Jumps at the end of each of `n` equal intervals; `n` must not be 0.
+    Steps(u32),
+}
+
+/// How a property moves from its old value to its new one.
+pub struct Tween {
+    pub duration: Duration,
+    pub easing: Easing,
+    pub delay: Duration,
+}
+/// A linear tween over `duration`, without delay.
+pub const fn tween(duration: Duration) -> Tween {
+    Tween { duration, easing: Easing::Linear, delay: ZERO }
+}
+/// A tween that takes no time.
+pub const fn instant() -> Tween {
+    tween(ZERO)
+}
+impl Tween {
+    /// This tween with `easing`.
+    pub const fn ease(mut self, easing: Easing) -> Tween {
+        self.easing = easing;
+        self
+    }
+
+    /// This tween, starting `delay` after the cursor.
+    pub const fn delay(mut self, delay: Duration) -> Tween {
+        self.delay = delay;
+        self
+    }
+}
+
+/// A direction on the screen.
+pub enum Direction {
+    Left,
+    Right,
+    Up,
+    Down,
+}
+/// How a layer swaps its old content for its new one.
+pub enum TransitionKind {
+    /// Switches at the start.
+    Cut,
+    /// The old content fades out while the new one fades in.
+    Crossfade,
+    /// A pixel switches once the mask's luminance is at most the sweeping threshold.
+    Rule { mask: ImageAsset, softness: u8, reverse: bool },
+    /// Reveals the new content moving in a direction.
+    Wipe(Direction),
+    /// `count` stripes perpendicular to `direction`, each wiping.
+    Blinds { direction: Direction, count: u32 },
+    /// Fades to `color`, holds it, then fades in the new content.
+    ThroughColor { color: Color, hold: Duration },
+}
+/// A layer swap with its timing.
+pub struct Transition {
+    pub kind: TransitionKind,
+    pub duration: Duration,
+    pub easing: Easing,
+    pub delay: Duration,
+}
+/// A linear transition of `kind` over `duration`, without delay.
+const fn transition(kind: TransitionKind, duration: Duration) -> Transition {
+    Transition { kind, duration, easing: Easing::Linear, delay: ZERO }
+}
+/// An immediate switch.
+pub const fn cut() -> Transition {
+    transition(TransitionKind::Cut, ZERO)
+}
+/// A crossfade over `duration`.
+pub const fn fade(duration: Duration) -> Transition {
+    transition(TransitionKind::Crossfade, duration)
+}
+/// A rule (mask) transition with hard edges.
+pub const fn rule(mask: ImageAsset, duration: Duration) -> Transition {
+    rule_with(mask, 0, false, duration)
+}
+/// A rule (mask) transition with a blend ramp of `softness` luminance units.
+pub const fn rule_with(mask: ImageAsset, softness: u8, reverse: bool, duration: Duration) -> Transition {
+    transition(TransitionKind::Rule { mask, softness, reverse }, duration)
+}
+/// A wipe moving in `direction`.
+pub const fn wipe(direction: Direction, duration: Duration) -> Transition {
+    transition(TransitionKind::Wipe(direction), duration)
+}
+/// `count` stripes wiping in `direction`.
+pub const fn blinds(direction: Direction, count: u32, duration: Duration) -> Transition {
+    transition(TransitionKind::Blinds { direction, count }, duration)
+}
+/// A fade through `color`, held for `hold`; the total is `duration + hold`.
+pub const fn through(color: Color, duration: Duration, hold: Duration) -> Transition {
+    transition(TransitionKind::ThroughColor { color, hold }, duration)
+}
+impl Transition {
+    /// This transition with `easing`.
+    pub const fn ease(mut self, easing: Easing) -> Transition {
+        self.easing = easing;
+        self
+    }
+
+    /// This transition, starting `delay` after the cursor.
+    pub const fn delay(mut self, delay: Duration) -> Transition {
+        self.delay = delay;
+        self
+    }
+}
+
+/// A key of a motion: a transform relative to the current value, reached at `at`.
+pub struct MotionKey {
+    pub at: Duration,
+    pub offset: Offset,
+    pub scale: Decimal,
+    pub rotation: Angle,
+    /// The easing of the segment that ends at this key.
+    pub easing: Easing,
+}
+/// A relative path that starts and ends at identity.
+pub struct Motion {
+    pub keys: Vec<MotionKey>,
+    pub repeat: u32,
+    pub delay: Duration,
+}
+/// A motion without keys, played once.
+pub const fn motion() -> Motion {
+    Motion { keys: Vec::new(), repeat: 1, delay: ZERO }
+}
+impl Motion {
+    /// Appends a key with scale 1.0, rotation 0°, easing Linear.
+    pub const fn key(self, at: Duration, offset: Offset) -> Motion {
+        self.key_full(at, offset, 1.0, degrees(0.0))
+    }
+
+    /// Appends a key with easing Linear.
+    pub const fn key_full(mut self, at: Duration, offset: Offset, scale: Decimal, rotation: Angle) -> Motion {
+        self.keys.push(MotionKey { at, offset, scale, rotation, easing: Easing::Linear });
+        self
+    }
+
+    /// Sets the easing of the segment that ends at the last key.
+    pub const fn ease(mut self, easing: Easing) -> Motion {
+        let count = self.keys.len();
+        if count > 0 {
+            if let Some(mut last) = self.keys.get(count - 1) {
+                last.easing = easing;
+                self.keys.set(count - 1, last);
+            }
+        }
+        self
+    }
+
+    /// This motion played `times` times; 0 is an evaluation error.
+    pub const fn repeat(mut self, times: u32) -> Motion {
+        self.repeat = times;
+        self
+    }
+
+    /// This motion, starting `delay` after the cursor.
+    pub const fn delay(mut self, delay: Duration) -> Motion {
+        self.delay = delay;
+        self
+    }
+}
+
+/// Rises by `height` and lands, over `duration`.
+pub const fn jump(height: i32, duration: Duration) -> Motion {
+    motion()
+        .key(duration.div(2), offset(0, -height))
+        .ease(Easing::OutQuad)
+        .key(duration, offset(0, 0))
+        .ease(Easing::InQuad)
+}
+
+/// Dips by `depth` and comes back, over `duration`.
+pub const fn nod(depth: i32, duration: Duration) -> Motion {
+    motion()
+        .key(duration.div(2), offset(0, depth))
+        .ease(Easing::OutQuad)
+        .key(duration, offset(0, 0))
+        .ease(Easing::InQuad)
+}
+
+/// Shakes sideways by `amplitude`, `count` times over `duration`.
+pub const fn shake(amplitude: i32, duration: Duration, count: u32) -> Motion {
+    let cycle = if count == 0 { duration } else { duration.div(count) };
+    motion()
+        .key(cycle.div(4), offset(-amplitude, 0))
+        .key(cycle.times(3).div(4), offset(amplitude, 0))
+        .key(cycle, offset(0, 0))
+        .repeat(count)
+}
+
+/// Shakes diagonally by `horizontal` and `vertical` every 50 ms, over `duration`.
+pub const fn quake(horizontal: i32, vertical: i32, duration: Duration) -> Motion {
+    let mut result = motion();
+    for k in 1..duration.ms / 50 {
+        let shift = if k % 2 == 1 {
+            offset(horizontal, -vertical)
+        } else {
+            offset(-horizontal, vertical)
+        };
+        result = result.key(ms(k * 50), shift);
+    }
+    result.key(duration, offset(0, 0))
+}

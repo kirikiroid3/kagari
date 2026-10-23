@@ -13,7 +13,7 @@ comparison decidable.
 | `Decimal` | exact decimals | `fn`, `const fn`; constants anywhere |
 
 "Constants anywhere" means a constant expression of these types may appear in a `pushdown fn`,
-for example `fade(30)` inside a render chosen at compile time, because it is folded. A
+for example `fade(ms(500))` inside a render chosen at compile time, because it is folded. A
 `pushdown fn` may not hold one at runtime: a local, parameter, return value or story variable of
 such a type is an error (see [Finite types](./kinds.md#finite-types)).
 

@@ -1,0 +1,98 @@
+//! Characters on the stage: the layer studios used to build by hand, written with `const fn`
+//! helpers over the screen. Slots are studio `Point` constants; faces are `ImageAsset` constants.
+
+use crate::screen::{Anchor, EntityId, Offset, Plane, Point, Screen, TOP_LEFT, offset, point};
+use crate::screen::anim::{Motion, Transition, Tween, cut, fade, instant};
+
+/// How a character is placed: its entity, an offset added to every slot, and its layout.
+pub struct Character {
+    pub entity: EntityId,
+    pub offset: Offset,
+    pub anchor: Anchor,
+    pub plane: Plane,
+    pub z: i32,
+}
+/// A character drawn by `entity`, without offset, anchored top-left on the `Stage` plane at z 0.
+pub const fn character(entity: EntityId) -> Character {
+    Character { entity, offset: offset(0, 0), anchor: TOP_LEFT, plane: Plane::Stage, z: 0 }
+}
+impl Character {
+    /// This character shifted by `offset` at every slot.
+    pub const fn offset(mut self, offset: Offset) -> Character {
+        self.offset = offset;
+        self
+    }
+
+    /// This character anchored at `anchor`.
+    pub const fn anchor(mut self, anchor: Anchor) -> Character {
+        self.anchor = anchor;
+        self
+    }
+
+    /// This character on `plane`.
+    pub const fn plane(mut self, plane: Plane) -> Character {
+        self.plane = plane;
+        self
+    }
+
+    /// This character at order `z` in its plane.
+    pub const fn z(mut self, z: i32) -> Character {
+        self.z = z;
+        self
+    }
+
+    /// Shows the character with `face` at `at`, fading in, or moves and crossfades it if it is
+    /// already on the screen.
+    pub const fn show(self, screen: &mut Screen, face: ImageAsset, at: Point, tween: Tween) {
+        let target = point(at.x + self.offset.dx, at.y + self.offset.dy);
+        if screen.contains(self.entity) {
+            screen.entity(self.entity).image().change(face).apply_animation(fade(tween.duration));
+            screen.entity(self.entity).position().change(target).apply_animation(tween);
+        } else {
+            screen.entity(self.entity).set_plane(self.plane);
+            screen.entity(self.entity).set_z(self.z);
+            screen.entity(self.entity).set_anchor(self.anchor);
+            screen.entity(self.entity).position().change(target).apply_animation(instant());
+            screen.entity(self.entity).image().change(face).apply_animation(cut());
+        }
+        screen.entity(self.entity).opacity().change(1.0).apply_animation(tween);
+    }
+
+    /// Changes the face with `transition`.
+    pub const fn face(self, screen: &mut Screen, face: ImageAsset, transition: Transition) {
+        screen.entity(self.entity).image().change(face).apply_animation(transition);
+    }
+
+    /// Moves the character to `at`.
+    pub const fn move_to(self, screen: &mut Screen, at: Point, tween: Tween) {
+        let target = point(at.x + self.offset.dx, at.y + self.offset.dy);
+        screen.entity(self.entity).position().change(target).apply_animation(tween);
+    }
+
+    /// Fades the character out and despawns it.
+    pub const fn hide(self, screen: &mut Screen, tween: Tween) {
+        screen.entity(self.entity).opacity().change(0.0).apply_animation(tween);
+        screen.despawn(self.entity);
+    }
+
+    /// Plays `motion` on the character.
+    pub const fn act(self, screen: &mut Screen, motion: Motion) {
+        screen.entity(self.entity).apply_animation(motion);
+    }
+}
+
+/// Fades out and despawns every entity on the `Stage` plane.
+pub const fn hide_all(screen: &mut Screen, tween: Tween) {
+    for id in screen.entities(Plane::Stage) {
+        screen.entity(id).opacity().change(0.0).apply_animation(tween);
+        screen.despawn(id);
+    }
+}
+
+/// Shows `face` as the Hud's side image, or clears it, with `transition`.
+pub const fn side_face(screen: &mut Screen, face: Option<ImageAsset>, transition: Transition) {
+    match face {
+        Some(face) => screen.hud().side_image().change(face).apply_animation(transition),
+        None => screen.hud().side_image().clear().apply_animation(transition),
+    }
+}

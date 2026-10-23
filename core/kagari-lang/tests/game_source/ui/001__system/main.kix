@@ -1,3 +1,7 @@
+use std::narrative::text::text_style;
+use std::screen::size;
+use std::system::default_bindings;
+
 mod story {
     pub enum Ending { NormalEnd, AzusaEnd }
 
@@ -16,32 +20,62 @@ mod ui {
         super::Credits()
     }
 
-    pub fn GameView() -> Element {
-        GameView()
+    pub fn GameView(game: Narrative) -> Element {
+        game_screen!(game = game)
     }
 }
 
-static TEXT_SPEED: Setting<Int<0, 10>> = setting(5);
-static BGM_VOLUME: Setting<Int<0, 100>> = setting(80);
+static TEXT_SPEED: Setting<Duration> = setting(ms(30));
+static AUTO_DELAY: Setting<Duration> = setting(ms(1300));
+static AUTO_DELAY_PER_CHAR: Setting<Duration> = setting(ms(60));
+static SKIP_UNREAD: Setting<bool> = setting(false);
+static MASTER: Setting<Volume> = setting(volume(100));
+static MUSIC: Setting<Volume> = setting(volume(60));
+static SOUND: Setting<Volume> = setting(volume(100));
+static VOICE: Setting<Volume> = setting(volume(100));
+static VOICE_SUSTAIN: Setting<bool> = setting(false);
+static WAIT_FOR_VOICE: Setting<bool> = setting(true);
+static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
+static FULLSCREEN: Setting<bool> = setting(false);
+static ANIMATIONS: Setting<bool> = setting(true);
 static CLEARED_AZUSA: Meta<bool> = meta(false);
 
 fn main() -> System {
     System {
+        title: "Example",
+        resolution: size(1280, 720),
         start: ui::Title,
         game: ui::GameView,
-        save_slots: 6,
+        save_slots: 20,
+        auto_slots: 3,
+        backlog: 200,
+        text: text_style(26, WHITE),
+        settings: Settings {
+            text_speed: TEXT_SPEED,
+            auto_delay: AUTO_DELAY,
+            auto_delay_per_char: AUTO_DELAY_PER_CHAR,
+            skip_unread: SKIP_UNREAD,
+            master: MASTER,
+            music: MUSIC,
+            sound: SOUND,
+            voice: VOICE,
+            voice_sustain: VOICE_SUSTAIN,
+            wait_for_voice: WAIT_FOR_VOICE,
+            window_opacity: WINDOW_OPACITY,
+            fullscreen: FULLSCREEN,
+            animations: ANIMATIONS,
+        },
+        bindings: default_bindings(),
     }
 }
 
 fn Config() -> Overlay {
-    let (speed, set_speed) = signal(TEXT_SPEED.get());
+    let (music, set_music) = signal(MUSIC.get());
     Overlay(column![
-        text!(t!["Text speed: " {speed()}]),
+        text!(t!["Music: " {music().level}]),
         slider!{
-            min = 0,
-            max = 10,
-            value = speed(),
-            on_change = |v| { set_speed(v); TEXT_SPEED.set(v) },
+            value = music().level,
+            on_change = |v| { let vol = Volume { level: v, muted: music().muted }; set_music(vol); MUSIC.set(vol) },
         },
         button!{on_click = || nav::back(), t!["Back"]},
     ])

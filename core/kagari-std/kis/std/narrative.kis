@@ -1,15 +1,17 @@
-//! Steps, and the system's view of a running story.
+//! Steps, meta fields, and the system's view of a running story.
 
 pub mod text;
 
-pub use self::text::{Text, TextEffect};
-use crate::screen::{Render, Screen};
+pub use self::text::{Mark, Text, TextEffect};
+use crate::screen::{Render, VAlign, Visibility};
+use crate::system::{GameOverlay, saves::SaveSlot};
 
 /// A step the story suspends at; resumes with `Output`.
 pub trait Step {
     type Output;
 }
 
+/// Runs step `s` and resumes with its output.
 #[builtin] pub pushdown fn push_step<S: Step>(s: S) -> S::Output;
 
 /// The step written `s!(…)`.
@@ -31,6 +33,7 @@ pub struct Choice<A, const N: usize> {
     pub arms: [ChoiceArm<A>; N],
 }
 
+/// An arm of a `Choice`.
 pub struct ChoiceArm<A> {
     pub text: Text,
     pub shown: bool,
@@ -44,25 +47,82 @@ impl<A, const N: usize> Step for Choice<A, N> {
 /// A persistent global value outside saves.
 #[builtin] pub struct Meta<T>;
 
+/// A meta field starting at `init`.
 #[builtin] pub const fn meta<T>(init: T) -> Meta<T>;
 
 impl<T> Meta<T> {
+    /// The current value; reactive.
     #[builtin] pub fn get(&self) -> T;
+    /// Sets the value from system code.
     #[builtin] pub fn set(&self, value: T);
+    /// Sets the value from the story.
     #[builtin] pub pushdown fn write(&self, value: T);
 }
 
+/// A handle to the running game, given to the game view and to game overlays. Reads are reactive.
 #[builtin] pub struct Narrative;
-#[builtin] pub struct Line;
-#[builtin] pub struct Choices;
-#[builtin] pub struct History;
-#[builtin] pub struct Save;
-#[builtin] pub struct Divergence;
+impl Narrative {
+    /// The line shown; `None` at a choice or before the first step.
+    #[builtin] pub fn line(&self) -> Option<Line>;
+    /// The choice shown, with its disabled arms; `None` outside a choice.
+    #[builtin] pub fn menu(&self) -> Option<Menu>;
+    /// The Hud of the current step.
+    #[builtin] pub fn hud(&self) -> HudState;
+    /// The backlog, oldest first, bounded by `System::backlog`.
+    #[builtin] pub fn history(&self) -> Vec<Entry>;
+    /// The play mode.
+    #[builtin] pub fn mode(&self) -> PlayMode;
+    /// Sets the play mode.
+    #[builtin] pub fn set_mode(&self, mode: PlayMode);
+    /// Advances to the next step (`NextStep`).
+    #[builtin] pub fn advance(&self);
+    /// Selects a shown arm of the current choice.
+    #[builtin] pub fn select(&self, arm: Arm);
+    /// Saves the game into `slot`.
+    #[builtin] pub fn save(&self, slot: SaveSlot);
+    /// Returns to backlog entry `entry`, an index into `history()`.
+    #[builtin] pub fn rewind(&self, entry: u32);
+    /// Opens a game overlay.
+    #[builtin] pub fn call(&self, overlay: fn(Narrative) -> GameOverlay);
+    /// Plays `voice` again on the voice bus.
+    #[builtin] pub fn replay_voice(&self, voice: VoiceAsset);
+}
 
-#[builtin] pub fn current_line(n: &Narrative) -> Line;
-#[builtin] pub fn choices(n: &Narrative) -> Choices;
-#[builtin] pub fn history(n: &Narrative) -> History;
-#[builtin] pub fn screen(n: &Narrative) -> &Screen;
-#[builtin] pub fn snapshot(n: &Narrative) -> Save;
-#[builtin] pub fn restore(s: Save) -> Result<Narrative, Divergence>;
-#[builtin] pub fn rewind(n: &Narrative, entry: u64) -> Narrative;
+/// A line of a `Say` step.
+pub struct Line {
+    pub who: Option<Text>,
+    pub text: Option<Text>,
+    pub voice: Option<VoiceAsset>,
+    /// Whether the player has read this line before.
+    pub read: bool,
+}
+/// A selectable arm of the current choice.
+#[builtin] pub struct Arm;
+/// An arm of a shown choice.
+pub struct MenuArm {
+    pub text: Text,
+    /// `None`: a disabled arm from the step's `ChoiceMenu`.
+    pub arm: Option<Arm>,
+}
+/// A shown choice.
+pub struct Menu {
+    pub arms: Vec<MenuArm>,
+    pub align: VAlign,
+}
+/// The Hud as the game view draws it.
+pub struct HudState {
+    pub text_window: Visibility,
+    pub quick_menu: Visibility,
+    pub side_image: Option<ImageAsset>,
+}
+/// A backlog entry.
+pub enum Entry {
+    Line(Line),
+    Chosen(Text),
+}
+/// How the game advances.
+pub enum PlayMode {
+    Normal,
+    Auto,
+    Skip,
+}

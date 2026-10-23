@@ -1,6 +1,6 @@
 // Examples of the syntax book and the engine proposal; all of them resolve.
 
-const HANAKO: EntityId = 216;
+const HANAKO: EntityId = EntityId(216);
 
 // introduction.md, narrative/overview.md
 
@@ -80,7 +80,7 @@ pushdown fn FestivalEnd() {
 }
 
 const fn hanako_jumps(mut screen: Screen) -> Screen {
-    screen.entity(HANAKO).cord.apply_animation(jump(20));
+    screen.entity(HANAKO).apply_animation(jump(20, ms(300)));
     screen
 }
 

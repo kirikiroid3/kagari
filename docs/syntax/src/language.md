@@ -9,13 +9,13 @@ value, `::` separates path segments, `.` accesses fields and calls methods.
 | Item | Form | Notes |
 | ---- | ---- | ----- |
 | Function | `fn`, `pushdown fn`, `const fn` | The kind decides what the body may do; see [Function Kinds](./kinds.md) |
-| Struct | `struct Cord { x: i64, y: i64 }` | Named fields, tuple structs and unit structs |
+| Struct | `struct Point { x: i32, y: i32 }` | Named fields, tuple structs and unit structs |
 | Enum | `enum Route { None, Hanako, Azusa }` | Variants may carry data |
-| Constant | `const HANAKO: EntityId = 216;` | The initializer is a constant expression |
+| Constant | `const HANAKO: EntityId = EntityId(216);` | The initializer is a constant expression |
 | Story variable | `static mut ROUTE: Route = Route::None;` | Narrative state; only `pushdown fn` may use it, see [Story variables](./narrative/overview.md#story-variables) |
-| Handle | `static BGM_VOLUME: Setting<Int<0, 100>> = setting(80);` | An immutable static holds a handle to a setting or meta field; see [The Game System](./system.md) |
-| Type alias | `type EntityId = u64;` | |
-| Implementation | `impl Cord { … }` | Methods and associated functions |
+| Handle | `static MUSIC: Setting<Volume> = setting(volume(60));` | An immutable static holds a handle to a setting or meta field; see [The Game System](./system.md) |
+| Type alias | `type Render = const fn(Screen) -> Screen;` | |
+| Implementation | `impl Point { … }` | Methods and associated functions |
 | Module | `mod story;`, `mod ui { … }` | See [Source Files and Modules](./files.md) |
 | Import | `use story::Day1;` | |
 
@@ -28,7 +28,7 @@ Items may be used before their declaration, as in Rust.
 | `#[scene]`    | `pushdown fn` | A scene: may run steps and call other scenes; the unit of model checking. See [Scenes](./narrative/scenes.md#scenes-and-instant-procedures) |
 | `#[entry]`    | `#[scene]` function | An entry scene: the system can start the story here; see [Entry scenes](./narrative/scenes.md#entry-scenes) |
 | `#[must_use]` | `struct`, `enum` | Discarding a value of this type is a warning |
-| `#[builtin]`  | function | Implemented by the engine; no body. Only allowed in the standard library |
+| `#[builtin]`  | function, `struct` | Implemented by the engine: a function has no body, a type has no visible fields. Only allowed in the standard library |
 
 Any other attribute is an error.
 
@@ -39,7 +39,7 @@ Any other attribute is an error.
 | Booleans, unit | `bool`, `()` |
 | Bounded integers | `Int<0, 5>`; see [Numbers](./numbers.md) |
 | Rust integers, exact numbers | `u8` … `i128`, `usize`, `isize`, `Rat`, `Decimal`; see [Numbers](./numbers.md) |
-| Text | `Text`: constant text, plain (`"Mio"`) or rich (`t![…]`); `String`: a runtime string |
+| Text | `Text`: constant text, plain (`"Mio"`) or rich (`t![…]`); string literals have type `Text`. `String`: a runtime string |
 | Tuples, arrays | `(bool, Route)`, `[Int<0, 3>; 4]` |
 | Structs, enums | user-declared; `Option<T>` from the prelude |
 | Collections | `Vec<T>` |
@@ -51,9 +51,9 @@ Which types the story may hold is restricted to [finite types](./kinds.md#finite
 
 Every type built without closures has structural equality: two values are equal when they are
 built the same way. There is no `derive`. Function pointers compare by identity, and closures
-cannot be compared. *Tentative:* the standard traits `Eq` and `Step` are the only traits; user
-traits and user generics are an [open question](./open-questions.md#traits-and-generics). Const
-generic arguments exist for `Int<lo, hi>` and standard library types.
+cannot be compared. *Tentative:* the standard traits `Eq`, `Step`, `Asset` and `ToText` are the
+only traits; user traits and user generics are an [open question](./open-questions.md#traits-and-generics).
+Const generic arguments exist for `Int<lo, hi>` and standard library types.
 
 ## Expressions and statements
 

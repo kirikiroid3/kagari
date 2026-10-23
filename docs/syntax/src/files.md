@@ -38,18 +38,45 @@ use characters::{HANAKO, AZUSA};
 
 ## The standard library
 
-The standard library is the module `std`:
+The standard library is the module `std`. Its reference is the standard library book; this table
+lists the modules and the book chapter of each:
 
-| Module          | Contents |
-| --------------- | -------- |
-| `std::screen`   | The screen (an ECS world), components, animations; see [Presentation](./presentation.md) |
-| `std::narrative`| The `push_step` primitive, `Say`, `Choice`, `Text`, `TextEffect`, `Meta`; the `Narrative` interface for the system |
-| `std::ui`       | UI forms, signals; see [The Game System](./system.md) |
-| `std::system`   | Navigation, saves, settings; see [The Game System](./system.md) |
+| Module               | Contents | Standard library book |
+| -------------------- | -------- | --------------------- |
+| `std`                | `Int`, `String`, `Vec`, `Rat`, `Decimal`, `Option`, `Result`, the traits `Eq` and `Asset`, the asset types and `asset` | *Core Types* |
+| `std::time`          | `Duration` (whole milliseconds), `ms`, `secs` | *Core Types* |
+| `std::screen`        | The screen: entities, properties, layers, Hud, camera, filters; see [Presentation](./presentation.md) | *Screen* |
+| `std::screen::anim`  | `Tween`, `Transition`, `Motion`, easings and the motion presets | *Animation* |
+| `std::screen::audio` | Music and ambience channels, loops, one-shot sounds, audio fades | *Audio* |
+| `std::stage`         | Characters, slots and side faces, written in plain `const fn` on top of `std::screen` | *Stage* |
+| `std::narrative`     | The `Step` trait and the `push_step` primitive, `Say`, `Choice`, `Meta`; the `Narrative` handle for the system | *Narrative* |
+| `std::narrative::text` | `Text`, `TextEffect` and its constructors, `ToText`, `TextStyle` | *Text* |
+| `std::ui`            | UI elements, signals, the targets of the UI forms; `std::ui::style` for looks | *UI* |
+| `std::system`        | `System`, `Settings`, `Setting`, bindings, seen sets; see [The Game System](./system.md) | *The Game System* |
+| `std::system::nav`   | Navigation between modes, starting and loading the story | *The Game System* |
+| `std::system::saves` | Save slots and save information | *The Game System* |
 
-A **prelude** is imported into every module automatically. It contains the types and functions
-the examples of this book use without a `use`: `Screen`, `Render`, `Text`, `Int`, `Option`,
-`jump`, `fade`, `instant_switch` and the asset types.
+A **prelude** is imported into every module automatically. It contains:
+
+- from `std`: `Int`, `String`, `Vec`, `Rat`, `Decimal`, `Option` with `None` and `Some`, `Result`
+  with `Ok` and `Err`, `Eq`, the asset types and `asset`;
+- from `std::time`: `Duration`, `ms`, `secs`;
+- from `std::screen`: `Screen`, `Render`, `EntityId`, `Part`, `Point`, `Offset`, `Size`, `Anchor`,
+  `Color`, `Plane`, `Visibility`, `point`, `offset`, `rgb`, `hex`, `BLACK`, `WHITE`,
+  `TRANSPARENT`;
+- from `std::screen::anim`: `Easing`, `Tween`, `Transition`, `Motion`, `tween`, `instant`, `cut`,
+  `fade`, `rule`, `wipe`, `through`, `motion`, `jump`, `nod`, `shake`, `quake`;
+- from `std::screen::audio`: `looped`, `sound`, `crossfade`;
+- from `std::stage`: `Character`, `character`;
+- from `std::narrative`: `Text`, `TextEffect`, `Say`, `Choice`, `ChoiceArm`, `push_step`, `Meta`,
+  `meta`, `Narrative`;
+- from `std::narrative::text`: `emphasis`, `dots`, `color_text`, `bold`, `pause`, `click_wait`,
+  `mark`;
+- from `std::system`: `nav`, `Setting`, `setting`, `System`, `Settings`, `Volume`, `volume`,
+  `RootPage`, `Overlay`, `GameOverlay`, `Dialog`;
+- from `std::ui`: `signal`, `Element`.
+
+Everything else is imported with `use`, for example `use std::screen::size;`.
 
 ## Assets
 
@@ -58,9 +85,18 @@ const CG_001: ImageAsset = asset("cg_001.png");
 const AZUSA_0072: VoiceAsset = asset("voice/azusa_0072.ogg");
 ```
 
-*Tentative.* `asset` is a built-in `const fn` that binds a file to a constant. The constant's type
-must be `ImageAsset`, `AudioAsset` or `VoiceAsset`, and the path, relative to the declaring file,
-must not be empty. The file is checked to exist at compile time.
+`asset` binds a file to a constant:
+
+```kis
+#[builtin] pub const fn asset<A: Asset>(path: narrative::Text) -> A;
+```
+
+- There are five asset types, the only implementations of the trait `Asset`: `ImageAsset`,
+  `AudioAsset`, `VoiceAsset`, `VideoAsset` and `FontAsset`.
+- The constant's type chooses `A`. The argument must be a string literal, and the path, relative
+  to the declaring file, must not be empty.
+- The file is checked to exist at compile time, so a missing file is a compile error, not a
+  runtime failure.
 
 An asset type is a [finite type](./kinds.md#finite-types): its values are exactly the asset
 constants of the program. So the story may choose between assets at runtime, for example a voice

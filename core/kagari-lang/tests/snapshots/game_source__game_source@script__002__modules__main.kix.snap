@@ -5,9 +5,12 @@ input_file: core/kagari-lang/tests/game_source/script/002__modules/main.kix
 ---
 no diagnostics
 --- resolutions ---
-script/002__modules/characters.kis:1:19 EntityId -> type std::screen::EntityId
-script/002__modules/characters.kis:2:18 EntityId -> type std::screen::EntityId
-script/002__modules/characters.kis:5:32 u64 -> prim u64
+script/002__modules/characters.kis:1:19 EntityId -> struct std::screen::EntityId
+script/002__modules/characters.kis:1:30 EntityId -> struct std::screen::EntityId
+script/002__modules/characters.kis:2:18 EntityId -> struct std::screen::EntityId
+script/002__modules/characters.kis:2:29 EntityId -> struct std::screen::EntityId
+script/002__modules/characters.kis:5:32 ImageAsset -> struct std::ImageAsset
+script/002__modules/characters.kis:5:45 asset -> fn std::asset
 script/002__modules/main.kix:10:5 ui::f -> fn crate::ui::f
 script/002__modules/main.kix:11:9 _ids -> local _ids@11:9
 script/002__modules/main.kix:11:17 HANAKO -> const crate::characters::HANAKO
@@ -23,11 +26,12 @@ script/002__modules/story/day1.kix:11:35 Screen -> struct std::screen::Screen
 script/002__modules/story/day1.kix:11:46 Screen -> struct std::screen::Screen
 script/002__modules/story/day1.kix:12:5 screen -> local screen@11:23
 script/002__modules/story/day1.kix:12:19 HANAKO -> const crate::characters::HANAKO
-script/002__modules/story/day1.kix:12:48 jump -> fn std::screen::jump
+script/002__modules/story/day1.kix:12:43 jump -> fn std::screen::anim::jump
+script/002__modules/story/day1.kix:12:52 ms -> fn std::time::ms
 script/002__modules/story/day1.kix:13:5 screen -> local screen@11:23
 script/002__modules/story/day1.kix:13:19 AZUSA -> const crate::characters::AZUSA
-script/002__modules/story/day1.kix:13:52 AZUSA::CLOSE_EYE_SMILE -> const crate::characters::AZUSA::CLOSE_EYE_SMILE
-script/002__modules/story/day1.kix:13:92 instant_switch -> fn std::screen::instant_switch
+script/002__modules/story/day1.kix:13:41 AZUSA::CLOSE_EYE_SMILE -> const crate::characters::AZUSA::CLOSE_EYE_SMILE
+script/002__modules/story/day1.kix:13:81 cut -> fn std::screen::anim::cut
 script/002__modules/story/day1.kix:14:5 screen -> local screen@11:23
 script/002__modules/story/day1.kix:19:32 smile -> fn crate::story::day1::helpers::smile
 script/002__modules/story/day1.kix:20:5 super::Interlude -> fn crate::story::Interlude

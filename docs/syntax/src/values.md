@@ -17,8 +17,8 @@ There are no moves and no destructors. A value is gone when nothing holds it.
 copy, as `render` functions do with the screen:
 
 ```kis
-const fn hanako_jumps(mut screen: Screen) -> Screen {
-    screen.entity(HANAKO).cord.apply_animation(jump(20));
+const fn hanako_appears(mut screen: Screen) -> Screen {
+    screen.entity(HANAKO).opacity().change(1.0).apply_animation(tween(ms(300)));
     screen
 }
 ```
@@ -29,11 +29,12 @@ A reference is **second-class**: it can be passed down, never kept.
   (`&self`, `&mut self`).
 - A function may return a reference only if its receiver is a reference. The result is a
   *projection* of the receiver, a part of it, and lives until the end of the statement that
-  produced it. This is what makes `screen.entity(HANAKO).cord.apply_animation(…)` work:
-  `entity` projects an entity out of the screen, `.cord` a component out of the entity, and
-  `apply_animation` changes it in place.
+  produced it. This is what makes `screen.entity(HANAKO).opacity().change(1.0).apply_animation(…)`
+  work: `entity` projects an entity out of the screen, `opacity` a property out of the entity,
+  `change` a pending change out of the property, and `apply_animation` completes it in place.
 - A reference cannot be stored in a field, a local, a static or a collection, and cannot be
-  captured by a closure.
+  captured by a closure. Code that changes the same entity twice repeats the projection chain in
+  each statement.
 - **Exclusivity.** In one call, a place passed as `&mut` may not also be passed as any other
   argument, so two parameters never alias when one of them can change.
 

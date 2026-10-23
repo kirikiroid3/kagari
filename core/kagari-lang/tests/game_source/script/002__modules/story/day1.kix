@@ -9,8 +9,8 @@ mod helpers {
 }
 
 const fn azusa_smiles(mut screen: Screen) -> Screen {
-    screen.entity(HANAKO).cord.apply_animation(jump(20));
-    screen.entity(AZUSA).appearance.emotion.change(AZUSA::CLOSE_EYE_SMILE).apply_animation(instant_switch());
+    screen.entity(HANAKO).apply_animation(jump(20, ms(300)));
+    screen.entity(AZUSA).image().change(AZUSA::CLOSE_EYE_SMILE).apply_animation(cut());
     screen
 }
 

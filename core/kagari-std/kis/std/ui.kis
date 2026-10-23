@@ -1,5 +1,155 @@
-//! UI values and signals.
+//! UI values, reactivity, and the functions UI forms desugar to.
 
+pub mod style;
+
+use crate::narrative::{Narrative, Text};
+use crate::narrative::text::TextStyle;
+use crate::screen::{Anchor, Insets, Point};
+use crate::system::saves::SaveSlot;
+use self::style::{ButtonStyle, Paint, SliderStyle};
+
+/// A UI element tree, laid out by the engine.
 #[builtin] pub struct Element;
+/// An element placed in a `layer`.
+#[builtin] pub struct Placed;
+/// Flex alignment.
+pub enum Align {
+    Start,
+    Center,
+    End,
+    Stretch,
+    SpaceBetween,
+}
+/// How an image fills its box.
+pub enum Fit {
+    Stretch,
+    Contain,
+    Cover,
+    Natural,
+}
 
+/// A reactive value: a getter and a setter.
 #[builtin] pub fn signal<T>(init: T) -> (Fn() -> T, Fn(T));
+/// Runs `run` now and again whenever a source it read changes.
+#[builtin] pub fn effect(run: Fn());
+/// One element per item, kept in sync with `items`.
+#[builtin] pub fn each<T>(items: Fn() -> Vec<T>, item: Fn(T) -> Element) -> Element;
+/// `then()` while `when()` is true, else nothing.
+#[builtin] pub fn show(when: Fn() -> bool, then: Fn() -> Element) -> Element;
+/// Text in the default style, or the current look's style inside a button or toggle.
+#[builtin] pub fn label(text: Text) -> Element;
+/// An empty element that grows.
+#[builtin] pub fn spacer() -> Element;
+/// A scrollable box.
+#[builtin] pub fn scroll(child: Fn() -> Element) -> Element;
+/// The screenshot of a save slot.
+#[builtin] pub fn thumbnail(slot: SaveSlot) -> Element;
+/// The current line: reveal, text effects, pauses, marks and the click-wait glyph.
+#[builtin] pub fn message(game: Narrative, style: TextStyle) -> Element;
+
+impl Element {
+    /// A fixed width in pixels.
+    #[builtin] pub fn width(self, px: u32) -> Element;
+    /// A fixed height in pixels.
+    #[builtin] pub fn height(self, px: u32) -> Element;
+    /// Inner spacing.
+    #[builtin] pub fn padding(self, insets: Insets) -> Element;
+    /// Spacing between children of a row or column.
+    #[builtin] pub fn gap(self, px: u32) -> Element;
+    /// Alignment of the children of a row or column.
+    #[builtin] pub fn align(self, main: Align, cross: Align) -> Element;
+    /// The flex grow factor.
+    #[builtin] pub fn grow(self, factor: u32) -> Element;
+    /// Paint behind the element.
+    #[builtin] pub fn background(self, paint: Paint) -> Element;
+    /// The element's opacity, 0.0..=1.0.
+    #[builtin] pub fn opacity(self, opacity: Decimal) -> Element;
+    /// The position in the focus order.
+    #[builtin] pub fn focus_order(self, order: u32) -> Element;
+    /// Places the element's `anchor` at `position` in a layer.
+    #[builtin] pub fn at(self, position: Point, anchor: Anchor) -> Placed;
+    /// Fills the layer.
+    #[builtin] pub fn cover(self) -> Placed;
+}
+
+/// What `column![…]` desugars to.
+#[builtin] pub fn column<const N: usize>(children: [Fn() -> Element; N]) -> Element;
+/// What `row![…]` desugars to.
+#[builtin] pub fn row<const N: usize>(children: [Fn() -> Element; N]) -> Element;
+/// What `layer![…]` desugars to.
+#[builtin] pub fn layer<const N: usize>(children: [Fn() -> Placed; N]) -> Element;
+
+/// The attributes and content of `text!(…)`.
+pub struct TextProps {
+    pub style: Option<Fn() -> TextStyle>,
+    pub content: Fn() -> Text,
+}
+/// What `text!(…)` desugars to.
+#[builtin] pub fn text(props: TextProps) -> Element;
+
+/// The attributes and source of `image!(…)`.
+pub struct ImageProps {
+    pub fit: Option<Fn() -> Fit>,
+    pub source: Fn() -> ImageAsset,
+}
+/// What `image!(…)` desugars to.
+#[builtin] pub fn image(props: ImageProps) -> Element;
+
+/// The attributes of `game_screen!(…)`.
+pub struct GameScreenProps {
+    pub game: Fn() -> Narrative,
+}
+/// What `game_screen!(…)` desugars to: the screen of the running game.
+#[builtin] pub fn game_screen(props: GameScreenProps) -> Element;
+
+/// The attributes and children of `button!{…}`.
+pub struct ButtonProps<const N: usize> {
+    pub on_click: Option<Fn()>,
+    pub disabled: Option<Fn() -> bool>,
+    pub style: Option<Fn() -> ButtonStyle>,
+    pub children: [Fn() -> Element; N],
+}
+/// What `button!{…}` desugars to.
+#[builtin] pub fn button<const N: usize>(props: ButtonProps<N>) -> Element;
+
+/// The attributes of `slider!{…}`; the range is the range of the value's `Int` type.
+pub struct SliderProps<const LO: i128, const HI: i128> {
+    pub value: Fn() -> Int<LO, HI>,
+    pub on_change: Option<Fn(Int<LO, HI>)>,
+    pub step: Option<Fn() -> u32>,
+    pub disabled: Option<Fn() -> bool>,
+    pub style: Option<Fn() -> SliderStyle>,
+}
+/// What `slider!{…}` desugars to.
+#[builtin] pub fn slider<const LO: i128, const HI: i128>(props: SliderProps<LO, HI>) -> Element;
+
+/// The attributes and children of `toggle!{…}`.
+pub struct ToggleProps<const N: usize> {
+    pub value: Fn() -> bool,
+    pub on_change: Option<Fn(bool)>,
+    pub disabled: Option<Fn() -> bool>,
+    pub style: Option<Fn() -> ButtonStyle>,
+    pub children: [Fn() -> Element; N],
+}
+/// What `toggle!{…}` desugars to.
+#[builtin] pub fn toggle<const N: usize>(props: ToggleProps<N>) -> Element;
+
+/// An option of a `select!{…}`.
+pub struct SelectOption<T> {
+    pub value: T,
+    pub label: Element,
+}
+/// The option `value`, shown as `label`.
+pub fn option<T>(value: T, label: Element) -> SelectOption<T> {
+    SelectOption { value, label }
+}
+/// The attributes and options of `select!{…}`.
+pub struct SelectProps<T, const N: usize> {
+    pub value: Fn() -> T,
+    pub on_change: Option<Fn(T)>,
+    pub disabled: Option<Fn() -> bool>,
+    pub style: Option<Fn() -> ButtonStyle>,
+    pub options: [Fn() -> SelectOption<T>; N],
+}
+/// What `select!{…}` desugars to.
+#[builtin] pub fn select<T: Eq, const N: usize>(props: SelectProps<T, N>) -> Element;

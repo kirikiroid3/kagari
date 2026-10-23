@@ -1,14 +1,19 @@
 //! Operations that change the system's mode stack.
 
-use crate::system::RootPage;
+use crate::system::{Dialog, Overlay, RootPage};
+use crate::system::saves::{Divergence, SaveSlot};
 
-#[builtin] pub fn call<M>(mode: fn() -> M);
+/// Pushes an overlay.
+#[builtin] pub fn call(overlay: fn() -> Overlay);
+/// Pushes a modal dialog.
+#[builtin] pub fn dialog(dialog: fn() -> Dialog);
+/// Pops the top mode; ignored on a base.
 #[builtin] pub fn back();
+/// Replaces the whole stack with `page`.
 #[builtin] pub fn goto(page: fn() -> RootPage);
+/// Starts the `#[entry]` scene `entry` with `args`; `on_exit` gets its return value.
 #[builtin] pub fn start<E, A, R>(entry: E, args: A, on_exit: Fn(R));
-#[builtin] pub fn load(slot: u64);
-#[builtin] pub fn save(slot: u64);
-#[builtin] pub fn advance();
-#[builtin] pub fn select<A>(arm: A);
-#[builtin] pub fn rewind(entry: u64);
+/// Loads `slot`; on divergence returns `Err` and leaves the stack unchanged.
+#[builtin] pub fn load(slot: SaveSlot) -> Result<(), Divergence>;
+/// Quits the program.
 #[builtin] pub fn quit();

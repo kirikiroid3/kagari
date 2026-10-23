@@ -69,7 +69,7 @@ A `pushdown fn` may call a `const fn` when every argument is either a constant e
 finite type:
 
 - **All arguments constant.** The call is evaluated at compile time and replaced by its value,
-  which may be of any type. `fade(30)` is such a call.
+  which may be of any type. `fade(ms(500))` is such a call.
 - **Some arguments finite and runtime.** The compiler *tabulates* the function: it evaluates it on
   every combination of argument values. That proves the call terminates on every input it can
   receive, and turns it into a finite table the analyzer can read. The result must be of a finite
@@ -99,7 +99,7 @@ pushdown fn Greeting() {
 A plain `fn` is Turing-complete runtime code: the game system, its UI, saves, settings, and meta.
 It cannot call a `pushdown fn` and cannot read story variables. Its only way into the story is
 [starting an entry scene](./narrative/scenes.md#entry-scenes), and its only view of a running story
-is the [`Narrative` interface](./system.md#the-narrative-interface).
+is the [`Narrative` handle](./system.md#the-narrative-handle).
 
 ## Finite types
 
@@ -114,12 +114,14 @@ finite:
 | Structs, tuples and arrays `[T; N]` of finite types | First-class closures |
 | `Option<T>` of a finite `T` | Signals, settings and meta values |
 | `Text` (its values are the constant texts of the program) | |
-| Asset types (their values are the asset constants of the program) | |
+| Asset types `ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset` (their values are the asset constants of the program) | |
 | `pushdown fn`, `scene fn` and `const fn` pointers (their values are the named functions of the program) | |
 | `&T`, `&mut T` of a finite `T`, as parameters | |
 
 A constant expression of any type may still appear in a `pushdown fn`, since it is folded at
-compile time.
+compile time. Of the standard library's own types, `Screen`, `Narrative`, the screen state types,
+`Duration`, `Color` and the other number-based data are not finite; the standard library book,
+chapter *Checks*, gives the full list.
 
 ## Why this works
 

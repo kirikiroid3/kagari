@@ -2,7 +2,8 @@
 
 ## Traits and generics
 
-The standard library uses generics (`Option<T>`, `step<S: Step>`) and the traits `Eq` and `Step`.
+The standard library uses generics (`Option<T>`, `push_step<S: Step>`) and the traits `Eq`,
+`Step`, `Asset` and `ToText`.
 May studios declare their own generic functions and traits? In a `pushdown fn`, every type
 parameter would have to be instantiated with a finite type, and monomorphization keeps the story a
 finite program; in `fn` and `const fn` there is no such constraint.
@@ -36,17 +37,11 @@ The proposal keeps a deterministic PRNG whose state is in σ. What is the API: a
 draws an `Int<lo, hi>`? The analyzer would treat each draw as a free choice of a value in the
 range.
 
-## Text effects
-
-[Text effects](./narrative/forms.md#text-effects) are values of type `TextEffect` (tentative
-name). Which effects does the standard library provide (colour, emphasis, size, shake), and may an
-effect animate?
-
 ## Text interpolation
 
-If message text interpolates a story value, a line is no longer a function of its step, and
-backlog entries must carry the interpolated values. Is interpolation needed, and if so, are those
-values recorded in the history or recomputed by replay?
+An [interpolated value](./narrative/forms.md#t-text) makes a line depend on story state, so
+backlog entries must carry the interpolated values. Are those values recorded in the history, or
+recomputed by replay?
 
 ## Keyframe placement
 
@@ -67,9 +62,9 @@ variable, or both?
 
 ## Game system
 
-[The Game System](./system.md) is a sketch. The names and attributes of its UI forms, the mode
-types, the operations, styling and focus rules are all open, and so is the design resolution (one
-fixed resolution per game, or several with a rule for choosing).
+[The Game System](./system.md) has one design resolution, fixed by `System::resolution`. Still
+open: styling themes shared across modes, and support for several resolutions with a rule for
+choosing between them.
 
 ## Diagnostics
 

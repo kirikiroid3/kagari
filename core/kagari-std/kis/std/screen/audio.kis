@@ -1,0 +1,97 @@
+//! Audio on the screen: looping channels and one-shot sounds.
+
+use crate::time::{Duration, ZERO};
+
+/// A track that loops: it plays from 0 and jumps from `loop_end` back to `loop_start`.
+pub struct Loop {
+    pub audio: AudioAsset,
+    pub loop_start: Duration,
+    /// `None`: the end of the file.
+    pub loop_end: Option<Duration>,
+}
+/// `audio`, looping as a whole.
+pub const fn looped(audio: AudioAsset) -> Loop {
+    Loop { audio, loop_start: ZERO, loop_end: None }
+}
+impl Loop {
+    /// This track looping over `start..end`; the part before `start` plays once as an intro.
+    pub const fn region(mut self, start: Duration, end: Option<Duration>) -> Loop {
+        self.loop_start = start;
+        self.loop_end = end;
+        self
+    }
+}
+
+/// A one-shot sound.
+pub struct Sound {
+    pub audio: AudioAsset,
+    /// 0.0..=1.0.
+    pub volume: Decimal,
+    pub start: Duration,
+    /// `None`: the end of the file.
+    pub end: Option<Duration>,
+    pub delay: Duration,
+}
+/// `audio`, played whole at full volume.
+pub const fn sound(audio: AudioAsset) -> Sound {
+    Sound { audio, volume: 1.0, start: ZERO, end: None, delay: ZERO }
+}
+impl Sound {
+    /// This sound at `volume`, 0.0..=1.0.
+    pub const fn volume(mut self, volume: Decimal) -> Sound {
+        self.volume = volume;
+        self
+    }
+
+    /// This sound playing only `start..end` of the file.
+    pub const fn range(mut self, start: Duration, end: Option<Duration>) -> Sound {
+        self.start = start;
+        self.end = end;
+        self
+    }
+
+    /// This sound, starting `delay` after the cursor.
+    pub const fn delay(mut self, delay: Duration) -> Sound {
+        self.delay = delay;
+        self
+    }
+}
+
+/// How a channel goes from its old track to its new one.
+pub struct AudioFade {
+    pub fade_out: Duration,
+    pub fade_in: Duration,
+    /// Whether the fades run at the same time or one after the other.
+    pub overlap: bool,
+}
+/// Both fades over `duration`, at the same time.
+pub const fn crossfade(duration: Duration) -> AudioFade {
+    AudioFade { fade_out: duration, fade_in: duration, overlap: true }
+}
+/// Fades out, then fades in.
+pub const fn fade_out_in(fade_out: Duration, fade_in: Duration) -> AudioFade {
+    AudioFade { fade_out, fade_in, overlap: false }
+}
+/// Switches at once.
+pub const fn switch() -> AudioFade {
+    AudioFade { fade_out: ZERO, fade_in: ZERO, overlap: false }
+}
+
+/// A channel that plays one looping track.
+#[builtin] pub struct Channel;
+impl Channel {
+    /// The track playing, if any.
+    #[builtin] pub const fn get(&self) -> Option<Loop>;
+    /// Changes the track; the same track keeps playing without a restart.
+    #[builtin] pub const fn change(&mut self, track: Loop) -> &mut ChannelChange;
+    /// Stops the track.
+    #[builtin] pub const fn stop(&mut self) -> &mut ChannelChange;
+    /// The channel volume, 0.0..=1.0.
+    #[builtin] pub const fn volume(&mut self) -> &mut crate::screen::Prop<Decimal>;
+}
+/// A pending channel change; it happens only through `apply_animation`.
+#[must_use] #[builtin] pub struct ChannelChange;
+impl ChannelChange {
+    /// Fades from the old track to the new one.
+    #[builtin] pub const fn apply_animation(&mut self, fade: AudioFade);
+}

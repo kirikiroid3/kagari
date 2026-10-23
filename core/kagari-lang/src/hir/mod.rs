@@ -148,6 +148,7 @@ pub enum LangItem {
     MonoRuby,
     Effect,
     Concat,
+    ToText,
     Asset,
 }
 
@@ -165,6 +166,7 @@ impl LangItem {
             LangItem::MonoRuby => &["narrative", "text", "mono_ruby"],
             LangItem::Effect => &["narrative", "text", "effect"],
             LangItem::Concat => &["narrative", "text", "concat"],
+            LangItem::ToText => &["narrative", "text", "to_text"],
             LangItem::Asset => &["asset"],
         }
     }

@@ -19,7 +19,7 @@
 | `#[scene]` | `pushdown fn` | A scene: may run steps and call scenes; a component of the checked state machine |
 | `#[entry]` | `#[scene]` with finite parameters and return type | The system can start the story here |
 | `#[must_use]` | `struct`, `enum` | Discarding or leaving a value pending is a warning |
-| `#[builtin]` | function | Engine-implemented, no body; standard library only |
+| `#[builtin]` | function, type | Engine-implemented: no body, no visible fields; standard library only |
 
 ## Forms (`.kix` only)
 
@@ -36,10 +36,11 @@ items of `t![…]`.
 | ---- | ----------- | ----- | ---------- | -------- |
 | `s!(…)` | `push_step(Say { … })` | `()` | `who`, `voice`, `render` | at most one `t![…]` |
 | `choice!{…}` | `push_step(Choice { … })` | the arms' enum | `id` (required), `render` | arms `t![…] => V`, `t![…] if cond => V` |
-| `t![…]` | a `Text` value | `Text` | none | `"…"`, `["基"]("よみ")`, `["漢字"]("かん"\|"じ")`, `!["…"](effect)`, `{expr}` |
+| `t![…]` | `concat([…])` of `ruby`, `mono_ruby`, `effect`, `to_text` calls | `Text` | none | `"…"`, `["基"]("よみ")`, `["漢字"]("かん"\|"じ")`, `!["…"](effect)`, `{expr}` |
+| UI forms | calls of `std::ui` functions with props structs | `Element` | see the standard library book, chapter *UI* | see the standard library book, chapter *UI* |
 
-`s!` and `choice!` are allowed only in a scene. UI forms are listed in [The Game
-System](./system.md#components-and-signals).
+`s!` and `choice!` are allowed only in a scene. UI forms are introduced in [The Game
+System](./system.md#components-and-signals); their lowering is not implemented yet.
 
 ## Story items
 
@@ -48,7 +49,8 @@ System](./system.md#components-and-signals).
 | Story variable | `static mut NAME: FiniteType = constant;` |
 | Setting | `static NAME: Setting<T> = setting(init);` |
 | Meta field | `static NAME: Meta<T> = meta(init);` |
-| Asset | `const NAME: ImageAsset = asset("path");` |
+| Asset | `const NAME: ImageAsset = asset("path");`, likewise `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset` |
+| Entity id | `const NAME: EntityId = EntityId(n);`, with `n` ≥ 1 |
 | Render | `const fn name(mut screen: Screen) -> Screen { …; screen }` |
 
 ## Control flow in the story

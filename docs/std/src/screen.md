@@ -1,0 +1,430 @@
+# Screen
+
+`std::screen` declares the screen a render transforms: entities and their components, the Hud,
+the choice menu, the camera, the screen filter and the audio channels. Every item is `const fn`.
+Timeline methods are described in [Animation](./animation.md), audio in [Audio](./audio.md).
+
+```kis
+pub mod anim;
+pub mod audio;
+
+pub type Render = const fn(Screen) -> Screen;
+```
+
+A render is a `const fn` from the screen before a step to the screen after it. It changes the
+screen in place through projections, one chain per statement:
+
+```kis
+const fn azusa_smiles(mut screen: Screen) -> Screen {
+    screen.entity(AZUSA).image().change(AZUSA::CLOSE_EYE_SMILE).apply_animation(cut());
+    screen.entity(HANAKO).apply_animation(jump(20, ms(300)));
+    screen
+}
+```
+
+## The logical screen
+
+The **logical screen** of a step is the persistent state after its render:
+
+- the entities with their components;
+- the Hud, the camera and the screen filter;
+- the audio channels.
+
+Snapshots, screen equality and the consistency check use the logical screen only. The timeline,
+scheduled animations, one-shot sounds and the `ChoiceMenu` belong to the step and are not part of
+it.
+
+Animations never change the start or end state: a tween or transition runs from the old value to
+the value set by `change`, and a motion ends at identity. So a click, skip, or the `animations`
+setting being off can never change the logical screen.
+
+## Step entry
+
+Before the step's render runs, the engine resets the step-only state:
+
+- the timeline cursor goes to (entry, 0 ms);
+- scheduled animations are completed;
+- one-shot cues are dropped unless they are already playing;
+- the `ChoiceMenu` is emptied and set to `Middle`;
+- the text start goes to (entry, 0).
+
+A step without `render` gets the same reset.
+
+## Geometry
+
+```kis
+pub struct EntityId(pub u32);
+/// Reserved for the background entity of `Screen::empty()`; studio ids start at 1.
+pub const BACKGROUND: EntityId = EntityId(0);
+pub struct Part(pub u8);
+pub const MAIN: Part = Part(0);
+
+pub struct Point { pub x: i32, pub y: i32 }
+pub const fn point(x: i32, y: i32) -> Point { Point { x, y } }
+pub struct Offset { pub dx: i32, pub dy: i32 }
+pub const fn offset(dx: i32, dy: i32) -> Offset { Offset { dx, dy } }
+pub struct Size { pub w: u32, pub h: u32 }
+pub const fn size(w: u32, h: u32) -> Size { Size { w, h } }
+pub struct Insets { pub top: i32, pub right: i32, pub bottom: i32, pub left: i32 }
+pub const fn insets(top: i32, right: i32, bottom: i32, left: i32) -> Insets { … }
+pub const fn uniform(n: i32) -> Insets { … }
+/// Fractions of the entity's own size, 0.0..=1.0.
+pub struct Anchor { pub x: Decimal, pub y: Decimal }
+pub const TOP_LEFT: Anchor = Anchor { x: 0.0, y: 0.0 };
+pub const CENTER: Anchor = Anchor { x: 0.5, y: 0.5 };
+pub const BOTTOM_CENTER: Anchor = Anchor { x: 0.5, y: 1.0 };
+pub struct Angle { pub degrees: Decimal }
+pub const fn degrees(d: Decimal) -> Angle { Angle { degrees: d } }
+```
+
+- Positions and lengths are pixels in the design resolution `System::resolution`.
+- Entity ids are studio constants: `const HANAKO: EntityId = EntityId(1);`. Id 0 is
+  `BACKGROUND`.
+- `insets` takes CSS order (top, right, bottom, left); `uniform(n)` is `n` on every edge.
+- `Angle` is clockwise.
+
+## Colour
+
+```kis
+pub struct Color { pub r: u8, pub g: u8, pub b: u8, pub a: u8 }
+pub const fn rgb(r: u8, g: u8, b: u8) -> Color { Color { r, g, b, a: 255 } }
+pub const fn rgba(r: u8, g: u8, b: u8, a: u8) -> Color { Color { r, g, b, a } }
+pub const fn hex(rgb: u32) -> Color { … }   // 0xRRGGBB, alpha 255
+pub const BLACK: Color = Color { r: 0, g: 0, b: 0, a: 255 };
+pub const WHITE: Color = Color { r: 255, g: 255, b: 255, a: 255 };
+pub const TRANSPARENT: Color = Color { r: 0, g: 0, b: 0, a: 0 };
+```
+
+Colours are sRGB with alpha. `hex(0x382000)` is `rgb(0x38, 0x20, 0x00)`; bits above `0xFFFFFF`
+are ignored.
+
+## Planes, flips and blend modes
+
+```kis
+pub enum Plane { Background, Stage, Front, OverWindow }
+pub enum Visibility { Shown, Hidden }
+pub enum Flip { None, Horizontal, Vertical, Both }
+pub enum VAlign { Top, Middle, Bottom }
+pub enum BlendMode {
+    Normal, Add, Multiply, Screen, Overlay, Darken, Lighten, ColorDodge, ColorBurn,
+    HardLight, SoftLight, Difference, Exclusion, Hue, Saturation, Color, Luminosity,
+}
+```
+
+- The text window is drawn by the game view between `Front` and `OverWindow`.
+- `BlendMode` follows the CSS blend modes: how an entity is composited over what is drawn below
+  it.
+
+## Filters
+
+```kis
+pub struct Filter {
+    pub grayscale: Decimal, pub sepia: Decimal, pub brightness: Decimal,
+    pub contrast: Decimal, pub saturation: Decimal, pub blur: u32,
+}
+pub const NO_FILTER: Filter = Filter {
+    grayscale: 0.0, sepia: 0.0, brightness: 1.0, contrast: 1.0, saturation: 1.0, blur: 0,
+};
+impl Filter {
+    pub const fn grayscale(mut self, amount: Decimal) -> Filter { … }
+    pub const fn sepia(mut self, amount: Decimal) -> Filter { … }
+    pub const fn brightness(mut self, amount: Decimal) -> Filter { … }
+    pub const fn contrast(mut self, amount: Decimal) -> Filter { … }
+    pub const fn saturation(mut self, amount: Decimal) -> Filter { … }
+    pub const fn blur(mut self, px: u32) -> Filter { … }
+}
+```
+
+- The filter functions follow CSS. `grayscale` and `sepia` are fractions `0.0..=1.0`;
+  `brightness`, `contrast` and `saturation` are factors ≥ 0, where 1.0 is unchanged; `blur` is a
+  radius in pixels.
+- An entity has its own filter; the screen filter applies to the `Background`, `Stage` and
+  `Front` planes. Both are `Prop<Filter>` and interpolate field by field.
+
+```kis
+screen.filter().change(NO_FILTER.sepia(0.8)).apply_animation(tween(ms(500)));
+```
+
+## `Screen`
+
+```kis
+#[builtin] pub struct Screen;
+impl Screen {
+    #[builtin] pub const fn empty() -> Screen;
+    #[builtin] pub const fn entity(&mut self, id: EntityId) -> &mut Entity;
+    #[builtin] pub const fn contains(&self, id: EntityId) -> bool;
+    #[builtin] pub const fn entities(&self, plane: Plane) -> Vec<EntityId>;
+    #[builtin] pub const fn despawn(&mut self, id: EntityId);
+    pub const fn background(&mut self) -> &mut ImageLayer { self.entity(BACKGROUND).image() }
+    #[builtin] pub const fn hud(&mut self) -> &mut Hud;
+    #[builtin] pub const fn choice_menu(&mut self) -> &mut ChoiceMenu;
+    #[builtin] pub const fn camera(&mut self) -> &mut Camera;
+    #[builtin] pub const fn filter(&mut self) -> &mut Prop<Filter>;
+    #[builtin] pub const fn music(&mut self) -> &mut audio::Channel;
+    #[builtin] pub const fn ambience(&mut self, channel: Int<0, 3>) -> &mut audio::Channel;
+    #[builtin] pub const fn play(&mut self, sound: audio::Sound);
+    #[builtin] pub const fn stop_sounds(&mut self, fade_out: Duration);
+    #[builtin] pub const fn wait(&mut self, duration: Duration);
+    #[builtin] pub const fn barrier(&mut self);
+    #[builtin] pub const fn at_mark(&mut self, mark: Mark);
+    #[builtin] pub const fn at_entry(&mut self);
+    #[builtin] pub const fn begin_text(&mut self);
+}
+```
+
+### `Screen::empty()`
+
+It has only `BACKGROUND`, with plane `Background` and opacity 1.0.
+
+- The Hud has the text window and quick menu `Shown` and no side image.
+- The camera has offset 0, zoom 1.0 and rotation 0.
+- The screen filter is `NO_FILTER`.
+- Every channel is silent with volume 1.0.
+
+A render whose output does not depend on its input is a keyframe; `Screen::empty()` is the usual
+way to write one:
+
+```kis
+const fn roof_evening(_screen: Screen) -> Screen {
+    let mut screen = Screen::empty();
+    screen.background().change(BG::ROOF_EVENING).apply_animation(fade(ms(500)));
+    screen
+}
+```
+
+### Spawning
+
+`entity(id)` creates the entity if it is absent, with these defaults:
+
+|Component|Default|
+|---|---|
+|plane, z|`Stage`, 0|
+|position, anchor|(0, 0), `TOP_LEFT`|
+|scale, rotation|1.0, 0°|
+|**opacity**|**0.0**|
+|filter|`NO_FILTER`|
+|fill, fill size|`TRANSPARENT`, `None` (whole screen)|
+|layers|no parts, no label, no movie|
+|flip, blend, gate|`None`, `Normal`, `None`|
+
+A spawned entity is invisible, so every appearance states its animation:
+
+```kis
+screen.entity(HANAKO).image().change(HANAKO::SMILE).apply_animation(cut());
+screen.entity(HANAKO).opacity().change(1.0).apply_animation(tween(ms(300)));
+```
+
+`entity(id)` on an id with a pending despawn cancels the despawn; the entity keeps its current
+values.
+
+### Despawning and queries
+
+- `despawn(id)` removes the entity from the logical screen immediately. It is still drawn until
+  its scheduled animations end, and then removed. So a fade-out followed by `despawn` fades out.
+- `contains(id)` reflects the logical screen.
+- `entities(plane)` returns the ids of the logical screen on that plane, in ascending order.
+
+## `Entity`
+
+```kis
+#[builtin] pub struct Entity;
+impl Entity {
+    #[builtin] pub const fn position(&mut self) -> &mut Prop<Point>;
+    #[builtin] pub const fn scale(&mut self) -> &mut Prop<Decimal>;
+    #[builtin] pub const fn rotation(&mut self) -> &mut Prop<Angle>;
+    #[builtin] pub const fn opacity(&mut self) -> &mut Prop<Decimal>;
+    #[builtin] pub const fn filter(&mut self) -> &mut Prop<Filter>;
+    #[builtin] pub const fn fill(&mut self) -> &mut Prop<Color>;
+    #[builtin] pub const fn part(&mut self, part: Part) -> &mut ImageLayer;
+    pub const fn image(&mut self) -> &mut ImageLayer { self.part(MAIN) }
+    #[builtin] pub const fn label(&mut self) -> &mut LabelLayer;
+    #[builtin] pub const fn movie(&mut self) -> &mut MovieLayer;
+    #[builtin] pub const fn set_plane(&mut self, plane: Plane);
+    #[builtin] pub const fn set_z(&mut self, z: i32);
+    #[builtin] pub const fn set_anchor(&mut self, anchor: Anchor);
+    #[builtin] pub const fn set_flip(&mut self, flip: Flip);
+    #[builtin] pub const fn set_blend(&mut self, blend: BlendMode);
+    #[builtin] pub const fn set_fill_size(&mut self, size: Option<Size>);
+    #[builtin] pub const fn gate(&mut self, setting: Option<Setting<bool>>);
+    #[builtin] pub const fn apply_animation(&mut self, motion: anim::Motion);
+}
+```
+
+The component set is fixed; studios add no components.
+
+|Kind of member|Members|Changed with|
+|---|---|---|
+|Interpolated properties|`position`, `scale`, `rotation`, `opacity`, `filter`, `fill`|`change(v).apply_animation(Tween)`|
+|Layers|`part(p)`, `image()`, `label()`, `movie()`|`change(x).apply_animation(Transition)`|
+|Layout settings|`set_plane`, `set_z`, `set_anchor`, `set_flip`, `set_blend`, `set_fill_size`, `gate`|direct setters, not interpolable|
+|Relative motion|`apply_animation(Motion)`|see [Animation](./animation.md#motion)|
+
+- **Opacity** is a fraction `0.0..=1.0`. **Scale** is a factor; scale and rotation pivot on the
+  anchor.
+- **Fill** is a colour drawn below the parts, over the fill size. `set_fill_size(None)` covers the
+  whole screen, which makes an entity with only a fill a full-screen colour plate.
+- **Parts** are image layers keyed by `Part`; `image()` is `MAIN`. Parts let a studio stack a body,
+  a face and an overlay on one entity.
+
+### Drawing order
+
+- Planes are drawn in the order `Background < Stage < Front < (text window, drawn by the game
+  view) < OverWindow`. Inside a plane, z ascends, then `EntityId` ascends.
+- Inside an entity, the order is fill, parts by ascending `Part`, movie, label.
+- The anchor point sits at `position`. The entity size is the size of the `MAIN` part's image,
+  else the fill size, else the label box. Scale and rotation pivot on the anchor.
+- The camera applies to `Background`, `Stage` and `Front` only: offset translates, zoom and
+  rotation pivot on the screen centre.
+- The screen filter applies to the same three planes.
+
+### `gate`
+
+`gate(Some(s))` draws the entity only while setting `s` is true; `gate(None)` always draws it.
+
+- The handle is part of the logical screen and compares by identity, not by value. A render cannot
+  read the setting, so the logical screen does not depend on it.
+- This is the std use of the language's *deferred reference*: the engine reads the value at draw
+  time.
+
+```kis
+static SHOW_CLOCK: Setting<bool> = setting(true);
+const CLOCK: EntityId = EntityId(40);
+const CLOCK_FACE: ImageAsset = asset("clock.png");
+
+const fn clock_overlay(mut screen: Screen) -> Screen {
+    screen.entity(CLOCK).set_plane(Plane::OverWindow);
+    screen.entity(CLOCK).gate(Some(SHOW_CLOCK));
+    screen.entity(CLOCK).image().change(CLOCK_FACE).apply_animation(cut());
+    screen.entity(CLOCK).opacity().change(1.0).apply_animation(tween(ms(200)));
+    screen
+}
+```
+
+## `Prop` and `Change`
+
+```kis
+#[builtin] pub struct Prop<T>;
+impl<T> Prop<T> {
+    #[builtin] pub const fn get(&self) -> T;
+    #[builtin] pub const fn change(&mut self, value: T) -> &mut Change<T>;
+}
+#[must_use] #[builtin] pub struct Change<T>;
+impl<T> Change<T> {
+    #[builtin] pub const fn apply_animation(&mut self, tween: anim::Tween);
+}
+```
+
+`Prop::change(v).apply_animation(t)`:
+
+- The logical value becomes `v` at once, so a later `get` in the same render sees `v`.
+- The engine interpolates from the value the property has at `cursor + t.delay` to `v`, over
+  `t.duration` with `t.easing`.
+- A later animation of the same property that starts while an earlier one is still running cuts
+  the earlier one to its end.
+- `Prop<Visibility>` interpolates as a fade.
+
+`Change<T>` is `#[must_use]`: a change with no `apply_animation` does not happen, and the statement
+is a warning. A change that should be immediate says so with `instant()`.
+
+## Layers and `Swap`
+
+```kis
+#[builtin] pub struct ImageLayer;
+impl ImageLayer {
+    #[builtin] pub const fn get(&self) -> Option<ImageAsset>;
+    #[builtin] pub const fn change(&mut self, image: ImageAsset) -> &mut Swap;
+    #[builtin] pub const fn clear(&mut self) -> &mut Swap;
+}
+#[builtin] pub struct LabelLayer;
+impl LabelLayer {
+    #[builtin] pub const fn change(&mut self, text: Text) -> &mut Swap;
+    #[builtin] pub const fn clear(&mut self) -> &mut Swap;
+    #[builtin] pub const fn set_style(&mut self, style: TextStyle);
+    #[builtin] pub const fn set_width(&mut self, width: Option<u32>);
+}
+pub struct Movie { pub video: VideoAsset, pub looping: bool }
+pub const fn movie(video: VideoAsset) -> Movie { Movie { video, looping: false } }
+impl Movie { pub const fn looping(mut self) -> Movie { … } }
+#[builtin] pub struct MovieLayer;
+impl MovieLayer {
+    #[builtin] pub const fn change(&mut self, movie: Movie) -> &mut Swap;
+    #[builtin] pub const fn clear(&mut self) -> &mut Swap;
+}
+#[must_use] #[builtin] pub struct Swap;
+impl Swap {
+    #[builtin] pub const fn apply_animation(&mut self, transition: anim::Transition);
+}
+```
+
+- A layer swap behaves like a property change, with a `Transition` instead of a `Tween`: the
+  logical content changes at once, and the transition runs from the old content to the new one at
+  `cursor + delay`.
+- `clear()` swaps to nothing.
+- A label layer shows a `Text` with its own `TextStyle`; `set_width(Some(w))` wraps at `w` pixels,
+  `None` does not wrap.
+- `movie(v)` plays once; `movie(v).looping()` loops.
+- `Swap` is `#[must_use]`.
+
+```kis
+screen.background().change(BG::ROOF).apply_animation(fade(ms(500)));
+```
+
+## `Hud`
+
+```kis
+#[builtin] pub struct Hud;
+impl Hud {
+    #[builtin] pub const fn text_window(&mut self) -> &mut Prop<Visibility>;
+    #[builtin] pub const fn quick_menu(&mut self) -> &mut Prop<Visibility>;
+    #[builtin] pub const fn side_image(&mut self) -> &mut ImageLayer;
+}
+```
+
+The Hud is what the story asks of the game view's chrome: whether the text window and the quick
+menu are shown, and the side image next to the text window. It is part of the logical screen. The
+game view reads it through `Narrative::hud()`; the story never reads it.
+
+```kix
+s!(render = |mut screen| {
+    screen.hud().text_window().change(Visibility::Hidden).apply_animation(instant());
+    screen
+});
+```
+
+## `ChoiceMenu`
+
+```kis
+#[builtin] pub struct ChoiceMenu;
+impl ChoiceMenu {
+    /// A display-only arm, shown disabled at position `at` of the shown list (clamped).
+    #[builtin] pub const fn disabled_arm(&mut self, at: u32, text: Text);
+    #[builtin] pub const fn set_align(&mut self, align: VAlign);
+}
+```
+
+- The choice menu is step-only: it is emptied and set to `Middle` at every step entry, and is not
+  part of the logical screen.
+- `disabled_arm` adds a display-only arm to the choice the step shows. It has no value, cannot be
+  selected and is not part of `choice!`, so no analysis sees it. Story code picks the render that
+  adds it; see [Narrative](./narrative.md#disabled-arms).
+- `set_align` places the menu vertically.
+
+## `Camera`
+
+```kis
+#[builtin] pub struct Camera;
+impl Camera {
+    #[builtin] pub const fn offset(&mut self) -> &mut Prop<Offset>;
+    #[builtin] pub const fn zoom(&mut self) -> &mut Prop<Decimal>;
+    #[builtin] pub const fn rotation(&mut self) -> &mut Prop<Angle>;
+    #[builtin] pub const fn apply_animation(&mut self, motion: anim::Motion);
+}
+```
+
+The camera applies to `Background`, `Stage` and `Front`, so the text window and `OverWindow` stay
+still. Offset translates; zoom and rotation pivot on the screen centre. A camera motion is the usual
+way to shake the whole scene:
+
+```kis
+screen.camera().apply_animation(quake(8, 4, ms(600)));
+```
