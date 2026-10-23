@@ -3,6 +3,7 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/script/008__impls_and_blocks/main.kix
 ---
+script/008__impls_and_blocks/main.kix:33:5: error[kind/call-rule]: cannot call `pushdown fn` `push_step` from the `fn` `run`: the only way into the story is `nav::start` of an entry scene
 script/008__impls_and_blocks/main.kix:52:6: error[resolve/bad-impl-target]: inherent impls on primitive types are only allowed in the standard library
 --- resolutions ---
 script/008__impls_and_blocks/main.kix:1:24 u64 -> prim u64

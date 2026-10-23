@@ -13,6 +13,7 @@ salsa = { workspace = true }
 rustc-hash = { workspace = true }
 smol_str = { workspace = true }
 la-arena = { workspace = true }
+stacker = { workspace = true }
 unicode-ident = { workspace = true }
 
 [dev-dependencies]

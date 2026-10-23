@@ -169,7 +169,7 @@ fn resolve_item(
             let local = resolver.locals.alloc(Local {
                 name: Name::new_static("self"),
                 pat: None,
-                mutable: false,
+                mutable: body.self_mutable,
             });
             resolver
                 .scopes

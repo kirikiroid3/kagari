@@ -35,3 +35,5 @@ script/002__modules/story/day1.kix:13:81 cut -> fn std::screen::anim::cut
 script/002__modules/story/day1.kix:14:5 screen -> local screen@11:23
 script/002__modules/story/day1.kix:19:32 smile -> fn crate::story::day1::helpers::smile
 script/002__modules/story/day1.kix:20:5 super::Interlude -> fn crate::story::Interlude
+--- renders ---
+script/002__modules/story/day1.kix:6:18 smile -> delta

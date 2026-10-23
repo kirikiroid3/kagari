@@ -1,0 +1,105 @@
+// Type errors of stage 3 inference; each function shows one kind of error.
+
+struct Point { x: u32, y: u32 }
+
+enum Ending { Good, Bad }
+
+#[scene]
+#[entry]
+pushdown fn Main(flag: bool) -> Ending {
+    if flag { Ending::Good } else { Ending::Bad }
+}
+
+#[scene]
+pushdown fn Side() -> Ending {
+    Ending::Bad
+}
+
+#[scene]
+pushdown fn Pick() {
+    // The step's output is the arms' type: `Ending`, not `bool`.
+    let picked = choice!{ id = "pick", t!["Good"] => Ending::Good, t!["Bad"] => Ending::Bad };
+    let wrong: bool = picked;
+}
+
+fn on_exit(ending: Ending) {}
+
+fn mismatch() -> bool {
+    let n: u32 = true;
+    5
+}
+
+fn int_ranges(a: Int<0, 5>, b: Int<1, 3>) -> Int<0, 5> {
+    let sum: Int<1, 8> = a + b;
+    let quotient = a / a;
+    let mixed = a + 1u32;
+    sum
+}
+
+fn literals() {
+    let small: u8 = 300;
+    let counter: Int<0, 5> = 6;
+}
+
+fn pattern_literals(n: Int<0, 5>, byte: u8) -> u32 {
+    match byte {
+        0..=300 => 0,
+        _ => match n {
+            7 => 1,
+            _ => 2,
+        },
+    }
+}
+
+fn conversions(wide: u32, narrow: Int<0, 5>) {
+    let byte: u8 = wide.into();
+    let fine: u64 = wide.into();
+    let clamped: u8 = wide.saturate();
+    let cast = wide as u8;
+    let lossy: Int<0, 3> = narrow.into();
+}
+
+fn fields(p: Point) -> u32 {
+    let missing = Point { x: 1 };
+    let unknown = Point { x: 1, y: 2, z: 3 };
+    p.z
+}
+
+fn methods(p: Point) {
+    p.frobnicate();
+}
+
+fn equality() -> bool {
+    let f = || 1u32;
+    f == f
+}
+
+fn arity(x: u32) -> u32 {
+    arity(x, x)
+}
+
+fn same<T: Eq>(a: T, b: T) -> bool {
+    a == b
+}
+
+fn bounds() -> bool {
+    same(|| 1u32, || 2u32)
+}
+
+fn navigation() {
+    nav::start(Side, (), on_exit);
+    nav::start(Main, (1u32,), on_exit);
+}
+
+const PATH: Text = "missing.png";
+const IMAGE: ImageAsset = asset(PATH);
+
+fn annotations() {
+    let list = Vec::new();
+}
+
+fn no_value(flag: bool) -> u32 {
+    if flag {
+        return 1;
+    }
+}

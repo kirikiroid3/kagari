@@ -362,3 +362,19 @@ style/002__studio/main.kix:215:9 Plan::Leave -> variant crate::Plan::Leave
 style/002__studio/main.kix:217:17 still -> fn crate::still
 style/002__studio/main.kix:218:17 still_text -> fn crate::still_text
 style/002__studio/main.kix:219:5 DAY -> static crate::DAY
+--- renders ---
+style/002__studio/main.kix:64:10 flashback -> delta
+style/002__studio/main.kix:74:10 flashback_end -> delta
+style/002__studio/main.kix:82:10 chapter_card -> delta
+style/002__studio/main.kix:96:10 item_popup -> delta
+style/002__studio/main.kix:108:10 item_popup_end -> delta
+style/002__studio/main.kix:115:10 still -> delta
+style/002__studio/main.kix:125:10 still_text -> delta
+style/002__studio/main.kix:131:10 surprised_at_mark -> delta
+style/002__studio/main.kix:139:10 opening -> delta
+style/002__studio/main.kix:148:10 hanako_smiles -> delta
+style/002__studio/main.kix:154:10 hanako_moves_left -> delta
+style/002__studio/main.kix:159:10 knocking -> delta
+style/002__studio/main.kix:168:10 earthquake -> delta
+style/002__studio/main.kix:174:10 night_falls -> delta
+style/002__studio/main.kix:181:10 locked_arm -> delta

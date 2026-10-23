@@ -1,4 +1,5 @@
-//! A textual dump of name resolution, for tests and the `check` example.
+//! Textual dumps of name resolution and const evaluation, for tests and the `check`
+//! example.
 
 use std::fmt::Write as _;
 use std::path::Path as FsPath;
@@ -8,8 +9,9 @@ use kagari_syntax::{TextRange, TextSize};
 use crate::db::Db;
 use crate::def_map::{CrateId, Def, DefMaps, ModuleId, Resolution, TypeKey, def_maps};
 use crate::diagnostic::line_col;
+use crate::eval::{RenderId, const_eval};
 use crate::hir::{Body, Expr, ExprStore, Name, Pat, PathKind, TypeRef, file_hir};
-use crate::input::{Program, SourceFile};
+use crate::input::{FilePath, Program, SourceFile};
 use crate::item_tree::{ItemId, ItemKind, ItemParent, item_tree};
 use crate::resolve::{BodyResolution, StoreResolution, file_resolution};
 
@@ -61,6 +63,62 @@ pub fn resolution_dump(db: &dyn Db, program: Program, base: Option<&FsPath>) -> 
         for (offset, line) in lines {
             let _ = writeln!(out, "{shown}:{} {line}", dumper.position(offset));
         }
+    }
+    out
+}
+
+/// Each render a step of the game uses (`eval::ConstEval::renders`), sorted by location:
+/// `{file}:{line}:{col} {name} -> keyframe|delta`. A named render is located at its name, an
+/// inline closure at the closure and named `closure in {item}`. Empty without renders.
+pub fn render_dump(db: &dyn Db, program: Program, base: Option<&FsPath>) -> String {
+    let maps = def_maps(db, program);
+    let game = |file: SourceFile| {
+        maps.files
+            .iter()
+            .any(|(loaded, krate)| *loaded == file && *krate == CrateId::Game)
+    };
+    let name = |item: ItemId| {
+        item_tree(db, item.file)
+            .item(item.index)
+            .and_then(|data| data.name.clone())
+            .map_or_else(|| "?".to_owned(), |name| name.to_string())
+    };
+    let mut lines: Vec<(FilePath, TextSize, String)> = Vec::new();
+    for (id, info) in &const_eval(db, program).renders {
+        let (file, offset, shown) = match *id {
+            RenderId::Fn(item) => {
+                let Some(data) = item_tree(db, item.file).item(item.index) else {
+                    continue;
+                };
+                (item.file, data.name_range.start(), name(item))
+            }
+            RenderId::Closure(owner, expr) => {
+                let Some(Some(body)) = file_hir(db, owner.file).bodies.get(owner.index as usize)
+                else {
+                    continue;
+                };
+                let offset = body.store.expr_range(expr).start();
+                (owner.file, offset, format!("closure in {}", name(owner)))
+            }
+        };
+        if !game(file) {
+            continue;
+        }
+        let (line, col) = line_col(db, file.path(db), offset);
+        let kind = if info.keyframe { "keyframe" } else { "delta" };
+        lines.push((
+            file.path(db).clone(),
+            offset,
+            format!(
+                "{}:{line}:{col} {shown} -> {kind}",
+                file.path(db).display(base)
+            ),
+        ));
+    }
+    lines.sort();
+    let mut out = String::new();
+    for (_, _, line) in lines {
+        let _ = writeln!(out, "{line}");
     }
     out
 }

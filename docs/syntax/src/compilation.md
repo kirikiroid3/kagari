@@ -25,15 +25,17 @@ A game is compiled from one root file into one `.kagari` bytecode file.
      without recursion or unbounded loops; the arms of each `choice!` being distinct variants of
      one enum; ruby readings matching their base text.
 4. **Const evaluation.** Constants are evaluated. `const fn` called from the story with finite
-   arguments are [tabulated](./kinds.md#calling-const-fn-from-the-story). Renders are evaluated on
-   the screens that reach their steps; renders that ignore their input are marked as
-   [keyframes](./presentation.md#keyframes).
+   arguments are [tabulated](./kinds.md#calling-const-fn-from-the-story). Every render a step
+   uses is evaluated once on an opaque input screen: a render that finishes without reading its
+   input is marked as a [keyframe](./presentation.md#keyframes); any other render is evaluated
+   again on `Screen::empty()`, so its evaluation errors are reported.
 5. **Analysis.** Whole-program properties:
    - *Termination.* Every loop and every cycle of calls passes through a step (see
      [Termination](./narrative/scenes.md#termination)).
    - *Stuck choices.* No `choice!` is reachable with every arm's guard false.
-   - *Consistency.* The screen at a step does not depend on which path reached it unless the
-     author made that dependency explicit (see [Consistency](./presentation.md#consistency)).
+   - *Consistency.* Renders are evaluated on the screens that reach their steps, and the screen
+     at a step does not depend on which path reached it unless the author made that dependency
+     explicit (see [Consistency](./presentation.md#consistency)).
    - *Bounded screens.* No render makes the set of screens at a step grow past the cap (see
      [Unbounded screens](./presentation.md#unbounded-screens)).
    - *Reachability and liveness.* Unreachable steps and story variables that never influence

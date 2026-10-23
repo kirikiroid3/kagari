@@ -1,0 +1,192 @@
+// `match` exhaustiveness, unreachable arms and refutable patterns.
+
+enum Route { A, B, C }
+enum Map { A, B, Leave }
+enum Empty {}
+struct Point { x: u64, y: u64 }
+struct Unit;
+
+const CONST_X: Route = Route::C;
+const LOW: u64 = 1 + 0;
+const HIGH: u64 = LOW * 9;
+const NEG: i32 = -3;
+const WRAPPED: Option<Route> = Some(Route::A);
+
+static mut VISITED: bool = false;
+
+// Exhaustive matches: no diagnostics.
+
+fn payloads_ok(r: Option<Route>) -> u32 {
+    match r {
+        Some(Route::A | Route::B) => 0,
+        Some(CONST_X) => 1,
+        None => 2,
+    }
+}
+
+fn bounded_ok(n: Int<0, 5>) -> u32 {
+    match n {
+        0..=3 => 0,
+        4..=5 => 1,
+    }
+}
+
+fn ints_ok(n: i8, m: u64) -> u32 {
+    let a = match n {
+        -128..=-1 => 0,
+        0 => 1,
+        1.. => 2,
+    };
+    match m {
+        0 => a,
+        LOW..=HIGH => 1,
+        10.. => 2,
+    }
+}
+
+fn consts_ok(o: Option<Route>) -> u32 {
+    match o {
+        WRAPPED => 0,
+        Some(Route::B | Route::C) => 1,
+        None => 2,
+    }
+}
+
+fn structs_ok(p: &Point, u: Unit) -> u64 {
+    let a = match u {
+        Unit => 0,
+    };
+    match p {
+        Point { x: 0, y } => *y,
+        Point { x: 1.., .. } => a,
+    }
+}
+
+fn empty_ok(e: Empty) -> u32 {
+    match e {}
+}
+
+fn result_ok(r: Result<u32, Empty>) -> u32 {
+    match r {
+        Ok(x) => x,
+    }
+}
+
+fn conditions_ok(o: Option<u8>) {
+    if let Some(3) = o {}
+    while let Some(_) = o {}
+    let Point { x, .. } = Point { x: 1, y: 2 };
+}
+
+// Non-exhaustive matches.
+
+fn payloads(r: Option<Route>) -> u32 {
+    match r {
+        Some(Route::A) => 0,
+        None => 1,
+    }
+}
+
+fn bounded(n: Int<0, 10>) -> u32 {
+    match n {
+        0..=5 => 0,
+    }
+}
+
+fn gaps(n: i32, m: u64) -> u32 {
+    let a = match n {
+        ..=-1 => 0,
+        1..=5 => 1,
+        10.. => 2,
+    };
+    let b = match n {
+        NEG => 0,
+    };
+    match m {
+        LOW..=9 => a,
+    }
+}
+
+fn through_ref(r: &Route) -> u32 {
+    match r {
+        Route::A => 0,
+        Route::B => 1,
+    }
+}
+
+fn guards(b: bool) -> u32 {
+    match b {
+        true if b => 0,
+        false => 1,
+    }
+}
+
+fn tuples(a: bool, b: bool) -> u32 {
+    match (a, b) {
+        (true, _) => 0,
+        (_, true) => 1,
+    }
+}
+
+fn records(p: Point) -> u64 {
+    match p {
+        Point { x: 0, .. } => 0,
+    }
+}
+
+fn texts(t: Text) -> u32 {
+    match t {
+        "a" => 0,
+        "b" => 1,
+    }
+}
+
+fn many(o: Option<Option<Route>>) -> u32 {
+    match o {
+        Some(Some(Route::A)) => 0,
+    }
+}
+
+#[scene]
+pushdown fn Hub() {
+    match choice!{
+        id = "map",
+        t!["A"] => Map::A,
+        t!["Leave"] if VISITED => Map::Leave,
+    } {
+        Map::A => VISITED = true,
+        Map::Leave => {}
+    }
+    match choice!{
+        id = "map2",
+        t!["A"] => Map::A,
+        t!["B"] => Map::B,
+    } {
+        Map::A => VISITED = true,
+        _ => {}
+    }
+}
+
+// Unreachable arms.
+
+fn unreachable(r: Route, b: bool) -> u32 {
+    let a = match r {
+        Route::A | Route::B => 0,
+        Route::B | Route::A => 1,
+        _ => 2,
+        Route::C => 3,
+    };
+    match b {
+        true => a,
+        false => 1,
+        _ if b => 2,
+    }
+}
+
+// Refutable patterns.
+
+fn refutable(r: Option<Route>, Route::A: Route) {
+    let Some(x) = r;
+    for 3 in 0..5 {}
+    let f = |Some(y): Option<u8>| y;
+}

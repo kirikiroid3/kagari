@@ -100,9 +100,9 @@ pub const fn rgba(r: u8, g: u8, b: u8, a: u8) -> Color {
 /// The opaque colour `0xRRGGBB`; bits above `0xFFFFFF` are ignored.
 pub const fn hex(rgb: u32) -> Color {
     Color {
-        r: ((rgb >> 16) & 255) as u8,
-        g: ((rgb >> 8) & 255) as u8,
-        b: (rgb & 255) as u8,
+        r: ((rgb >> 16) & 255).saturate(),
+        g: ((rgb >> 8) & 255).saturate(),
+        b: (rgb & 255).saturate(),
         a: 255,
     }
 }

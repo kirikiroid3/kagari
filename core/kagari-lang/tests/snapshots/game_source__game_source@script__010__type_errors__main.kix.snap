@@ -1,0 +1,144 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/script/010__type_errors/main.kix
+---
+script/010__type_errors/main.kix:22:23: error[type/mismatched-types]: mismatched types: expected `bool`, found `Ending`
+script/010__type_errors/main.kix:28:18: error[type/mismatched-types]: mismatched types: expected `u32`, found `bool`
+script/010__type_errors/main.kix:29:5: error[type/mismatched-types]: mismatched types: expected `bool`, found `{integer}`
+script/010__type_errors/main.kix:34:20: error[type/divisor-may-be-zero]: the divisor's range `Int<0, 5>` contains 0; narrow its type first
+script/010__type_errors/main.kix:35:17: error[type/int-mix]: cannot mix `Int<0, 5>` and `u32`; convert one side with `.into()` or `.saturate()`
+script/010__type_errors/main.kix:36:5: error[type/mismatched-types]: mismatched types: expected `Int<0, 5>`, found `Int<1, 8>`
+script/010__type_errors/main.kix:40:21: error[type/literal-out-of-range]: literal out of range for `u8`: `300` does not fit
+script/010__type_errors/main.kix:41:30: error[type/literal-out-of-range]: literal out of range for `Int<0, 5>`: `6` does not fit
+script/010__type_errors/main.kix:46:9: error[type/literal-out-of-range]: literal out of range for `u8`: `300` does not fit
+script/010__type_errors/main.kix:48:13: error[type/literal-out-of-range]: literal out of range for `Int<0, 5>`: `7` does not fit
+script/010__type_errors/main.kix:55:20: error[type/lossy-into]: `u32` does not always fit in `u8`; use `.saturate()` to clamp it
+script/010__type_errors/main.kix:58:16: error[type/as-cast]: there are no `as` casts; use `.into()` or `.saturate()`
+script/010__type_errors/main.kix:59:28: error[type/lossy-into]: `Int<0, 5>` does not always fit in `Int<0, 3>`; use `.saturate()` to clamp it
+script/010__type_errors/main.kix:63:19: error[type/missing-field]: missing field `y` in initializer of `Point`
+script/010__type_errors/main.kix:64:42: error[type/unknown-field]: `Point` has no field named `z`
+script/010__type_errors/main.kix:65:5: error[type/unknown-field]: no field `z` on type `Point`
+script/010__type_errors/main.kix:69:5: error[type/unknown-method]: no method named `frobnicate` found for `Point`
+script/010__type_errors/main.kix:74:5: error[type/not-eq]: `==` needs `Eq`, but closures such as `Fn() -> u32` are never `Eq`
+script/010__type_errors/main.kix:78:5: error[type/wrong-arity]: this function takes 1 argument but 2 were supplied
+script/010__type_errors/main.kix:86:5: error[type/unsatisfied-bound]: the trait bound `Fn() -> u32: Eq` is not satisfied
+script/010__type_errors/main.kix:90:16: error[type/bad-nav-start]: the first argument of `nav::start` must name an `#[entry]` scene
+script/010__type_errors/main.kix:91:23: error[type/mismatched-types]: mismatched types: expected `bool`, found `u32`
+script/010__type_errors/main.kix:95:33: error[type/asset-path-not-literal]: the path of `asset` must be a string literal
+script/010__type_errors/main.kix:98:16: error[type/annotations-needed]: type annotations needed: cannot infer the type `Vec<_>`
+script/010__type_errors/main.kix:102:5: error[type/mismatched-types]: mismatched types: expected `u32`, found `()`
+--- resolutions ---
+script/010__type_errors/main.kix:3:19 u32 -> prim u32
+script/010__type_errors/main.kix:3:27 u32 -> prim u32
+script/010__type_errors/main.kix:9:18 flag -> local flag@9:18
+script/010__type_errors/main.kix:9:24 bool -> prim bool
+script/010__type_errors/main.kix:9:33 Ending -> enum crate::Ending
+script/010__type_errors/main.kix:10:8 flag -> local flag@9:18
+script/010__type_errors/main.kix:10:15 Ending::Good -> variant crate::Ending::Good
+script/010__type_errors/main.kix:10:37 Ending::Bad -> variant crate::Ending::Bad
+script/010__type_errors/main.kix:14:23 Ending -> enum crate::Ending
+script/010__type_errors/main.kix:15:5 Ending::Bad -> variant crate::Ending::Bad
+script/010__type_errors/main.kix:21:9 picked -> local picked@21:9
+script/010__type_errors/main.kix:21:54 Ending::Good -> variant crate::Ending::Good
+script/010__type_errors/main.kix:21:81 Ending::Bad -> variant crate::Ending::Bad
+script/010__type_errors/main.kix:22:9 wrong -> local wrong@22:9
+script/010__type_errors/main.kix:22:16 bool -> prim bool
+script/010__type_errors/main.kix:22:23 picked -> local picked@21:9
+script/010__type_errors/main.kix:25:12 ending -> local ending@25:12
+script/010__type_errors/main.kix:25:20 Ending -> enum crate::Ending
+script/010__type_errors/main.kix:27:18 bool -> prim bool
+script/010__type_errors/main.kix:28:9 n -> local n@28:9
+script/010__type_errors/main.kix:28:12 u32 -> prim u32
+script/010__type_errors/main.kix:32:15 a -> local a@32:15
+script/010__type_errors/main.kix:32:18 Int -> prim Int
+script/010__type_errors/main.kix:32:29 b -> local b@32:29
+script/010__type_errors/main.kix:32:32 Int -> prim Int
+script/010__type_errors/main.kix:32:46 Int -> prim Int
+script/010__type_errors/main.kix:33:9 sum -> local sum@33:9
+script/010__type_errors/main.kix:33:14 Int -> prim Int
+script/010__type_errors/main.kix:33:26 a -> local a@32:15
+script/010__type_errors/main.kix:33:30 b -> local b@32:29
+script/010__type_errors/main.kix:34:9 quotient -> local quotient@34:9
+script/010__type_errors/main.kix:34:20 a -> local a@32:15
+script/010__type_errors/main.kix:34:24 a -> local a@32:15
+script/010__type_errors/main.kix:35:9 mixed -> local mixed@35:9
+script/010__type_errors/main.kix:35:17 a -> local a@32:15
+script/010__type_errors/main.kix:36:5 sum -> local sum@33:9
+script/010__type_errors/main.kix:40:9 small -> local small@40:9
+script/010__type_errors/main.kix:40:16 u8 -> prim u8
+script/010__type_errors/main.kix:41:9 counter -> local counter@41:9
+script/010__type_errors/main.kix:41:18 Int -> prim Int
+script/010__type_errors/main.kix:44:21 n -> local n@44:21
+script/010__type_errors/main.kix:44:24 Int -> prim Int
+script/010__type_errors/main.kix:44:35 byte -> local byte@44:35
+script/010__type_errors/main.kix:44:41 u8 -> prim u8
+script/010__type_errors/main.kix:44:48 u32 -> prim u32
+script/010__type_errors/main.kix:45:11 byte -> local byte@44:35
+script/010__type_errors/main.kix:47:20 n -> local n@44:21
+script/010__type_errors/main.kix:54:16 wide -> local wide@54:16
+script/010__type_errors/main.kix:54:22 u32 -> prim u32
+script/010__type_errors/main.kix:54:27 narrow -> local narrow@54:27
+script/010__type_errors/main.kix:54:35 Int -> prim Int
+script/010__type_errors/main.kix:55:9 byte -> local byte@55:9
+script/010__type_errors/main.kix:55:15 u8 -> prim u8
+script/010__type_errors/main.kix:55:20 wide -> local wide@54:16
+script/010__type_errors/main.kix:56:9 fine -> local fine@56:9
+script/010__type_errors/main.kix:56:15 u64 -> prim u64
+script/010__type_errors/main.kix:56:21 wide -> local wide@54:16
+script/010__type_errors/main.kix:57:9 clamped -> local clamped@57:9
+script/010__type_errors/main.kix:57:18 u8 -> prim u8
+script/010__type_errors/main.kix:57:23 wide -> local wide@54:16
+script/010__type_errors/main.kix:58:9 cast -> local cast@58:9
+script/010__type_errors/main.kix:58:16 wide -> local wide@54:16
+script/010__type_errors/main.kix:58:24 u8 -> prim u8
+script/010__type_errors/main.kix:59:9 lossy -> local lossy@59:9
+script/010__type_errors/main.kix:59:16 Int -> prim Int
+script/010__type_errors/main.kix:59:28 narrow -> local narrow@54:27
+script/010__type_errors/main.kix:62:11 p -> local p@62:11
+script/010__type_errors/main.kix:62:14 Point -> struct crate::Point
+script/010__type_errors/main.kix:62:24 u32 -> prim u32
+script/010__type_errors/main.kix:63:9 missing -> local missing@63:9
+script/010__type_errors/main.kix:63:19 Point -> struct crate::Point
+script/010__type_errors/main.kix:64:9 unknown -> local unknown@64:9
+script/010__type_errors/main.kix:64:19 Point -> struct crate::Point
+script/010__type_errors/main.kix:65:5 p -> local p@62:11
+script/010__type_errors/main.kix:68:12 p -> local p@68:12
+script/010__type_errors/main.kix:68:15 Point -> struct crate::Point
+script/010__type_errors/main.kix:69:5 p -> local p@68:12
+script/010__type_errors/main.kix:72:18 bool -> prim bool
+script/010__type_errors/main.kix:73:9 f -> local f@73:9
+script/010__type_errors/main.kix:74:5 f -> local f@73:9
+script/010__type_errors/main.kix:74:10 f -> local f@73:9
+script/010__type_errors/main.kix:77:10 x -> local x@77:10
+script/010__type_errors/main.kix:77:13 u32 -> prim u32
+script/010__type_errors/main.kix:77:21 u32 -> prim u32
+script/010__type_errors/main.kix:78:5 arity -> fn crate::arity
+script/010__type_errors/main.kix:78:11 x -> local x@77:10
+script/010__type_errors/main.kix:78:14 x -> local x@77:10
+script/010__type_errors/main.kix:81:12 Eq -> trait std::Eq
+script/010__type_errors/main.kix:81:16 a -> local a@81:16
+script/010__type_errors/main.kix:81:19 T -> generic T
+script/010__type_errors/main.kix:81:22 b -> local b@81:22
+script/010__type_errors/main.kix:81:25 T -> generic T
+script/010__type_errors/main.kix:81:31 bool -> prim bool
+script/010__type_errors/main.kix:82:5 a -> local a@81:16
+script/010__type_errors/main.kix:82:10 b -> local b@81:22
+script/010__type_errors/main.kix:85:16 bool -> prim bool
+script/010__type_errors/main.kix:86:5 same -> fn crate::same
+script/010__type_errors/main.kix:90:5 nav::start -> fn std::system::nav::start
+script/010__type_errors/main.kix:90:16 Side -> fn crate::Side
+script/010__type_errors/main.kix:90:26 on_exit -> fn crate::on_exit
+script/010__type_errors/main.kix:91:5 nav::start -> fn std::system::nav::start
+script/010__type_errors/main.kix:91:16 Main -> fn crate::Main
+script/010__type_errors/main.kix:91:31 on_exit -> fn crate::on_exit
+script/010__type_errors/main.kix:94:13 Text -> struct std::narrative::text::Text
+script/010__type_errors/main.kix:95:14 ImageAsset -> struct std::ImageAsset
+script/010__type_errors/main.kix:95:27 asset -> fn std::asset
+script/010__type_errors/main.kix:95:33 PATH -> const crate::PATH
+script/010__type_errors/main.kix:98:9 list -> local list@98:9
+script/010__type_errors/main.kix:98:16 Vec::new -> fn std::Vec::new
+script/010__type_errors/main.kix:101:13 flag -> local flag@101:13
+script/010__type_errors/main.kix:101:19 bool -> prim bool
+script/010__type_errors/main.kix:101:28 u32 -> prim u32
+script/010__type_errors/main.kix:102:8 flag -> local flag@101:13

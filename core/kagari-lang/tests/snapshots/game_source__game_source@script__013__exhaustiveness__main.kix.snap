@@ -1,0 +1,211 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/script/013__exhaustiveness/main.kix
+---
+script/013__exhaustiveness/main.kix:84:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `Some(Route::B)` and `Some(Route::C)` not covered
+script/013__exhaustiveness/main.kix:91:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `6..=10` not covered
+script/013__exhaustiveness/main.kix:97:19: error[type/non-exhaustive-match]: non-exhaustive patterns: `0` and `6..=9` not covered
+script/013__exhaustiveness/main.kix:102:19: error[type/non-exhaustive-match]: non-exhaustive patterns: `i32::MIN..=-4` and `-2..=i32::MAX` not covered
+script/013__exhaustiveness/main.kix:105:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `0` and `10..=u64::MAX` not covered
+script/013__exhaustiveness/main.kix:111:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `Route::C` not covered
+script/013__exhaustiveness/main.kix:118:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `true` not covered
+script/013__exhaustiveness/main.kix:125:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `(false, false)` not covered
+script/013__exhaustiveness/main.kix:132:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `Point { x: 1..=u64::MAX, .. }` not covered
+script/013__exhaustiveness/main.kix:138:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `_` not covered
+script/013__exhaustiveness/main.kix:145:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `None`, `Some(None)`, `Some(Some(Route::B))` and 1 more not covered
+script/013__exhaustiveness/main.kix:152:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `Map::B` not covered
+script/013__exhaustiveness/main.kix:175:9: warning[type/unreachable-pattern]: unreachable pattern
+script/013__exhaustiveness/main.kix:177:9: warning[type/unreachable-pattern]: unreachable pattern
+script/013__exhaustiveness/main.kix:182:9: warning[type/unreachable-pattern]: unreachable pattern
+script/013__exhaustiveness/main.kix:188:32: error[type/refutable-pattern]: refutable pattern in function argument: `Route::B` and `Route::C` not covered
+script/013__exhaustiveness/main.kix:189:9: error[type/refutable-pattern]: refutable pattern in local binding: `None` not covered
+script/013__exhaustiveness/main.kix:190:9: error[type/refutable-pattern]: refutable pattern in `for` loop binding: `0..=2` and `4` not covered
+script/013__exhaustiveness/main.kix:191:14: error[type/refutable-pattern]: refutable pattern in closure argument: `None` not covered
+--- resolutions ---
+script/013__exhaustiveness/main.kix:6:19 u64 -> prim u64
+script/013__exhaustiveness/main.kix:6:27 u64 -> prim u64
+script/013__exhaustiveness/main.kix:9:16 Route -> enum crate::Route
+script/013__exhaustiveness/main.kix:9:24 Route::C -> variant crate::Route::C
+script/013__exhaustiveness/main.kix:10:12 u64 -> prim u64
+script/013__exhaustiveness/main.kix:11:13 u64 -> prim u64
+script/013__exhaustiveness/main.kix:11:19 LOW -> const crate::LOW
+script/013__exhaustiveness/main.kix:12:12 i32 -> prim i32
+script/013__exhaustiveness/main.kix:13:16 Option -> enum std::Option
+script/013__exhaustiveness/main.kix:13:23 Route -> enum crate::Route
+script/013__exhaustiveness/main.kix:13:32 Some -> variant std::Option::Some
+script/013__exhaustiveness/main.kix:13:37 Route::A -> variant crate::Route::A
+script/013__exhaustiveness/main.kix:15:21 bool -> prim bool
+script/013__exhaustiveness/main.kix:19:16 r -> local r@19:16
+script/013__exhaustiveness/main.kix:19:19 Option -> enum std::Option
+script/013__exhaustiveness/main.kix:19:26 Route -> enum crate::Route
+script/013__exhaustiveness/main.kix:19:37 u32 -> prim u32
+script/013__exhaustiveness/main.kix:20:11 r -> local r@19:16
+script/013__exhaustiveness/main.kix:21:9 Some -> variant std::Option::Some
+script/013__exhaustiveness/main.kix:21:14 Route::A -> variant crate::Route::A
+script/013__exhaustiveness/main.kix:21:25 Route::B -> variant crate::Route::B
+script/013__exhaustiveness/main.kix:22:9 Some -> variant std::Option::Some
+script/013__exhaustiveness/main.kix:22:14 CONST_X -> const crate::CONST_X
+script/013__exhaustiveness/main.kix:23:9 None -> variant std::Option::None
+script/013__exhaustiveness/main.kix:27:15 n -> local n@27:15
+script/013__exhaustiveness/main.kix:27:18 Int -> prim Int
+script/013__exhaustiveness/main.kix:27:32 u32 -> prim u32
+script/013__exhaustiveness/main.kix:28:11 n -> local n@27:15
+script/013__exhaustiveness/main.kix:34:12 n -> local n@34:12
+script/013__exhaustiveness/main.kix:34:15 i8 -> prim i8
+script/013__exhaustiveness/main.kix:34:19 m -> local m@34:19
+script/013__exhaustiveness/main.kix:34:22 u64 -> prim u64
+script/013__exhaustiveness/main.kix:34:30 u32 -> prim u32
+script/013__exhaustiveness/main.kix:35:9 a -> local a@35:9
+script/013__exhaustiveness/main.kix:35:19 n -> local n@34:12
+script/013__exhaustiveness/main.kix:40:11 m -> local m@34:19
+script/013__exhaustiveness/main.kix:41:14 a -> local a@35:9
+script/013__exhaustiveness/main.kix:42:9 LOW -> const crate::LOW
+script/013__exhaustiveness/main.kix:42:15 HIGH -> const crate::HIGH
+script/013__exhaustiveness/main.kix:47:14 o -> local o@47:14
+script/013__exhaustiveness/main.kix:47:17 Option -> enum std::Option
+script/013__exhaustiveness/main.kix:47:24 Route -> enum crate::Route
+script/013__exhaustiveness/main.kix:47:35 u32 -> prim u32
+script/013__exhaustiveness/main.kix:48:11 o -> local o@47:14
+script/013__exhaustiveness/main.kix:49:9 WRAPPED -> const crate::WRAPPED
+script/013__exhaustiveness/main.kix:50:9 Some -> variant std::Option::Some
+script/013__exhaustiveness/main.kix:50:14 Route::B -> variant crate::Route::B
+script/013__exhaustiveness/main.kix:50:25 Route::C -> variant crate::Route::C
+script/013__exhaustiveness/main.kix:51:9 None -> variant std::Option::None
+script/013__exhaustiveness/main.kix:55:15 p -> local p@55:15
+script/013__exhaustiveness/main.kix:55:19 Point -> struct crate::Point
+script/013__exhaustiveness/main.kix:55:26 u -> local u@55:26
+script/013__exhaustiveness/main.kix:55:29 Unit -> struct crate::Unit
+script/013__exhaustiveness/main.kix:55:38 u64 -> prim u64
+script/013__exhaustiveness/main.kix:56:9 a -> local a@56:9
+script/013__exhaustiveness/main.kix:56:19 u -> local u@55:26
+script/013__exhaustiveness/main.kix:57:9 Unit -> struct crate::Unit
+script/013__exhaustiveness/main.kix:59:11 p -> local p@55:15
+script/013__exhaustiveness/main.kix:60:9 Point -> struct crate::Point
+script/013__exhaustiveness/main.kix:60:23 y -> local y@60:23
+script/013__exhaustiveness/main.kix:60:31 y -> local y@60:23
+script/013__exhaustiveness/main.kix:61:9 Point -> struct crate::Point
+script/013__exhaustiveness/main.kix:61:33 a -> local a@56:9
+script/013__exhaustiveness/main.kix:65:13 e -> local e@65:13
+script/013__exhaustiveness/main.kix:65:16 Empty -> enum crate::Empty
+script/013__exhaustiveness/main.kix:65:26 u32 -> prim u32
+script/013__exhaustiveness/main.kix:66:11 e -> local e@65:13
+script/013__exhaustiveness/main.kix:69:14 r -> local r@69:14
+script/013__exhaustiveness/main.kix:69:17 Result -> enum std::Result
+script/013__exhaustiveness/main.kix:69:24 u32 -> prim u32
+script/013__exhaustiveness/main.kix:69:29 Empty -> enum crate::Empty
+script/013__exhaustiveness/main.kix:69:40 u32 -> prim u32
+script/013__exhaustiveness/main.kix:70:11 r -> local r@69:14
+script/013__exhaustiveness/main.kix:71:9 Ok -> variant std::Result::Ok
+script/013__exhaustiveness/main.kix:71:12 x -> local x@71:12
+script/013__exhaustiveness/main.kix:71:18 x -> local x@71:12
+script/013__exhaustiveness/main.kix:75:18 o -> local o@75:18
+script/013__exhaustiveness/main.kix:75:21 Option -> enum std::Option
+script/013__exhaustiveness/main.kix:75:28 u8 -> prim u8
+script/013__exhaustiveness/main.kix:76:12 Some -> variant std::Option::Some
+script/013__exhaustiveness/main.kix:76:22 o -> local o@75:18
+script/013__exhaustiveness/main.kix:77:15 Some -> variant std::Option::Some
+script/013__exhaustiveness/main.kix:77:25 o -> local o@75:18
+script/013__exhaustiveness/main.kix:78:9 Point -> struct crate::Point
+script/013__exhaustiveness/main.kix:78:17 x -> local x@78:17
+script/013__exhaustiveness/main.kix:78:27 Point -> struct crate::Point
+script/013__exhaustiveness/main.kix:83:13 r -> local r@83:13
+script/013__exhaustiveness/main.kix:83:16 Option -> enum std::Option
+script/013__exhaustiveness/main.kix:83:23 Route -> enum crate::Route
+script/013__exhaustiveness/main.kix:83:34 u32 -> prim u32
+script/013__exhaustiveness/main.kix:84:11 r -> local r@83:13
+script/013__exhaustiveness/main.kix:85:9 Some -> variant std::Option::Some
+script/013__exhaustiveness/main.kix:85:14 Route::A -> variant crate::Route::A
+script/013__exhaustiveness/main.kix:86:9 None -> variant std::Option::None
+script/013__exhaustiveness/main.kix:90:12 n -> local n@90:12
+script/013__exhaustiveness/main.kix:90:15 Int -> prim Int
+script/013__exhaustiveness/main.kix:90:30 u32 -> prim u32
+script/013__exhaustiveness/main.kix:91:11 n -> local n@90:12
+script/013__exhaustiveness/main.kix:96:9 n -> local n@96:9
+script/013__exhaustiveness/main.kix:96:12 i32 -> prim i32
+script/013__exhaustiveness/main.kix:96:17 m -> local m@96:17
+script/013__exhaustiveness/main.kix:96:20 u64 -> prim u64
+script/013__exhaustiveness/main.kix:96:28 u32 -> prim u32
+script/013__exhaustiveness/main.kix:97:9 a -> local a@97:9
+script/013__exhaustiveness/main.kix:97:19 n -> local n@96:9
+script/013__exhaustiveness/main.kix:102:9 b -> local b@102:9
+script/013__exhaustiveness/main.kix:102:19 n -> local n@96:9
+script/013__exhaustiveness/main.kix:103:9 NEG -> const crate::NEG
+script/013__exhaustiveness/main.kix:105:11 m -> local m@96:17
+script/013__exhaustiveness/main.kix:106:9 LOW -> const crate::LOW
+script/013__exhaustiveness/main.kix:106:20 a -> local a@97:9
+script/013__exhaustiveness/main.kix:110:16 r -> local r@110:16
+script/013__exhaustiveness/main.kix:110:20 Route -> enum crate::Route
+script/013__exhaustiveness/main.kix:110:30 u32 -> prim u32
+script/013__exhaustiveness/main.kix:111:11 r -> local r@110:16
+script/013__exhaustiveness/main.kix:112:9 Route::A -> variant crate::Route::A
+script/013__exhaustiveness/main.kix:113:9 Route::B -> variant crate::Route::B
+script/013__exhaustiveness/main.kix:117:11 b -> local b@117:11
+script/013__exhaustiveness/main.kix:117:14 bool -> prim bool
+script/013__exhaustiveness/main.kix:117:23 u32 -> prim u32
+script/013__exhaustiveness/main.kix:118:11 b -> local b@117:11
+script/013__exhaustiveness/main.kix:119:17 b -> local b@117:11
+script/013__exhaustiveness/main.kix:124:11 a -> local a@124:11
+script/013__exhaustiveness/main.kix:124:14 bool -> prim bool
+script/013__exhaustiveness/main.kix:124:20 b -> local b@124:20
+script/013__exhaustiveness/main.kix:124:23 bool -> prim bool
+script/013__exhaustiveness/main.kix:124:32 u32 -> prim u32
+script/013__exhaustiveness/main.kix:125:12 a -> local a@124:11
+script/013__exhaustiveness/main.kix:125:15 b -> local b@124:20
+script/013__exhaustiveness/main.kix:131:12 p -> local p@131:12
+script/013__exhaustiveness/main.kix:131:15 Point -> struct crate::Point
+script/013__exhaustiveness/main.kix:131:25 u64 -> prim u64
+script/013__exhaustiveness/main.kix:132:11 p -> local p@131:12
+script/013__exhaustiveness/main.kix:133:9 Point -> struct crate::Point
+script/013__exhaustiveness/main.kix:137:10 t -> local t@137:10
+script/013__exhaustiveness/main.kix:137:13 Text -> struct std::narrative::text::Text
+script/013__exhaustiveness/main.kix:137:22 u32 -> prim u32
+script/013__exhaustiveness/main.kix:138:11 t -> local t@137:10
+script/013__exhaustiveness/main.kix:144:9 o -> local o@144:9
+script/013__exhaustiveness/main.kix:144:12 Option -> enum std::Option
+script/013__exhaustiveness/main.kix:144:19 Option -> enum std::Option
+script/013__exhaustiveness/main.kix:144:26 Route -> enum crate::Route
+script/013__exhaustiveness/main.kix:144:38 u32 -> prim u32
+script/013__exhaustiveness/main.kix:145:11 o -> local o@144:9
+script/013__exhaustiveness/main.kix:146:9 Some -> variant std::Option::Some
+script/013__exhaustiveness/main.kix:146:14 Some -> variant std::Option::Some
+script/013__exhaustiveness/main.kix:146:19 Route::A -> variant crate::Route::A
+script/013__exhaustiveness/main.kix:154:20 Map::A -> variant crate::Map::A
+script/013__exhaustiveness/main.kix:155:24 VISITED -> static crate::VISITED
+script/013__exhaustiveness/main.kix:155:35 Map::Leave -> variant crate::Map::Leave
+script/013__exhaustiveness/main.kix:157:9 Map::A -> variant crate::Map::A
+script/013__exhaustiveness/main.kix:157:19 VISITED -> static crate::VISITED
+script/013__exhaustiveness/main.kix:158:9 Map::Leave -> variant crate::Map::Leave
+script/013__exhaustiveness/main.kix:162:20 Map::A -> variant crate::Map::A
+script/013__exhaustiveness/main.kix:163:20 Map::B -> variant crate::Map::B
+script/013__exhaustiveness/main.kix:165:9 Map::A -> variant crate::Map::A
+script/013__exhaustiveness/main.kix:165:19 VISITED -> static crate::VISITED
+script/013__exhaustiveness/main.kix:172:16 r -> local r@172:16
+script/013__exhaustiveness/main.kix:172:19 Route -> enum crate::Route
+script/013__exhaustiveness/main.kix:172:26 b -> local b@172:26
+script/013__exhaustiveness/main.kix:172:29 bool -> prim bool
+script/013__exhaustiveness/main.kix:172:38 u32 -> prim u32
+script/013__exhaustiveness/main.kix:173:9 a -> local a@173:9
+script/013__exhaustiveness/main.kix:173:19 r -> local r@172:16
+script/013__exhaustiveness/main.kix:174:9 Route::A -> variant crate::Route::A
+script/013__exhaustiveness/main.kix:174:20 Route::B -> variant crate::Route::B
+script/013__exhaustiveness/main.kix:175:9 Route::B -> variant crate::Route::B
+script/013__exhaustiveness/main.kix:175:20 Route::A -> variant crate::Route::A
+script/013__exhaustiveness/main.kix:177:9 Route::C -> variant crate::Route::C
+script/013__exhaustiveness/main.kix:179:11 b -> local b@172:26
+script/013__exhaustiveness/main.kix:180:17 a -> local a@173:9
+script/013__exhaustiveness/main.kix:182:14 b -> local b@172:26
+script/013__exhaustiveness/main.kix:188:14 r -> local r@188:14
+script/013__exhaustiveness/main.kix:188:17 Option -> enum std::Option
+script/013__exhaustiveness/main.kix:188:24 Route -> enum crate::Route
+script/013__exhaustiveness/main.kix:188:32 Route::A -> variant crate::Route::A
+script/013__exhaustiveness/main.kix:188:42 Route -> enum crate::Route
+script/013__exhaustiveness/main.kix:189:9 Some -> variant std::Option::Some
+script/013__exhaustiveness/main.kix:189:14 x -> local x@189:14
+script/013__exhaustiveness/main.kix:189:19 r -> local r@188:14
+script/013__exhaustiveness/main.kix:191:9 f -> local f@191:9
+script/013__exhaustiveness/main.kix:191:14 Some -> variant std::Option::Some
+script/013__exhaustiveness/main.kix:191:19 y -> local y@191:19
+script/013__exhaustiveness/main.kix:191:23 Option -> enum std::Option
+script/013__exhaustiveness/main.kix:191:30 u8 -> prim u8
+script/013__exhaustiveness/main.kix:191:35 y -> local y@191:19

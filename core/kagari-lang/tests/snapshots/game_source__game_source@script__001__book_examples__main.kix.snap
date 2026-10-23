@@ -131,3 +131,5 @@ script/001__book_examples/main.kix:198:16 route -> local route@197:20
 script/001__book_examples/main.kix:198:23 affection -> local affection@197:34
 script/001__book_examples/main.kix:199:14 Route::Mio -> variant crate::proposal::Route::Mio
 script/001__book_examples/main.kix:200:14 Route::Mio -> variant crate::proposal::Route::Mio
+--- renders ---
+script/001__book_examples/main.kix:82:10 hanako_jumps -> delta

@@ -1,0 +1,184 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/script/011__kind_errors/main.kix
+---
+script/011__kind_errors/main.kix:4:19: error[kind/not-finite]: the type of a story variable must be finite, but `u32` is not
+script/011__kind_errors/main.kix:5:33: error[kind/call-rule]: cannot call `fn` `start` from the initializer of the story variable `FROM_FN`: `const` code is pure and can call only `const fn`
+  note: script/011__kind_errors/main.kix:21:4: `start` is declared here
+script/011__kind_errors/main.kix:6:22: error[kind/bad-handle]: an immutable `static` must hold a `Setting<T>` or `Meta<T>` handle, but this is `u32`; use `const` for a constant or `static mut` for a story variable
+script/011__kind_errors/main.kix:10:39: error[kind/not-constant]: the initializer of a `const` must be a constant expression: an assignment is not a constant expression
+script/011__kind_errors/main.kix:11:17: error[kind/reference-in-item]: the type of a `const` cannot contain a reference, but this is `&u32`
+script/011__kind_errors/main.kix:17:1: error[kind/misplaced-attribute]: `#[scene]` is only allowed on a `pushdown fn`, but this is a `fn`
+script/011__kind_errors/main.kix:18:1: error[kind/misplaced-attribute]: `#[entry]` needs `#[scene]`: an entry scene is a `#[scene]` `pushdown fn`
+script/011__kind_errors/main.kix:19:1: error[kind/misplaced-attribute]: `#[must_use]` is only allowed on a struct or an enum, but this is a `fn`
+script/011__kind_errors/main.kix:26:5: error[kind/call-rule]: cannot call the scene `Main` from the `fn` `system`: the only way into the story is `nav::start` of an entry scene
+  note: script/011__kind_errors/main.kix:45:13: `Main` is declared here
+script/011__kind_errors/main.kix:29:17: error[kind/story-variable-outside-story]: story variable `ROUTE` cannot be used in the `fn` `system`: only `pushdown fn` code may read or write story variables
+  note: script/011__kind_errors/main.kix:3:12: `ROUTE` is declared here
+script/011__kind_errors/main.kix:34:14: error[kind/call-rule]: cannot call `fn` `Setting::get` from the `const fn` `render`: `const` code is pure and can call only `const fn`; in `const` code a `Setting` handle can only be passed as a value, as to `Entity::gate`
+script/011__kind_errors/main.kix:35:19: error[kind/meta-in-const]: meta field `CLEARED` cannot be used in the `const fn` `render`: meta is read by `fn` code and written by the story, never seen by `const` code
+script/011__kind_errors/main.kix:36:5: warning[kind/unused-must-use]: unused `Swap` that must be used: the change does not happen without `apply_animation`
+script/011__kind_errors/main.kix:58:25: error[kind/choice-id]: the choice id `map` is used twice in `Main`: a choice id must be unique within its function, since saves record it
+  note: script/011__kind_errors/main.kix:48:18: first used here
+script/011__kind_errors/main.kix:58:68: error[kind/choice-arms]: `Map::A` is already an arm of this choice: each variant may be chosen at most once
+  note: script/011__kind_errors/main.kix:58:43: first used here
+script/011__kind_errors/main.kix:62:8: error[kind/ruby-readings]: a mono ruby needs one reading per character: `漢字` has 2 characters but 3 readings are given
+script/011__kind_errors/main.kix:66:14: error[kind/for-not-constant]: a `for` loop in the scene `Main` must iterate over an array or over a range whose bounds are constant expressions
+script/011__kind_errors/main.kix:74:14: error[kind/step-outside-scene]: only a scene can run a step: a `pushdown` closure cannot use `s!` or `choice!`; mark the function `#[scene]`
+script/011__kind_errors/main.kix:79:25: error[kind/text-in-entry]: the parameter types of an entry scene cannot contain `Text`, but this is `Text`: `fn` code can build runtime text
+script/011__kind_errors/main.kix:79:38: error[kind/not-finite]: parameter type `u32` is not finite: a scene can hold only finite types
+script/011__kind_errors/main.kix:86:5: error[kind/step-outside-scene]: only a scene can run a step: the instant procedure `visit` cannot use `s!` or `choice!`; mark the function `#[scene]`
+script/011__kind_errors/main.kix:87:5: error[kind/scene-call-outside-scene]: only a scene can call another scene: the instant procedure `visit` cannot call the scene `Other`
+  note: script/011__kind_errors/main.kix:71:13: `Other` is declared here
+script/011__kind_errors/main.kix:88:5: error[kind/call-rule]: cannot call `fn` `start` from the instant procedure `visit`: the story can call only `pushdown fn` and `const fn`
+  note: script/011__kind_errors/main.kix:21:4: `start` is declared here
+script/011__kind_errors/main.kix:89:5: error[kind/unbounded-loop]: `while` is not allowed in the instant procedure `visit`: an instant procedure has only bounded loops (`for` over an array or a range with constant bounds)
+script/011__kind_errors/main.kix:93:22: error[kind/instant-recursion]: instant procedures cannot recurse, but these calls form a cycle: `ping` → `pong` → `ping`; mark one of them `#[scene]` and pass through a step
+script/011__kind_errors/main.kix:97:27: error[kind/instant-recursion]: instant procedures cannot recurse, but these calls form a cycle: `again` → `again` (passed as a value to code that may call it); mark one of them `#[scene]` and pass through a step
+script/011__kind_errors/main.kix:104:9: error[kind/second-class-closure]: `g` cannot hold a closure in the instant procedure `twice`: closures in the story are second-class and can only be passed as arguments and called
+script/011__kind_errors/main.kix:114:14: error[kind/aliased-mut-argument]: `p` is passed as `&mut` and also as another argument of this call: in the story, a `&mut` argument cannot alias another argument
+  note: script/011__kind_errors/main.kix:114:11: the same place is also passed here
+script/011__kind_errors/main.kix:115:9: error[kind/second-class-reference]: `q` cannot hold a reference in the instant procedure `alias`: references in the story are second-class and can only be passed as arguments
+script/011__kind_errors/main.kix:118:37: error[kind/second-class-reference]: an instant procedure cannot return a reference: references in the story are second-class, and only a method whose receiver is a reference may return one
+script/011__kind_errors/main.kix:127:5: error[kind/immutable-place]: cannot assign to `b.x`, as `b` is not declared as mutable
+  note: script/011__kind_errors/main.kix:125:9: consider changing this to be mutable
+script/011__kind_errors/main.kix:129:16: error[kind/not-finite]: this `const fn` call has runtime arguments, so it is tabulated, and its result must be finite, but `u32` is not
+--- resolutions ---
+script/011__kind_errors/main.kix:3:19 Int -> prim Int
+script/011__kind_errors/main.kix:4:19 u32 -> prim u32
+script/011__kind_errors/main.kix:5:21 Int -> prim Int
+script/011__kind_errors/main.kix:5:33 start -> fn crate::start
+script/011__kind_errors/main.kix:6:22 u32 -> prim u32
+script/011__kind_errors/main.kix:7:19 Setting -> struct std::system::Setting
+script/011__kind_errors/main.kix:7:27 bool -> prim bool
+script/011__kind_errors/main.kix:7:35 setting -> fn std::system::setting
+script/011__kind_errors/main.kix:8:17 Meta -> struct std::narrative::Meta
+script/011__kind_errors/main.kix:8:22 bool -> prim bool
+script/011__kind_errors/main.kix:8:30 meta -> fn std::narrative::meta
+script/011__kind_errors/main.kix:9:12 Int -> prim Int
+script/011__kind_errors/main.kix:10:16 u32 -> prim u32
+script/011__kind_errors/main.kix:10:28 n -> local n@10:28
+script/011__kind_errors/main.kix:10:39 n -> local n@10:28
+script/011__kind_errors/main.kix:10:47 n -> local n@10:28
+script/011__kind_errors/main.kix:11:18 u32 -> prim u32
+script/011__kind_errors/main.kix:15:19 Int -> prim Int
+script/011__kind_errors/main.kix:15:33 Int -> prim Int
+script/011__kind_errors/main.kix:21:15 Int -> prim Int
+script/011__kind_errors/main.kix:26:5 Main -> fn crate::Main
+script/011__kind_errors/main.kix:27:9 on -> local on@27:9
+script/011__kind_errors/main.kix:27:14 PETALS_ON -> static crate::PETALS_ON
+script/011__kind_errors/main.kix:28:5 CLEARED -> static crate::CLEARED
+script/011__kind_errors/main.kix:29:9 route -> local route@29:9
+script/011__kind_errors/main.kix:29:17 ROUTE -> static crate::ROUTE
+script/011__kind_errors/main.kix:32:17 screen -> local screen@32:17
+script/011__kind_errors/main.kix:32:29 Screen -> struct std::screen::Screen
+script/011__kind_errors/main.kix:32:40 Screen -> struct std::screen::Screen
+script/011__kind_errors/main.kix:33:5 screen -> local screen@32:17
+script/011__kind_errors/main.kix:33:19 EntityId -> struct std::screen::EntityId
+script/011__kind_errors/main.kix:33:37 Some -> variant std::Option::Some
+script/011__kind_errors/main.kix:33:42 PETALS_ON -> static crate::PETALS_ON
+script/011__kind_errors/main.kix:34:9 on -> local on@34:9
+script/011__kind_errors/main.kix:34:14 PETALS_ON -> static crate::PETALS_ON
+script/011__kind_errors/main.kix:35:9 cleared -> local cleared@35:9
+script/011__kind_errors/main.kix:35:19 CLEARED -> static crate::CLEARED
+script/011__kind_errors/main.kix:36:5 screen -> local screen@32:17
+script/011__kind_errors/main.kix:37:5 screen -> local screen@32:17
+script/011__kind_errors/main.kix:37:49 cut -> fn std::screen::anim::cut
+script/011__kind_errors/main.kix:38:5 screen -> local screen@32:17
+script/011__kind_errors/main.kix:45:23 Ending -> enum crate::Ending
+script/011__kind_errors/main.kix:49:24 Map::A -> variant crate::Map::A
+script/011__kind_errors/main.kix:50:24 ROUTE -> static crate::ROUTE
+script/011__kind_errors/main.kix:50:38 Map::B -> variant crate::Map::B
+script/011__kind_errors/main.kix:51:28 Map::Leave -> variant crate::Map::Leave
+script/011__kind_errors/main.kix:53:13 Map::A -> variant crate::Map::A
+script/011__kind_errors/main.kix:53:23 visit -> fn crate::visit
+script/011__kind_errors/main.kix:54:13 Map::B -> variant crate::Map::B
+script/011__kind_errors/main.kix:54:23 Other -> fn crate::Other
+script/011__kind_errors/main.kix:55:13 Map::Leave -> variant crate::Map::Leave
+script/011__kind_errors/main.kix:55:27 break -> loop@46:5
+script/011__kind_errors/main.kix:58:43 Map::A -> variant crate::Map::A
+script/011__kind_errors/main.kix:58:68 Map::A -> variant crate::Map::A
+script/011__kind_errors/main.kix:59:9 Map::A -> variant crate::Map::A
+script/011__kind_errors/main.kix:64:9 i -> local i@64:9
+script/011__kind_errors/main.kix:64:17 MAX -> const crate::MAX
+script/011__kind_errors/main.kix:64:23 ROUTE -> static crate::ROUTE
+script/011__kind_errors/main.kix:64:31 i -> local i@64:9
+script/011__kind_errors/main.kix:65:9 n -> local n@65:9
+script/011__kind_errors/main.kix:65:13 ROUTE -> static crate::ROUTE
+script/011__kind_errors/main.kix:66:9 i -> local i@66:9
+script/011__kind_errors/main.kix:66:17 n -> local n@65:9
+script/011__kind_errors/main.kix:66:21 visit -> fn crate::visit
+script/011__kind_errors/main.kix:67:5 Ending::Normal -> variant crate::Ending::Normal
+script/011__kind_errors/main.kix:73:5 twice -> fn crate::twice
+script/011__kind_errors/main.kix:73:14 ROUTE -> static crate::ROUTE
+script/011__kind_errors/main.kix:74:5 twice -> fn crate::twice
+script/011__kind_errors/main.kix:79:19 name -> local name@79:19
+script/011__kind_errors/main.kix:79:25 Text -> struct std::narrative::text::Text
+script/011__kind_errors/main.kix:79:31 count -> local count@79:31
+script/011__kind_errors/main.kix:79:38 u32 -> prim u32
+script/011__kind_errors/main.kix:79:46 Ending -> enum crate::Ending
+script/011__kind_errors/main.kix:80:5 Ending::Normal -> variant crate::Ending::Normal
+script/011__kind_errors/main.kix:84:5 ROUTE -> static crate::ROUTE
+script/011__kind_errors/main.kix:85:5 CLEARED -> static crate::CLEARED
+script/011__kind_errors/main.kix:87:5 Other -> fn crate::Other
+script/011__kind_errors/main.kix:88:5 start -> fn crate::start
+script/011__kind_errors/main.kix:89:11 ROUTE -> static crate::ROUTE
+script/011__kind_errors/main.kix:89:23 ROUTE -> static crate::ROUTE
+script/011__kind_errors/main.kix:90:9 i -> local i@90:9
+script/011__kind_errors/main.kix:90:23 ROUTE -> static crate::ROUTE
+script/011__kind_errors/main.kix:90:31 i -> local i@90:9
+script/011__kind_errors/main.kix:93:22 pong -> fn crate::pong
+script/011__kind_errors/main.kix:94:22 ping -> fn crate::ping
+script/011__kind_errors/main.kix:96:17 p -> local p@96:17
+script/011__kind_errors/main.kix:96:37 p -> local p@96:17
+script/011__kind_errors/main.kix:97:23 run -> fn crate::run
+script/011__kind_errors/main.kix:97:27 again -> fn crate::again
+script/011__kind_errors/main.kix:98:22 run -> fn crate::run
+script/011__kind_errors/main.kix:98:26 leaf -> fn crate::leaf
+script/011__kind_errors/main.kix:99:22 ROUTE -> static crate::ROUTE
+script/011__kind_errors/main.kix:101:19 f -> local f@101:19
+script/011__kind_errors/main.kix:102:5 f -> local f@101:19
+script/011__kind_errors/main.kix:103:5 f -> local f@101:19
+script/011__kind_errors/main.kix:104:9 g -> local g@104:9
+script/011__kind_errors/main.kix:104:13 f -> local f@101:19
+script/011__kind_errors/main.kix:109:19 a -> local a@109:19
+script/011__kind_errors/main.kix:109:27 Point -> struct crate::Point
+script/011__kind_errors/main.kix:109:34 b -> local b@109:34
+script/011__kind_errors/main.kix:109:38 Point -> struct crate::Point
+script/011__kind_errors/main.kix:110:5 a -> local a@109:19
+script/011__kind_errors/main.kix:110:11 b -> local b@109:34
+script/011__kind_errors/main.kix:113:19 p -> local p@113:19
+script/011__kind_errors/main.kix:113:27 Point -> struct crate::Point
+script/011__kind_errors/main.kix:114:5 shift -> fn crate::shift
+script/011__kind_errors/main.kix:114:11 p -> local p@113:19
+script/011__kind_errors/main.kix:114:14 p -> local p@113:19
+script/011__kind_errors/main.kix:115:9 q -> local q@115:9
+script/011__kind_errors/main.kix:115:14 p -> local p@113:19
+script/011__kind_errors/main.kix:118:23 p -> local p@118:23
+script/011__kind_errors/main.kix:118:27 Point -> struct crate::Point
+script/011__kind_errors/main.kix:118:38 Int -> prim Int
+script/011__kind_errors/main.kix:119:6 p -> local p@118:23
+script/011__kind_errors/main.kix:124:9 a -> local a@124:9
+script/011__kind_errors/main.kix:124:17 Point -> struct crate::Point
+script/011__kind_errors/main.kix:125:9 b -> local b@125:9
+script/011__kind_errors/main.kix:125:13 Point -> struct crate::Point
+script/011__kind_errors/main.kix:126:5 shift -> fn crate::shift
+script/011__kind_errors/main.kix:126:16 a -> local a@124:9
+script/011__kind_errors/main.kix:126:20 b -> local b@125:9
+script/011__kind_errors/main.kix:127:5 b -> local b@125:9
+script/011__kind_errors/main.kix:128:9 tab -> local tab@128:9
+script/011__kind_errors/main.kix:128:15 mood -> fn crate::mood
+script/011__kind_errors/main.kix:128:20 ROUTE -> static crate::ROUTE
+script/011__kind_errors/main.kix:129:9 wide -> local wide@129:9
+script/011__kind_errors/main.kix:129:16 widen -> fn crate::widen
+script/011__kind_errors/main.kix:129:22 ROUTE -> static crate::ROUTE
+script/011__kind_errors/main.kix:132:15 x -> local x@132:15
+script/011__kind_errors/main.kix:132:18 Int -> prim Int
+script/011__kind_errors/main.kix:132:32 Map -> enum crate::Map
+script/011__kind_errors/main.kix:132:41 x -> local x@132:15
+script/011__kind_errors/main.kix:132:49 Map::A -> variant crate::Map::A
+script/011__kind_errors/main.kix:132:65 Map::B -> variant crate::Map::B
+script/011__kind_errors/main.kix:133:16 x -> local x@133:16
+script/011__kind_errors/main.kix:133:19 Int -> prim Int
+script/011__kind_errors/main.kix:133:33 u32 -> prim u32

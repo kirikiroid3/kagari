@@ -1,8 +1,9 @@
 # Checks
 
 This chapter is the contract between the library and the type and kind checker (stage 3 of the
-compiler). Stage 3 is not implemented yet; today the compiler resolves std names and reports
-resolution errors only.
+compiler). Stage 3 infers types and checks the type rules, `Eq` and the other trait bounds,
+`asset::<A>` and `nav::start`, and every rule below: the kind rules, finite types, settings in
+`const fn`, `#[must_use]` and `for`-loop constness.
 
 ## Kinds
 

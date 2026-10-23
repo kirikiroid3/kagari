@@ -1,0 +1,133 @@
+// Kind and story rules of stage 3: each violation next to its allowed counterpart.
+
+static mut ROUTE: Int<0, 3> = 0;
+static mut COUNT: u32 = 0;                       // error: story variable not finite
+static mut FROM_FN: Int<0, 3> = start();         // error: `fn` call in an initializer
+static LIMIT_HANDLE: u32 = 3;                    // error: not a handle
+static PETALS_ON: Setting<bool> = setting(true);
+static CLEARED: Meta<bool> = meta(false);
+const MAX: Int<0, 3> = 3;
+const COUNTED: u32 = { let mut n = 0; n += 1; n };   // error: not constant
+const BORROWED: &u32 = &1;                        // error: reference in a const
+
+enum Ending { Normal }
+enum Map { A, B, Leave }
+struct Point { x: Int<0, 3>, y: Int<0, 3> }
+
+#[scene] fn not_a_story() {}                     // error: `#[scene]` on a `fn`
+#[entry] pushdown fn not_a_scene() {}            // error: `#[entry]` without `#[scene]`
+#[must_use] const fn not_a_type() {}             // error: `#[must_use]` on a function
+
+fn start() -> Int<0, 3> { 0 }
+
+// Call rules.
+
+fn system() {
+    Main();                                      // error: `fn` -> scene
+    let on = PETALS_ON.get();
+    CLEARED.set(true);
+    let route = ROUTE;                           // error: story variable in `fn`
+}
+
+const fn render(mut screen: Screen) -> Screen {
+    screen.entity(EntityId(1)).gate(Some(PETALS_ON));
+    let on = PETALS_ON.get();                    // error: `const fn` -> `fn`
+    let cleared = CLEARED;                       // error: meta in `const` code
+    screen.background().clear();                 // warning: unused `Swap`
+    screen.background().clear().apply_animation(cut());
+    screen
+}
+
+// Scenes and instant procedures.
+
+#[scene]
+#[entry]
+pushdown fn Main() -> Ending {
+    loop {
+        match choice!{
+            id = "map",
+            t!["A"] => Map::A,
+            t!["B"] if ROUTE == 1 => Map::B,
+            t!["Leave"] => Map::Leave,
+        } {
+            Map::A => visit(),
+            Map::B => Other(),
+            Map::Leave => break,
+        }
+    }
+    match choice!{ id = "map", t!["A"] => Map::A, t!["A again"] => Map::A } {   // errors: id, arm
+        Map::A => {}
+        _ => {}
+    }
+    s!(t![["漢字"]("か"|"ん"|"じ")]);           // error: 3 readings for 2 characters
+    s!(t![["漢字"]("かん"|"じ")]);
+    for i in 0..MAX { ROUTE = i; }
+    let n = ROUTE;
+    for i in 0..n { visit(); }                   // error: runtime range
+    Ending::Normal
+}
+
+#[scene]
+pushdown fn Other() {
+    s!(t!["Other."]);
+    twice(|| ROUTE = 1);
+    twice(|| s!(t!["no"]));                      // error: step in a closure
+}
+
+#[scene]
+#[entry]
+pushdown fn Named(name: Text, count: u32) -> Ending {   // errors: `Text`, `u32`
+    Ending::Normal
+}
+
+pushdown fn visit() {
+    ROUTE = 1;
+    CLEARED.write(true);
+    s!(t!["no"]);                                // error: step outside a scene
+    Other();                                     // error: scene call outside a scene
+    start();                                     // error: pushdown -> `fn`
+    while ROUTE < 3 { ROUTE += 1; }              // error: unbounded loop
+    for i in [1, 2] { ROUTE = i; }
+}
+
+pushdown fn ping() { pong(); }                   // error: recursion
+pushdown fn pong() { ping(); }
+
+pushdown fn run(p: pushdown fn()) { p() }
+pushdown fn again() { run(again) }               // error: recursion through a pointer
+pushdown fn once() { run(leaf) }                 // ok: `leaf` never calls `run`
+pushdown fn leaf() { ROUTE = 2; }
+
+pushdown fn twice(f: pushdown Fn()) {
+    f();
+    f();
+    let g = f;                                   // error: closure in a local
+}
+
+// References and mutability.
+
+pushdown fn shift(a: &mut Point, b: &Point) {
+    a.x = b.y;
+}
+
+pushdown fn alias(p: &mut Point) {
+    shift(p, p);                                 // error: aliased `&mut`
+    let q = &p.x;                                // error: reference in a local
+}
+
+pushdown fn wrong_ref(p: &Point) -> &Int<0, 3> {    // error: reference result
+    &p.x
+}
+
+#[scene]
+pushdown fn Moves() {
+    let mut a = Point { x: 0, y: 1 };
+    let b = Point { x: 1, y: 2 };
+    shift(&mut a, &b);
+    b.x = 3;                                     // error: immutable local
+    let tab = mood(ROUTE);
+    let wide = widen(ROUTE);                     // error: tabulated result not finite
+}
+
+const fn mood(x: Int<0, 3>) -> Map { if x > 1 { Map::A } else { Map::B } }
+const fn widen(x: Int<0, 3>) -> u32 { 1 }

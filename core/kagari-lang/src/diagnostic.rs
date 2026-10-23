@@ -155,6 +155,90 @@ codes! {
     ResolveMissingStdItem = "resolve/missing-std-item";
     ResolveAssetNotFound = "resolve/asset-not-found";
     ResolveEmptyAssetPath = "resolve/empty-asset-path";
+
+    // Stage 3, type inference (Infer slice).
+    TypeMismatch = "type/mismatched-types";
+    TypeUnsupportedConst = "type/unsupported-const";
+    TypeConstOverflow = "type/const-overflow";
+    TypeBadIntBounds = "type/bad-int-bounds";
+    TypeWrongGenericCount = "type/wrong-generic-count";
+    TypeExpectedType = "type/expected-type";
+    TypeExpectedConst = "type/expected-const";
+    TypeExpectedTrait = "type/expected-trait";
+    TypeExpectedValue = "type/expected-value";
+    TypeAliasCycle = "type/alias-cycle";
+    TypeInferInSignature = "type/infer-in-signature";
+    TypeBadLiteral = "type/bad-literal";
+    TypeLiteralOutOfRange = "type/literal-out-of-range";
+    TypeIntMix = "type/int-mix";
+    TypeBadOperands = "type/bad-operands";
+    TypeDivisorMayBeZero = "type/divisor-may-be-zero";
+    TypeNotEq = "type/not-eq";
+    TypeLossyInto = "type/lossy-into";
+    TypeAsCast = "type/as-cast";
+    TypeUnknownField = "type/unknown-field";
+    TypeMissingField = "type/missing-field";
+    TypeUnknownMethod = "type/unknown-method";
+    TypeNotAMethod = "type/not-a-method";
+    TypeWrongArity = "type/wrong-arity";
+    TypeNotCallable = "type/not-callable";
+    TypeUnsatisfiedBound = "type/unsatisfied-bound";
+    TypeBadNavStart = "type/bad-nav-start";
+    TypeAssetPathNotLiteral = "type/asset-path-not-literal";
+    TypeAnnotationsNeeded = "type/annotations-needed";
+    TypeOpenRange = "type/open-range";
+    TypeNotIterable = "type/not-iterable";
+    TypeNotIndexable = "type/not-indexable";
+    TypeBadDeref = "type/bad-deref";
+    TypeBadTry = "type/bad-try";
+    TypeBadPattern = "type/bad-pattern";
+    TypeCapturingClosure = "type/capturing-closure";
+
+    // Exhaust slice: `match` exhaustiveness and pattern refutability.
+    TypeNonExhaustiveMatch = "type/non-exhaustive-match";
+    TypeRefutablePattern = "type/refutable-pattern";
+    TypeUnreachablePattern = "type/unreachable-pattern", warning;
+
+    // Checks slice: kind and story rules (stage 3).
+    KindCallRule = "kind/call-rule";
+    KindStepOutsideScene = "kind/step-outside-scene";
+    KindSceneCallOutsideScene = "kind/scene-call-outside-scene";
+    KindUnboundedLoop = "kind/unbounded-loop";
+    KindInstantRecursion = "kind/instant-recursion";
+    KindForNotConstant = "kind/for-not-constant";
+    KindStoryVariableOutsideStory = "kind/story-variable-outside-story";
+    KindNotFinite = "kind/not-finite";
+    KindTextInEntry = "kind/text-in-entry";
+    KindNotConstant = "kind/not-constant";
+    KindBadHandle = "kind/bad-handle";
+    KindReferenceInItem = "kind/reference-in-item";
+    KindMetaInConst = "kind/meta-in-const";
+    KindSecondClassReference = "kind/second-class-reference";
+    KindSecondClassClosure = "kind/second-class-closure";
+    KindAliasedMut = "kind/aliased-mut-argument";
+    KindImmutablePlace = "kind/immutable-place";
+    KindMisplacedAttribute = "kind/misplaced-attribute";
+    KindChoiceId = "kind/choice-id";
+    KindChoiceArms = "kind/choice-arms";
+    KindRubyReadings = "kind/ruby-readings";
+    KindEffectNotConstant = "kind/effect-not-constant";
+    KindUnusedMustUse = "kind/unused-must-use", warning;
+
+    // Eval slice: const evaluation (stage 4).
+    EvalOverflow = "eval/overflow";
+    EvalDivisionByZero = "eval/division-by-zero";
+    EvalInexactDivision = "eval/inexact-division";
+    EvalBudgetExceeded = "eval/budget-exceeded";
+    EvalDomainTooLarge = "eval/domain-too-large";
+    EvalIndexOutOfRange = "eval/index-out-of-range";
+    EvalConstCycle = "eval/const-cycle";
+    EvalHandleOutsideStatic = "eval/handle-outside-static";
+    EvalInvalidMotion = "eval/invalid-motion";
+    EvalInvalidEasing = "eval/invalid-easing";
+    EvalDuplicateMark = "eval/duplicate-mark";
+    EvalBeginTextOnMark = "eval/begin-text-on-mark";
+    EvalFractionOutOfRange = "eval/fraction-out-of-range";
+    EvalDurationOverflow = "eval/duration-overflow";
 }
 
 /// Render diagnostics as `{path}:{line}:{col}: {severity}[{code}]: {message}` lines,

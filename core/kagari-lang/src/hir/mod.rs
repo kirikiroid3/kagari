@@ -476,6 +476,8 @@ pub struct Body {
     pub store: ExprStore,
     pub params: Vec<PatId>,
     pub has_self: bool,
+    /// Whether the `self` parameter is `mut self` (by value).
+    pub self_mutable: bool,
     pub value: ExprId,
 }
 

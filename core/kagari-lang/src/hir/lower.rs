@@ -48,13 +48,13 @@ fn lower_body(file: SourceFile, tree: &ItemTree, node: &SyntaxNode) -> Option<Bo
         tree,
         store: ExprStore::default(),
     };
-    let (params, has_self, value) = if let Some(it) = ast::Fn::cast(node.clone()) {
+    let (params, has_self, self_mutable, value) = if let Some(it) = ast::Fn::cast(node.clone()) {
         let body = it.body()?;
         let param_list = it.param_list();
-        let has_self = param_list
-            .as_ref()
-            .and_then(|list| list.self_param())
-            .is_some();
+        let self_param = param_list.as_ref().and_then(|list| list.self_param());
+        let has_self = self_param.is_some();
+        let self_mutable = self_param
+            .is_some_and(|param| param.amp_token().is_none() && param.mut_token().is_some());
         let params = param_list
             .into_iter()
             .flat_map(|list| list.params())
@@ -66,18 +66,20 @@ fn lower_body(file: SourceFile, tree: &ItemTree, node: &SyntaxNode) -> Option<Bo
         (
             params,
             has_self,
+            self_mutable,
             lowerer.lower_expr(ast::Expr::BlockExpr(body)),
         )
     } else if let Some(it) = ast::Const::cast(node.clone()) {
-        (Vec::new(), false, lowerer.lower_expr(it.body()?))
+        (Vec::new(), false, false, lowerer.lower_expr(it.body()?))
     } else {
         let it = ast::Static::cast(node.clone())?;
-        (Vec::new(), false, lowerer.lower_expr(it.body()?))
+        (Vec::new(), false, false, lowerer.lower_expr(it.body()?))
     };
     Some(Body {
         store: lowerer.store,
         params,
         has_self,
+        self_mutable,
         value,
     })
 }

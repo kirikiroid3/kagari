@@ -1,0 +1,144 @@
+// Const evaluation: one error of each kind from game code, keyframes and deltas.
+
+use std::narrative::Mark;
+use std::narrative::text::{concat, effect, mark};
+use std::screen::NO_FILTER;
+
+const A: EntityId = EntityId(3);
+const BG: ImageAsset = asset("bg.png");
+
+// Errors in constants.
+const DUPLICATE_MARKS: Text = concat([effect("a", mark(1)), effect("b", mark(1))]);
+const fn vec_set() -> Vec<u32> {
+    let mut v = Vec::new();
+    v.push(1u32);
+    v.set(4, 2u32);
+    v
+}
+const VEC_SET: Vec<u32> = vec_set();
+const SECS_OVERFLOW: Duration = secs(5000000);
+const PLUS_OVERFLOW: Duration = ms(4000000000).plus(ms(400000000));
+const OVERFLOW: u8 = 200u8 + 100u8;
+const fn divide(a: i32, b: i32) -> i32 {
+    a / b
+}
+const DIVISION: i32 = divide(1, 0);
+const fn spin(n: u64) -> u64 {
+    let mut i = 0u64;
+    while i < n {
+        i = i + 1;
+    }
+    i
+}
+const BUDGET: u64 = spin(100000000);
+const fn deep(n: u64) -> u64 {
+    if n == 0 { 0 } else { deep(n - 1) + 1 }
+}
+const DEEP: u64 = deep(5000);
+const fn forever(n: u64) -> u64 {
+    forever(n + 1)
+}
+const RECURSION: u64 = forever(0);
+const INDEX: i32 = {
+    let a = [1, 2];
+    a[2]
+};
+const INEXACT: Decimal = 1.0 / 3.0;
+const HANDLE: Setting<bool> = setting(true);
+
+// Errors in renders, reported at the step that uses them.
+const fn no_keys(mut screen: Screen) -> Screen {
+    screen.entity(A).apply_animation(motion());
+    screen
+}
+const fn key_at_zero(mut screen: Screen) -> Screen {
+    screen.entity(A).apply_animation(motion().key(ms(0), offset(0, 0)));
+    screen
+}
+const fn keys_not_increasing(mut screen: Screen) -> Screen {
+    screen.entity(A).apply_animation(motion().key(ms(100), offset(1, 0)).key(ms(100), offset(0, 0)));
+    screen
+}
+const fn not_identity(mut screen: Screen) -> Screen {
+    screen.entity(A).apply_animation(motion().key(ms(100), offset(1, 0)));
+    screen
+}
+const fn repeat_zero(mut screen: Screen) -> Screen {
+    screen.camera().apply_animation(shake(4, ms(400), 0));
+    screen
+}
+const fn bezier(mut screen: Screen) -> Screen {
+    screen.entity(A).opacity().change(1.0).apply_animation(tween(ms(100)).ease(Easing::CubicBezier(1.5, 0.0, 0.5, 1.0)));
+    screen
+}
+const fn steps_zero(mut screen: Screen) -> Screen {
+    screen.background().change(BG).apply_animation(fade(ms(100)).ease(Easing::Steps(0)));
+    screen
+}
+const fn text_on_mark(mut screen: Screen) -> Screen {
+    screen.at_mark(Mark(2));
+    screen.begin_text();
+    screen
+}
+const fn opacity(mut screen: Screen) -> Screen {
+    screen.entity(A).opacity().change(1.5).apply_animation(instant());
+    screen
+}
+const fn volume(mut screen: Screen) -> Screen {
+    screen.music().volume().change(2.0).apply_animation(instant());
+    screen
+}
+const fn anchor(mut screen: Screen) -> Screen {
+    screen.entity(A).set_anchor(Anchor { x: 0.5, y: 1.5 });
+    screen
+}
+const fn grayscale(mut screen: Screen) -> Screen {
+    screen.filter().change(NO_FILTER.grayscale(2.0)).apply_animation(instant());
+    screen
+}
+
+// Keyframes and deltas.
+const fn fresh(_screen: Screen) -> Screen {
+    let mut screen = Screen::empty();
+    screen.background().change(BG).apply_animation(fade(ms(500)));
+    screen
+}
+const fn enter(mut screen: Screen) -> Screen {
+    screen.entity(A).image().change(BG).apply_animation(cut());
+    screen.entity(A).opacity().change(1.0).apply_animation(tween(ms(300)));
+    screen
+}
+
+// Tabulated calls.
+static mut DAY: Int<0, 3> = 1;
+static mut BIG: Int<0, 100000> = 0;
+const fn per_day(day: Int<0, 3>) -> Int<0, 12> {
+    let days: u32 = day.into();
+    (12u32 / days).saturate()
+}
+const fn same(x: Int<0, 100000>) -> Int<0, 100000> {
+    x
+}
+
+#[entry]
+#[scene]
+pushdown fn Start() {
+    s!(render = no_keys, t!["1"]);
+    s!(render = key_at_zero, t!["2"]);
+    s!(render = keys_not_increasing, t!["3"]);
+    s!(render = not_identity, t!["4"]);
+    s!(render = repeat_zero, t!["5"]);
+    s!(render = bezier, t!["6"]);
+    s!(render = steps_zero, t!["7"]);
+    s!(render = text_on_mark, t!["8"]);
+    s!(render = opacity, t!["9"]);
+    s!(render = volume, t!["10"]);
+    s!(render = anchor, t!["11"]);
+    s!(render = grayscale, t!["12"]);
+    s!(render = fresh, t!["Day " {DAY}]);
+    s!(render = enter);
+    s!(render = |_screen| Screen::empty());
+    s!(render = |mut screen| { screen.hud().text_window().change(Visibility::Hidden).apply_animation(instant()); screen });
+    let rate = per_day(DAY);
+    let big = same(BIG);
+}

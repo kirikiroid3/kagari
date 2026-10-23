@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use kagari_lang::debug::resolution_dump;
+use kagari_lang::debug::{render_dump, resolution_dump};
 use kagari_lang::{FilePath, OsFileSystem, RootDatabase, check, render_diagnostics};
 
 #[test]
@@ -14,6 +14,11 @@ fn game_source() {
         let mut out = render_diagnostics(&db, diags, Some(&base));
         out.push_str("--- resolutions ---\n");
         out.push_str(&resolution_dump(&db, program, Some(&base)));
+        let renders = render_dump(&db, program, Some(&base));
+        if !renders.is_empty() {
+            out.push_str("--- renders ---\n");
+            out.push_str(&renders);
+        }
         insta::assert_snapshot!(out);
     });
 }

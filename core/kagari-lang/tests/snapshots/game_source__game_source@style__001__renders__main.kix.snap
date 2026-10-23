@@ -65,3 +65,9 @@ style/001__renders/main.kix:41:102 instant -> fn std::screen::anim::instant
 style/001__renders/main.kix:41:114 screen -> local screen@41:18
 style/001__renders/main.kix:42:17 roof_scene -> fn crate::roof_scene
 style/001__renders/main.kix:43:17 roof_evening -> fn crate::roof_evening
+--- renders ---
+style/001__renders/main.kix:13:10 azusa_smiles -> delta
+style/001__renders/main.kix:24:10 roof_scene -> delta
+style/001__renders/main.kix:28:10 roof_evening -> keyframe
+style/001__renders/main.kix:38:18 closure in Roof -> delta
+style/001__renders/main.kix:41:17 closure in Roof -> delta
