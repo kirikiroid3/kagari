@@ -349,3 +349,22 @@ over all branches.
 
 Handlers are Turing-complete, so a handler can run forever; the compiler does not check that.
 None of the proposal's goals depend on it.
+
+The graph is collected as follows:
+
+- A **mode** is a `fn` with the signature of one of the [mode kinds](#modes); the game mode is
+  `System::game`, and the root is `System::start`, both read from the `System` record `main`
+  returns.
+- The **code of a mode** is its component and, transitively, every function it calls or uses as a
+  value, such as a handler. A function passed to an operation is that operation's target, not
+  code of the mode. The exit handler of `nav::start` is code of the game mode: it runs when the
+  story ends.
+- An operation whose target is not a named function (a local holding a pointer, say) can reach
+  every mode of its kind.
+- **Bindings** count too: an `Action::Open` binding opens its overlay from every mode, an
+  `Action::OpenInGame` binding opens its game overlay over the game, and an `Action::Back` binding
+  is a way back from every overlay and dialog, so with `default_bindings()` no overlay is a trap.
+  Bindings are input, not modes pushing each other, so they never make a cycle for the bounded
+  stack check.
+- A way out of an overlay or a dialog is `nav::back`, `nav::goto`, `nav::start`, `nav::load` or
+  `nav::quit`.

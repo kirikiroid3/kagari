@@ -27,7 +27,7 @@ use crate::ty::{Const, FnDefId, FnRef, GenericArg, IntTy, Ty};
 use super::const_exprs::ConstExprs;
 use super::num::{self, Decimal, Rat};
 use super::screen::{PendingChange, Screen, ScreenObj};
-use super::std_items::StdTable;
+use super::std_items::{Builtin, StdTable};
 use super::value::{AssetKind, ConstValue, HandleKind, Text, adt_variants, item_name};
 use super::{EVAL_STEP_BUDGET, Fault};
 
@@ -545,6 +545,9 @@ pub(crate) struct Frame<'db> {
     pub lazy: Option<&'db ConstExprs>,
     /// A `const` or `static` initializer: `?` has no function to return from.
     pub initializer: bool,
+    /// Subexpressions whose value is already computed, in these heap cells: the story
+    /// analysis evaluates the steps and scene calls inside an expression first.
+    pub overrides: FxHashMap<ExprId, usize>,
 }
 
 impl<'db> Frame<'db> {
@@ -555,6 +558,7 @@ impl<'db> Frame<'db> {
             locals: FxHashMap::default(),
             lazy: None,
             initializer: false,
+            overrides: FxHashMap::default(),
         }
     }
 
@@ -592,6 +596,9 @@ pub(crate) struct Machine<'c, 'db> {
     pub ctx: &'c Ctx<'db>,
     pub heap: Vec<Value>,
     steps: u64,
+    /// Story mode (stage 5): the heap cells of the story variables. Story variables can
+    /// then be read and written, and instant procedures called.
+    pub story: Option<FxHashMap<ItemId, usize>>,
 }
 
 impl<'c, 'db> Machine<'c, 'db> {
@@ -600,6 +607,7 @@ impl<'c, 'db> Machine<'c, 'db> {
             ctx,
             heap: Vec::new(),
             steps: 0,
+            story: None,
         }
     }
 
@@ -667,7 +675,7 @@ impl<'c, 'db> Machine<'c, 'db> {
         Ok(value.clone())
     }
 
-    fn write_place(&mut self, place: &Place, value: Value) -> Result<(), ErrorKind> {
+    pub(crate) fn write_place(&mut self, place: &Place, value: Value) -> Result<(), ErrorKind> {
         if place.obj.is_some() {
             return Err(ErrorKind::Abort);
         }
@@ -736,14 +744,23 @@ impl<'c, 'db> Machine<'c, 'db> {
     }
 
     /// The place `expr` denotes; a temporary for an expression that is not a place.
-    fn eval_place(&mut self, frame: &mut Frame<'db>, expr: ExprId) -> R<Place> {
+    pub(crate) fn eval_place(&mut self, frame: &mut Frame<'db>, expr: ExprId) -> R<Place> {
+        if let Some(cell) = frame.overrides.get(&expr) {
+            return Ok(Place::cell(*cell));
+        }
         match frame.expr(expr) {
-            Expr::Path(_) => {
-                if let Some(ValueRef::Local(local)) = frame.b.infer.paths.get(&expr) {
+            Expr::Path(_) => match frame.b.infer.paths.get(&expr) {
+                Some(ValueRef::Local(local)) => {
                     let cell = self.local_cell(frame, *local)?;
                     return Ok(Place::cell(cell));
                 }
-            }
+                Some(ValueRef::Static(item)) => {
+                    if let Some(cell) = self.story.as_ref().and_then(|story| story.get(item)) {
+                        return Ok(Place::cell(*cell));
+                    }
+                }
+                _ => {}
+            },
             Expr::Field { base, .. } => {
                 let Some(field) = frame.b.infer.fields.get(&expr).copied() else {
                     return Err(Exit::Error(EvalError::abort()));
@@ -798,7 +815,12 @@ impl<'c, 'db> Machine<'c, 'db> {
         Ok(Place::cell(self.alloc(value)))
     }
 
-    fn deref_place(&mut self, frame: &Frame<'_>, expr: ExprId, place: &Place) -> R<Place> {
+    pub(crate) fn deref_place(
+        &mut self,
+        frame: &Frame<'_>,
+        expr: ExprId,
+        place: &Place,
+    ) -> R<Place> {
         match self.place_mut(place) {
             Ok(Value::Ref(next)) => Ok((**next).clone()),
             Ok(Value::Probe) | Err(ErrorKind::Inspected) => {
@@ -832,6 +854,11 @@ impl<'c, 'db> Machine<'c, 'db> {
     #[inline(never)]
     fn eval_inner(&mut self, frame: &mut Frame<'db>, expr: ExprId) -> R<Value> {
         self.tick(frame, expr, 1)?;
+        if let Some(cell) = frame.overrides.get(&expr) {
+            return self
+                .read_place(&Place::cell(*cell))
+                .map_err(|kind| Self::fail(frame, expr, kind));
+        }
         if matches!(frame.b.infer.expr_types.get(expr), Some(Ty::Error)) {
             return Err(Exit::Error(EvalError::abort()));
         }
@@ -1147,7 +1174,7 @@ impl<'c, 'db> Machine<'c, 'db> {
     }
 
     /// Allocates uninitialized cells for every binding of `pat`.
-    fn declare(&mut self, frame: &mut Frame<'db>, pat: PatId) {
+    pub(crate) fn declare(&mut self, frame: &mut Frame<'db>, pat: PatId) {
         let store = &frame.b.body.store;
         let mut stack = vec![pat];
         while let Some(pat) = stack.pop() {
@@ -1169,7 +1196,7 @@ impl<'c, 'db> Machine<'c, 'db> {
 
     /// Binds an irrefutable pattern (stage 3 rejects refutable ones, so a mismatch aborts
     /// silently).
-    fn bind(&mut self, frame: &mut Frame<'db>, pat: PatId, value: Value) -> R<()> {
+    pub(crate) fn bind(&mut self, frame: &mut Frame<'db>, pat: PatId, value: Value) -> R<()> {
         if self.match_pat(frame, pat, Scrut::Val(value))? {
             Ok(())
         } else {
@@ -1272,9 +1299,15 @@ impl<'c, 'db> Machine<'c, 'db> {
                         .map(|data| &data.kind),
                     Some(ItemKind::Static { mutable: true })
                 );
-                // Story variables in const code are reported by stage 3.
                 if mutable {
-                    return Err(Exit::Error(EvalError::abort()));
+                    // Story variables in const code are reported by stage 3.
+                    let Some(cell) = self.story.as_ref().and_then(|story| story.get(item)) else {
+                        return Err(Exit::Error(EvalError::abort()));
+                    };
+                    let cell = *cell;
+                    return self
+                        .read_place(&Place::cell(cell))
+                        .map_err(|kind| Self::fail(frame, expr, kind));
                 }
                 match self.ctx.static_value(*item) {
                     Ok(StaticValue {
@@ -1816,19 +1849,31 @@ impl<'c, 'db> Machine<'c, 'db> {
             FnDefId::Item(item) => item,
         };
         if let Some(builtin) = self.std().builtin(item) {
+            // In story mode the only pushdown builtin besides `push_step` (which the story
+            // analysis runs itself) is `Meta::write`: the story never reads meta back, so
+            // it changes nothing the analysis tracks.
+            if builtin == Builtin::Runtime
+                && self.story.is_some()
+                && item != self.std().push_step
+                && self.ctx.sigs.fn_sig(item).map(|sig| sig.kind) == Some(FnKind::Pushdown)
+            {
+                return Ok(Value::unit());
+            }
             return self
                 .builtin(frame, expr, builtin, fn_ref, args)
                 .map_err(|kind| Self::fail(frame, expr, kind));
         }
-        let kind = match item_tree(self.ctx.db, item.file)
-            .item(item.index)
-            .map(|data| &data.kind)
-        {
-            Some(ItemKind::Fn { kind, .. }) => *kind,
-            _ => return Err(Exit::Error(EvalError::abort())),
+        let Some(sig) = self.ctx.sigs.fn_sig(item) else {
+            return Err(Exit::Error(EvalError::abort()));
         };
-        // Calling a `fn` or `pushdown fn` from const code is a call-rule error of stage 3.
-        if kind != FnKind::Const {
+        // Calling a `fn` or `pushdown fn` from const code is a call-rule error of stage 3;
+        // in story mode instant procedures run, scenes never (the analysis runs them).
+        let allowed = match sig.kind {
+            FnKind::Const => true,
+            FnKind::Pushdown => self.story.is_some() && !sig.scene,
+            FnKind::Plain => false,
+        };
+        if !allowed {
             return Err(Exit::Error(EvalError::abort()));
         }
         let Some(body) = self.ctx.body(item) else {
@@ -1977,6 +2022,11 @@ impl<'c, 'db> Machine<'c, 'db> {
             };
             scrut = Scrut::Place(next);
         }
+    }
+
+    /// Whether `value` matches the refutable `pat`, binding its locals when it does.
+    pub(crate) fn test_pat(&mut self, frame: &mut Frame<'db>, pat: PatId, value: Value) -> R<bool> {
+        self.match_pat(frame, pat, Scrut::Val(value))
     }
 
     /// Matches `pat`, binding its locals; errors without a location get the pattern's.

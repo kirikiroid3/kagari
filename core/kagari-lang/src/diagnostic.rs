@@ -239,6 +239,24 @@ codes! {
     EvalBeginTextOnMark = "eval/begin-text-on-mark";
     EvalFractionOutOfRange = "eval/fraction-out-of-range";
     EvalDurationOverflow = "eval/duration-overflow";
+
+    // Analysis slice: whole-program analyses of the story (stage 5).
+    AnalysisSteplessLoop = "analysis/stepless-loop";
+    AnalysisSteplessRecursion = "analysis/stepless-recursion";
+    AnalysisStuckChoice = "analysis/stuck-choice";
+    AnalysisInconsistentScreen = "analysis/inconsistent-screen", warning;
+    AnalysisUnboundedScreens = "analysis/unbounded-screens";
+    AnalysisTooManyStates = "analysis/too-many-states", warning;
+    AnalysisIncomplete = "analysis/incomplete", warning;
+    AnalysisUnreachableScene = "analysis/unreachable-scene", warning;
+    AnalysisUnreachableStep = "analysis/unreachable-step", warning;
+    AnalysisUnusedStoryVariable = "analysis/unused-story-variable", warning;
+
+    // System checks: the mode graph (stage 5).
+    SystemUnreachableMode = "system/unreachable-mode", warning;
+    SystemBackFromBase = "system/back-from-base";
+    SystemTrappedMode = "system/trapped-mode";
+    SystemUnboundedStack = "system/unbounded-stack", warning;
 }
 
 /// Render diagnostics as `{path}:{line}:{col}: {severity}[{code}]: {message}` lines,

@@ -1,0 +1,87 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/analysis/003__influence/main.kix
+---
+analysis/003__influence/main.kix:7:12: warning[analysis/unused-story-variable]: the story variable `WRITE_ONLY` is never read: assignments to it have no effect
+analysis/003__influence/main.kix:8:12: warning[analysis/unused-story-variable]: the story variable `COUNTER` is never read: assignments to it have no effect
+analysis/003__influence/main.kix:9:12: warning[analysis/unused-story-variable]: the story variable `SOURCE` never influences the story: no condition, step, meta write or ending depends on its value
+analysis/003__influence/main.kix:10:12: warning[analysis/unused-story-variable]: the story variable `SINK` is never read: assignments to it have no effect
+analysis/003__influence/main.kix:11:12: warning[analysis/unused-story-variable]: the story variable `IGNORED` never influences the story: no condition, step, meta write or ending depends on its value
+analysis/003__influence/main.kix:12:12: warning[analysis/unused-story-variable]: the story variable `UNTOUCHED` is never used
+--- resolutions ---
+analysis/003__influence/main.kix:7:24 bool -> prim bool
+analysis/003__influence/main.kix:8:21 Int -> prim Int
+analysis/003__influence/main.kix:9:20 Int -> prim Int
+analysis/003__influence/main.kix:10:18 Int -> prim Int
+analysis/003__influence/main.kix:11:21 bool -> prim bool
+analysis/003__influence/main.kix:12:23 bool -> prim bool
+analysis/003__influence/main.kix:15:19 bool -> prim bool
+analysis/003__influence/main.kix:16:19 bool -> prim bool
+analysis/003__influence/main.kix:17:21 bool -> prim bool
+analysis/003__influence/main.kix:18:18 Ending -> enum crate::Ending
+analysis/003__influence/main.kix:18:27 Ending::Bad -> variant crate::Ending::Bad
+analysis/003__influence/main.kix:19:18 bool -> prim bool
+analysis/003__influence/main.kix:20:20 Int -> prim Int
+analysis/003__influence/main.kix:21:19 Int -> prim Int
+analysis/003__influence/main.kix:22:21 bool -> prim bool
+analysis/003__influence/main.kix:26:18 replay -> local replay@26:18
+analysis/003__influence/main.kix:26:26 bool -> prim bool
+analysis/003__influence/main.kix:26:35 Ending -> enum crate::Ending
+analysis/003__influence/main.kix:28:5 SHOWN -> static crate::SHOWN
+analysis/003__influence/main.kix:28:13 replay -> local replay@26:18
+analysis/003__influence/main.kix:29:5 GUARD -> static crate::GUARD
+analysis/003__influence/main.kix:29:13 replay -> local replay@26:18
+analysis/003__influence/main.kix:30:8 replay -> local replay@26:18
+analysis/003__influence/main.kix:31:9 CHAIN -> static crate::CHAIN
+analysis/003__influence/main.kix:33:5 WRITE_ONLY -> static crate::WRITE_ONLY
+analysis/003__influence/main.kix:34:5 COUNTER -> static crate::COUNTER
+analysis/003__influence/main.kix:35:5 SINK -> static crate::SINK
+analysis/003__influence/main.kix:35:12 SOURCE -> static crate::SOURCE
+analysis/003__influence/main.kix:36:5 ignore -> fn crate::ignore
+analysis/003__influence/main.kix:36:12 IGNORED -> static crate::IGNORED
+analysis/003__influence/main.kix:37:8 SHOWN -> static crate::SHOWN
+analysis/003__influence/main.kix:42:23 Pick::Stay -> variant crate::Pick::Stay
+analysis/003__influence/main.kix:43:24 GUARD -> static crate::GUARD
+analysis/003__influence/main.kix:43:33 Pick::Leave -> variant crate::Pick::Leave
+analysis/003__influence/main.kix:45:9 Pick::Stay -> variant crate::Pick::Stay
+analysis/003__influence/main.kix:46:9 Pick::Leave -> variant crate::Pick::Leave
+analysis/003__influence/main.kix:46:24 Side -> fn crate::Side
+analysis/003__influence/main.kix:48:5 branch -> fn crate::branch
+analysis/003__influence/main.kix:48:12 DECIDES -> static crate::DECIDES
+analysis/003__influence/main.kix:49:5 raise -> fn crate::raise
+analysis/003__influence/main.kix:49:16 FLAG -> static crate::FLAG
+analysis/003__influence/main.kix:50:8 FLAG -> static crate::FLAG
+analysis/003__influence/main.kix:53:23 SPOKEN -> static crate::SPOKEN
+analysis/003__influence/main.kix:54:9 copy -> local copy@54:9
+analysis/003__influence/main.kix:54:16 CHAIN -> static crate::CHAIN
+analysis/003__influence/main.kix:55:9 seen -> local seen@55:9
+analysis/003__influence/main.kix:56:5 seen -> local seen@55:9
+analysis/003__influence/main.kix:56:12 copy -> local copy@54:9
+analysis/003__influence/main.kix:57:11 seen -> local seen@55:9
+analysis/003__influence/main.kix:59:9 seen -> local seen@55:9
+analysis/003__influence/main.kix:61:9 target -> local target@61:9
+analysis/003__influence/main.kix:62:5 store -> fn crate::store
+analysis/003__influence/main.kix:62:16 target -> local target@61:9
+analysis/003__influence/main.kix:62:24 VIA_REF -> static crate::VIA_REF
+analysis/003__influence/main.kix:63:8 target -> local target@61:9
+analysis/003__influence/main.kix:64:9 BEST -> static crate::BEST
+analysis/003__influence/main.kix:64:16 Ending::Good -> variant crate::Ending::Good
+analysis/003__influence/main.kix:66:5 BEST -> static crate::BEST
+analysis/003__influence/main.kix:74:20 value -> local value@74:20
+analysis/003__influence/main.kix:74:27 bool -> prim bool
+analysis/003__influence/main.kix:75:9 unused -> local unused@75:9
+analysis/003__influence/main.kix:75:18 value -> local value@74:20
+analysis/003__influence/main.kix:78:20 value -> local value@78:20
+analysis/003__influence/main.kix:78:27 bool -> prim bool
+analysis/003__influence/main.kix:79:8 value -> local value@78:20
+analysis/003__influence/main.kix:80:9 SHOWN -> static crate::SHOWN
+analysis/003__influence/main.kix:84:19 flag -> local flag@84:19
+analysis/003__influence/main.kix:84:30 bool -> prim bool
+analysis/003__influence/main.kix:85:6 flag -> local flag@84:19
+analysis/003__influence/main.kix:88:19 target -> local target@88:19
+analysis/003__influence/main.kix:88:32 bool -> prim bool
+analysis/003__influence/main.kix:88:38 value -> local value@88:38
+analysis/003__influence/main.kix:88:45 bool -> prim bool
+analysis/003__influence/main.kix:89:6 target -> local target@88:19
+analysis/003__influence/main.kix:89:15 value -> local value@88:38

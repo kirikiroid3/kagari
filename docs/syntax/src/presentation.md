@@ -224,11 +224,21 @@ The last step shows the roof on one path and the classroom on the other. If that
 is fine. If it is a leftover from a branch, it is exactly the kind of bug that is invisible to
 everyone but the author.
 
-The compiler computes, for each step, the set of screens that can reach it, and reports steps
-where that set has more than one element, together with the paths that cause it. This is the
-presentation-ambiguity lint from the proposal. The sets are tracked per entity and component, and
-each scene is summarized once as the set of screen changes it can make between its entry and its
-exit, so calls do not re-analyze the callee.
+The compiler computes, for each step, the screens that can reach it, and reports a step whose
+shown screen (the logical screen after its render) is not determined by the story state, together
+with the renders that last changed the screen on the differing paths. This is the
+presentation-ambiguity lint from the proposal, a warning.
+
+*The story state* at a step is everything the story itself could tell apart: the step, the values
+of the story variables, the locals of every frame on the call stack that are still used later, the
+entry arguments, and the call sites on the stack. Two arrivals at a step that agree on all of it
+must show the same screen. So an interrupt scene, such as a phone call that can happen anywhere,
+may show a different screen at each of its call sites, but not two screens for one call site. A
+merge is reported once, at the first step after it; the steps after that one differ for the same
+reason.
+
+Each scene is explored once per entry state and entry screen, so a call does not re-analyze the
+callee for a screen it was already entered with.
 
 The author fixes a report in one of two ways:
 
@@ -246,9 +256,10 @@ has no bound and the consistency check could not finish.
 
 Renders are Turing-complete `const fn`, so whether that set is finite cannot be decided in
 general. *Tentative:* the compiler computes the sets as a fixpoint, evaluating each render on the
-screens that reach its step, and stops when a step's set grows past a fixed cap. The render that
-made it grow is reported as an error; error recovery leaves it out so that the rest of the program
-is still checked.
+screens that reach its step, and stops when a step's set grows past a fixed cap, currently 64
+screens. The render that produced the new screen is reported as an error
+(`analysis/unbounded-screens`); error recovery leaves it out, as if it left the screen unchanged,
+and computes the sets again, so that the rest of the program is still checked.
 
 The rule is sound: when the program is accepted, the computed sets are exact. It may reject a
 render that is bounded only above the cap. The cap is an [open question](./open-questions.md#bounded-screen-cap).

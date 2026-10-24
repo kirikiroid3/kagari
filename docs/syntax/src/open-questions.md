@@ -45,7 +45,14 @@ replay a bounded amount of presentation, or only suggested by a lint?
 
 How large may the set of screens at a step grow before the [unbounded-screen
 check](./presentation.md#unbounded-screens) rejects the render that grows it? A fixed number, a
-setting per project, or a cap per entity and component?
+setting per project, or a cap per entity and component? The compiler currently uses a fixed 64.
+
+## State cap
+
+The [analysis](./compilation.md#how-the-analysis-runs) explores every state of the story and gives
+up past a fixed number of states (currently 200,000), with a warning; the reachability claims are
+then skipped. Should the cap be a project setting, and should a story over the cap be an error
+instead, since its unreachable steps go unreported?
 
 ## φ policy
 

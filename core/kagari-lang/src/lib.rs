@@ -7,7 +7,7 @@
 
 //! The Kagari front end: a salsa database running compilation stages 1 (parse, item trees,
 //! HIR lowering with forms desugared), 2 (module trees and name resolution), 3 (type and
-//! kind checking) and 4 (const evaluation).
+//! kind checking), 4 (const evaluation) and 5 (whole-program analysis).
 
 mod db;
 mod diagnostic;
@@ -16,6 +16,7 @@ mod module_files;
 mod parse_query;
 mod pipeline;
 
+pub mod analysis;
 pub mod debug;
 pub mod def_map;
 pub mod eval;

@@ -1,0 +1,129 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/analysis/006__screens/main.kix
+---
+analysis/006__screens/main.kix:58:5: warning[analysis/inconsistent-screen]: the screen this step shows depends on the path that reached it: insert a keyframe after the paths merge, or choose the render by a story variable
+  note: analysis/006__screens/main.kix:56:41: on one of the paths, the screen was last changed here
+  note: analysis/006__screens/main.kix:55:36: on one of the paths, the screen was last changed here
+analysis/006__screens/main.kix:89:17: error[eval/fraction-out-of-range]: opacity must be in 0.0..=1.0, found 1.5
+  note: analysis/006__screens/main.kix:34:5: evaluation failed here
+analysis/006__screens/main.kix:94:37: error[analysis/unbounded-screens]: this render makes more than 64 different screens reach the step at 93:15: the screens at that step have no bound
+  note: analysis/006__screens/main.kix:93:15: the step whose screens grow
+--- resolutions ---
+analysis/006__screens/main.kix:4:12 EntityId -> struct std::screen::EntityId
+analysis/006__screens/main.kix:4:23 EntityId -> struct std::screen::EntityId
+analysis/006__screens/main.kix:6:19 Place -> enum crate::Place
+analysis/006__screens/main.kix:6:27 Place::Roof -> variant crate::Place::Roof
+analysis/006__screens/main.kix:11:15 screen -> local screen@11:15
+analysis/006__screens/main.kix:11:27 Screen -> struct std::screen::Screen
+analysis/006__screens/main.kix:11:38 Screen -> struct std::screen::Screen
+analysis/006__screens/main.kix:12:5 screen -> local screen@11:15
+analysis/006__screens/main.kix:12:32 BG::ROOF -> const crate::BG::ROOF
+analysis/006__screens/main.kix:12:58 fade -> fn std::screen::anim::fade
+analysis/006__screens/main.kix:12:63 ms -> fn std::time::ms
+analysis/006__screens/main.kix:13:5 screen -> local screen@11:15
+analysis/006__screens/main.kix:16:20 screen -> local screen@16:20
+analysis/006__screens/main.kix:16:32 Screen -> struct std::screen::Screen
+analysis/006__screens/main.kix:16:43 Screen -> struct std::screen::Screen
+analysis/006__screens/main.kix:17:5 screen -> local screen@16:20
+analysis/006__screens/main.kix:17:32 BG::CLASSROOM -> const crate::BG::CLASSROOM
+analysis/006__screens/main.kix:17:63 fade -> fn std::screen::anim::fade
+analysis/006__screens/main.kix:17:68 ms -> fn std::time::ms
+analysis/006__screens/main.kix:18:5 screen -> local screen@16:20
+analysis/006__screens/main.kix:21:18 _screen -> local _screen@21:18
+analysis/006__screens/main.kix:21:27 Screen -> struct std::screen::Screen
+analysis/006__screens/main.kix:21:38 Screen -> struct std::screen::Screen
+analysis/006__screens/main.kix:22:9 screen -> local screen@22:9
+analysis/006__screens/main.kix:22:22 Screen::empty -> fn std::screen::Screen::empty
+analysis/006__screens/main.kix:23:5 screen -> local screen@22:9
+analysis/006__screens/main.kix:23:32 BG::EVENING -> const crate::BG::EVENING
+analysis/006__screens/main.kix:23:61 fade -> fn std::screen::anim::fade
+analysis/006__screens/main.kix:23:66 ms -> fn std::time::ms
+analysis/006__screens/main.kix:24:5 screen -> local screen@22:9
+analysis/006__screens/main.kix:27:22 screen -> local screen@27:22
+analysis/006__screens/main.kix:27:34 Screen -> struct std::screen::Screen
+analysis/006__screens/main.kix:27:45 Screen -> struct std::screen::Screen
+analysis/006__screens/main.kix:28:5 screen -> local screen@27:22
+analysis/006__screens/main.kix:28:19 MIO -> const crate::MIO
+analysis/006__screens/main.kix:28:62 tween -> fn std::screen::anim::tween
+analysis/006__screens/main.kix:28:68 ms -> fn std::time::ms
+analysis/006__screens/main.kix:29:5 screen -> local screen@27:22
+analysis/006__screens/main.kix:32:24 screen -> local screen@32:24
+analysis/006__screens/main.kix:32:36 Screen -> struct std::screen::Screen
+analysis/006__screens/main.kix:32:47 Screen -> struct std::screen::Screen
+analysis/006__screens/main.kix:33:9 opacity -> local opacity@33:9
+analysis/006__screens/main.kix:33:19 screen -> local screen@32:24
+analysis/006__screens/main.kix:33:33 MIO -> const crate::MIO
+analysis/006__screens/main.kix:34:5 screen -> local screen@32:24
+analysis/006__screens/main.kix:34:19 MIO -> const crate::MIO
+analysis/006__screens/main.kix:34:41 opacity -> local opacity@33:9
+analysis/006__screens/main.kix:34:72 tween -> fn std::screen::anim::tween
+analysis/006__screens/main.kix:34:78 ms -> fn std::time::ms
+analysis/006__screens/main.kix:35:5 screen -> local screen@32:24
+analysis/006__screens/main.kix:38:26 screen -> local screen@38:26
+analysis/006__screens/main.kix:38:38 Screen -> struct std::screen::Screen
+analysis/006__screens/main.kix:38:49 Screen -> struct std::screen::Screen
+analysis/006__screens/main.kix:39:9 at -> local at@39:9
+analysis/006__screens/main.kix:39:14 screen -> local screen@38:26
+analysis/006__screens/main.kix:39:28 MIO -> const crate::MIO
+analysis/006__screens/main.kix:40:5 screen -> local screen@38:26
+analysis/006__screens/main.kix:40:19 MIO -> const crate::MIO
+analysis/006__screens/main.kix:40:42 point -> fn std::screen::point
+analysis/006__screens/main.kix:40:48 at -> local at@39:9
+analysis/006__screens/main.kix:40:59 at -> local at@39:9
+analysis/006__screens/main.kix:40:82 instant -> fn std::screen::anim::instant
+analysis/006__screens/main.kix:41:5 screen -> local screen@38:26
+analysis/006__screens/main.kix:45:21 ImageAsset -> struct std::ImageAsset
+analysis/006__screens/main.kix:45:34 asset -> fn std::asset
+analysis/006__screens/main.kix:46:26 ImageAsset -> struct std::ImageAsset
+analysis/006__screens/main.kix:46:39 asset -> fn std::asset
+analysis/006__screens/main.kix:47:24 ImageAsset -> struct std::ImageAsset
+analysis/006__screens/main.kix:47:37 asset -> fn std::asset
+analysis/006__screens/main.kix:54:48 Place::Roof -> variant crate::Place::Roof
+analysis/006__screens/main.kix:54:80 Place::Classroom -> variant crate::Place::Classroom
+analysis/006__screens/main.kix:55:9 Place::Roof -> variant crate::Place::Roof
+analysis/006__screens/main.kix:55:36 roof -> fn crate::roof
+analysis/006__screens/main.kix:56:9 Place::Classroom -> variant crate::Place::Classroom
+analysis/006__screens/main.kix:56:41 classroom -> fn crate::classroom
+analysis/006__screens/main.kix:62:48 Place::Roof -> variant crate::Place::Roof
+analysis/006__screens/main.kix:62:80 Place::Classroom -> variant crate::Place::Classroom
+analysis/006__screens/main.kix:63:9 Place::Roof -> variant crate::Place::Roof
+analysis/006__screens/main.kix:63:36 roof -> fn crate::roof
+analysis/006__screens/main.kix:64:9 Place::Classroom -> variant crate::Place::Classroom
+analysis/006__screens/main.kix:64:41 classroom -> fn crate::classroom
+analysis/006__screens/main.kix:66:17 evening -> fn crate::evening
+analysis/006__screens/main.kix:69:48 Place::Roof -> variant crate::Place::Roof
+analysis/006__screens/main.kix:69:80 Place::Classroom -> variant crate::Place::Classroom
+analysis/006__screens/main.kix:70:9 Place::Roof -> variant crate::Place::Roof
+analysis/006__screens/main.kix:71:13 PLACE -> static crate::PLACE
+analysis/006__screens/main.kix:71:21 Place::Roof -> variant crate::Place::Roof
+analysis/006__screens/main.kix:72:25 roof -> fn crate::roof
+analysis/006__screens/main.kix:74:9 Place::Classroom -> variant crate::Place::Classroom
+analysis/006__screens/main.kix:75:13 PLACE -> static crate::PLACE
+analysis/006__screens/main.kix:75:21 Place::Classroom -> variant crate::Place::Classroom
+analysis/006__screens/main.kix:76:25 classroom -> fn crate::classroom
+analysis/006__screens/main.kix:79:20 PLACE -> static crate::PLACE
+analysis/006__screens/main.kix:79:29 Place::Roof -> variant crate::Place::Roof
+analysis/006__screens/main.kix:79:43 roof -> fn crate::roof
+analysis/006__screens/main.kix:79:57 classroom -> fn crate::classroom
+analysis/006__screens/main.kix:82:17 roof -> fn crate::roof
+analysis/006__screens/main.kix:83:5 PhoneCall -> fn crate::PhoneCall
+analysis/006__screens/main.kix:84:17 classroom -> fn crate::classroom
+analysis/006__screens/main.kix:85:5 PhoneCall -> fn crate::PhoneCall
+analysis/006__screens/main.kix:88:17 mio_appears -> fn crate::mio_appears
+analysis/006__screens/main.kix:89:17 mio_brightens -> fn crate::mio_brightens
+analysis/006__screens/main.kix:93:54 Walk::On -> variant crate::Walk::On
+analysis/006__screens/main.kix:93:78 Walk::Stop -> variant crate::Walk::Stop
+analysis/006__screens/main.kix:94:13 Walk::On -> variant crate::Walk::On
+analysis/006__screens/main.kix:94:37 mio_steps_right -> fn crate::mio_steps_right
+analysis/006__screens/main.kix:95:13 Walk::Stop -> variant crate::Walk::Stop
+analysis/006__screens/main.kix:95:27 break -> loop@92:5
+analysis/006__screens/main.kix:98:17 evening -> fn crate::evening
+--- renders ---
+analysis/006__screens/main.kix:11:10 roof -> delta
+analysis/006__screens/main.kix:16:10 classroom -> delta
+analysis/006__screens/main.kix:21:10 evening -> keyframe
+analysis/006__screens/main.kix:27:10 mio_appears -> delta
+analysis/006__screens/main.kix:32:10 mio_brightens -> delta
+analysis/006__screens/main.kix:38:10 mio_steps_right -> delta

@@ -1,0 +1,151 @@
+// Stuck choices, reachability, scene calls and errors in story code (stage 5).
+
+static mut KEY: bool = false;
+static mut KNOCKS: Int<0, 3> = 0;
+static mut ROUTE: Route = Route::None;
+static mut AT: Int<0, 1> = 0;
+
+enum Route { None, Roof, Garden }
+enum Door { Open, Knock }
+enum Where { Roof, Garden }
+enum Ending { Normal, Secret }
+
+#[scene]
+#[entry]
+pushdown fn Main(replay: bool) -> Ending {
+    if replay {
+        KEY = true;
+    }
+    Door();
+    // Reached only when `KNOCKS` is 3, which never happens.
+    if KNOCKS == 3 {
+        s!(t!["The door gives way."]);
+    }
+    let mut found: Int<0, 3> = 0;
+    Collect(&mut found);
+    Collect(&mut found);
+    if found == 2 {
+        s!(t!["Two keys."]);
+    } else {
+        s!(t!["Something is missing."]);
+    }
+    let next: scene fn() = match Choose() {
+        Where::Roof => Roof,
+        Where::Garden => Garden,
+    };
+    next();
+    for lap in 0..2 {
+        s!(t!["Lap " {lap}]);
+    }
+    // A place indexed by a scene's result is assigned in place.
+    let mut marks = [false, false];
+    marks[Slot()] = true;
+    if marks[0] {
+        s!(t!["Marked."]);
+    } else {
+        s!(t!["Unmarked: never."]);
+    }
+    // A `&mut` argument is written back to the place it was taken from, even though the
+    // callee changes the index.
+    let mut flags = [false, false];
+    Flag(&mut flags[AT]);
+    if flags[0] {
+        s!(t!["Flagged."]);
+    } else {
+        s!(t!["Unflagged: never."]);
+    }
+    // Both laps run between the same two steps: the operand `lap`, evaluated before the
+    // `loop` operand, is evaluated again on the second lap.
+    let mut total: Int<0, 3> = 0;
+    for lap in 0..2 {
+        total = next_total(lap, loop { break 1; });
+    }
+    if total == 2 {
+        s!(t!["Total two."]);
+    } else {
+        s!(t!["Total: never."]);
+    }
+    // `continue` to an outer `for` from a loop that steps keeps the `for` going.
+    'outer: for x in [1, 2] {
+        loop {
+            s!(t!["x = " {x}]);
+            if x == 2 {
+                break 'outer;
+            }
+            continue 'outer;
+        }
+    }
+    s!(t!["After the loops."]);
+    if ROUTE == Route::Garden {
+        return Ending::Secret;
+    }
+    Ending::Normal
+}
+
+#[scene]
+pushdown fn Slot() -> Int<0, 1> {
+    s!(t!["Which slot?"]);
+    0
+}
+
+#[scene]
+pushdown fn Flag(flag: &mut bool) {
+    AT = 1;
+    *flag = true;
+    s!(t!["Flag raised."]);
+}
+
+// Stuck: without the key, the third visit offers no arm.
+#[scene]
+pushdown fn Door() {
+    loop {
+        match choice!{
+            id = "door",
+            t!["Open the door"] if KEY => Door::Open,
+            t!["Knock"] if KNOCKS < 2 => Door::Knock,
+        } {
+            Door::Open => break,
+            Door::Knock => KNOCKS += 1,
+        }
+    }
+}
+
+#[scene]
+pushdown fn Collect(count: &mut Int<0, 3>) {
+    s!(t!["You found a key."]);
+    *count += 1;
+}
+
+#[scene]
+pushdown fn Choose() -> Where {
+    match choice!{
+        id = "where",
+        t!["The roof"] => Where::Roof,
+        t!["The garden"] => Where::Garden,
+    } {
+        Where::Roof => Where::Roof,
+        Where::Garden => Where::Garden,
+    }
+}
+
+#[scene]
+pushdown fn Roof() {
+    ROUTE = Route::Roof;
+    s!(t!["The wind is cold."]);
+}
+
+#[scene]
+pushdown fn Garden() {
+    ROUTE = Route::Garden;
+    s!(t!["The flowers are open."]);
+}
+
+// Never called.
+#[scene]
+pushdown fn Epilogue() {
+    s!(t!["Years later."]);
+}
+
+const fn next_total(lap: Int<0, 1>, one: Int<0, 1>) -> Int<0, 3> {
+    (lap + one).into()
+}

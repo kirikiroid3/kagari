@@ -10,7 +10,7 @@ mod ops;
 mod pat;
 mod path;
 mod table;
-mod walk;
+pub(crate) mod walk;
 
 use la_arena::ArenaMap;
 use rustc_hash::FxHashMap;

@@ -1,0 +1,101 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/analysis/005__story/main.kix
+---
+analysis/005__story/main.kix:22:9: warning[analysis/unreachable-step]: this step is never reached
+analysis/005__story/main.kix:30:9: warning[analysis/unreachable-step]: this step is never reached
+analysis/005__story/main.kix:46:9: warning[analysis/unreachable-step]: this step is never reached
+analysis/005__story/main.kix:55:9: warning[analysis/unreachable-step]: this step is never reached
+analysis/005__story/main.kix:66:9: warning[analysis/unreachable-step]: this step is never reached
+analysis/005__story/main.kix:102:15: error[analysis/stuck-choice]: this choice can be reached with every arm hidden: the player would have nothing to select (for example when `KEY` is `false`, `KNOCKS` is `2`)
+analysis/005__story/main.kix:145:13: warning[analysis/unreachable-scene]: the scene `Epilogue` is never reached from an entry scene
+--- resolutions ---
+analysis/005__story/main.kix:3:17 bool -> prim bool
+analysis/005__story/main.kix:4:20 Int -> prim Int
+analysis/005__story/main.kix:5:19 Route -> enum crate::Route
+analysis/005__story/main.kix:5:27 Route::None -> variant crate::Route::None
+analysis/005__story/main.kix:6:16 Int -> prim Int
+analysis/005__story/main.kix:15:18 replay -> local replay@15:18
+analysis/005__story/main.kix:15:26 bool -> prim bool
+analysis/005__story/main.kix:15:35 Ending -> enum crate::Ending
+analysis/005__story/main.kix:16:8 replay -> local replay@15:18
+analysis/005__story/main.kix:17:9 KEY -> static crate::KEY
+analysis/005__story/main.kix:19:5 Door -> fn crate::Door
+analysis/005__story/main.kix:21:8 KNOCKS -> static crate::KNOCKS
+analysis/005__story/main.kix:24:9 found -> local found@24:9
+analysis/005__story/main.kix:24:20 Int -> prim Int
+analysis/005__story/main.kix:25:5 Collect -> fn crate::Collect
+analysis/005__story/main.kix:25:18 found -> local found@24:9
+analysis/005__story/main.kix:26:5 Collect -> fn crate::Collect
+analysis/005__story/main.kix:26:18 found -> local found@24:9
+analysis/005__story/main.kix:27:8 found -> local found@24:9
+analysis/005__story/main.kix:32:9 next -> local next@32:9
+analysis/005__story/main.kix:32:34 Choose -> fn crate::Choose
+analysis/005__story/main.kix:33:9 Where::Roof -> variant crate::Where::Roof
+analysis/005__story/main.kix:33:24 Roof -> fn crate::Roof
+analysis/005__story/main.kix:34:9 Where::Garden -> variant crate::Where::Garden
+analysis/005__story/main.kix:34:26 Garden -> fn crate::Garden
+analysis/005__story/main.kix:36:5 next -> local next@32:9
+analysis/005__story/main.kix:37:9 lap -> local lap@37:9
+analysis/005__story/main.kix:38:23 lap -> local lap@37:9
+analysis/005__story/main.kix:41:9 marks -> local marks@41:9
+analysis/005__story/main.kix:42:5 marks -> local marks@41:9
+analysis/005__story/main.kix:42:11 Slot -> fn crate::Slot
+analysis/005__story/main.kix:43:8 marks -> local marks@41:9
+analysis/005__story/main.kix:50:9 flags -> local flags@50:9
+analysis/005__story/main.kix:51:5 Flag -> fn crate::Flag
+analysis/005__story/main.kix:51:15 flags -> local flags@50:9
+analysis/005__story/main.kix:51:21 AT -> static crate::AT
+analysis/005__story/main.kix:52:8 flags -> local flags@50:9
+analysis/005__story/main.kix:59:9 total -> local total@59:9
+analysis/005__story/main.kix:59:20 Int -> prim Int
+analysis/005__story/main.kix:60:9 lap -> local lap@60:9
+analysis/005__story/main.kix:61:9 total -> local total@59:9
+analysis/005__story/main.kix:61:17 next_total -> fn crate::next_total
+analysis/005__story/main.kix:61:28 lap -> local lap@60:9
+analysis/005__story/main.kix:61:40 break -> loop@61:33
+analysis/005__story/main.kix:63:8 total -> local total@59:9
+analysis/005__story/main.kix:69:17 x -> local x@69:17
+analysis/005__story/main.kix:71:27 x -> local x@69:17
+analysis/005__story/main.kix:72:16 x -> local x@69:17
+analysis/005__story/main.kix:73:17 break -> loop@69:5
+analysis/005__story/main.kix:75:13 continue -> loop@69:5
+analysis/005__story/main.kix:79:8 ROUTE -> static crate::ROUTE
+analysis/005__story/main.kix:79:17 Route::Garden -> variant crate::Route::Garden
+analysis/005__story/main.kix:80:16 Ending::Secret -> variant crate::Ending::Secret
+analysis/005__story/main.kix:82:5 Ending::Normal -> variant crate::Ending::Normal
+analysis/005__story/main.kix:86:23 Int -> prim Int
+analysis/005__story/main.kix:92:18 flag -> local flag@92:18
+analysis/005__story/main.kix:92:29 bool -> prim bool
+analysis/005__story/main.kix:93:5 AT -> static crate::AT
+analysis/005__story/main.kix:94:6 flag -> local flag@92:18
+analysis/005__story/main.kix:104:36 KEY -> static crate::KEY
+analysis/005__story/main.kix:104:43 Door::Open -> variant crate::Door::Open
+analysis/005__story/main.kix:105:28 KNOCKS -> static crate::KNOCKS
+analysis/005__story/main.kix:105:42 Door::Knock -> variant crate::Door::Knock
+analysis/005__story/main.kix:107:13 Door::Open -> variant crate::Door::Open
+analysis/005__story/main.kix:107:27 break -> loop@101:5
+analysis/005__story/main.kix:108:13 Door::Knock -> variant crate::Door::Knock
+analysis/005__story/main.kix:108:28 KNOCKS -> static crate::KNOCKS
+analysis/005__story/main.kix:114:21 count -> local count@114:21
+analysis/005__story/main.kix:114:33 Int -> prim Int
+analysis/005__story/main.kix:116:6 count -> local count@114:21
+analysis/005__story/main.kix:120:25 Where -> enum crate::Where
+analysis/005__story/main.kix:123:27 Where::Roof -> variant crate::Where::Roof
+analysis/005__story/main.kix:124:29 Where::Garden -> variant crate::Where::Garden
+analysis/005__story/main.kix:126:9 Where::Roof -> variant crate::Where::Roof
+analysis/005__story/main.kix:126:24 Where::Roof -> variant crate::Where::Roof
+analysis/005__story/main.kix:127:9 Where::Garden -> variant crate::Where::Garden
+analysis/005__story/main.kix:127:26 Where::Garden -> variant crate::Where::Garden
+analysis/005__story/main.kix:133:5 ROUTE -> static crate::ROUTE
+analysis/005__story/main.kix:133:13 Route::Roof -> variant crate::Route::Roof
+analysis/005__story/main.kix:139:5 ROUTE -> static crate::ROUTE
+analysis/005__story/main.kix:139:13 Route::Garden -> variant crate::Route::Garden
+analysis/005__story/main.kix:149:21 lap -> local lap@149:21
+analysis/005__story/main.kix:149:26 Int -> prim Int
+analysis/005__story/main.kix:149:37 one -> local one@149:37
+analysis/005__story/main.kix:149:42 Int -> prim Int
+analysis/005__story/main.kix:149:56 Int -> prim Int
+analysis/005__story/main.kix:150:6 lap -> local lap@149:21
+analysis/005__story/main.kix:150:12 one -> local one@149:37

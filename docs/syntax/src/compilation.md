@@ -45,6 +45,51 @@ A game is compiled from one root file into one `.kagari` bytecode file.
 
 Stages 1–4 are cheap. Stage 5 is where the analyses described in the proposal run.
 
+### How the analysis runs
+
+Stage 5 runs only on a program that stages 1–4 accepted without errors: it executes the story,
+which needs well-typed, well-kinded code.
+
+**Termination** is checked first, on the control flow of each scene alone: every branch counts
+as possible. A program with a stepless loop or a stepless call cycle is not analyzed further,
+since running it could never reach the next step.
+
+**The states of the story** are then computed exactly. The story is a recursive state machine
+over finite data, and the compiler explores it from every entry scene and every value of its
+arguments. A state is a position in a scene, the locals of the scene that are still used later,
+and the values of the story variables; instant code between two steps runs in the const
+evaluator. Each scene is summarized per *context*, its arguments and the story variables when it
+is entered, as the set of values and story variables it can return with, so a scene called from
+many places in the same state is explored once. The exploration has a cap on the number of
+states (*tentative*: 200,000, a compiler setting). A story with more states, or an entry scene
+whose arguments take more values than the [tabulation](./kinds.md#calling-const-fn-from-the-story)
+limit, gets the warning `analysis/too-many-states`: what was found is still reported, but the
+analyses that need every state (unreachable steps and scenes) are skipped. So is a path the
+analysis cannot follow, such as one that holds a closure capturing locals across a step; it is
+reported where it stops (`analysis/incomplete`, a warning).
+
+On these states:
+
+- a step that is a `choice!` with no arm shown is a *stuck choice*, reported with the story
+  variables of one such state;
+- an evaluation error in story code (an index out of range, for example) is reported where the
+  story runs into it;
+- a scene no entry scene reaches, and a step of a reached scene that no state reaches, are
+  reported as unreachable.
+
+**Screens** are computed over the same states, since renders never influence the story. The
+story starts on `Screen::empty()`; a step's render runs on every screen that reaches the step,
+and its errors on any of them are reported. The screens then decide
+[consistency](./presentation.md#consistency) and [bounded
+screens](./presentation.md#unbounded-screens).
+
+**Liveness** is a dependence analysis over every `pushdown fn`: a story variable *influences*
+the story when its value can flow, through locals, parameters, return values and other story
+variables, into a condition, a `match` scrutinee or guard, a `for` iterable, a step, a meta
+write, a call through a pointer or closure, or the ending of an entry scene. Every other story
+variable is reported: never read, read only into variables that do not influence the story, or
+never used at all.
+
 ## `.kagari` header
 
 A `.kagari` file starts with 16 magic bytes:

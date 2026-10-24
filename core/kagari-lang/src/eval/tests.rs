@@ -1820,11 +1820,13 @@ const fn fresh(_screen: Screen) -> Screen {
 
 #[entry]
 #[scene]
-pushdown fn Start() {
+pushdown fn Start(met: bool) {
+    MET = met;
     s!(render = petals, t![\"Day \" {DAY} \"!\"]);
     s!(render = if MET { petals } else { fresh }, t![\"x\"]);
     s!(render = |screen| screen, t![\"identity\"]);
     s!(render = |_screen| Screen::empty(), t![\"empty\"]);
+    DAY += 1;
     match mood(DAY, MET) {
         Mood::Warm => s!(t![\"w\"]),
         _ => s!(t![\"o\"]),

@@ -6,12 +6,12 @@
 
 mod anim;
 mod builtins;
-mod const_exprs;
-mod domain;
-mod interp;
+pub(crate) mod const_exprs;
+pub(crate) mod domain;
+pub(crate) mod interp;
 mod num;
-mod screen;
-mod std_items;
+pub(crate) mod screen;
+pub(crate) mod std_items;
 mod value;
 
 #[cfg(test)]

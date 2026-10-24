@@ -1,0 +1,104 @@
+// The screens that reach each step (stage 5): consistency, bounded screens, and renders
+// evaluated on the screens that reach them.
+
+const MIO: EntityId = EntityId(30);
+
+static mut PLACE: Place = Place::Roof;
+
+enum Place { Roof, Classroom }
+enum Walk { On, Stop }
+
+const fn roof(mut screen: Screen) -> Screen {
+    screen.background().change(BG::ROOF).apply_animation(fade(ms(500)));
+    screen
+}
+
+const fn classroom(mut screen: Screen) -> Screen {
+    screen.background().change(BG::CLASSROOM).apply_animation(fade(ms(500)));
+    screen
+}
+
+const fn evening(_screen: Screen) -> Screen {
+    let mut screen = Screen::empty();
+    screen.background().change(BG::EVENING).apply_animation(fade(ms(500)));
+    screen
+}
+
+const fn mio_appears(mut screen: Screen) -> Screen {
+    screen.entity(MIO).opacity().change(1.0).apply_animation(tween(ms(300)));
+    screen
+}
+
+const fn mio_brightens(mut screen: Screen) -> Screen {
+    let opacity = screen.entity(MIO).opacity().get();
+    screen.entity(MIO).opacity().change(opacity + 0.5).apply_animation(tween(ms(300)));
+    screen
+}
+
+const fn mio_steps_right(mut screen: Screen) -> Screen {
+    let at = screen.entity(MIO).position().get();
+    screen.entity(MIO).position().change(point(at.x + 10, at.y)).apply_animation(instant());
+    screen
+}
+
+mod BG {
+    pub const ROOF: ImageAsset = asset("roof.png");
+    pub const CLASSROOM: ImageAsset = asset("classroom.png");
+    pub const EVENING: ImageAsset = asset("evening.png");
+}
+
+#[scene]
+#[entry]
+pushdown fn Main() {
+    // Warning: the last step shows the roof on one path and the classroom on the other.
+    match choice!{ id = "where", t!["Roof"] => Place::Roof, t!["Classroom"] => Place::Classroom } {
+        Place::Roof => s!(render = roof, t!["The wind is cold."]),
+        Place::Classroom => s!(render = classroom, t!["It's quiet."]),
+    }
+    s!(t!["So, about tomorrow…"]);
+    s!(t!["(Reported once, at the first step after the merge.)"]);
+
+    // Fine: a keyframe after the merge.
+    match choice!{ id = "again", t!["Roof"] => Place::Roof, t!["Classroom"] => Place::Classroom } {
+        Place::Roof => s!(render = roof, t!["The wind is cold."]),
+        Place::Classroom => s!(render = classroom, t!["It's quiet."]),
+    }
+    s!(render = evening, t!["Evening came."]);
+
+    // Fine: the dependency is a story variable.
+    match choice!{ id = "third", t!["Roof"] => Place::Roof, t!["Classroom"] => Place::Classroom } {
+        Place::Roof => {
+            PLACE = Place::Roof;
+            s!(render = roof, t!["The wind is cold."]);
+        }
+        Place::Classroom => {
+            PLACE = Place::Classroom;
+            s!(render = classroom, t!["It's quiet."]);
+        }
+    }
+    s!(render = if PLACE == Place::Roof { roof } else { classroom }, t!["Still here."]);
+
+    // Fine: an interrupt overlays whatever screen each call site has.
+    s!(render = roof, t!["On the roof."]);
+    PhoneCall();
+    s!(render = classroom, t!["In the classroom."]);
+    PhoneCall();
+
+    // Error at `mio_brightens`: Mio is already fully opaque on the screen that reaches it.
+    s!(render = mio_appears, t!["Mio walks in."]);
+    s!(render = mio_brightens, t!["She smiles."]);
+
+    // Error: every lap moves Mio further, so the screens at the hub have no bound.
+    loop {
+        match choice!{ id = "walk", t!["Walk on"] => Walk::On, t!["Stop"] => Walk::Stop } {
+            Walk::On => s!(render = mio_steps_right, t!["You walk on."]),
+            Walk::Stop => break,
+        }
+    }
+    s!(render = evening, t!["The end."]);
+}
+
+#[scene]
+pushdown fn PhoneCall() {
+    s!(t!["The phone rings."]);
+}

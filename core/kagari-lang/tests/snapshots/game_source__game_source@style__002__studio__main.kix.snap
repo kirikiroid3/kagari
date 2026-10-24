@@ -3,7 +3,9 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/style/002__studio/main.kix
 ---
-no diagnostics
+style/002__studio/main.kix:217:5: warning[analysis/inconsistent-screen]: the screen this step shows depends on the path that reached it: insert a keyframe after the paths merge, or choose the render by a story variable
+  note: style/002__studio/main.kix:207:17: on one of the paths, the screen was last changed here
+  note: style/002__studio/main.kix:214:35: on one of the paths, the screen was last changed here
 --- resolutions ---
 style/002__studio/main.kix:13:15 Character -> struct std::stage::Character
 style/002__studio/main.kix:13:27 character -> fn std::stage::character

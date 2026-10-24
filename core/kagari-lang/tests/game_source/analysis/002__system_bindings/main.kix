@@ -1,0 +1,84 @@
+use std::narrative::text::text_style;
+use std::screen::size;
+use std::system::{Action, Binding, Input, Key, bind, default_bindings};
+
+mod story {
+    #[scene]
+    #[entry]
+    pub pushdown fn Main() {}
+}
+
+static TEXT_SPEED: Setting<Duration> = setting(ms(30));
+static AUTO_DELAY: Setting<Duration> = setting(ms(1300));
+static AUTO_DELAY_PER_CHAR: Setting<Duration> = setting(ms(60));
+static SKIP_UNREAD: Setting<bool> = setting(false);
+static MASTER: Setting<Volume> = setting(volume(100));
+static MUSIC: Setting<Volume> = setting(volume(60));
+static SOUND: Setting<Volume> = setting(volume(100));
+static VOICE: Setting<Volume> = setting(volume(100));
+static VOICE_SUSTAIN: Setting<bool> = setting(false);
+static WAIT_FOR_VOICE: Setting<bool> = setting(true);
+static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
+static FULLSCREEN: Setting<bool> = setting(false);
+static ANIMATIONS: Setting<bool> = setting(true);
+
+// The defaults bind Escape to `Action::Back`: every overlay and dialog can be left.
+const fn bindings() -> Vec<Binding> {
+    let mut list = default_bindings();
+    list.push(bind(Input::Key(Key::B), Action::OpenInGame(Backlog)));
+    list
+}
+
+fn main() -> System {
+    System {
+        title: "Bindings",
+        resolution: size(1280, 720),
+        start: Title,
+        game: GameView,
+        save_slots: 20,
+        auto_slots: 3,
+        backlog: 200,
+        text: text_style(26, WHITE),
+        settings: Settings {
+            text_speed: TEXT_SPEED,
+            auto_delay: AUTO_DELAY,
+            auto_delay_per_char: AUTO_DELAY_PER_CHAR,
+            skip_unread: SKIP_UNREAD,
+            master: MASTER,
+            music: MUSIC,
+            sound: SOUND,
+            voice: VOICE,
+            voice_sustain: VOICE_SUSTAIN,
+            wait_for_voice: WAIT_FOR_VOICE,
+            window_opacity: WINDOW_OPACITY,
+            fullscreen: FULLSCREEN,
+            animations: ANIMATIONS,
+        },
+        bindings: bindings(),
+    }
+}
+
+fn Title() -> RootPage {
+    RootPage(column![
+        button!{on_click = || nav::start(story::Main, (), |_end| ()), t!["Start"]},
+        button!{on_click = || nav::dialog(Notice), t!["Notice"]},
+    ])
+}
+
+fn GameView(game: Narrative) -> Element {
+    game_screen!(game = game)
+}
+
+// Opened by the `B` binding in the game; left with the `Back` binding.
+fn Backlog(game: Narrative) -> GameOverlay {
+    GameOverlay(text!(t!["Backlog"]))
+}
+
+// Left with the `Back` binding.
+fn Notice() -> Dialog {
+    Dialog(text!(t!["Notice"]))
+}
+
+fn History(game: Narrative) -> GameOverlay {
+    GameOverlay(text!(t!["History"]))
+}

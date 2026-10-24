@@ -1,0 +1,90 @@
+// Story variables that never influence the story (stage 5 liveness).
+
+enum Ending { Good, Bad }
+enum Pick { Stay, Leave }
+
+// Warnings.
+static mut WRITE_ONLY: bool = false;          // only assigned: never read
+static mut COUNTER: Int<0, 9> = 0;            // only `COUNTER += 1`: never read
+static mut SOURCE: Int<0, 9> = 0;             // read only into `SINK`
+static mut SINK: Int<0, 9> = 0;               // only assigned
+static mut IGNORED: bool = false;             // passed to a procedure that ignores it
+static mut UNTOUCHED: bool = false;           // never used at all
+
+// No warnings.
+static mut SHOWN: bool = false;               // `if` condition
+static mut GUARD: bool = false;               // choice guard
+static mut DECIDES: bool = false;             // decides a branch in a procedure
+static mut BEST: Ending = Ending::Bad;        // flows into the entry scene's ending
+static mut FLAG: bool = false;                // written through `&mut`, read by the caller
+static mut SPOKEN: Int<0, 9> = 0;             // shown in a line
+static mut CHAIN: Int<0, 9> = 0;              // flows through a local into a condition
+static mut VIA_REF: bool = false;             // written through `&mut` into a local the caller tests
+
+#[scene]
+#[entry]
+pushdown fn Main(replay: bool) -> Ending {
+    // Entry arguments make every branch below reachable.
+    SHOWN = replay;
+    GUARD = replay;
+    if replay {
+        CHAIN = 3;
+    }
+    WRITE_ONLY = true;
+    COUNTER += 1;
+    SINK = SOURCE;
+    ignore(IGNORED);
+    if SHOWN {
+        s!(t!["Shown."]);
+    }
+    match choice!{
+        id = "pick",
+        t!["Stay"] => Pick::Stay,
+        t!["Leave"] if GUARD => Pick::Leave,
+    } {
+        Pick::Stay => {}
+        Pick::Leave => Side(),
+    }
+    branch(DECIDES);
+    raise(&mut FLAG);
+    if FLAG {
+        s!(t!["Raised."]);
+    }
+    s!(t!["Spoken: " {SPOKEN}]);
+    let copy = CHAIN;
+    let mut seen = false;
+    seen = copy == 3;
+    while seen {
+        s!(t!["Looping."]);
+        seen = false;
+    }
+    let mut target = false;
+    store(&mut target, VIA_REF);
+    if target {
+        BEST = Ending::Good;
+    }
+    BEST
+}
+
+#[scene]
+pushdown fn Side() {
+    s!(t!["A side scene."]);
+}
+
+pushdown fn ignore(value: bool) {
+    let unused = value;
+}
+
+pushdown fn branch(value: bool) {
+    if value {
+        SHOWN = false;
+    }
+}
+
+pushdown fn raise(flag: &mut bool) {
+    *flag = true;
+}
+
+pushdown fn store(target: &mut bool, value: bool) {
+    *target = value;
+}

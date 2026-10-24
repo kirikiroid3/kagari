@@ -1,0 +1,140 @@
+// Termination (stage 5): every loop and every cycle of scene calls passes a step.
+
+static mut DONE: bool = false;
+static mut COUNT: Int<0, 3> = 0;
+
+enum Go { On, Stop }
+
+#[scene]
+#[entry]
+pushdown fn Main() {
+    // Error: the `else` path goes around without a step.
+    loop {
+        if DONE {
+            s!(t!["Done."]);
+        } else {
+            COUNT += 1;
+        }
+    }
+}
+
+#[scene]
+pushdown fn Waits() {
+    // Error: a `while` whose body never steps.
+    while COUNT < 3 {
+        COUNT += 1;
+    }
+    // Fine: every lap runs a step.
+    while !DONE {
+        s!(t!["Waiting."]);
+        DONE = true;
+    }
+    // Fine: `for` over a constant range is bounded.
+    for _lap in 0..3 {
+        COUNT += 1;
+    }
+}
+
+#[scene]
+pushdown fn Hub() {
+    // Error: `Maybe` may return without a step.
+    loop {
+        Maybe();
+    }
+}
+
+#[scene]
+pushdown fn Hub2() {
+    // Fine: `Always` runs a step on every path; `break` leaves the loop.
+    loop {
+        Always();
+        match choice!{ id = "go", t!["Again"] => Go::On, t!["Stop"] => Go::Stop } {
+            Go::On => continue,
+            Go::Stop => break,
+        }
+    }
+}
+
+#[scene]
+pushdown fn Skips() {
+    // Error: `continue` goes around before the step.
+    loop {
+        if DONE {
+            continue;
+        }
+        s!(t!["Not done."]);
+    }
+}
+
+// Fine: a `scene fn(bool)` can hold `Speak`, which always steps, but not `Quiet`, which has
+// another parameter type and may return without a step.
+#[scene]
+pushdown fn Relay() {
+    let next: scene fn(bool) = Speak;
+    loop {
+        next(true);
+    }
+}
+
+#[scene]
+pushdown fn Speak(loud: bool) {
+    if loud {
+        s!(t!["LOUD."]);
+    } else {
+        s!(t!["Quiet."]);
+    }
+}
+
+#[scene]
+pushdown fn Quiet(level: Int<0, 3>) {
+    if level == 3 {
+        s!(t!["Shh."]);
+    }
+}
+
+#[scene]
+pushdown fn Maybe() {
+    if DONE {
+        s!(t!["Maybe."]);
+    }
+}
+
+#[scene]
+pushdown fn Always() {
+    if DONE {
+        s!(t!["One."]);
+    } else {
+        s!(t!["Two."]);
+    }
+}
+
+// Error: calls itself before any step.
+#[scene]
+pushdown fn Echo() {
+    if DONE {
+        Echo();
+    }
+    s!(t!["Echo."]);
+}
+
+// Error: `Ping` and `Pong` call each other before any step.
+#[scene]
+pushdown fn Ping() {
+    Pong();
+}
+
+#[scene]
+pushdown fn Pong() {
+    Maybe();
+    Ping();
+}
+
+// Fine: the recursion passes a step first.
+#[scene]
+pushdown fn Countdown() {
+    s!(t!["Tick."]);
+    if COUNT > 0 {
+        COUNT -= 1;
+        Countdown();
+    }
+}

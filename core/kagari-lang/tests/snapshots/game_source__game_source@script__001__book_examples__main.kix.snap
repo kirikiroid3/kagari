@@ -3,7 +3,12 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/script/001__book_examples/main.kix
 ---
-no diagnostics
+script/001__book_examples/main.kix:101:13: warning[analysis/unreachable-scene]: the scene `Day` is never reached from an entry scene
+script/001__book_examples/main.kix:107:13: warning[analysis/unreachable-scene]: the scene `Week` is never reached from an entry scene
+script/001__book_examples/main.kix:120:13: warning[analysis/unreachable-scene]: the scene `Confession` is never reached from an entry scene
+script/001__book_examples/main.kix:132:13: warning[analysis/unreachable-scene]: the scene `Day3` is never reached from an entry scene
+script/001__book_examples/main.kix:140:13: warning[analysis/unreachable-scene]: the scene `AzusaRoute` is never reached from an entry scene
+script/001__book_examples/main.kix:184:13: warning[analysis/unreachable-scene]: the scene `Greeting` is never reached from an entry scene
 --- resolutions ---
 script/001__book_examples/main.kix:3:15 EntityId -> struct std::screen::EntityId
 script/001__book_examples/main.kix:3:26 EntityId -> struct std::screen::EntityId

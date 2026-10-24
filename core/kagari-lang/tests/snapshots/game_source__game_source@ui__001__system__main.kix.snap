@@ -3,7 +3,9 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/ui/001__system/main.kix
 ---
-no diagnostics
+ui/001__system/main.kix:23:12: warning[system/unreachable-mode]: the game is never started: no reachable mode calls `nav::start` or `nav::load`
+ui/001__system/main.kix:72:4: warning[system/unreachable-mode]: the overlay `Config` is never shown: no reachable mode opens it
+ui/001__system/main.kix:84:4: warning[system/unreachable-mode]: the root page `Credits` is never shown: no reachable mode goes to it
 --- resolutions ---
 ui/001__system/main.kix:10:26 cleared_azusa -> local cleared_azusa@10:26
 ui/001__system/main.kix:10:41 bool -> prim bool

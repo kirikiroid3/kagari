@@ -1,9 +1,10 @@
-//! The front-end pipeline: stages 1–4 (parse, item trees, HIR lowering, name resolution,
-//! signatures and type inference, pattern and kind checks, const evaluation).
+//! The front-end pipeline: stages 1–5 (parse, item trees, HIR lowering, name resolution,
+//! signatures and type inference, pattern and kind checks, const evaluation, analysis).
 
+use crate::analysis::analysis;
 use crate::db::Db;
 use crate::def_map::def_maps;
-use crate::diagnostic::{Diagnostic, DiagnosticCode};
+use crate::diagnostic::{Diagnostic, DiagnosticCode, Severity};
 use crate::eval::const_eval;
 use crate::input::Program;
 use crate::item_tree::item_tree;
@@ -14,7 +15,8 @@ use crate::typeck::exhaustive::file_pattern_checks;
 use crate::typeck::kinds::{file_kind_checks, instant_recursion};
 
 /// Every diagnostic of the program and the standard library, sorted by location and
-/// deduplicated.
+/// deduplicated. Stage 5 runs only on a program without errors from stages 1–4: its
+/// analyses execute the story and assume it is well-typed and well-kinded.
 #[salsa::tracked(returns(ref))]
 pub fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
     let maps = def_maps(db, program);
@@ -62,6 +64,9 @@ pub fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
     }
     diags.extend(instant_recursion(db, program).iter().cloned());
     diags.extend(const_eval(db, program).diagnostics.iter().cloned());
+    if !diags.iter().any(|diag| diag.severity == Severity::Error) {
+        diags.extend(analysis(db, program).diagnostics.iter().cloned());
+    }
     diags.sort_by(|a, b| {
         (
             &a.file,

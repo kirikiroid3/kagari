@@ -1,0 +1,161 @@
+use std::narrative::text::text_style;
+use std::screen::size;
+use std::system::{Action, Binding, Input, Key, bind};
+use std::system::saves::SaveSlot;
+
+mod story {
+    pub enum Ending { Good, Bad }
+
+    #[scene]
+    #[entry]
+    pub pushdown fn Main() -> Ending {
+        Ending::Good
+    }
+}
+
+static TEXT_SPEED: Setting<Duration> = setting(ms(30));
+static AUTO_DELAY: Setting<Duration> = setting(ms(1300));
+static AUTO_DELAY_PER_CHAR: Setting<Duration> = setting(ms(60));
+static SKIP_UNREAD: Setting<bool> = setting(false);
+static MASTER: Setting<Volume> = setting(volume(100));
+static MUSIC: Setting<Volume> = setting(volume(60));
+static SOUND: Setting<Volume> = setting(volume(100));
+static VOICE: Setting<Volume> = setting(volume(100));
+static VOICE_SUSTAIN: Setting<bool> = setting(false);
+static WAIT_FOR_VOICE: Setting<bool> = setting(true);
+static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
+static FULLSCREEN: Setting<bool> = setting(false);
+static ANIMATIONS: Setting<bool> = setting(true);
+
+// No `Action::Back` binding: overlays and dialogs must leave by themselves.
+const fn bindings() -> Vec<Binding> {
+    let mut list = Vec::new();
+    list.push(bind(Input::Key(Key::F1), Action::Open(Help)));
+    list
+}
+
+fn main() -> System {
+    System {
+        title: "Analysis",
+        resolution: size(1280, 720),
+        start: Title,
+        game: GameView,
+        save_slots: 20,
+        auto_slots: 3,
+        backlog: 200,
+        text: text_style(26, WHITE),
+        settings: Settings {
+            text_speed: TEXT_SPEED,
+            auto_delay: AUTO_DELAY,
+            auto_delay_per_char: AUTO_DELAY_PER_CHAR,
+            skip_unread: SKIP_UNREAD,
+            master: MASTER,
+            music: MUSIC,
+            sound: SOUND,
+            voice: VOICE,
+            voice_sustain: VOICE_SUSTAIN,
+            wait_for_voice: WAIT_FOR_VOICE,
+            window_opacity: WINDOW_OPACITY,
+            fullscreen: FULLSCREEN,
+            animations: ANIMATIONS,
+        },
+        bindings: bindings(),
+    }
+}
+
+// Shared by a root page and by overlays: its `nav::back()` is reported once, for `Title`.
+fn back_button() -> Element {
+    button!{on_click = || nav::back(), t!["Back"]}
+}
+
+fn Title() -> RootPage {
+    RootPage(column![
+        button!{on_click = || nav::start(story::Main, (), on_ending), t!["Start"]},
+        button!{on_click = || nav::call(Config), t!["Config"]},
+        button!{on_click = || nav::dialog(ConfirmReset), t!["Reset"]},
+        button!{on_click = || nav::dialog(ConfirmQuit), t!["Quit"]},
+        back_button(),
+    ])
+}
+
+// The exit handler runs in the game mode; `Credits` is reached only through it.
+fn on_ending(ending: story::Ending) {
+    match ending {
+        story::Ending::Good => nav::goto(Credits),
+        story::Ending::Bad => nav::goto(Title),
+    }
+}
+
+fn Credits() -> RootPage {
+    RootPage(column![
+        button!{on_click = || nav::goto(Title), t!["Title"]},
+        button!{on_click = || nav::start(story::Main, (), |_ending| nav::back()), t!["Replay"]},
+    ])
+}
+
+fn GameView(game: Narrative) -> Element {
+    column![
+        game_screen!(game = game),
+        button!{on_click = || game.call(SaveMenu), t!["Save"]},
+    ]
+}
+
+fn SaveMenu(game: Narrative) -> GameOverlay {
+    GameOverlay(column![
+        button!{on_click = || game.save(SaveSlot::Quick), t!["Save"]},
+        back_button(),
+    ])
+}
+
+fn Config() -> Overlay {
+    Overlay(column![
+        button!{on_click = || nav::call(Audio), t!["Audio"]},
+        button!{on_click = || nav::call(Gallery), t!["Gallery"]},
+        back_button(),
+    ])
+}
+
+// `Audio` and `Video` push each other.
+fn Audio() -> Overlay {
+    Overlay(column![
+        button!{on_click = || nav::call(Video), t!["Video"]},
+        back_button(),
+    ])
+}
+
+fn Video() -> Overlay {
+    Overlay(column![
+        button!{on_click = || nav::call(Audio), t!["Audio"]},
+        back_button(),
+    ])
+}
+
+fn Gallery() -> Overlay {
+    Overlay(column![
+        button!{on_click = || nav::call(Gallery), t!["Again"]},
+        back_button(),
+    ])
+}
+
+// Opened by the F1 binding.
+fn Help() -> Overlay {
+    Overlay(back_button())
+}
+
+// Leaves by quitting.
+fn ConfirmQuit() -> Dialog {
+    Dialog(button!{on_click = || nav::quit(), t!["Yes"]})
+}
+
+// No way out.
+fn ConfirmReset() -> Dialog {
+    Dialog(button!{on_click = || MUSIC.set(volume(60)), t!["Reset"]})
+}
+
+fn Unused() -> Overlay {
+    Overlay(back_button())
+}
+
+fn Orphan() -> Dialog {
+    Dialog(back_button())
+}
