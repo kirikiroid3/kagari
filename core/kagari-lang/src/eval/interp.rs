@@ -8,7 +8,7 @@
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::db::Db;
 use crate::def_map::{Def, Resolution};
@@ -363,6 +363,10 @@ pub(crate) struct Ctx<'db> {
     pub sigs: &'db ProgramSignatures,
     consts: RefCell<ConstCache>,
     statics: RefCell<FxHashMap<ItemId, Slot<StaticValue>>>,
+    /// Non-generic constants and statics whose evaluation reached themselves. A use inside
+    /// the cycle aborts (a non-generic item reports its own errors); the item whose
+    /// evaluation closed the cycle reports it once, at its own name.
+    cycles: RefCell<FxHashSet<ItemId>>,
     /// The nesting of interpreted calls, across machines.
     depth: Cell<u32>,
 }
@@ -390,6 +394,7 @@ impl<'db> Ctx<'db> {
             sigs,
             consts: RefCell::default(),
             statics: RefCell::default(),
+            cycles: RefCell::default(),
             depth: Cell::new(0),
         }
     }
@@ -440,16 +445,10 @@ impl<'db> Ctx<'db> {
         match self.consts.borrow().get(&key) {
             Some(Slot::Done(result)) => return result.clone(),
             Some(Slot::InProgress) => {
-                return Err(EvalError {
-                    kind: fault(
-                        DiagnosticCode::EvalConstCycle,
-                        format!(
-                            "the value of `{}` depends on itself",
-                            item_name(self.db, item)
-                        ),
-                    ),
-                    span: None,
-                });
+                if key.1.is_empty() {
+                    self.cycles.borrow_mut().insert(item);
+                }
+                return Err(self.cycle_error(item));
             }
             None => {}
         }
@@ -464,6 +463,11 @@ impl<'db> Ctx<'db> {
                     .freeze(&value)
                     .map_err(|kind| EvalError { kind, span: None })
             });
+        let result = if key.1.is_empty() && self.cycles.borrow_mut().remove(&item) {
+            Err(self.cycle_error(item))
+        } else {
+            result
+        };
         let mut consts = self.consts.borrow_mut();
         if self.nested_budget_failure(&result) {
             consts.remove(&key);
@@ -473,21 +477,29 @@ impl<'db> Ctx<'db> {
         result
     }
 
+    /// The error of a constant or static whose value depends on itself: it cannot be
+    /// computed at compile time.
+    fn cycle_error(&self, item: ItemId) -> EvalError {
+        EvalError {
+            kind: fault(
+                DiagnosticCode::EvalConstCycle,
+                format!(
+                    "the value of `{}` depends on itself, so it cannot be computed at compile \
+                     time",
+                    item_name(self.db, item)
+                ),
+            ),
+            span: None,
+        }
+    }
+
     /// The evaluated initializer of a `static`.
     pub fn static_value(&self, item: ItemId) -> Result<StaticValue, EvalError> {
         match self.statics.borrow().get(&item) {
             Some(Slot::Done(result)) => return result.clone(),
             Some(Slot::InProgress) => {
-                return Err(EvalError {
-                    kind: fault(
-                        DiagnosticCode::EvalConstCycle,
-                        format!(
-                            "the value of `{}` depends on itself",
-                            item_name(self.db, item)
-                        ),
-                    ),
-                    span: None,
-                });
+                self.cycles.borrow_mut().insert(item);
+                return Err(self.cycle_error(item));
             }
             None => {}
         }
@@ -503,6 +515,11 @@ impl<'db> Ctx<'db> {
                 .map_err(|kind| EvalError { kind, span: None })?;
             Ok(StaticValue { handle, value })
         });
+        let result = if self.cycles.borrow_mut().remove(&item) {
+            Err(self.cycle_error(item))
+        } else {
+            result
+        };
         let mut statics = self.statics.borrow_mut();
         if self.nested_budget_failure(&result) {
             statics.remove(&item);

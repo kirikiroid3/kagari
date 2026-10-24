@@ -1888,6 +1888,43 @@ fn rat_builtins() {
 }
 
 #[test]
+fn constant_cycles_are_errors() {
+    let source = "
+        const A: u32 = A;
+        const B: u32 = C + 1;
+        const C: u32 = B;
+        const D: u32 = A + 1;
+        const E: u32 = 3;
+    ";
+    let (db, program) = setup(source);
+    let eval = const_eval(&db, program);
+    let reported: Vec<(DiagnosticCode, &str)> = eval
+        .diagnostics
+        .iter()
+        .map(|diag| (diag.code, diag.message.as_str()))
+        .collect();
+    // One error per cycle, at the constant whose evaluation closed it; a constant that
+    // only uses a failed one (`D`) adds nothing.
+    assert_eq!(
+        reported,
+        vec![
+            (
+                DiagnosticCode::EvalConstCycle,
+                "the value of `A` depends on itself, so it cannot be computed at compile time"
+            ),
+            (
+                DiagnosticCode::EvalConstCycle,
+                "the value of `B` depends on itself, so it cannot be computed at compile time"
+            ),
+        ]
+    );
+    assert_eq!(
+        eval.consts.get(&item(&db, program, "E")),
+        Some(&ConstValue::Int(3))
+    );
+}
+
+#[test]
 fn evaluates_a_game_end_to_end() {
     let (db, program) = setup_at("/game/main.kix", GAME);
     let diags: Vec<String> = check(&db, program)

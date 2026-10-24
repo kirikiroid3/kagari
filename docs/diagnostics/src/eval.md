@@ -76,17 +76,13 @@ Fix: use an index below the length, such as `a[1]`.
 
 ## E4006 `const-cycle`
 
-**Error.** The value of a `const` depends on itself, directly or through other constants.
+**Error.** The value of a `const` depends on itself, directly or through other constants, so
+it cannot be computed at compile time. Each cycle is reported once, at the constant whose
+evaluation closed it.
 
 ```kis
-struct Wrap<T> { value: T }
-
-impl<T> Wrap<T> {
-    const A: u32 = Wrap::<T>::B + 1;
-    const B: u32 = Wrap::<T>::A;
-}
-
-const USE: u32 = Wrap::<bool>::A;
+const A: u32 = B + 1;
+const B: u32 = A;
 ```
 
 Fix: break the cycle by giving one of the constants a value that does not refer back, such as `const B: u32 = 0;`.
