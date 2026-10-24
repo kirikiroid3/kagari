@@ -3,31 +3,31 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/script/010__type_errors/main.kix
 ---
-script/010__type_errors/main.kix:22:23: error[type/mismatched-types]: mismatched types: expected `bool`, found `Ending`
-script/010__type_errors/main.kix:28:18: error[type/mismatched-types]: mismatched types: expected `u32`, found `bool`
-script/010__type_errors/main.kix:29:5: error[type/mismatched-types]: mismatched types: expected `bool`, found `{integer}`
-script/010__type_errors/main.kix:34:20: error[type/divisor-may-be-zero]: the divisor's range `Int<0, 5>` contains 0; narrow its type first
-script/010__type_errors/main.kix:35:17: error[type/int-mix]: cannot mix `Int<0, 5>` and `u32`; convert one side with `.into()` or `.saturate()`
-script/010__type_errors/main.kix:36:5: error[type/mismatched-types]: mismatched types: expected `Int<0, 5>`, found `Int<1, 8>`
-script/010__type_errors/main.kix:40:21: error[type/literal-out-of-range]: literal out of range for `u8`: `300` does not fit
-script/010__type_errors/main.kix:41:30: error[type/literal-out-of-range]: literal out of range for `Int<0, 5>`: `6` does not fit
-script/010__type_errors/main.kix:46:9: error[type/literal-out-of-range]: literal out of range for `u8`: `300` does not fit
-script/010__type_errors/main.kix:48:13: error[type/literal-out-of-range]: literal out of range for `Int<0, 5>`: `7` does not fit
-script/010__type_errors/main.kix:55:20: error[type/lossy-into]: `u32` does not always fit in `u8`; use `.saturate()` to clamp it
-script/010__type_errors/main.kix:58:16: error[type/as-cast]: there are no `as` casts; use `.into()` or `.saturate()`
-script/010__type_errors/main.kix:59:28: error[type/lossy-into]: `Int<0, 5>` does not always fit in `Int<0, 3>`; use `.saturate()` to clamp it
-script/010__type_errors/main.kix:63:19: error[type/missing-field]: missing field `y` in initializer of `Point`
-script/010__type_errors/main.kix:64:42: error[type/unknown-field]: `Point` has no field named `z`
-script/010__type_errors/main.kix:65:5: error[type/unknown-field]: no field `z` on type `Point`
-script/010__type_errors/main.kix:69:5: error[type/unknown-method]: no method named `frobnicate` found for `Point`
-script/010__type_errors/main.kix:74:5: error[type/not-eq]: `==` needs `Eq`, but closures such as `Fn() -> u32` are never `Eq`
-script/010__type_errors/main.kix:78:5: error[type/wrong-arity]: this function takes 1 argument but 2 were supplied
-script/010__type_errors/main.kix:86:5: error[type/unsatisfied-bound]: the trait bound `Fn() -> u32: Eq` is not satisfied
-script/010__type_errors/main.kix:90:16: error[type/bad-nav-start]: the first argument of `nav::start` must name an `#[entry]` scene
-script/010__type_errors/main.kix:91:23: error[type/mismatched-types]: mismatched types: expected `bool`, found `u32`
-script/010__type_errors/main.kix:95:33: error[type/asset-path-not-literal]: the path of `asset` must be a string literal
-script/010__type_errors/main.kix:98:16: error[type/annotations-needed]: type annotations needed: cannot infer the type `Vec<_>`
-script/010__type_errors/main.kix:102:5: error[type/mismatched-types]: mismatched types: expected `u32`, found `()`
+script/010__type_errors/main.kix:22:23: error[E2001]: mismatched types: expected `bool`, found `Ending`
+script/010__type_errors/main.kix:28:18: error[E2001]: mismatched types: expected `u32`, found `bool`
+script/010__type_errors/main.kix:29:5: error[E2001]: mismatched types: expected `bool`, found `{integer}`
+script/010__type_errors/main.kix:34:20: error[E2016]: the divisor's range `Int<0, 5>` contains 0; narrow its type first
+script/010__type_errors/main.kix:35:17: error[E2014]: cannot mix `Int<0, 5>` and `u32`; convert one side with `.into()` or `.saturate()`
+script/010__type_errors/main.kix:36:5: error[E2001]: mismatched types: expected `Int<0, 5>`, found `Int<1, 8>`
+script/010__type_errors/main.kix:40:21: error[E2013]: literal out of range for `u8`: `300` does not fit
+script/010__type_errors/main.kix:41:30: error[E2013]: literal out of range for `Int<0, 5>`: `6` does not fit
+script/010__type_errors/main.kix:46:9: error[E2013]: literal out of range for `u8`: `300` does not fit
+script/010__type_errors/main.kix:48:13: error[E2013]: literal out of range for `Int<0, 5>`: `7` does not fit
+script/010__type_errors/main.kix:55:20: error[E2018]: `u32` does not always fit in `u8`; use `.saturate()` to clamp it
+script/010__type_errors/main.kix:58:16: error[E2019]: there are no `as` casts; use `.into()` or `.saturate()`
+script/010__type_errors/main.kix:59:28: error[E2018]: `Int<0, 5>` does not always fit in `Int<0, 3>`; use `.saturate()` to clamp it
+script/010__type_errors/main.kix:63:19: error[E2021]: missing field `y` in initializer of `Point`
+script/010__type_errors/main.kix:64:42: error[E2020]: `Point` has no field named `z`
+script/010__type_errors/main.kix:65:5: error[E2020]: no field `z` on type `Point`
+script/010__type_errors/main.kix:69:5: error[E2022]: no method named `frobnicate` found for `Point`
+script/010__type_errors/main.kix:74:5: error[E2017]: `==` needs `Eq`, but closures such as `Fn() -> u32` are never `Eq`
+script/010__type_errors/main.kix:78:5: error[E2024]: this function takes 1 argument but 2 were supplied
+script/010__type_errors/main.kix:86:5: error[E2026]: the trait bound `Fn() -> u32: Eq` is not satisfied
+script/010__type_errors/main.kix:90:16: error[E2027]: the first argument of `nav::start` must name an `#[entry]` scene
+script/010__type_errors/main.kix:91:23: error[E2001]: mismatched types: expected `bool`, found `u32`
+script/010__type_errors/main.kix:95:33: error[E2028]: the path of `asset` must be a string literal
+script/010__type_errors/main.kix:98:16: error[E2029]: type annotations needed: cannot infer the type `Vec<_>`
+script/010__type_errors/main.kix:102:5: error[E2001]: mismatched types: expected `u32`, found `()`
 --- resolutions ---
 script/010__type_errors/main.kix:3:19 u32 -> prim u32
 script/010__type_errors/main.kix:3:27 u32 -> prim u32

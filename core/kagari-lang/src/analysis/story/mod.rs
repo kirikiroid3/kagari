@@ -16,8 +16,11 @@
 mod cfg;
 mod exec;
 mod explore;
+mod keyframes;
 mod screens;
 mod termination;
+#[cfg(test)]
+mod tests;
 
 use rustc_hash::FxHashMap;
 
@@ -33,12 +36,8 @@ use crate::signatures::program_signatures;
 
 use cfg::StoryBody;
 
-/// The most states the exploration may visit (*tentative*: a compiler setting). More is
-/// `analysis/too-many-states`.
-pub const STATE_CAP: usize = 200_000;
-
 /// The most distinct screens that may reach one step (*tentative*: the cap is an open
-/// question). A render that makes a step's set grow past it is `analysis/unbounded-screens`.
+/// question). A render that makes a step's set grow past it is `E5005`.
 pub const SCREEN_CAP: usize = 64;
 
 /// A lowered scene.
@@ -109,7 +108,7 @@ pub(super) fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
                     let Some(b) = ctx.body(item) else {
                         continue;
                     };
-                    let body = cfg::lower(b, sigs, std.push_step);
+                    let body = cfg::lower(b, sigs, std.push_step, std.rng_choose);
                     scenes.index.insert(item, scenes.list.len());
                     scenes.list.push(SceneData {
                         item,
@@ -131,6 +130,9 @@ pub(super) fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
     if let Some(explored) = explored {
         screens::check(db, &ctx, &scenes, &explored, &mut out);
         explored.report_reachability(db, &scenes, &mut out);
+        if program.options(db).keyframe_check {
+            out.extend(keyframes::check(db, program, &explored, &scenes));
+        }
     }
     out
 }

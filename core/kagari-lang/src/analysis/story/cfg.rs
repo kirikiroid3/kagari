@@ -19,7 +19,7 @@ use crate::infer::ValueRef;
 use crate::item_tree::{FnKind, ItemId};
 use crate::resolve::LocalId;
 use crate::signatures::ProgramSignatures;
-use crate::ty::{FnDefId, FnRef, Ty};
+use crate::ty::{FnDefId, FnRef, GenericArg, Ty};
 
 pub(super) type BlockId = usize;
 pub(super) type Slot = usize;
@@ -135,6 +135,14 @@ pub(super) enum Term {
         dest: Option<Slot>,
         next: BlockId,
     },
+    /// `rng_choose::<T>()`, the call `expr`; resumes at `next` with the drawn value of `ty`
+    /// in `dest`.
+    Rng {
+        expr: ExprId,
+        ty: Ty,
+        dest: Option<Slot>,
+        next: BlockId,
+    },
     /// A scene call; resumes at `next` with the return value in `dest` and the final
     /// values of the callee's `&mut` parameters in `outs`.
     Call {
@@ -230,7 +238,9 @@ impl StoryBody {
             Term::Goto(next) => vec![*next],
             Term::If { then, other, .. } | Term::Test { then, other, .. } => vec![*then, *other],
             Term::ForNext { body, exit, .. } => vec![*body, *exit],
-            Term::Step { next, .. } | Term::Call { next, .. } => vec![*next],
+            Term::Step { next, .. } | Term::Rng { next, .. } | Term::Call { next, .. } => {
+                vec![*next]
+            }
             Term::Return { .. } | Term::Unreachable => Vec::new(),
         }
     }
@@ -244,11 +254,17 @@ enum SceneCall {
     Method(FnRef),
 }
 
-pub(super) fn lower(b: BodyRef<'_>, sigs: &ProgramSignatures, push_step: ItemId) -> StoryBody {
+pub(super) fn lower(
+    b: BodyRef<'_>,
+    sigs: &ProgramSignatures,
+    push_step: ItemId,
+    rng_choose: ItemId,
+) -> StoryBody {
     let mut lowerer = Lowerer {
         b,
         sigs,
         push_step,
+        rng_choose,
         structural: FxHashSet::default(),
         body: StoryBody {
             slots: Vec::new(),
@@ -280,6 +296,7 @@ struct Lowerer<'a, 'db> {
     b: BodyRef<'db>,
     sigs: &'a ProgramSignatures,
     push_step: ItemId,
+    rng_choose: ItemId,
     /// Expressions that contain a step, a scene call, a `loop` or a `while`.
     structural: FxHashSet<ExprId>,
     body: StoryBody,
@@ -310,6 +327,7 @@ impl Lowerer<'_, '_> {
             }
             let own = matches!(data, Expr::Loop { .. } | Expr::While { .. })
                 || self.is_step(expr)
+                || self.is_rng(expr).is_some()
                 || self.scene_call(expr).is_some();
             if own || children(data).iter().any(|c| self.structural.contains(c)) {
                 self.structural.insert(expr);
@@ -326,6 +344,27 @@ impl Lowerer<'_, '_> {
                 self.b.infer.paths.get(callee),
                 Some(ValueRef::Fn(FnRef { def: FnDefId::Item(item), .. })) if *item == self.push_step
             )
+    }
+
+    /// The type drawn when `expr` is `rng_choose::<T>()`.
+    fn is_rng(&self, expr: ExprId) -> Option<Ty> {
+        let Expr::Call { callee, args } = self.expr(expr) else {
+            return None;
+        };
+        if !args.is_empty() {
+            return None;
+        }
+        match self.b.infer.paths.get(callee) {
+            Some(ValueRef::Fn(FnRef {
+                def: FnDefId::Item(item),
+                args,
+                ..
+            })) if *item == self.rng_choose => match args.first() {
+                Some(GenericArg::Type(ty)) => Some(ty.clone()),
+                _ => None,
+            },
+            _ => None,
+        }
     }
 
     fn is_scene(&self, item: ItemId) -> bool {
@@ -838,6 +877,17 @@ impl Lowerer<'_, '_> {
                 });
                 self.cur = Some(next);
             }
+            Expr::Call { .. } if self.is_rng(expr).is_some() => {
+                let ty = self.is_rng(expr).unwrap_or(Ty::Error);
+                let next = self.new_block();
+                self.terminate(Term::Rng {
+                    expr,
+                    ty,
+                    dest,
+                    next,
+                });
+                self.cur = Some(next);
+            }
             _ => match self.scene_call(expr) {
                 Some(call) => self.lower_scene_call(expr, call, dest),
                 None => self.lower_hoisted(expr, dest),
@@ -1320,6 +1370,13 @@ fn liveness(body: &StoryBody, uses: &Uses<'_, '_>) -> FxHashMap<BlockId, SlotSet
                     live.insert(*arg);
                     live
                 }
+                Term::Rng { dest, next, .. } => {
+                    let mut live = get(&live_in, *next);
+                    if let Some(dest) = dest {
+                        live.remove(*dest);
+                    }
+                    live
+                }
                 Term::Call {
                     callee,
                     args,
@@ -1388,6 +1445,13 @@ fn liveness(body: &StoryBody, uses: &Uses<'_, '_>) -> FxHashMap<BlockId, SlotSet
                     live.remove(*dest);
                 }
                 live.insert(*arg);
+                kept.insert(index, live);
+            }
+            Term::Rng { dest, next, .. } => {
+                let mut live = get(&live_in, *next);
+                if let Some(dest) = dest {
+                    live.remove(*dest);
+                }
                 kept.insert(index, live);
             }
             Term::Call {

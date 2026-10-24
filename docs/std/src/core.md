@@ -19,6 +19,19 @@ the traits, and the asset types. `std::time` declares `Duration`.
 |`Rat`|Exact rationals|
 |`Decimal`|Exact decimals, written as literals like `0.5`; the replacement for floats and the type of every fraction in `std`|
 
+```kis
+impl Rat {
+    /// `num / den` in lowest terms; `den == 0` is a division by zero.
+    #[builtin] pub const fn new(num: i128, den: i128) -> Rat;
+    /// This value as a `Decimal`: the integer part and at most 7 digits after the point,
+    /// truncated toward zero.
+    #[builtin] pub const fn to_decimal(self) -> Decimal;
+}
+```
+
+`Rat` has no literal: `Rat::new(1, 3)` is one third. `Rat::new(1, 3).to_decimal()` is `0.3333333`.
+`Decimal / Decimal` is exact, then truncated to 7 digits after the point the same way.
+
 `Int<lo, hi>`, the Rust primitive integers (`u8` … `u128`, `i8` … `i128`, `usize`, `isize`) and
 `bool` are language types, not std items. `Int<lo, hi>` holds the integers `lo..=hi` and is the
 only integer type the story may hold at runtime. The syntax reference describes the numeric types
@@ -74,6 +87,7 @@ The prelude also imports the variants: `None`, `Some`, `Ok`, `Err`.
 |`Asset`|`std`|Types whose values are exactly the asset constants of the program|
 |`Step`|`std::narrative`|Types that `push_step` can suspend on; see [Narrative](./narrative.md)|
 |`ToText`|`std::narrative::text`|Types a `{expr}` item of `t![…]` may interpolate; see [Text](./text.md#interpolation)|
+|`RandChoose`|`std`|Types `rng_choose` can draw: fieldless enums (implicitly) and `Int<lo, hi>`; see [Narrative](./narrative.md#rng_choose)|
 
 ```kis
 /// Types with structural equality.
@@ -87,6 +101,7 @@ impl Eq for AudioAsset {}
 impl Eq for VoiceAsset {}
 impl Eq for VideoAsset {}
 impl Eq for FontAsset {}
+impl Eq for ShaderAsset {}
 impl Eq for narrative::Text {}
 impl Eq for screen::Screen {}
 
@@ -97,6 +112,9 @@ impl Eq for screen::Screen {}
     /// This value clamped to the range of `T`.
     const fn saturate<T: Integer>(self) -> T;
 }
+/// Types a story can draw at random: fieldless enums and `Int<lo, hi>`.
+#[builtin] pub trait RandChoose {}
+impl<const LO: i64, const HI: i64> RandChoose for Int<LO, HI> {}
 /// Types whose values are exactly the asset constants of the program.
 #[builtin] pub trait Asset {}
 ```
@@ -121,11 +139,14 @@ compile error. `saturate` clamps, so `300u32.saturate()` into `u8` is `255`.
 #[builtin] pub struct VoiceAsset;
 #[builtin] pub struct VideoAsset;
 #[builtin] pub struct FontAsset;
+/// A WGSL shader file (`.wgsl`): a filter, or generated content such as weather or particles.
+#[builtin] pub struct ShaderAsset;
 impl Asset for ImageAsset {}
 impl Asset for AudioAsset {}
 impl Asset for VoiceAsset {}
 impl Asset for VideoAsset {}
 impl Asset for FontAsset {}
+impl Asset for ShaderAsset {}
 
 #[builtin] pub const fn asset<A: Asset>(path: narrative::Text) -> A;
 ```
@@ -137,6 +158,7 @@ impl Asset for FontAsset {}
 |`VoiceAsset`|`Say::voice`|
 |`VideoAsset`|movie layers|
 |`FontAsset`|`TextEffect::font`, `TextStyle::font`|
+|`ShaderAsset`|`Screen::filter`, `Entity::filter`, `Entity::shader` (`.wgsl` files)|
 
 An asset is declared as a constant:
 

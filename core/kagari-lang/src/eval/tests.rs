@@ -13,7 +13,8 @@ use super::domain::DomainCtx;
 use super::interp::{Ctx, EvalError, Frame, Machine, Place, Value};
 use super::num::{self, Decimal, Rat};
 use super::screen::{
-    ChannelId, EntityProp, LayerTarget, PendingChange, PropTarget, Screen, Target,
+    ChannelId, EntityProp, LayerTarget, PendingChange, PropTarget, Scheduled, ScheduledKind,
+    Screen, Target,
 };
 use super::std_items::{Builtin, StdTable};
 use super::value::{AssetKind, ConstValue, Text};
@@ -41,6 +42,7 @@ fn setup_at(main: &str, source: &str) -> (RootDatabase, Program) {
     let mut files = FxHashMap::default();
     files.insert(PathBuf::from(main), source.to_owned());
     files.insert(PathBuf::from("/game/a.png"), String::new());
+    files.insert(PathBuf::from("/game/sepia.wgsl"), String::new());
     let db = RootDatabase::new(Arc::new(MemoryFileSystem(files)));
     let program = db.program(FilePath::disk(main));
     (db, program)
@@ -282,7 +284,11 @@ fn decimal_arithmetic() {
         Some(std::cmp::Ordering::Less)
     );
     assert_eq!(dec("1").checked_div(dec("4")), Ok(dec("0.25")));
-    assert_eq!(dec("1").checked_div(dec("3")), Err(false));
+    assert_eq!(dec("1").checked_div(dec("3")), Ok(dec("0.3333333")));
+    assert_eq!(
+        dec("2").checked_neg().unwrap().checked_div(dec("3")),
+        dec("0.6666666").checked_neg().ok_or(false)
+    );
     assert_eq!(dec("1").checked_div(dec("0.0")), Err(true));
     assert!(dec("0.0").is_fraction() && dec("1.0").is_fraction() && dec("0.7").is_fraction());
     assert!(!dec("1.01").is_fraction());
@@ -304,7 +310,11 @@ fn rat_arithmetic() {
     assert_eq!(half.checked_div(third), Rat::new(3, 2));
     assert_eq!(third.checked_cmp(half), Some(std::cmp::Ordering::Less));
     assert_eq!(Rat::new(1, 8).unwrap().to_decimal(), Some(dec("0.125")));
-    assert_eq!(third.to_decimal(), None);
+    assert_eq!(third.to_decimal(), Some(dec("0.3333333")));
+    assert_eq!(
+        Rat::new(-2, 3).unwrap().to_decimal(),
+        dec("0.6666666").checked_neg()
+    );
     assert_eq!(Rat::from_decimal(dec("0.75")), Rat::new(3, 4));
     assert_eq!(Rat::new(-3, 4).unwrap().to_string(), "-3/4");
     assert_eq!(Rat::from_int(5).to_string(), "5");
@@ -423,7 +433,7 @@ fn pending_changes_need_an_animation() {
         ConstValue::Decimal(Decimal::ONE),
     );
     // Making the change does nothing by itself.
-    Screen::check_change(&change, &std).unwrap();
+    Screen::check_change(&change).unwrap();
     assert_eq!(opacity(&screen, 3), ConstValue::Decimal(Decimal::ZERO));
     screen
         .commit(change, tween(&std, linear(&std)), &std)
@@ -459,6 +469,39 @@ fn pending_changes_need_an_animation() {
         .unwrap();
     assert_eq!(screen.step.scheduled.len(), scheduled);
     assert_eq!(screen.channel(ChannelId::Music).track, Some(track));
+}
+
+#[test]
+fn replay_bgm_restarts_the_track() {
+    let (db, program) = setup("");
+    let std = std_table(&db, program);
+    // Without a track there is nothing to restart.
+    let mut silent = Screen::empty(&std);
+    silent.replay_music().unwrap();
+    assert!(silent.step.scheduled.is_empty());
+
+    let mut screen = Screen::empty(&std);
+    let track = ConstValue::Tuple(vec![ConstValue::Int(1)]);
+    screen
+        .commit(
+            PendingChange::Channel(ChannelId::Music, Some(track)),
+            ConstValue::unit(),
+            &std,
+        )
+        .unwrap();
+    let carried = screen.clone();
+    screen.replay_music().unwrap();
+    let replays: Vec<&Scheduled> = screen
+        .step
+        .scheduled
+        .iter()
+        .skip(carried.step.scheduled.len())
+        .collect();
+    assert_eq!(replays.len(), 1);
+    assert_eq!(replays[0].kind, ScheduledKind::ReplayMusic);
+    assert_eq!(replays[0].target, Some(Target::Channel(ChannelId::Music)));
+    // The logical screen is unchanged, so the screens compare equal.
+    assert_eq!(screen, carried);
 }
 
 fn hash_of(screen: &Screen) -> u64 {
@@ -683,7 +726,7 @@ fn fraction_rules() {
     let (db, program) = setup("");
     let std = std_table(&db, program);
     let decimal = |text: &str| ConstValue::Decimal(dec(text));
-    let check = |change: PendingChange| Screen::check_change(&change, &std).map_err(|f| f.code);
+    let check = |change: PendingChange| Screen::check_change(&change).map_err(|f| f.code);
     let opacity = |value| PendingChange::Prop(PropTarget::Entity(1, EntityProp::Opacity), value);
     assert_eq!(check(opacity(decimal("1.0"))), Ok(()));
     assert_eq!(
@@ -695,43 +738,6 @@ fn fraction_rules() {
     assert_eq!(
         check(volume(ConstValue::Decimal(
             dec("0.1").checked_neg().unwrap()
-        ))),
-        Err(DiagnosticCode::EvalFractionOutOfRange)
-    );
-    let filter = |grayscale: &str, brightness: ConstValue| {
-        let values = [
-            ("grayscale", decimal(grayscale)),
-            ("sepia", decimal("0.0")),
-            ("brightness", brightness),
-            ("contrast", decimal("1.0")),
-            ("saturation", decimal("1.0")),
-            ("blur", ConstValue::Int(0)),
-        ];
-        std.filter.make(
-            std.filter
-                .fields
-                .iter()
-                .map(|field| {
-                    values
-                        .iter()
-                        .find(|(name, _)| name == field)
-                        .unwrap()
-                        .1
-                        .clone()
-                })
-                .collect(),
-        )
-    };
-    let screen_filter = |value| PendingChange::Prop(PropTarget::ScreenFilter, value);
-    assert_eq!(check(screen_filter(filter("0.5", decimal("2.0")))), Ok(()));
-    assert_eq!(
-        check(screen_filter(filter("1.5", decimal("1.0")))),
-        Err(DiagnosticCode::EvalFractionOutOfRange)
-    );
-    assert_eq!(
-        check(screen_filter(filter(
-            "0.0",
-            ConstValue::Decimal(dec("1").checked_neg().unwrap())
         ))),
         Err(DiagnosticCode::EvalFractionOutOfRange)
     );
@@ -1125,8 +1131,8 @@ fn integer_overflow_and_division() {
         Ok(ConstValue::Int(0x38))
     );
     assert_eq!(
-        fault_code(eval_item("const E: Decimal = 1.0 / 3.0;", "E")),
-        DiagnosticCode::EvalInexactDivision
+        eval_item("const E: Decimal = 1.0 / 3.0;", "E"),
+        Ok(ConstValue::Decimal(dec("0.3333333")))
     );
     assert_eq!(
         eval_item("const E: Decimal = 0.5 * 0.5 + 0.25;", "E"),
@@ -1770,7 +1776,6 @@ fn overflow_in_duration_code_is_a_duration_overflow() {
 // ----- End to end, with inference ------------------------------------------------------
 
 const GAME: &str = "
-use std::screen::{Filter, NO_FILTER};
 use std::stage::{Character, character};
 
 const A: EntityId = EntityId(3);
@@ -1778,7 +1783,7 @@ const IMG: ImageAsset = asset(\"a.png\");
 const D: Duration = secs(2).plus(ms(250)).times(2).div(3);
 const J: Motion = jump(20, ms(300));
 const Q: Motion = quake(8, 4, ms(200));
-const SEPIA: Filter = NO_FILTER.sepia(0.8).blur(3);
+const SEPIA: ShaderAsset = asset(\"sepia.wgsl\");
 const COLOR: Color = hex(0x382010);
 static PETALS: Setting<bool> = setting(true);
 static mut DAY: Int<1, 3> = 2;
@@ -1807,7 +1812,7 @@ const fn petals(mut screen: Screen) -> Screen {
     screen.entity(A).image().change(IMG).apply_animation(fade(ms(500)));
     screen.entity(A).apply_animation(J);
     screen.camera().apply_animation(Q);
-    screen.filter().change(SEPIA).apply_animation(tween(D));
+    screen.filter().change(Some(SEPIA)).apply_animation(tween(D));
     CH.show(&mut screen, IMG, point(100, 200), tween(ms(300)));
     screen
 }
@@ -1864,6 +1869,25 @@ fn deep_recursion_grows_the_stack() {
 }
 
 #[test]
+fn rat_builtins() {
+    let source = "
+        const R: Rat = Rat::new(2, -4);
+        const D: Decimal = Rat::new(1, 3).to_decimal();
+        const Z: Rat = Rat::new(1, 0);
+    ";
+    let (db, program) = setup(source);
+    let eval = const_eval(&db, program);
+    let value = |name: &str| eval.consts.get(&item(&db, program, name)).cloned();
+    assert_eq!(
+        value("R").map(|value| display_value(&db, &value)),
+        Some("-1/2".to_owned())
+    );
+    assert_eq!(value("D"), Some(ConstValue::Decimal(dec("0.3333333"))));
+    let codes: Vec<DiagnosticCode> = eval.diagnostics.iter().map(|diag| diag.code).collect();
+    assert_eq!(codes, vec![DiagnosticCode::EvalDivisionByZero]);
+}
+
+#[test]
 fn evaluates_a_game_end_to_end() {
     let (db, program) = setup_at("/game/main.kix", GAME);
     let diags: Vec<String> = check(&db, program)
@@ -1913,11 +1937,11 @@ fn evaluates_a_game_end_to_end() {
     );
     assert_eq!(entity.opacity, ConstValue::Decimal(Decimal::ONE));
     assert_eq!(
-        screen
-            .logical
-            .filter
-            .field(std.filter.field("sepia").unwrap()),
-        Some(&ConstValue::Decimal(dec("0.8")))
+        screen.logical.filter,
+        std.some(ConstValue::Asset {
+            kind: AssetKind::Shader,
+            path: FilePath::disk("/game/sepia.wgsl"),
+        })
     );
     let motions = screen
         .step

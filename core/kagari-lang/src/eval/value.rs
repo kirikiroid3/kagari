@@ -106,7 +106,7 @@ impl ConstValue {
     }
 }
 
-/// The five asset types.
+/// The six asset types.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum AssetKind {
     Image,
@@ -114,15 +114,17 @@ pub enum AssetKind {
     Voice,
     Video,
     Font,
+    Shader,
 }
 
 impl AssetKind {
-    pub const ALL: [AssetKind; 5] = [
+    pub const ALL: [AssetKind; 6] = [
         AssetKind::Image,
         AssetKind::Audio,
         AssetKind::Voice,
         AssetKind::Video,
         AssetKind::Font,
+        AssetKind::Shader,
     ];
 
     /// The std type name, e.g. `ImageAsset`.
@@ -133,6 +135,7 @@ impl AssetKind {
             AssetKind::Voice => "VoiceAsset",
             AssetKind::Video => "VideoAsset",
             AssetKind::Font => "FontAsset",
+            AssetKind::Shader => "ShaderAsset",
         }
     }
 }

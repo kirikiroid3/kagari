@@ -7,12 +7,13 @@ use std::path::Path as FsPath;
 use kagari_syntax::{TextRange, TextSize};
 
 use crate::db::Db;
-use crate::def_map::{CrateId, Def, DefMaps, ModuleId, Resolution, TypeKey, def_maps};
+use crate::def_map::{CrateId, Def, DefMaps, Resolution, def_maps};
 use crate::diagnostic::line_col;
 use crate::eval::{RenderId, const_eval};
 use crate::hir::{Body, Expr, ExprStore, Name, Pat, PathKind, TypeRef, file_hir};
 use crate::input::{FilePath, Program, SourceFile};
-use crate::item_tree::{ItemId, ItemKind, ItemParent, item_tree};
+use crate::item_tree::{ItemId, item_tree};
+use crate::paths;
 use crate::resolve::{BodyResolution, StoreResolution, file_resolution};
 
 /// For each game-crate file (sorted by path) and each resolved path, in source order:
@@ -232,13 +233,13 @@ impl Dumper<'_> {
             Resolution::SelfType(_) => "Self".to_owned(),
             Resolution::Assoc(item) => {
                 let kind = self.item_kind(*item);
-                format!("{kind} {}", self.assoc_path(*item))
+                format!("{kind} {}", paths::assoc_path(self.db, self.maps, *item))
             }
             Resolution::Deferred { base, rest } => {
                 let base = match base.as_ref() {
                     Resolution::GenericParam { owner, index } => self.generic_name(*owner, *index),
                     Resolution::SelfType(_) => Name::new_static("Self"),
-                    Resolution::Def(def) => Name::new(self.def_path(*def)),
+                    Resolution::Def(def) => Name::new(paths::def_path(self.db, self.maps, *def)),
                     _ => Name::new_static("?"),
                 };
                 let rest: Vec<&str> = rest.iter().map(Name::as_str).collect();
@@ -254,7 +255,7 @@ impl Dumper<'_> {
             Def::Variant { .. } => "variant",
             Def::Item(item) => self.item_kind(item),
         };
-        format!("{kind} {}", self.def_path(def))
+        format!("{kind} {}", paths::def_path(self.db, self.maps, def))
     }
 
     fn item_kind(&self, item: ItemId) -> &'static str {
@@ -270,76 +271,5 @@ impl Dumper<'_> {
             .and_then(Option::as_ref)
             .and_then(|signature| signature.generics.get(index as usize))
             .map_or_else(|| Name::new_static("?"), |param| param.name.clone())
-    }
-
-    fn module_path(&self, module: ModuleId) -> String {
-        let mut parts = Vec::new();
-        let mut current = Some(module);
-        while let Some(id) = current {
-            let data = self.maps.module(id);
-            match (&data.name, data.parent) {
-                (_, None) => parts.push(match id.krate {
-                    CrateId::Game => "crate".to_owned(),
-                    CrateId::Std => "std".to_owned(),
-                }),
-                (Some(name), Some(_)) => parts.push(name.to_string()),
-                (None, Some(_)) => parts.push("{block}".to_owned()),
-            }
-            current = data.parent;
-        }
-        parts.reverse();
-        parts.join("::")
-    }
-
-    fn def_path(&self, def: Def) -> String {
-        match def {
-            Def::Module(module) => self.module_path(module),
-            Def::Item(item) => self.item_path(item),
-            Def::Variant { enum_item, index } => {
-                let tree = item_tree(self.db, enum_item.file);
-                let variant = match tree.item(enum_item.index).map(|data| &data.kind) {
-                    Some(ItemKind::Enum { variants }) => variants
-                        .get(index as usize)
-                        .map_or_else(|| "?".to_owned(), |(name, _, _)| name.to_string()),
-                    _ => "?".to_owned(),
-                };
-                format!("{}::{variant}", self.item_path(enum_item))
-            }
-        }
-    }
-
-    fn item_path(&self, item: ItemId) -> String {
-        let tree = item_tree(self.db, item.file);
-        let name = tree
-            .item(item.index)
-            .and_then(|data| data.name.clone())
-            .unwrap_or_default();
-        let module = self.maps.module_of_item(self.db, item);
-        format!("{}::{name}", self.module_path(module))
-    }
-
-    /// `{type path}::{name}` for impl items, `{trait path}::{name}` for trait items.
-    fn assoc_path(&self, item: ItemId) -> String {
-        let tree = item_tree(self.db, item.file);
-        let Some(data) = tree.item(item.index) else {
-            return "?".to_owned();
-        };
-        let name = data.name.clone().unwrap_or_default();
-        let ItemParent::Item(parent) = data.parent else {
-            return self.item_path(item);
-        };
-        let parent = ItemId {
-            file: item.file,
-            index: parent,
-        };
-        let owner = match tree.item(parent.index).map(|data| &data.kind) {
-            Some(ItemKind::Trait { .. }) => self.item_path(parent),
-            _ => match self.maps.impl_keys.get(&parent) {
-                Some(TypeKey::Item(target)) => self.item_path(*target),
-                Some(TypeKey::Prim(prim)) => prim.name().to_owned(),
-                None => "?".to_owned(),
-            },
-        };
-        format!("{owner}::{name}")
     }
 }

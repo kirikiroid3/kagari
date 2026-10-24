@@ -6,6 +6,7 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
+kagari-bytecode = { workspace = true }
 kagari-syntax = { workspace = true }
 kagari-std = { workspace = true }
 rowan = { workspace = true }

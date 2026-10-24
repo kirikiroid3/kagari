@@ -63,7 +63,7 @@ character, so a misspelled face is a resolve error and a missing file is an asse
 ```kix
 use std::narrative::Mark;
 use std::narrative::text::{speed, text_style};
-use std::screen::{BOTTOM_CENTER, BlendMode, NO_FILTER};
+use std::screen::{BOTTOM_CENTER, BlendMode};
 use std::stage::{hide_all, side_face};
 
 const HANAKO: Character = character(EntityId(1)).offset(offset(0, 40)).anchor(BOTTOM_CENTER);
@@ -74,6 +74,8 @@ mod HANAKO {
     pub const ANGRY: ImageAsset = asset("hanako_angry.png");
     pub const SURPRISED: ImageAsset = asset("hanako_surprised.png");
 }
+
+const MEMORY: ShaderAsset = asset("memory.wgsl");
 
 const LEFT: Point = point(320, 720);
 const CENTER: Point = point(640, 720);
@@ -162,16 +164,16 @@ does the same without an entity.
 
 ### Flashback
 
-A colour-blend fill over the stage plus a sepia screen filter:
+A colour-blend fill over the stage plus a shader screen filter:
 
 ```kix
-/// Tints the stage with a colour blend and sepia, for a memory.
+/// Tints the stage with a colour blend and a shader filter, for a memory.
 const fn flashback(mut screen: Screen) -> Screen {
     screen.entity(TINT).set_plane(Plane::Front);
     screen.entity(TINT).set_blend(BlendMode::Color);
     screen.entity(TINT).fill().change(hex(0x382000)).apply_animation(instant());
     screen.entity(TINT).opacity().change(0.6).apply_animation(tween(ms(800)));
-    screen.filter().change(NO_FILTER.sepia(0.5)).apply_animation(tween(ms(800)));
+    screen.filter().change(Some(MEMORY)).apply_animation(tween(ms(800)));
     screen
 }
 
@@ -179,7 +181,7 @@ const fn flashback(mut screen: Screen) -> Screen {
 const fn flashback_end(mut screen: Screen) -> Screen {
     screen.entity(TINT).opacity().change(0.0).apply_animation(tween(ms(800)));
     screen.despawn(TINT);
-    screen.filter().change(NO_FILTER).apply_animation(tween(ms(800)));
+    screen.filter().change(None).apply_animation(tween(ms(800)));
     screen
 }
 ```

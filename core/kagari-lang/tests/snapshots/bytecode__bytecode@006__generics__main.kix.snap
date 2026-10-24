@@ -1,0 +1,124 @@
+---
+source: core/kagari-lang/tests/bytecode.rs
+expression: out
+input_file: core/kagari-lang/tests/bytecode/006__generics/main.kix
+---
+006__generics/main.kix:60:4: warning[W6001]: the game is never started: no reachable mode calls `nav::start` or `nav::load`
+--- bytecode ---
+fn crate::styled [fn] params=0 regs=7
+  0000 CALL r1, (), std::narrative::text::bold
+  0001 INT r4, 255
+  0002 INT r5, 0
+  0003 INT r6, 0
+  0004 CALL r3, (r4, r5, r6), std::screen::rgb
+  0005 CALL r2, (r3), std::narrative::text::color_text
+  0006 CALL r0, (r1, r2), std::narrative::text::TextEffect::and
+  0007 RET r0
+
+fn crate::main [fn, main] params=0 regs=28
+  0000 CONST r1, #12 "Generics"
+  0001 INT r11, 1280
+  0002 INT r12, 720
+  0003 CALL r2, (r11, r12), std::screen::size
+  0004 FUNC r3, crate::Title
+  0005 FUNC r4, crate::GameView
+  0006 INT r5, 20
+  0007 INT r6, 3
+  0008 INT r7, 200
+  0009 INT r13, 26
+  0010 CONST r14, #14 std::screen::Color {255, 255, 255, 255}
+  0011 CALL r8, (r13, r14), std::narrative::text::text_style
+  0012 CONST r15, #15 crate::TEXT_SPEED
+  0013 CONST r16, #16 crate::AUTO_DELAY
+  0014 CONST r17, #17 crate::AUTO_DELAY_PER_CHAR
+  0015 CONST r18, #18 crate::SKIP_UNREAD
+  0016 CONST r19, #19 crate::MASTER
+  0017 CONST r20, #20 crate::MUSIC
+  0018 CONST r21, #21 crate::SOUND
+  0019 CONST r22, #22 crate::VOICE
+  0020 CONST r23, #23 crate::VOICE_SUSTAIN
+  0021 CONST r24, #24 crate::WAIT_FOR_VOICE
+  0022 CONST r25, #25 crate::WINDOW_OPACITY
+  0023 CONST r26, #26 crate::FULLSCREEN
+  0024 CONST r27, #27 crate::ANIMATIONS
+  0025 ADT r9, (r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27), std::system::Settings
+  0026 CALL r10, (), std::system::default_bindings
+  0027 ADT r0, (r1, r2, r3, r4, r5, r6, r7, r8, r9, r10), std::system::System
+  0028 RET r0
+
+fn crate::Title [fn] params=0 regs=5
+  0000 ADT r3, (), std::Option::None
+  0001 CLOSURE r4, (), crate::Title::{closure#0}
+  0002 ADT r2, (r3, r4), std::ui::TextProps
+  0003 CALLIMP r1, (r2), std::ui::text
+  0004 ADT r0, (r1), std::system::RootPage
+  0005 RET r0
+
+fn crate::GameView [fn] params=1 regs=5
+  0000 MOVE r4, r0
+  0001 CLOSURE r3, (r4), crate::GameView::{closure#0}
+  0002 ADT r2, (r3), std::ui::GameScreenProps
+  0003 CALLIMP r1, (r2), std::ui::game_screen
+  0004 RET r1
+
+fn std::narrative::text::TextEffect::and [const] params=2 regs=36
+  0000 FIELD r14, r0, 0
+  0001 FIELD r15, r1, 0
+  0002 CALL r3, (r14, r15), std::narrative::text::either::<Color>
+  0003 FIELD r16, r0, 1
+  0004 FIELD r17, r1, 1
+  0005 CALL r4, (r16, r17), std::narrative::text::either::<Decimal>
+  0006 FIELD r18, r0, 2
+  0007 FIELD r19, r1, 2
+  0008 CALL r5, (r18, r19), std::narrative::text::either::<Weight>
+  0009 FIELD r20, r0, 3
+  0010 FIELD r21, r1, 3
+  0011 CALL r6, (r20, r21), std::narrative::text::either::<bool>
+  0012 FIELD r22, r0, 4
+  0013 FIELD r23, r1, 4
+  0014 CALL r7, (r22, r23), std::narrative::text::either::<FontAsset>
+  0015 FIELD r24, r0, 5
+  0016 FIELD r25, r1, 5
+  0017 CALL r8, (r24, r25), std::narrative::text::either::<Outline>
+  0018 FIELD r26, r0, 6
+  0019 FIELD r27, r1, 6
+  0020 CALL r9, (r26, r27), std::narrative::text::either::<Shadow>
+  0021 FIELD r28, r0, 7
+  0022 FIELD r29, r1, 7
+  0023 CALL r10, (r28, r29), std::narrative::text::either::<Emphasis>
+  0024 FIELD r30, r0, 8
+  0025 FIELD r31, r1, 8
+  0026 CALL r11, (r30, r31), std::narrative::text::either::<Reveal>
+  0027 FIELD r32, r0, 9
+  0028 FIELD r33, r1, 9
+  0029 CALL r12, (r32, r33), std::narrative::text::either::<Pause>
+  0030 FIELD r34, r0, 10
+  0031 FIELD r35, r1, 10
+  0032 CALL r13, (r34, r35), std::narrative::text::either::<Mark>
+  0033 ADT r2, (r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13), std::narrative::text::TextEffect
+  0034 RET r2
+
+fn crate::Title::{closure#0} [fn, closure] params=0 regs=1
+  0000 CONST r0, #31 "Title"
+  0001 RET r0
+
+fn crate::GameView::{closure#0} [fn, closure] params=1 regs=2
+  0000 MOVE r1, r0
+  0001 RET r1
+
+import std::ui::text [fn] params=1
+import std::ui::game_screen [fn] params=1
+static crate::TEXT_SPEED [setting] = std::time::Duration {30}
+static crate::AUTO_DELAY [setting] = std::time::Duration {1300}
+static crate::AUTO_DELAY_PER_CHAR [setting] = std::time::Duration {60}
+static crate::SKIP_UNREAD [setting] = false
+static crate::MASTER [setting] = std::system::Volume {100, false}
+static crate::MUSIC [setting] = std::system::Volume {60, false}
+static crate::SOUND [setting] = std::system::Volume {100, false}
+static crate::VOICE [setting] = std::system::Volume {100, false}
+static crate::VOICE_SUSTAIN [setting] = false
+static crate::WAIT_FOR_VOICE [setting] = true
+static crate::WINDOW_OPACITY [setting] = 80
+static crate::FULLSCREEN [setting] = false
+static crate::ANIMATIONS [setting] = true
+options max_call_depth=2048

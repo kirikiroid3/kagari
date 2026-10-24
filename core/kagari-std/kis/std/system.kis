@@ -88,6 +88,9 @@ pub struct System {
 #[builtin] pub fn heard(audio: AudioAsset) -> bool;
 /// Whether `video` has ever played.
 #[builtin] pub fn watched(video: VideoAsset) -> bool;
+/// Sets the system music channel: heard while no game runs on the mode stack; while a game
+/// runs, the game screen's music channel plays instead. `None` stops it.
+#[builtin] pub fn set_music(track: Option<crate::screen::audio::Loop>, fade: crate::screen::audio::AudioFade);
 
 /// A keyboard key.
 pub enum Key {

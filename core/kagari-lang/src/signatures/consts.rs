@@ -18,7 +18,7 @@ const UNSUPPORTED: &str =
 /// Folds `expr`, an expression of `store` (a signature or body of `owner`, resolved by
 /// `res`), to a type-level constant: integer literals, unary `-`, `+ - * / %`, blocks with only
 /// a tail, const generic parameters and `const` items. Anything else is reported as
-/// `type/unsupported-const` and folds to `Const::Error`.
+/// `E2002` and folds to `Const::Error`.
 pub fn fold_const_expr(
     db: &dyn Db,
     program: Program,

@@ -73,6 +73,8 @@ pub(super) enum CalleeKind {
     Scene,
     /// `push_step`.
     Step,
+    /// `rng_choose`.
+    Rng,
 }
 
 /// A called function: a named one or a value of pointer or closure type.
@@ -985,6 +987,9 @@ impl BodyChecker<'_, '_> {
                     FnKind::Pushdown if Some(*item) == self.env.sigs.std.push_step => {
                         CalleeKind::Step
                     }
+                    FnKind::Pushdown if Some(*item) == self.env.sigs.std.rng_choose => {
+                        CalleeKind::Rng
+                    }
                     FnKind::Pushdown if sig.scene => CalleeKind::Scene,
                     FnKind::Pushdown => CalleeKind::Instant,
                 })
@@ -1012,7 +1017,7 @@ impl BodyChecker<'_, '_> {
                     CalleeKind::Scene => format!("the scene `{path}`"),
                     CalleeKind::Plain => format!("`{}` `{path}`", fn_kind_word(FnKind::Plain)),
                     CalleeKind::Const => format!("`{}` `{path}`", fn_kind_word(FnKind::Const)),
-                    CalleeKind::Instant | CalleeKind::Step => {
+                    CalleeKind::Instant | CalleeKind::Step | CalleeKind::Rng => {
                         format!("`{}` `{path}`", fn_kind_word(FnKind::Pushdown))
                     }
                 }
@@ -1031,7 +1036,10 @@ impl BodyChecker<'_, '_> {
         let desc = self.callee_desc(callee, kind);
         let here = self.ctx_desc();
         let (code, message) = match (ctx.kind, kind) {
-            (ClosureKind::Plain, CalleeKind::Instant | CalleeKind::Scene | CalleeKind::Step) => (
+            (
+                ClosureKind::Plain,
+                CalleeKind::Instant | CalleeKind::Scene | CalleeKind::Step | CalleeKind::Rng,
+            ) => (
                 DiagnosticCode::KindCallRule,
                 format!(
                     "cannot call {desc} from {here}: the only way into the story is \
@@ -1040,7 +1048,11 @@ impl BodyChecker<'_, '_> {
             ),
             (
                 ClosureKind::Const,
-                CalleeKind::Plain | CalleeKind::Instant | CalleeKind::Scene | CalleeKind::Step,
+                CalleeKind::Plain
+                | CalleeKind::Instant
+                | CalleeKind::Scene
+                | CalleeKind::Step
+                | CalleeKind::Rng,
             ) => {
                 let mut message = format!(
                     "cannot call {desc} from {here}: `const` code is pure and can call only \
@@ -1071,6 +1083,10 @@ impl BodyChecker<'_, '_> {
                 } else {
                     format!("only a scene can run a step: {here} cannot call `push_step`")
                 },
+            ),
+            (ClosureKind::Pushdown, CalleeKind::Rng) if !ctx.scene => (
+                DiagnosticCode::KindRngOutsideScene,
+                format!("only a scene can draw a random value: {here} cannot call `rng_choose`"),
             ),
             (ClosureKind::Pushdown, CalleeKind::Scene) if !ctx.scene => (
                 DiagnosticCode::KindSceneCallOutsideScene,
@@ -1122,7 +1138,9 @@ impl BodyChecker<'_, '_> {
     /// `const fn` or constructor that may fold them into a constant.
     fn arg_pos(&self, target: Option<&Callee>) -> Pos {
         match target.and_then(|target| self.callee_kind(target)) {
-            Some(CalleeKind::Instant | CalleeKind::Scene | CalleeKind::Step) => Pos::ProcArg,
+            Some(CalleeKind::Instant | CalleeKind::Scene | CalleeKind::Step | CalleeKind::Rng) => {
+                Pos::ProcArg
+            }
             _ => Pos::Arg,
         }
     }

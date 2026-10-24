@@ -45,7 +45,7 @@ lists the modules and the book chapter of each:
 | -------------------- | -------- | --------------------- |
 | `std`                | `String`, `Vec`, `Range`, `Rat`, `Decimal`, `Option`, `Result`, the traits `Eq`, `Integer` and `Asset`, the asset types and `asset` | *Core Types* |
 | `std::time`          | `Duration` (whole milliseconds), `ms`, `secs` | *Core Types* |
-| `std::screen`        | The screen: entities, properties, layers, Hud, camera, filters; see [Presentation](./presentation.md) | *Screen* |
+| `std::screen`        | The screen: entities, properties, layers, Hud, camera, shader filters; see [Presentation](./presentation.md) | *Screen* |
 | `std::screen::anim`  | `Tween`, `Transition`, `Motion`, easings and the motion presets | *Animation* |
 | `std::screen::audio` | Music and ambience channels, loops, one-shot sounds, audio fades | *Audio* |
 | `std::stage`         | Characters, slots and side faces, written in plain `const fn` on top of `std::screen` | *Stage* |
@@ -91,8 +91,9 @@ const AZUSA_0072: VoiceAsset = asset("voice/azusa_0072.ogg");
 #[builtin] pub const fn asset<A: Asset>(path: narrative::Text) -> A;
 ```
 
-- There are five asset types, the only implementations of the trait `Asset`: `ImageAsset`,
-  `AudioAsset`, `VoiceAsset`, `VideoAsset` and `FontAsset`.
+- There are six asset types, the only implementations of the trait `Asset`: `ImageAsset`,
+  `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset` and `ShaderAsset` (a WGSL shader,
+  `.wgsl`: a filter, or generated content such as weather or particles).
 - The constant's type chooses `A`. The argument must be a string literal, and the path, relative
   to the declaring file, must not be empty.
 - The file is checked to exist at compile time, so a missing file is a compile error, not a

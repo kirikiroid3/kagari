@@ -3,16 +3,16 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/script/003__module_errors/main.kix
 ---
-script/003__module_errors/main.kix:1:5: error[module/file-not-found]: file not found for module `missing`; expected one of `missing.kis`, `missing.kix`, `missing/mod.kis`, `missing/mod.kix`
-script/003__module_errors/main.kix:2:5: error[module/ambiguous-file]: module `twice` has more than one file: `twice.kis`, `twice.kix`
-script/003__module_errors/main.kix:5:5: error[resolve/unresolved-import]: unresolved import `nowhere::x`
-script/003__module_errors/main.kix:10:4: error[resolve/duplicate-definition]: `a` is defined multiple times
+script/003__module_errors/main.kix:1:5: error[E1002]: file not found for module `missing`; expected one of `missing.kis`, `missing.kix`, `missing/mod.kis`, `missing/mod.kix`
+script/003__module_errors/main.kix:2:5: error[E1003]: module `twice` has more than one file: `twice.kis`, `twice.kix`
+script/003__module_errors/main.kix:5:5: error[E1015]: unresolved import `nowhere::x`
+script/003__module_errors/main.kix:10:4: error[E1014]: `a` is defined multiple times
   note: script/003__module_errors/main.kix:9:4: first defined here
-script/003__module_errors/main.kix:13:12: error[resolve/private-item]: `hidden` is private
-script/003__module_errors/main.kix:15:13: error[resolve/ambiguous-name]: `X` is ambiguous
+script/003__module_errors/main.kix:13:12: error[E1017]: `hidden` is private
+script/003__module_errors/main.kix:15:13: error[E1018]: `X` is ambiguous
   note: script/003__module_errors/main.kix:6:5: `X` could refer to the item imported here
   note: script/003__module_errors/main.kix:7:5: `X` could refer to the item imported here
-script/003__module_errors/main.kix:28:18: error[resolve/private-item]: `SECRET` is private
+script/003__module_errors/main.kix:28:18: error[E1017]: `SECRET` is private
 --- resolutions ---
 script/003__module_errors/main.kix:13:5 other::hidden -> fn crate::other::hidden
 script/003__module_errors/main.kix:14:5 other::shown -> fn crate::other::shown

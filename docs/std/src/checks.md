@@ -71,7 +71,7 @@ A `Setting<T>` handle may appear in a `const fn` only as a value, i.e. passed to
 ## `#[must_use]`
 
 It covers `Change<T>`, `Swap` and `ChannelChange`. A pending change that is discarded, or bound
-to a local and never completed with `apply_animation`, is a warning, and the change does not
+to a local and never completed with `apply_animation`, is a warning (`W3023`), and the change does not
 happen.
 
 ## `for` loops
@@ -83,7 +83,7 @@ happen.
 
 ## Const-evaluation errors
 
-These are compile errors:
+These are compile errors (`E4xxx`, see the Kagari Diagnostics book):
 
 - the Motion rules: no keys, `at` not strictly increasing or equal to 0, a last key that is not
   identity, `repeat` = 0;
@@ -92,5 +92,4 @@ These are compile errors:
 - `begin_text` while anchored on a mark;
 - `Vec::set` out of range;
 - `Duration` overflow or underflow;
-- a `Decimal` fraction outside 0.0–1.0 where the rules require it: opacity, volume, anchor,
-  filter amounts except brightness/contrast/saturation, which must be ≥ 0.
+- a `Decimal` fraction outside 0.0–1.0 where the rules require it: opacity, volume, anchor.

@@ -34,7 +34,7 @@ items of `t![…]`.
 
 | Form | Desugars to | Value | Attributes | Elements |
 | ---- | ----------- | ----- | ---------- | -------- |
-| `s!(…)` | `push_step(Say { … })` | `()` | `who`, `voice`, `render` | at most one `t![…]` |
+| `s!(…)` | `push_step(Say { … })` | `()` | `who`, `voice`, `render`, `history` | at most one `t![…]` |
 | `choice!{…}` | `push_step(Choice { … })` | the arms' enum | `id` (required), `render` | arms `t![…] => V`, `t![…] if cond => V` |
 | `t![…]` | `concat([…])` of `ruby`, `mono_ruby`, `effect`, `to_text` calls | `Text` | none | `"…"`, `["基"]("よみ")`, `["漢字"]("かん"\|"じ")`, `!["…"](effect)`, `{expr}` |
 | UI forms | calls of `std::ui` functions with props structs | `Element` | see the standard library book, chapter *UI* | see the standard library book, chapter *UI* |
@@ -49,7 +49,7 @@ System](./system.md#components-and-signals).
 | Story variable | `static mut NAME: FiniteType = constant;` |
 | Setting | `static NAME: Setting<T> = setting(init);` |
 | Meta field | `static NAME: Meta<T> = meta(init);` |
-| Asset | `const NAME: ImageAsset = asset("path");`, likewise `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset` |
+| Asset | `const NAME: ImageAsset = asset("path");`, likewise `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset`, `ShaderAsset` |
 | Entity id | `const NAME: EntityId = EntityId(n);`, with `n` ≥ 1 |
 | Render | `const fn name(mut screen: Screen) -> Screen { …; screen }` |
 
@@ -64,4 +64,5 @@ System](./system.md#components-and-signals).
 | Bounded repetition | `for i in 0..n` |
 | Change a counter | `x += 1;` (saturates) |
 | Write meta | `META_FIELD.write(v);` |
+| Draw at random (scenes only) | `rng_choose::<T>()`, `T` a fieldless enum or `Int<lo, hi>` |
 | End the story | return from the entry scene |

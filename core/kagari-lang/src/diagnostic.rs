@@ -123,140 +123,146 @@ macro_rules! codes {
 }
 
 codes! {
-    Syntax = "syntax";
+    // E0: syntax.
+    Syntax = "E0001";
 
-    ModuleBadRoot = "module/bad-root";
-    ModuleFileNotFound = "module/file-not-found";
-    ModuleAmbiguousFile = "module/ambiguous-file";
-    ModuleFileReused = "module/file-reused";
-    ModuleInBlock = "module/file-module-in-block";
+    // E1: module, item, resolve.
+    ModuleBadRoot = "E1001";
+    ModuleFileNotFound = "E1002";
+    ModuleAmbiguousFile = "E1003";
+    ModuleFileReused = "E1004";
+    ModuleInBlock = "E1005";
 
-    ItemUnknownAttribute = "item/unknown-attribute";
-    ItemAttributeArguments = "item/attribute-arguments";
-    ItemBuiltinOutsideStd = "item/builtin-outside-std";
-    ItemBuiltinWithBody = "item/builtin-with-body";
-    ItemMissingBody = "item/missing-body";
-    ItemMissingValue = "item/missing-value";
-    ItemTraitOutsideStd = "item/trait-outside-std";
-    ItemTraitNotBuiltin = "item/trait-not-builtin";
+    ItemUnknownAttribute = "E1006";
+    ItemAttributeArguments = "E1007";
+    ItemBuiltinOutsideStd = "E1008";
+    ItemBuiltinWithBody = "E1009";
+    ItemMissingBody = "E1010";
+    ItemMissingValue = "E1011";
+    ItemTraitOutsideStd = "E1012";
+    ItemTraitNotBuiltin = "E1013";
 
-    ResolveDuplicate = "resolve/duplicate-definition";
-    ResolveUnresolvedImport = "resolve/unresolved-import";
-    ResolveUnresolvedName = "resolve/unresolved-name";
-    ResolvePrivate = "resolve/private-item";
-    ResolveAmbiguous = "resolve/ambiguous-name";
-    ResolveUndeclaredLabel = "resolve/undeclared-label";
-    ResolveOutsideLoop = "resolve/outside-loop";
-    ResolveSelfOutsideImpl = "resolve/self-outside-impl";
-    ResolveBadImplTarget = "resolve/bad-impl-target";
-    ResolveTraitImplOutsideStd = "resolve/trait-impl-outside-std";
-    ResolveDuplicateBinding = "resolve/duplicate-binding";
-    ResolveInconsistentBinding = "resolve/inconsistent-binding";
-    ResolveMissingStdItem = "resolve/missing-std-item";
-    ResolveAssetNotFound = "resolve/asset-not-found";
-    ResolveEmptyAssetPath = "resolve/empty-asset-path";
+    ResolveDuplicate = "E1014";
+    ResolveUnresolvedImport = "E1015";
+    ResolveUnresolvedName = "E1016";
+    ResolvePrivate = "E1017";
+    ResolveAmbiguous = "E1018";
+    ResolveUndeclaredLabel = "E1019";
+    ResolveOutsideLoop = "E1020";
+    ResolveSelfOutsideImpl = "E1021";
+    ResolveBadImplTarget = "E1022";
+    ResolveTraitImplOutsideStd = "E1023";
+    ResolveDuplicateBinding = "E1024";
+    ResolveInconsistentBinding = "E1025";
+    ResolveMissingStdItem = "E1026";
+    ResolveAssetNotFound = "E1027";
+    ResolveEmptyAssetPath = "E1028";
 
-    // Stage 3, type inference (Infer slice).
-    TypeMismatch = "type/mismatched-types";
-    TypeUnsupportedConst = "type/unsupported-const";
-    TypeConstOverflow = "type/const-overflow";
-    TypeBadIntBounds = "type/bad-int-bounds";
-    TypeWrongGenericCount = "type/wrong-generic-count";
-    TypeExpectedType = "type/expected-type";
-    TypeExpectedConst = "type/expected-const";
-    TypeExpectedTrait = "type/expected-trait";
-    TypeExpectedValue = "type/expected-value";
-    TypeAliasCycle = "type/alias-cycle";
-    TypeInferInSignature = "type/infer-in-signature";
-    TypeBadLiteral = "type/bad-literal";
-    TypeLiteralOutOfRange = "type/literal-out-of-range";
-    TypeIntMix = "type/int-mix";
-    TypeBadOperands = "type/bad-operands";
-    TypeDivisorMayBeZero = "type/divisor-may-be-zero";
-    TypeNotEq = "type/not-eq";
-    TypeLossyInto = "type/lossy-into";
-    TypeAsCast = "type/as-cast";
-    TypeUnknownField = "type/unknown-field";
-    TypeMissingField = "type/missing-field";
-    TypeUnknownMethod = "type/unknown-method";
-    TypeNotAMethod = "type/not-a-method";
-    TypeWrongArity = "type/wrong-arity";
-    TypeNotCallable = "type/not-callable";
-    TypeUnsatisfiedBound = "type/unsatisfied-bound";
-    TypeBadNavStart = "type/bad-nav-start";
-    TypeAssetPathNotLiteral = "type/asset-path-not-literal";
-    TypeAnnotationsNeeded = "type/annotations-needed";
-    TypeOpenRange = "type/open-range";
-    TypeNotIterable = "type/not-iterable";
-    TypeNotIndexable = "type/not-indexable";
-    TypeBadDeref = "type/bad-deref";
-    TypeBadTry = "type/bad-try";
-    TypeBadPattern = "type/bad-pattern";
-    TypeCapturingClosure = "type/capturing-closure";
+    // E2: type inference, exhaustiveness and refutability.
+    TypeMismatch = "E2001";
+    TypeUnsupportedConst = "E2002";
+    TypeConstOverflow = "E2003";
+    TypeBadIntBounds = "E2004";
+    TypeWrongGenericCount = "E2005";
+    TypeExpectedType = "E2006";
+    TypeExpectedConst = "E2007";
+    TypeExpectedTrait = "E2008";
+    TypeExpectedValue = "E2009";
+    TypeAliasCycle = "E2010";
+    TypeInferInSignature = "E2011";
+    TypeBadLiteral = "E2012";
+    TypeLiteralOutOfRange = "E2013";
+    TypeIntMix = "E2014";
+    TypeBadOperands = "E2015";
+    TypeDivisorMayBeZero = "E2016";
+    TypeNotEq = "E2017";
+    TypeLossyInto = "E2018";
+    TypeAsCast = "E2019";
+    TypeUnknownField = "E2020";
+    TypeMissingField = "E2021";
+    TypeUnknownMethod = "E2022";
+    TypeNotAMethod = "E2023";
+    TypeWrongArity = "E2024";
+    TypeNotCallable = "E2025";
+    TypeUnsatisfiedBound = "E2026";
+    TypeBadNavStart = "E2027";
+    TypeAssetPathNotLiteral = "E2028";
+    TypeAnnotationsNeeded = "E2029";
+    TypeOpenRange = "E2030";
+    TypeNotIterable = "E2031";
+    TypeNotIndexable = "E2032";
+    TypeBadDeref = "E2033";
+    TypeBadTry = "E2034";
+    TypeBadPattern = "E2035";
+    TypeCapturingClosure = "E2036";
+    TypeNonExhaustiveMatch = "E2037";
+    TypeRefutablePattern = "E2038";
+    TypeUnreachablePattern = "W2039", warning;
 
-    // Exhaust slice: `match` exhaustiveness and pattern refutability.
-    TypeNonExhaustiveMatch = "type/non-exhaustive-match";
-    TypeRefutablePattern = "type/refutable-pattern";
-    TypeUnreachablePattern = "type/unreachable-pattern", warning;
+    // E3: kind and story rules.
+    KindCallRule = "E3001";
+    KindStepOutsideScene = "E3002";
+    KindSceneCallOutsideScene = "E3003";
+    KindUnboundedLoop = "E3004";
+    KindInstantRecursion = "E3005";
+    KindForNotConstant = "E3006";
+    KindStoryVariableOutsideStory = "E3007";
+    KindNotFinite = "E3008";
+    KindTextInEntry = "E3009";
+    KindNotConstant = "E3010";
+    KindBadHandle = "E3011";
+    KindReferenceInItem = "E3012";
+    KindMetaInConst = "E3013";
+    KindSecondClassReference = "E3014";
+    KindSecondClassClosure = "E3015";
+    KindAliasedMut = "E3016";
+    KindImmutablePlace = "E3017";
+    KindMisplacedAttribute = "E3018";
+    KindChoiceId = "E3019";
+    KindChoiceArms = "E3020";
+    KindRubyReadings = "E3021";
+    KindEffectNotConstant = "E3022";
+    KindUnusedMustUse = "W3023", warning;
+    KindRngOutsideScene = "E3024";
 
-    // Checks slice: kind and story rules (stage 3).
-    KindCallRule = "kind/call-rule";
-    KindStepOutsideScene = "kind/step-outside-scene";
-    KindSceneCallOutsideScene = "kind/scene-call-outside-scene";
-    KindUnboundedLoop = "kind/unbounded-loop";
-    KindInstantRecursion = "kind/instant-recursion";
-    KindForNotConstant = "kind/for-not-constant";
-    KindStoryVariableOutsideStory = "kind/story-variable-outside-story";
-    KindNotFinite = "kind/not-finite";
-    KindTextInEntry = "kind/text-in-entry";
-    KindNotConstant = "kind/not-constant";
-    KindBadHandle = "kind/bad-handle";
-    KindReferenceInItem = "kind/reference-in-item";
-    KindMetaInConst = "kind/meta-in-const";
-    KindSecondClassReference = "kind/second-class-reference";
-    KindSecondClassClosure = "kind/second-class-closure";
-    KindAliasedMut = "kind/aliased-mut-argument";
-    KindImmutablePlace = "kind/immutable-place";
-    KindMisplacedAttribute = "kind/misplaced-attribute";
-    KindChoiceId = "kind/choice-id";
-    KindChoiceArms = "kind/choice-arms";
-    KindRubyReadings = "kind/ruby-readings";
-    KindEffectNotConstant = "kind/effect-not-constant";
-    KindUnusedMustUse = "kind/unused-must-use", warning;
+    // E4: const evaluation.
+    EvalOverflow = "E4001";
+    EvalDivisionByZero = "E4002";
+    EvalBudgetExceeded = "E4003";
+    EvalDomainTooLarge = "E4004";
+    EvalIndexOutOfRange = "E4005";
+    EvalConstCycle = "E4006";
+    EvalHandleOutsideStatic = "E4007";
+    EvalInvalidMotion = "E4008";
+    EvalInvalidEasing = "E4009";
+    EvalDuplicateMark = "E4010";
+    EvalBeginTextOnMark = "E4011";
+    EvalFractionOutOfRange = "E4012";
+    EvalDurationOverflow = "E4013";
 
-    // Eval slice: const evaluation (stage 4).
-    EvalOverflow = "eval/overflow";
-    EvalDivisionByZero = "eval/division-by-zero";
-    EvalInexactDivision = "eval/inexact-division";
-    EvalBudgetExceeded = "eval/budget-exceeded";
-    EvalDomainTooLarge = "eval/domain-too-large";
-    EvalIndexOutOfRange = "eval/index-out-of-range";
-    EvalConstCycle = "eval/const-cycle";
-    EvalHandleOutsideStatic = "eval/handle-outside-static";
-    EvalInvalidMotion = "eval/invalid-motion";
-    EvalInvalidEasing = "eval/invalid-easing";
-    EvalDuplicateMark = "eval/duplicate-mark";
-    EvalBeginTextOnMark = "eval/begin-text-on-mark";
-    EvalFractionOutOfRange = "eval/fraction-out-of-range";
-    EvalDurationOverflow = "eval/duration-overflow";
+    // E5: whole-program analysis of the story.
+    AnalysisSteplessLoop = "E5001";
+    AnalysisSteplessRecursion = "E5002";
+    AnalysisStuckChoice = "E5003";
+    AnalysisInconsistentScreen = "W5004", warning;
+    AnalysisUnboundedScreens = "E5005";
+    AnalysisTooManyStates = "W5006", warning;
+    AnalysisIncomplete = "W5007", warning;
+    AnalysisUnreachableScene = "W5008", warning;
+    AnalysisUnreachableStep = "W5009", warning;
+    AnalysisUnusedStoryVariable = "W5010", warning;
+    AnalysisMissingKeyframe = "W5011", warning;
 
-    // Analysis slice: whole-program analyses of the story (stage 5).
-    AnalysisSteplessLoop = "analysis/stepless-loop";
-    AnalysisSteplessRecursion = "analysis/stepless-recursion";
-    AnalysisStuckChoice = "analysis/stuck-choice";
-    AnalysisInconsistentScreen = "analysis/inconsistent-screen", warning;
-    AnalysisUnboundedScreens = "analysis/unbounded-screens";
-    AnalysisTooManyStates = "analysis/too-many-states", warning;
-    AnalysisIncomplete = "analysis/incomplete", warning;
-    AnalysisUnreachableScene = "analysis/unreachable-scene", warning;
-    AnalysisUnreachableStep = "analysis/unreachable-step", warning;
-    AnalysisUnusedStoryVariable = "analysis/unused-story-variable", warning;
+    // E6: the system's mode graph.
+    SystemUnreachableMode = "W6001", warning;
+    SystemBackFromBase = "E6002";
+    SystemTrappedMode = "E6003";
+    SystemUnboundedStack = "W6004", warning;
 
-    // System checks: the mode graph (stage 5).
-    SystemUnreachableMode = "system/unreachable-mode", warning;
-    SystemBackFromBase = "system/back-from-base";
-    SystemTrappedMode = "system/trapped-mode";
-    SystemUnboundedStack = "system/unbounded-stack", warning;
+    // E7: bytecode emission.
+    EmitMissingMain = "E7001";
+    EmitFunctionTooLarge = "E7002";
+    EmitInvalidBytecode = "E7003";
 }
 
 /// Render diagnostics as `{path}:{line}:{col}: {severity}[{code}]: {message}` lines,
@@ -312,4 +318,33 @@ pub(crate) fn line_col(db: &dyn Db, file: &FilePath, offset: TextSize) -> (usize
         }
     }
     (line, col)
+}
+
+#[cfg(test)]
+mod tests {
+    use rustc_hash::FxHashSet;
+
+    use super::{DiagnosticCode, Severity};
+
+    #[test]
+    fn codes_are_numbered() {
+        let mut seen = FxHashSet::default();
+        for code in DiagnosticCode::ALL {
+            let text = code.as_str();
+            assert!(seen.insert(text), "duplicate code {text}");
+            let bytes = text.as_bytes();
+            assert!(
+                bytes.len() == 5
+                    && matches!(bytes[0], b'E' | b'W')
+                    && (b'0'..=b'7').contains(&bytes[1])
+                    && bytes[2..].iter().all(u8::is_ascii_digit),
+                "malformed code {text}"
+            );
+            assert_eq!(
+                bytes[0] == b'W',
+                code.default_severity() == Severity::Warning,
+                "{text}: the prefix must match the severity"
+            );
+        }
+    }
 }

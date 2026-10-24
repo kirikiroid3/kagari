@@ -21,7 +21,7 @@
 //!   targets) between overlays, game overlays and dialogs. Bindings are player input and never
 //!   count as pushes.
 
-mod code;
+pub(crate) mod code;
 
 use std::collections::VecDeque;
 

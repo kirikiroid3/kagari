@@ -143,10 +143,37 @@ pub struct AssetFile {
     pub exists: bool,
 }
 
+/// Most story states the analysis explores by default.
+pub const DEFAULT_STATE_CAP: u32 = 200_000;
+/// Most nested run-time calls by default.
+pub const DEFAULT_RECURSION_DEPTH: u32 = 2048;
+
+/// Options of one compilation. Defaults: see the constants.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CompileOptions {
+    /// Most story states the analysis explores (`W5006` past it).
+    pub state_cap: u32,
+    /// Most nested calls at run time; written into the bytecode.
+    pub recursion_depth: u32,
+    /// Whether the keyframe-placement check (`W5011`) runs.
+    pub keyframe_check: bool,
+}
+
+impl Default for CompileOptions {
+    fn default() -> Self {
+        CompileOptions {
+            state_cap: DEFAULT_STATE_CAP,
+            recursion_depth: DEFAULT_RECURSION_DEPTH,
+            keyframe_check: false,
+        }
+    }
+}
+
 /// A program rooted at its root `.kis`/`.kix` file.
 #[salsa::input(debug)]
 pub struct Program {
     pub root: SourceFile,
+    pub options: CompileOptions,
 }
 
 #[cfg(test)]

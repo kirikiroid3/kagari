@@ -13,6 +13,7 @@
 - [Presentation](./presentation.md)
 - [The Game System](./system.md)
 - [Compilation](./compilation.md)
+  - [The `.kagari` Format](./bytecode.md)
 - [Quick Reference](./reference.md)
 - [Relation to the Proposal](./proposal.md)
 - [Open Questions](./open-questions.md)

@@ -653,8 +653,8 @@ fn unguarded(pats: Vec<PatId>) -> Vec<(PatId, bool)> {
     pats.into_iter().map(|pat| (pat, false)).collect()
 }
 
-const NON_EXHAUSTIVE: &str = "type/non-exhaustive-match: non-exhaustive patterns:";
-const UNREACHABLE: &str = "type/unreachable-pattern: unreachable pattern";
+const NON_EXHAUSTIVE: &str = "E2037: non-exhaustive patterns:";
+const UNREACHABLE: &str = "W2039: unreachable pattern";
 
 fn missing(list: &str) -> String {
     format!("{NON_EXHAUSTIVE} {list} not covered")
@@ -967,7 +967,7 @@ fn refutable_bindings() {
     let value = b.let_stmt(pat, w.option_of(route.clone()));
     assert_eq!(
         b.render(&b.check(&w, value), &[]),
-        vec!["type/refutable-pattern: refutable pattern in local binding: `None` not covered"]
+        vec!["E2038: refutable pattern in local binding: `None` not covered"]
     );
 
     let mut b = B::default();
@@ -990,7 +990,7 @@ fn refutable_bindings() {
     assert_eq!(
         b.render(&b.check(&w, value), &[]),
         vec![
-            "type/refutable-pattern: refutable pattern in function argument: `Route::B` and \
+            "E2038: refutable pattern in function argument: `Route::B` and \
              `Route::C` not covered"
         ]
     );
@@ -1009,7 +1009,7 @@ fn refutable_bindings() {
     assert_eq!(
         b.render(&b.check(&w, value), &[]),
         vec![
-            "type/refutable-pattern: refutable pattern in `for` loop binding: `0..=2` and \
+            "E2038: refutable pattern in `for` loop binding: `0..=2` and \
              `4..=u8::MAX` not covered"
         ]
     );
@@ -1087,7 +1087,7 @@ fn opaque_text_literals() {
     let value = b.let_stmt(pat, text);
     assert_eq!(
         b.render(&b.check(&w, value), &[]),
-        vec!["type/refutable-pattern: refutable pattern in local binding: `_` not covered"]
+        vec!["E2038: refutable pattern in local binding: `_` not covered"]
     );
 }
 

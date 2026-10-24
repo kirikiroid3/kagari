@@ -80,8 +80,8 @@ azusa.opacity().change(1.0).apply_animation(tween(ms(300)));
 | Part | Defined in | Role |
 | ---- | ---------- | ---- |
 | Entities | render functions | Spawned, changed and despawned by renders; identified by an `EntityId` constant |
-| Components | `std::screen`, a fixed set | Data attached to entities: plane, z, position, anchor, scale, rotation, opacity, filter, fill, image parts, label, movie, flip, blend |
-| Resources | `std::screen`, a fixed set | Data of the screen itself: the Hud, the choice menu, the camera, the screen filter, the audio channels |
+| Components | `std::screen`, a fixed set | Data attached to entities: plane, z, position, anchor, scale, rotation, opacity, filter shader, generated-content shader, fill, image parts, label, movie, flip, blend |
+| Resources | `std::screen`, a fixed set | Data of the screen itself: the Hud, the choice menu, the camera, the screen filter shader, the audio channels |
 | Systems | the engine | Process entities at runtime, for example advancing animations frame by frame |
 
 Every component type is [`Eq`](./language.md#equality), so two screens can always be
@@ -105,10 +105,19 @@ passing a `Transition` to a position change:
 
 | Target | Changed with | Animation type |
 | ------ | ------------ | -------------- |
-| A property `Prop<T>`: position, scale, rotation, opacity, filter, fill; Hud visibilities; camera offset, zoom and rotation; channel volume | `.change(v)`, giving a `Change<T>` | `Tween`: duration, easing, delay |
+| A property `Prop<T>`: position, scale, rotation, opacity, filter and shader (`Option<ShaderAsset>`), fill; Hud visibilities; camera offset, zoom and rotation; channel volume | `.change(v)`, giving a `Change<T>` | `Tween`: duration, easing, delay |
 | A layer: `ImageLayer` (including the background and the side image), `LabelLayer`, `MovieLayer` | `.change(x)` or `.clear()`, giving a `Swap` | `Transition`: cut, crossfade, rule, wipe, blinds, through a colour |
 | An entity or the camera as a whole | `.apply_animation(m)` directly | `Motion`: a relative path that returns to where it started |
 | A music or ambience channel | `.change(track)` or `.stop()`, giving a `ChannelChange` | `AudioFade` |
+
+Filters, weather and particles are shaders. The screen and each entity have a `filter()`, an
+`Option<ShaderAsset>` that post-processes what they draw (`None` is no filter). Weather and
+particles are entities whose `shader()` is set: the shader generates their content, drawn in the
+entity's plane and ordered by its `z`, the analog of CSS `z-index`.
+
+Music carries over between steps: a step whose render leaves the music channel on the track that
+is already playing does not restart it. A render restarts the track from its start with
+`screen.replay_bgm()`.
 
 ```kis
 const fn mio_enters(mut screen: Screen) -> Screen {
@@ -178,7 +187,7 @@ A render whose output does not depend on its input screen is a **keyframe**: it 
 complete screen. The compiler detects keyframes itself; no annotation is required.
 
 `Screen::empty()` returns a screen with only the background entity, `BACKGROUND`, with no image:
-the Hud shows the text window and the quick menu, the camera and the screen filter are neutral,
+the Hud shows the text window and the quick menu, the camera is neutral, the screen filter is `None`,
 and every audio channel is silent. A keyframe can therefore be written explicitly:
 
 ```kis
@@ -195,7 +204,10 @@ renders only from the last keyframe on that path.
 
 {{#include diagrams/keyframes.svg}}
 
-Keyframes are recommended at choice points and chapter starts. Interrupt scenes, such as a phone
+Keyframes are recommended at choice points and chapter starts. The keyframe-placement check is
+opt-in, through `--keyframe-check` or `CompileOptions::keyframe_check`: when it is on, every
+`choice!` and the first step of each entry scene need a keyframe render, and a step without one
+gets the warning `W5011`. A step with no render is not a keyframe. Interrupt scenes, such as a phone
 call that can happen anywhere, should *not* start with a keyframe: they are meant to overlay
 whatever screen they interrupt.
 
@@ -227,7 +239,7 @@ everyone but the author.
 The compiler computes, for each step, the screens that can reach it, and reports a step whose
 shown screen (the logical screen after its render) is not determined by the story state, together
 with the renders that last changed the screen on the differing paths. This is the
-presentation-ambiguity lint from the proposal, a warning.
+presentation-ambiguity lint from the proposal, the warning `W5004`.
 
 *The story state* at a step is everything the story itself could tell apart: the step, the values
 of the story variables, the locals of every frame on the call stack that are still used later, the
@@ -242,7 +254,8 @@ callee for a screen it was already entered with.
 
 The author fixes a report in one of two ways:
 
-- **Insert a keyframe** after the merge, if the difference is a leftover.
+- **Insert a keyframe** at the first inconsistent step, the one reported, if the difference is a
+  leftover. This is the fix the warning suggests.
 - **Promote the dependency into a story variable**, if it is intended: set a variable in each
   branch and choose the render of the merged step by it. The analyzer then sees the dependency as
   story state.
@@ -258,7 +271,7 @@ Renders are Turing-complete `const fn`, so whether that set is finite cannot be 
 general. *Tentative:* the compiler computes the sets as a fixpoint, evaluating each render on the
 screens that reach its step, and stops when a step's set grows past a fixed cap, currently 64
 screens. The render that produced the new screen is reported as an error
-(`analysis/unbounded-screens`); error recovery leaves it out, as if it left the screen unchanged,
+(`E5005`); error recovery leaves it out, as if it left the screen unchanged,
 and computes the sets again, so that the rest of the program is still checked.
 
 The rule is sound: when the program is accepted, the computed sets are exact. It may reject a
@@ -327,7 +340,7 @@ window out. The side image is the speaker's face shown next to the text, swapped
 
 The screen API is defined by the standard library book. Chapter *Screen* covers geometry and
 colours, planes and drawing order, entities with their spawn defaults and despawning, properties
-and layers, the Hud, the choice menu, the camera, filters and blend modes. Chapter *Animation*
+and layers, the Hud, the choice menu, the camera, filter and generated-content shaders, and blend modes. Chapter *Animation*
 covers the step's timeline (`wait`, `barrier`, `at_mark`, `begin_text`), what a click and skip
 mode do to it, easings, tweens, transitions and motions with their presets. Chapter *Audio* covers
 channels, loops and one-shot sounds, and chapter *Stage* the character layer built on top.

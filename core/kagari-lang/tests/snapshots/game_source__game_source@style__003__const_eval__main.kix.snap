@@ -3,295 +3,282 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/style/003__const_eval/main.kix
 ---
-style/003__const_eval/main.kix:11:7: error[eval/duplicate-mark]: duplicate text mark `Mark(1)`
-  note: style/003__const_eval/main.kix:11:31: evaluation failed here
-style/003__const_eval/main.kix:18:7: error[eval/index-out-of-range]: `Vec::set` index 4 is out of range for length 1
-  note: style/003__const_eval/main.kix:15:5: evaluation failed here
-style/003__const_eval/main.kix:19:7: error[eval/duration-overflow]: `Duration` overflow: the time does not fit in `u32` milliseconds
+style/003__const_eval/main.kix:10:7: error[E4010]: duplicate text mark `Mark(1)`
+  note: style/003__const_eval/main.kix:10:31: evaluation failed here
+style/003__const_eval/main.kix:17:7: error[E4005]: `Vec::set` index 4 is out of range for length 1
+  note: style/003__const_eval/main.kix:14:5: evaluation failed here
+style/003__const_eval/main.kix:18:7: error[E4013]: `Duration` overflow: the time does not fit in `u32` milliseconds
   note: std/time.kis:18:20: evaluation failed here
-style/003__const_eval/main.kix:20:7: error[eval/duration-overflow]: `Duration` overflow: the time does not fit in `u32` milliseconds
+style/003__const_eval/main.kix:19:7: error[E4013]: `Duration` overflow: the time does not fit in `u32` milliseconds
   note: std/time.kis:24:24: evaluation failed here
-style/003__const_eval/main.kix:21:7: error[eval/overflow]: arithmetic overflow: 300 does not fit in `u8`
-  note: style/003__const_eval/main.kix:21:22: evaluation failed here
-style/003__const_eval/main.kix:25:7: error[eval/division-by-zero]: attempt to divide by zero
-  note: style/003__const_eval/main.kix:23:5: evaluation failed here
-style/003__const_eval/main.kix:33:7: error[eval/budget-exceeded]: constant evaluation exceeded its budget of 1000000 steps
-  note: style/003__const_eval/main.kix:28:17: evaluation failed here
-style/003__const_eval/main.kix:41:7: error[eval/budget-exceeded]: recursion too deep: more than 10000 nested calls during constant evaluation
-  note: style/003__const_eval/main.kix:38:33: evaluation failed here
-style/003__const_eval/main.kix:42:7: error[eval/index-out-of-range]: index 2 is out of range for length 2
-  note: style/003__const_eval/main.kix:44:5: evaluation failed here
-style/003__const_eval/main.kix:46:7: error[eval/inexact-division]: 1.0 / 3.0 has no exact `Decimal` value
-  note: style/003__const_eval/main.kix:46:26: evaluation failed here
-style/003__const_eval/main.kix:47:7: error[eval/handle-outside-static]: a `Setting` or `Meta` handle can only be the initializer of a `static`
-style/003__const_eval/main.kix:126:17: error[eval/invalid-motion]: a motion needs at least one key
-  note: style/003__const_eval/main.kix:51:5: evaluation failed here
-style/003__const_eval/main.kix:127:17: error[eval/invalid-motion]: the first motion key must be after 0 ms
-  note: style/003__const_eval/main.kix:55:5: evaluation failed here
-style/003__const_eval/main.kix:128:17: error[eval/invalid-motion]: motion key at 100 ms is not after the previous key at 100 ms
-  note: style/003__const_eval/main.kix:59:5: evaluation failed here
-style/003__const_eval/main.kix:129:17: error[eval/invalid-motion]: the last motion key must be the identity: offset (0, 0), scale 1.0, rotation 0°
-  note: style/003__const_eval/main.kix:63:5: evaluation failed here
-style/003__const_eval/main.kix:130:17: error[eval/invalid-motion]: a motion must repeat at least once, found `repeat(0)`
-  note: style/003__const_eval/main.kix:67:5: evaluation failed here
-style/003__const_eval/main.kix:131:17: error[eval/invalid-easing]: `CubicBezier` x1 must be in 0.0..=1.0, found 1.5
-  note: style/003__const_eval/main.kix:71:5: evaluation failed here
-style/003__const_eval/main.kix:132:17: error[eval/invalid-easing]: `Steps(0)`: the number of steps must not be 0
-  note: style/003__const_eval/main.kix:75:5: evaluation failed here
-style/003__const_eval/main.kix:133:17: error[eval/begin-text-on-mark]: `begin_text` while the timeline is anchored on `Mark(2)`
-  note: style/003__const_eval/main.kix:80:5: evaluation failed here
-style/003__const_eval/main.kix:134:17: error[eval/fraction-out-of-range]: opacity must be in 0.0..=1.0, found 1.5
-  note: style/003__const_eval/main.kix:84:5: evaluation failed here
-style/003__const_eval/main.kix:135:17: error[eval/fraction-out-of-range]: channel volume must be in 0.0..=1.0, found 2.0
-  note: style/003__const_eval/main.kix:88:5: evaluation failed here
-style/003__const_eval/main.kix:136:17: error[eval/fraction-out-of-range]: the anchor's y must be in 0.0..=1.0, found 1.5
-  note: style/003__const_eval/main.kix:92:5: evaluation failed here
-style/003__const_eval/main.kix:137:17: error[eval/fraction-out-of-range]: the filter's grayscale must be in 0.0..=1.0, found 2.0
-  note: style/003__const_eval/main.kix:96:5: evaluation failed here
-style/003__const_eval/main.kix:142:16: error[eval/division-by-zero]: attempt to divide by zero (with arguments `(0)`)
-  note: style/003__const_eval/main.kix:117:6: evaluation failed here
-style/003__const_eval/main.kix:143:15: error[eval/domain-too-large]: this call has too many argument combinations to tabulate: more than the limit of 65536
+style/003__const_eval/main.kix:20:7: error[E4001]: arithmetic overflow: 300 does not fit in `u8`
+  note: style/003__const_eval/main.kix:20:22: evaluation failed here
+style/003__const_eval/main.kix:24:7: error[E4002]: attempt to divide by zero
+  note: style/003__const_eval/main.kix:22:5: evaluation failed here
+style/003__const_eval/main.kix:32:7: error[E4003]: constant evaluation exceeded its budget of 1000000 steps
+  note: style/003__const_eval/main.kix:27:17: evaluation failed here
+style/003__const_eval/main.kix:40:7: error[E4003]: recursion too deep: more than 10000 nested calls during constant evaluation
+  note: style/003__const_eval/main.kix:37:33: evaluation failed here
+style/003__const_eval/main.kix:41:7: error[E4005]: index 2 is out of range for length 2
+  note: style/003__const_eval/main.kix:43:5: evaluation failed here
+style/003__const_eval/main.kix:46:7: error[E4007]: a `Setting` or `Meta` handle can only be the initializer of a `static`
+style/003__const_eval/main.kix:121:17: error[E4008]: a motion needs at least one key
+  note: style/003__const_eval/main.kix:50:5: evaluation failed here
+style/003__const_eval/main.kix:122:17: error[E4008]: the first motion key must be after 0 ms
+  note: style/003__const_eval/main.kix:54:5: evaluation failed here
+style/003__const_eval/main.kix:123:17: error[E4008]: motion key at 100 ms is not after the previous key at 100 ms
+  note: style/003__const_eval/main.kix:58:5: evaluation failed here
+style/003__const_eval/main.kix:124:17: error[E4008]: the last motion key must be the identity: offset (0, 0), scale 1.0, rotation 0°
+  note: style/003__const_eval/main.kix:62:5: evaluation failed here
+style/003__const_eval/main.kix:125:17: error[E4008]: a motion must repeat at least once, found `repeat(0)`
+  note: style/003__const_eval/main.kix:66:5: evaluation failed here
+style/003__const_eval/main.kix:126:17: error[E4009]: `CubicBezier` x1 must be in 0.0..=1.0, found 1.5
+  note: style/003__const_eval/main.kix:70:5: evaluation failed here
+style/003__const_eval/main.kix:127:17: error[E4009]: `Steps(0)`: the number of steps must not be 0
+  note: style/003__const_eval/main.kix:74:5: evaluation failed here
+style/003__const_eval/main.kix:128:17: error[E4011]: `begin_text` while the timeline is anchored on `Mark(2)`
+  note: style/003__const_eval/main.kix:79:5: evaluation failed here
+style/003__const_eval/main.kix:129:17: error[E4012]: opacity must be in 0.0..=1.0, found 1.5
+  note: style/003__const_eval/main.kix:83:5: evaluation failed here
+style/003__const_eval/main.kix:130:17: error[E4012]: channel volume must be in 0.0..=1.0, found 2.0
+  note: style/003__const_eval/main.kix:87:5: evaluation failed here
+style/003__const_eval/main.kix:131:17: error[E4012]: the anchor's y must be in 0.0..=1.0, found 1.5
+  note: style/003__const_eval/main.kix:91:5: evaluation failed here
+style/003__const_eval/main.kix:136:16: error[E4002]: attempt to divide by zero (with arguments `(0)`)
+  note: style/003__const_eval/main.kix:112:6: evaluation failed here
+style/003__const_eval/main.kix:137:15: error[E4004]: this call has too many argument combinations to tabulate: more than the limit of 65536
 --- resolutions ---
-style/003__const_eval/main.kix:7:10 EntityId -> struct std::screen::EntityId
-style/003__const_eval/main.kix:7:21 EntityId -> struct std::screen::EntityId
-style/003__const_eval/main.kix:8:11 ImageAsset -> struct std::ImageAsset
-style/003__const_eval/main.kix:8:24 asset -> fn std::asset
-style/003__const_eval/main.kix:11:24 Text -> struct std::narrative::text::Text
-style/003__const_eval/main.kix:11:31 concat -> fn std::narrative::text::concat
-style/003__const_eval/main.kix:11:39 effect -> fn std::narrative::text::effect
-style/003__const_eval/main.kix:11:51 mark -> fn std::narrative::text::mark
-style/003__const_eval/main.kix:11:61 effect -> fn std::narrative::text::effect
-style/003__const_eval/main.kix:11:73 mark -> fn std::narrative::text::mark
-style/003__const_eval/main.kix:12:23 Vec -> struct std::Vec
-style/003__const_eval/main.kix:12:27 u32 -> prim u32
-style/003__const_eval/main.kix:13:9 v -> local v@13:9
-style/003__const_eval/main.kix:13:17 Vec::new -> fn std::Vec::new
-style/003__const_eval/main.kix:14:5 v -> local v@13:9
-style/003__const_eval/main.kix:15:5 v -> local v@13:9
-style/003__const_eval/main.kix:16:5 v -> local v@13:9
-style/003__const_eval/main.kix:18:16 Vec -> struct std::Vec
-style/003__const_eval/main.kix:18:20 u32 -> prim u32
-style/003__const_eval/main.kix:18:27 vec_set -> fn crate::vec_set
+style/003__const_eval/main.kix:6:10 EntityId -> struct std::screen::EntityId
+style/003__const_eval/main.kix:6:21 EntityId -> struct std::screen::EntityId
+style/003__const_eval/main.kix:7:11 ImageAsset -> struct std::ImageAsset
+style/003__const_eval/main.kix:7:24 asset -> fn std::asset
+style/003__const_eval/main.kix:10:24 Text -> struct std::narrative::text::Text
+style/003__const_eval/main.kix:10:31 concat -> fn std::narrative::text::concat
+style/003__const_eval/main.kix:10:39 effect -> fn std::narrative::text::effect
+style/003__const_eval/main.kix:10:51 mark -> fn std::narrative::text::mark
+style/003__const_eval/main.kix:10:61 effect -> fn std::narrative::text::effect
+style/003__const_eval/main.kix:10:73 mark -> fn std::narrative::text::mark
+style/003__const_eval/main.kix:11:23 Vec -> struct std::Vec
+style/003__const_eval/main.kix:11:27 u32 -> prim u32
+style/003__const_eval/main.kix:12:9 v -> local v@12:9
+style/003__const_eval/main.kix:12:17 Vec::new -> fn std::Vec::new
+style/003__const_eval/main.kix:13:5 v -> local v@12:9
+style/003__const_eval/main.kix:14:5 v -> local v@12:9
+style/003__const_eval/main.kix:15:5 v -> local v@12:9
+style/003__const_eval/main.kix:17:16 Vec -> struct std::Vec
+style/003__const_eval/main.kix:17:20 u32 -> prim u32
+style/003__const_eval/main.kix:17:27 vec_set -> fn crate::vec_set
+style/003__const_eval/main.kix:18:22 Duration -> struct std::time::Duration
+style/003__const_eval/main.kix:18:33 secs -> fn std::time::secs
 style/003__const_eval/main.kix:19:22 Duration -> struct std::time::Duration
-style/003__const_eval/main.kix:19:33 secs -> fn std::time::secs
-style/003__const_eval/main.kix:20:22 Duration -> struct std::time::Duration
-style/003__const_eval/main.kix:20:33 ms -> fn std::time::ms
-style/003__const_eval/main.kix:20:53 ms -> fn std::time::ms
-style/003__const_eval/main.kix:21:17 u8 -> prim u8
-style/003__const_eval/main.kix:22:17 a -> local a@22:17
-style/003__const_eval/main.kix:22:20 i32 -> prim i32
-style/003__const_eval/main.kix:22:25 b -> local b@22:25
-style/003__const_eval/main.kix:22:28 i32 -> prim i32
-style/003__const_eval/main.kix:22:36 i32 -> prim i32
-style/003__const_eval/main.kix:23:5 a -> local a@22:17
-style/003__const_eval/main.kix:23:9 b -> local b@22:25
-style/003__const_eval/main.kix:25:17 i32 -> prim i32
-style/003__const_eval/main.kix:25:23 divide -> fn crate::divide
-style/003__const_eval/main.kix:26:15 n -> local n@26:15
-style/003__const_eval/main.kix:26:18 u64 -> prim u64
-style/003__const_eval/main.kix:26:26 u64 -> prim u64
-style/003__const_eval/main.kix:27:9 i -> local i@27:9
-style/003__const_eval/main.kix:28:11 i -> local i@27:9
-style/003__const_eval/main.kix:28:15 n -> local n@26:15
-style/003__const_eval/main.kix:29:9 i -> local i@27:9
-style/003__const_eval/main.kix:29:13 i -> local i@27:9
-style/003__const_eval/main.kix:31:5 i -> local i@27:9
-style/003__const_eval/main.kix:33:15 u64 -> prim u64
-style/003__const_eval/main.kix:33:21 spin -> fn crate::spin
-style/003__const_eval/main.kix:34:15 n -> local n@34:15
-style/003__const_eval/main.kix:34:18 u64 -> prim u64
-style/003__const_eval/main.kix:34:26 u64 -> prim u64
-style/003__const_eval/main.kix:35:8 n -> local n@34:15
-style/003__const_eval/main.kix:35:28 deep -> fn crate::deep
-style/003__const_eval/main.kix:35:33 n -> local n@34:15
-style/003__const_eval/main.kix:37:13 u64 -> prim u64
-style/003__const_eval/main.kix:37:19 deep -> fn crate::deep
-style/003__const_eval/main.kix:38:18 n -> local n@38:18
-style/003__const_eval/main.kix:38:21 u64 -> prim u64
-style/003__const_eval/main.kix:38:29 u64 -> prim u64
-style/003__const_eval/main.kix:39:5 forever -> fn crate::forever
-style/003__const_eval/main.kix:39:13 n -> local n@38:18
-style/003__const_eval/main.kix:41:18 u64 -> prim u64
-style/003__const_eval/main.kix:41:24 forever -> fn crate::forever
-style/003__const_eval/main.kix:42:14 i32 -> prim i32
-style/003__const_eval/main.kix:43:9 a -> local a@43:9
-style/003__const_eval/main.kix:44:5 a -> local a@43:9
-style/003__const_eval/main.kix:46:16 Decimal -> struct std::Decimal
-style/003__const_eval/main.kix:47:15 Setting -> struct std::system::Setting
-style/003__const_eval/main.kix:47:23 bool -> prim bool
-style/003__const_eval/main.kix:47:31 setting -> fn std::system::setting
-style/003__const_eval/main.kix:50:18 screen -> local screen@50:18
-style/003__const_eval/main.kix:50:30 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:50:41 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:51:5 screen -> local screen@50:18
-style/003__const_eval/main.kix:51:19 A -> const crate::A
-style/003__const_eval/main.kix:51:38 motion -> fn std::screen::anim::motion
-style/003__const_eval/main.kix:52:5 screen -> local screen@50:18
-style/003__const_eval/main.kix:54:22 screen -> local screen@54:22
-style/003__const_eval/main.kix:54:34 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:54:45 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:55:5 screen -> local screen@54:22
-style/003__const_eval/main.kix:55:19 A -> const crate::A
-style/003__const_eval/main.kix:55:38 motion -> fn std::screen::anim::motion
-style/003__const_eval/main.kix:55:51 ms -> fn std::time::ms
-style/003__const_eval/main.kix:55:58 offset -> fn std::screen::offset
-style/003__const_eval/main.kix:56:5 screen -> local screen@54:22
-style/003__const_eval/main.kix:58:30 screen -> local screen@58:30
-style/003__const_eval/main.kix:58:42 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:58:53 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:59:5 screen -> local screen@58:30
-style/003__const_eval/main.kix:59:19 A -> const crate::A
-style/003__const_eval/main.kix:59:38 motion -> fn std::screen::anim::motion
-style/003__const_eval/main.kix:59:51 ms -> fn std::time::ms
-style/003__const_eval/main.kix:59:60 offset -> fn std::screen::offset
-style/003__const_eval/main.kix:59:78 ms -> fn std::time::ms
-style/003__const_eval/main.kix:59:87 offset -> fn std::screen::offset
-style/003__const_eval/main.kix:60:5 screen -> local screen@58:30
-style/003__const_eval/main.kix:62:23 screen -> local screen@62:23
-style/003__const_eval/main.kix:62:35 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:62:46 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:63:5 screen -> local screen@62:23
-style/003__const_eval/main.kix:63:19 A -> const crate::A
-style/003__const_eval/main.kix:63:38 motion -> fn std::screen::anim::motion
-style/003__const_eval/main.kix:63:51 ms -> fn std::time::ms
-style/003__const_eval/main.kix:63:60 offset -> fn std::screen::offset
-style/003__const_eval/main.kix:64:5 screen -> local screen@62:23
-style/003__const_eval/main.kix:66:22 screen -> local screen@66:22
-style/003__const_eval/main.kix:66:34 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:66:45 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:67:5 screen -> local screen@66:22
-style/003__const_eval/main.kix:67:37 shake -> fn std::screen::anim::shake
-style/003__const_eval/main.kix:67:46 ms -> fn std::time::ms
-style/003__const_eval/main.kix:68:5 screen -> local screen@66:22
-style/003__const_eval/main.kix:70:17 screen -> local screen@70:17
-style/003__const_eval/main.kix:70:29 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:70:40 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:71:5 screen -> local screen@70:17
-style/003__const_eval/main.kix:71:19 A -> const crate::A
-style/003__const_eval/main.kix:71:60 tween -> fn std::screen::anim::tween
-style/003__const_eval/main.kix:71:66 ms -> fn std::time::ms
-style/003__const_eval/main.kix:71:80 Easing::CubicBezier -> variant std::screen::anim::Easing::CubicBezier
-style/003__const_eval/main.kix:72:5 screen -> local screen@70:17
-style/003__const_eval/main.kix:74:21 screen -> local screen@74:21
-style/003__const_eval/main.kix:74:33 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:74:44 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:75:5 screen -> local screen@74:21
-style/003__const_eval/main.kix:75:32 BG -> const crate::BG
-style/003__const_eval/main.kix:75:52 fade -> fn std::screen::anim::fade
-style/003__const_eval/main.kix:75:57 ms -> fn std::time::ms
-style/003__const_eval/main.kix:75:71 Easing::Steps -> variant std::screen::anim::Easing::Steps
-style/003__const_eval/main.kix:76:5 screen -> local screen@74:21
-style/003__const_eval/main.kix:78:23 screen -> local screen@78:23
-style/003__const_eval/main.kix:78:35 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:78:46 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:79:5 screen -> local screen@78:23
-style/003__const_eval/main.kix:79:20 Mark -> struct std::narrative::text::Mark
-style/003__const_eval/main.kix:80:5 screen -> local screen@78:23
-style/003__const_eval/main.kix:81:5 screen -> local screen@78:23
-style/003__const_eval/main.kix:83:18 screen -> local screen@83:18
-style/003__const_eval/main.kix:83:30 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:83:41 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:84:5 screen -> local screen@83:18
-style/003__const_eval/main.kix:84:19 A -> const crate::A
-style/003__const_eval/main.kix:84:60 instant -> fn std::screen::anim::instant
-style/003__const_eval/main.kix:85:5 screen -> local screen@83:18
-style/003__const_eval/main.kix:87:17 screen -> local screen@87:17
-style/003__const_eval/main.kix:87:29 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:87:40 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:88:5 screen -> local screen@87:17
-style/003__const_eval/main.kix:88:57 instant -> fn std::screen::anim::instant
-style/003__const_eval/main.kix:89:5 screen -> local screen@87:17
-style/003__const_eval/main.kix:91:17 screen -> local screen@91:17
-style/003__const_eval/main.kix:91:29 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:91:40 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:92:5 screen -> local screen@91:17
-style/003__const_eval/main.kix:92:19 A -> const crate::A
-style/003__const_eval/main.kix:92:33 Anchor -> struct std::screen::Anchor
-style/003__const_eval/main.kix:93:5 screen -> local screen@91:17
-style/003__const_eval/main.kix:95:20 screen -> local screen@95:20
-style/003__const_eval/main.kix:95:32 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:95:43 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:96:5 screen -> local screen@95:20
-style/003__const_eval/main.kix:96:28 NO_FILTER -> const std::screen::NO_FILTER
-style/003__const_eval/main.kix:96:70 instant -> fn std::screen::anim::instant
-style/003__const_eval/main.kix:97:5 screen -> local screen@95:20
-style/003__const_eval/main.kix:101:16 _screen -> local _screen@101:16
-style/003__const_eval/main.kix:101:25 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:101:36 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:102:9 screen -> local screen@102:9
-style/003__const_eval/main.kix:102:22 Screen::empty -> fn std::screen::Screen::empty
-style/003__const_eval/main.kix:103:5 screen -> local screen@102:9
-style/003__const_eval/main.kix:103:32 BG -> const crate::BG
-style/003__const_eval/main.kix:103:52 fade -> fn std::screen::anim::fade
-style/003__const_eval/main.kix:103:57 ms -> fn std::time::ms
-style/003__const_eval/main.kix:104:5 screen -> local screen@102:9
-style/003__const_eval/main.kix:106:16 screen -> local screen@106:16
-style/003__const_eval/main.kix:106:28 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:106:39 Screen -> struct std::screen::Screen
-style/003__const_eval/main.kix:107:5 screen -> local screen@106:16
-style/003__const_eval/main.kix:107:19 A -> const crate::A
-style/003__const_eval/main.kix:107:37 BG -> const crate::BG
-style/003__const_eval/main.kix:107:57 cut -> fn std::screen::anim::cut
-style/003__const_eval/main.kix:108:5 screen -> local screen@106:16
-style/003__const_eval/main.kix:108:19 A -> const crate::A
-style/003__const_eval/main.kix:108:60 tween -> fn std::screen::anim::tween
-style/003__const_eval/main.kix:108:66 ms -> fn std::time::ms
-style/003__const_eval/main.kix:109:5 screen -> local screen@106:16
-style/003__const_eval/main.kix:113:17 Int -> prim Int
-style/003__const_eval/main.kix:114:17 Int -> prim Int
-style/003__const_eval/main.kix:115:18 day -> local day@115:18
-style/003__const_eval/main.kix:115:23 Int -> prim Int
-style/003__const_eval/main.kix:115:37 Int -> prim Int
-style/003__const_eval/main.kix:116:9 days -> local days@116:9
-style/003__const_eval/main.kix:116:15 u32 -> prim u32
-style/003__const_eval/main.kix:116:21 day -> local day@115:18
-style/003__const_eval/main.kix:117:14 days -> local days@116:9
-style/003__const_eval/main.kix:119:15 x -> local x@119:15
-style/003__const_eval/main.kix:119:18 Int -> prim Int
-style/003__const_eval/main.kix:119:37 Int -> prim Int
-style/003__const_eval/main.kix:120:5 x -> local x@119:15
-style/003__const_eval/main.kix:126:17 no_keys -> fn crate::no_keys
-style/003__const_eval/main.kix:127:17 key_at_zero -> fn crate::key_at_zero
-style/003__const_eval/main.kix:128:17 keys_not_increasing -> fn crate::keys_not_increasing
-style/003__const_eval/main.kix:129:17 not_identity -> fn crate::not_identity
-style/003__const_eval/main.kix:130:17 repeat_zero -> fn crate::repeat_zero
-style/003__const_eval/main.kix:131:17 bezier -> fn crate::bezier
-style/003__const_eval/main.kix:132:17 steps_zero -> fn crate::steps_zero
-style/003__const_eval/main.kix:133:17 text_on_mark -> fn crate::text_on_mark
-style/003__const_eval/main.kix:134:17 opacity -> fn crate::opacity
-style/003__const_eval/main.kix:135:17 volume -> fn crate::volume
-style/003__const_eval/main.kix:136:17 anchor -> fn crate::anchor
-style/003__const_eval/main.kix:137:17 grayscale -> fn crate::grayscale
-style/003__const_eval/main.kix:138:17 fresh -> fn crate::fresh
-style/003__const_eval/main.kix:138:35 DAY -> static crate::DAY
-style/003__const_eval/main.kix:139:17 enter -> fn crate::enter
-style/003__const_eval/main.kix:140:18 _screen -> local _screen@140:18
-style/003__const_eval/main.kix:140:27 Screen::empty -> fn std::screen::Screen::empty
-style/003__const_eval/main.kix:141:18 screen -> local screen@141:18
-style/003__const_eval/main.kix:141:32 screen -> local screen@141:18
-style/003__const_eval/main.kix:141:66 Visibility::Hidden -> variant std::screen::Visibility::Hidden
-style/003__const_eval/main.kix:141:102 instant -> fn std::screen::anim::instant
-style/003__const_eval/main.kix:141:114 screen -> local screen@141:18
-style/003__const_eval/main.kix:142:9 rate -> local rate@142:9
-style/003__const_eval/main.kix:142:16 per_day -> fn crate::per_day
-style/003__const_eval/main.kix:142:24 DAY -> static crate::DAY
-style/003__const_eval/main.kix:143:9 big -> local big@143:9
-style/003__const_eval/main.kix:143:15 same -> fn crate::same
-style/003__const_eval/main.kix:143:20 BIG -> static crate::BIG
+style/003__const_eval/main.kix:19:33 ms -> fn std::time::ms
+style/003__const_eval/main.kix:19:53 ms -> fn std::time::ms
+style/003__const_eval/main.kix:20:17 u8 -> prim u8
+style/003__const_eval/main.kix:21:17 a -> local a@21:17
+style/003__const_eval/main.kix:21:20 i32 -> prim i32
+style/003__const_eval/main.kix:21:25 b -> local b@21:25
+style/003__const_eval/main.kix:21:28 i32 -> prim i32
+style/003__const_eval/main.kix:21:36 i32 -> prim i32
+style/003__const_eval/main.kix:22:5 a -> local a@21:17
+style/003__const_eval/main.kix:22:9 b -> local b@21:25
+style/003__const_eval/main.kix:24:17 i32 -> prim i32
+style/003__const_eval/main.kix:24:23 divide -> fn crate::divide
+style/003__const_eval/main.kix:25:15 n -> local n@25:15
+style/003__const_eval/main.kix:25:18 u64 -> prim u64
+style/003__const_eval/main.kix:25:26 u64 -> prim u64
+style/003__const_eval/main.kix:26:9 i -> local i@26:9
+style/003__const_eval/main.kix:27:11 i -> local i@26:9
+style/003__const_eval/main.kix:27:15 n -> local n@25:15
+style/003__const_eval/main.kix:28:9 i -> local i@26:9
+style/003__const_eval/main.kix:28:13 i -> local i@26:9
+style/003__const_eval/main.kix:30:5 i -> local i@26:9
+style/003__const_eval/main.kix:32:15 u64 -> prim u64
+style/003__const_eval/main.kix:32:21 spin -> fn crate::spin
+style/003__const_eval/main.kix:33:15 n -> local n@33:15
+style/003__const_eval/main.kix:33:18 u64 -> prim u64
+style/003__const_eval/main.kix:33:26 u64 -> prim u64
+style/003__const_eval/main.kix:34:8 n -> local n@33:15
+style/003__const_eval/main.kix:34:28 deep -> fn crate::deep
+style/003__const_eval/main.kix:34:33 n -> local n@33:15
+style/003__const_eval/main.kix:36:13 u64 -> prim u64
+style/003__const_eval/main.kix:36:19 deep -> fn crate::deep
+style/003__const_eval/main.kix:37:18 n -> local n@37:18
+style/003__const_eval/main.kix:37:21 u64 -> prim u64
+style/003__const_eval/main.kix:37:29 u64 -> prim u64
+style/003__const_eval/main.kix:38:5 forever -> fn crate::forever
+style/003__const_eval/main.kix:38:13 n -> local n@37:18
+style/003__const_eval/main.kix:40:18 u64 -> prim u64
+style/003__const_eval/main.kix:40:24 forever -> fn crate::forever
+style/003__const_eval/main.kix:41:14 i32 -> prim i32
+style/003__const_eval/main.kix:42:9 a -> local a@42:9
+style/003__const_eval/main.kix:43:5 a -> local a@42:9
+style/003__const_eval/main.kix:45:16 Decimal -> struct std::Decimal
+style/003__const_eval/main.kix:46:15 Setting -> struct std::system::Setting
+style/003__const_eval/main.kix:46:23 bool -> prim bool
+style/003__const_eval/main.kix:46:31 setting -> fn std::system::setting
+style/003__const_eval/main.kix:49:18 screen -> local screen@49:18
+style/003__const_eval/main.kix:49:30 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:49:41 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:50:5 screen -> local screen@49:18
+style/003__const_eval/main.kix:50:19 A -> const crate::A
+style/003__const_eval/main.kix:50:38 motion -> fn std::screen::anim::motion
+style/003__const_eval/main.kix:51:5 screen -> local screen@49:18
+style/003__const_eval/main.kix:53:22 screen -> local screen@53:22
+style/003__const_eval/main.kix:53:34 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:53:45 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:54:5 screen -> local screen@53:22
+style/003__const_eval/main.kix:54:19 A -> const crate::A
+style/003__const_eval/main.kix:54:38 motion -> fn std::screen::anim::motion
+style/003__const_eval/main.kix:54:51 ms -> fn std::time::ms
+style/003__const_eval/main.kix:54:58 offset -> fn std::screen::offset
+style/003__const_eval/main.kix:55:5 screen -> local screen@53:22
+style/003__const_eval/main.kix:57:30 screen -> local screen@57:30
+style/003__const_eval/main.kix:57:42 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:57:53 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:58:5 screen -> local screen@57:30
+style/003__const_eval/main.kix:58:19 A -> const crate::A
+style/003__const_eval/main.kix:58:38 motion -> fn std::screen::anim::motion
+style/003__const_eval/main.kix:58:51 ms -> fn std::time::ms
+style/003__const_eval/main.kix:58:60 offset -> fn std::screen::offset
+style/003__const_eval/main.kix:58:78 ms -> fn std::time::ms
+style/003__const_eval/main.kix:58:87 offset -> fn std::screen::offset
+style/003__const_eval/main.kix:59:5 screen -> local screen@57:30
+style/003__const_eval/main.kix:61:23 screen -> local screen@61:23
+style/003__const_eval/main.kix:61:35 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:61:46 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:62:5 screen -> local screen@61:23
+style/003__const_eval/main.kix:62:19 A -> const crate::A
+style/003__const_eval/main.kix:62:38 motion -> fn std::screen::anim::motion
+style/003__const_eval/main.kix:62:51 ms -> fn std::time::ms
+style/003__const_eval/main.kix:62:60 offset -> fn std::screen::offset
+style/003__const_eval/main.kix:63:5 screen -> local screen@61:23
+style/003__const_eval/main.kix:65:22 screen -> local screen@65:22
+style/003__const_eval/main.kix:65:34 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:65:45 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:66:5 screen -> local screen@65:22
+style/003__const_eval/main.kix:66:37 shake -> fn std::screen::anim::shake
+style/003__const_eval/main.kix:66:46 ms -> fn std::time::ms
+style/003__const_eval/main.kix:67:5 screen -> local screen@65:22
+style/003__const_eval/main.kix:69:17 screen -> local screen@69:17
+style/003__const_eval/main.kix:69:29 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:69:40 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:70:5 screen -> local screen@69:17
+style/003__const_eval/main.kix:70:19 A -> const crate::A
+style/003__const_eval/main.kix:70:60 tween -> fn std::screen::anim::tween
+style/003__const_eval/main.kix:70:66 ms -> fn std::time::ms
+style/003__const_eval/main.kix:70:80 Easing::CubicBezier -> variant std::screen::anim::Easing::CubicBezier
+style/003__const_eval/main.kix:71:5 screen -> local screen@69:17
+style/003__const_eval/main.kix:73:21 screen -> local screen@73:21
+style/003__const_eval/main.kix:73:33 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:73:44 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:74:5 screen -> local screen@73:21
+style/003__const_eval/main.kix:74:32 BG -> const crate::BG
+style/003__const_eval/main.kix:74:52 fade -> fn std::screen::anim::fade
+style/003__const_eval/main.kix:74:57 ms -> fn std::time::ms
+style/003__const_eval/main.kix:74:71 Easing::Steps -> variant std::screen::anim::Easing::Steps
+style/003__const_eval/main.kix:75:5 screen -> local screen@73:21
+style/003__const_eval/main.kix:77:23 screen -> local screen@77:23
+style/003__const_eval/main.kix:77:35 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:77:46 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:78:5 screen -> local screen@77:23
+style/003__const_eval/main.kix:78:20 Mark -> struct std::narrative::text::Mark
+style/003__const_eval/main.kix:79:5 screen -> local screen@77:23
+style/003__const_eval/main.kix:80:5 screen -> local screen@77:23
+style/003__const_eval/main.kix:82:18 screen -> local screen@82:18
+style/003__const_eval/main.kix:82:30 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:82:41 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:83:5 screen -> local screen@82:18
+style/003__const_eval/main.kix:83:19 A -> const crate::A
+style/003__const_eval/main.kix:83:60 instant -> fn std::screen::anim::instant
+style/003__const_eval/main.kix:84:5 screen -> local screen@82:18
+style/003__const_eval/main.kix:86:17 screen -> local screen@86:17
+style/003__const_eval/main.kix:86:29 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:86:40 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:87:5 screen -> local screen@86:17
+style/003__const_eval/main.kix:87:57 instant -> fn std::screen::anim::instant
+style/003__const_eval/main.kix:88:5 screen -> local screen@86:17
+style/003__const_eval/main.kix:90:17 screen -> local screen@90:17
+style/003__const_eval/main.kix:90:29 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:90:40 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:91:5 screen -> local screen@90:17
+style/003__const_eval/main.kix:91:19 A -> const crate::A
+style/003__const_eval/main.kix:91:33 Anchor -> struct std::screen::Anchor
+style/003__const_eval/main.kix:92:5 screen -> local screen@90:17
+style/003__const_eval/main.kix:96:16 _screen -> local _screen@96:16
+style/003__const_eval/main.kix:96:25 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:96:36 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:97:9 screen -> local screen@97:9
+style/003__const_eval/main.kix:97:22 Screen::empty -> fn std::screen::Screen::empty
+style/003__const_eval/main.kix:98:5 screen -> local screen@97:9
+style/003__const_eval/main.kix:98:32 BG -> const crate::BG
+style/003__const_eval/main.kix:98:52 fade -> fn std::screen::anim::fade
+style/003__const_eval/main.kix:98:57 ms -> fn std::time::ms
+style/003__const_eval/main.kix:99:5 screen -> local screen@97:9
+style/003__const_eval/main.kix:101:16 screen -> local screen@101:16
+style/003__const_eval/main.kix:101:28 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:101:39 Screen -> struct std::screen::Screen
+style/003__const_eval/main.kix:102:5 screen -> local screen@101:16
+style/003__const_eval/main.kix:102:19 A -> const crate::A
+style/003__const_eval/main.kix:102:37 BG -> const crate::BG
+style/003__const_eval/main.kix:102:57 cut -> fn std::screen::anim::cut
+style/003__const_eval/main.kix:103:5 screen -> local screen@101:16
+style/003__const_eval/main.kix:103:19 A -> const crate::A
+style/003__const_eval/main.kix:103:60 tween -> fn std::screen::anim::tween
+style/003__const_eval/main.kix:103:66 ms -> fn std::time::ms
+style/003__const_eval/main.kix:104:5 screen -> local screen@101:16
+style/003__const_eval/main.kix:108:17 Int -> prim Int
+style/003__const_eval/main.kix:109:17 Int -> prim Int
+style/003__const_eval/main.kix:110:18 day -> local day@110:18
+style/003__const_eval/main.kix:110:23 Int -> prim Int
+style/003__const_eval/main.kix:110:37 Int -> prim Int
+style/003__const_eval/main.kix:111:9 days -> local days@111:9
+style/003__const_eval/main.kix:111:15 u32 -> prim u32
+style/003__const_eval/main.kix:111:21 day -> local day@110:18
+style/003__const_eval/main.kix:112:14 days -> local days@111:9
+style/003__const_eval/main.kix:114:15 x -> local x@114:15
+style/003__const_eval/main.kix:114:18 Int -> prim Int
+style/003__const_eval/main.kix:114:37 Int -> prim Int
+style/003__const_eval/main.kix:115:5 x -> local x@114:15
+style/003__const_eval/main.kix:121:17 no_keys -> fn crate::no_keys
+style/003__const_eval/main.kix:122:17 key_at_zero -> fn crate::key_at_zero
+style/003__const_eval/main.kix:123:17 keys_not_increasing -> fn crate::keys_not_increasing
+style/003__const_eval/main.kix:124:17 not_identity -> fn crate::not_identity
+style/003__const_eval/main.kix:125:17 repeat_zero -> fn crate::repeat_zero
+style/003__const_eval/main.kix:126:17 bezier -> fn crate::bezier
+style/003__const_eval/main.kix:127:17 steps_zero -> fn crate::steps_zero
+style/003__const_eval/main.kix:128:17 text_on_mark -> fn crate::text_on_mark
+style/003__const_eval/main.kix:129:17 opacity -> fn crate::opacity
+style/003__const_eval/main.kix:130:17 volume -> fn crate::volume
+style/003__const_eval/main.kix:131:17 anchor -> fn crate::anchor
+style/003__const_eval/main.kix:132:17 fresh -> fn crate::fresh
+style/003__const_eval/main.kix:132:35 DAY -> static crate::DAY
+style/003__const_eval/main.kix:133:17 enter -> fn crate::enter
+style/003__const_eval/main.kix:134:18 _screen -> local _screen@134:18
+style/003__const_eval/main.kix:134:27 Screen::empty -> fn std::screen::Screen::empty
+style/003__const_eval/main.kix:135:18 screen -> local screen@135:18
+style/003__const_eval/main.kix:135:32 screen -> local screen@135:18
+style/003__const_eval/main.kix:135:66 Visibility::Hidden -> variant std::screen::Visibility::Hidden
+style/003__const_eval/main.kix:135:102 instant -> fn std::screen::anim::instant
+style/003__const_eval/main.kix:135:114 screen -> local screen@135:18
+style/003__const_eval/main.kix:136:9 rate -> local rate@136:9
+style/003__const_eval/main.kix:136:16 per_day -> fn crate::per_day
+style/003__const_eval/main.kix:136:24 DAY -> static crate::DAY
+style/003__const_eval/main.kix:137:9 big -> local big@137:9
+style/003__const_eval/main.kix:137:15 same -> fn crate::same
+style/003__const_eval/main.kix:137:20 BIG -> static crate::BIG
 --- renders ---
-style/003__const_eval/main.kix:50:10 no_keys -> delta
-style/003__const_eval/main.kix:54:10 key_at_zero -> delta
-style/003__const_eval/main.kix:58:10 keys_not_increasing -> delta
-style/003__const_eval/main.kix:62:10 not_identity -> delta
-style/003__const_eval/main.kix:66:10 repeat_zero -> delta
-style/003__const_eval/main.kix:70:10 bezier -> delta
-style/003__const_eval/main.kix:74:10 steps_zero -> delta
-style/003__const_eval/main.kix:78:10 text_on_mark -> delta
-style/003__const_eval/main.kix:83:10 opacity -> delta
-style/003__const_eval/main.kix:87:10 volume -> delta
-style/003__const_eval/main.kix:91:10 anchor -> delta
-style/003__const_eval/main.kix:95:10 grayscale -> delta
-style/003__const_eval/main.kix:101:10 fresh -> keyframe
-style/003__const_eval/main.kix:106:10 enter -> delta
-style/003__const_eval/main.kix:140:17 closure in Start -> keyframe
-style/003__const_eval/main.kix:141:17 closure in Start -> delta
+style/003__const_eval/main.kix:49:10 no_keys -> delta
+style/003__const_eval/main.kix:53:10 key_at_zero -> delta
+style/003__const_eval/main.kix:57:10 keys_not_increasing -> delta
+style/003__const_eval/main.kix:61:10 not_identity -> delta
+style/003__const_eval/main.kix:65:10 repeat_zero -> delta
+style/003__const_eval/main.kix:69:10 bezier -> delta
+style/003__const_eval/main.kix:73:10 steps_zero -> delta
+style/003__const_eval/main.kix:77:10 text_on_mark -> delta
+style/003__const_eval/main.kix:82:10 opacity -> delta
+style/003__const_eval/main.kix:86:10 volume -> delta
+style/003__const_eval/main.kix:90:10 anchor -> delta
+style/003__const_eval/main.kix:96:10 fresh -> keyframe
+style/003__const_eval/main.kix:101:10 enter -> delta
+style/003__const_eval/main.kix:134:17 closure in Start -> keyframe
+style/003__const_eval/main.kix:135:17 closure in Start -> delta

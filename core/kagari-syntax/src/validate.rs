@@ -139,7 +139,7 @@ fn validate_form(node: &SyntaxNode, kind: SourceKind, errors: &mut Vec<SyntaxErr
 
     match name.as_str() {
         "s" => {
-            check_keys(&name, &keys, &["who", "voice", "render"], errors);
+            check_keys(&name, &keys, &["who", "voice", "render", "history"], errors);
             for (index, element) in elements.iter().enumerate() {
                 if index >= 1 {
                     errors.push(SyntaxError::new(

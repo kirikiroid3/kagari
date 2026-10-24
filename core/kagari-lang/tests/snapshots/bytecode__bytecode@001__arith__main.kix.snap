@@ -1,0 +1,159 @@
+---
+source: core/kagari-lang/tests/bytecode.rs
+expression: out
+input_file: core/kagari-lang/tests/bytecode/001__arith/main.kix
+---
+001__arith/main.kix:88:4: warning[W6001]: the game is never started: no reachable mode calls `nav::start` or `nav::load`
+--- bytecode ---
+fn crate::ints [fn] params=2 regs=15
+  0000 INT r10, 2
+  0001 IMUL r9, r0, r10, u8
+  0002 INT r11, 1
+  0003 IADD r2, r9, r11, u8
+  0004 INT r12, 3
+  0005 IMUL r11, r12, r1, i32
+  0006 INT r13, 2
+  0007 IDIV r10, r11, r13, i32
+  0008 INT r14, 7
+  0009 IREM r9, r10, r14, i32
+  0010 ISUB r3, r1, r9, i32
+  0011 INT r10, 2
+  0012 ISHL r9, r1, r10, i32
+  0013 INT r11, 1
+  0014 ISHR r4, r9, r11, i32
+  0015 INT r10, 15
+  0016 IAND r9, r0, r10, u8
+  0017 INT r12, 3
+  0018 IXOR r11, r0, r12, u8
+  0019 IOR r5, r9, r11, u8
+  0020 MOVE r9, r2
+  0021 MOVE r6, r9
+  0022 MOVE r9, r5
+  0023 MOVE r7, r9
+  0024 IADD r11, r3, r4, i32
+  0025 IADD r10, r11, r6, i32
+  0026 IADD r9, r10, r7, i32
+  0027 INEG r8, r9, i32
+  0028 RET r8
+
+fn crate::bounded [fn] params=1 regs=6
+  0000 INT r1, 4
+  0001 INT r5, 3
+  0002 IADD r1, r1, r5, i128
+  0003 ICLAMP r1, r1, Int<0,5>
+  0004 MOVE r5, r0
+  0005 ICLAMP r2, r5, u8
+  0006 MOVE r5, r2
+  0007 MOVE r3, r5
+  0008 MOVE r4, r3
+  0009 RET r4
+
+fn crate::decimals [fn] params=1 regs=7
+  0000 CONST r4, #12 1.0
+  0001 CONST r5, #13 3.0
+  0002 DDIV r1, r4, r5
+  0003 INT r5, 1
+  0004 INT r6, 3
+  0005 RATNEW r4, r5, r6
+  0006 RATDEC r2, r4
+  0007 CONST r6, #14 0.5
+  0008 DMUL r5, r0, r6
+  0009 DADD r4, r5, r1
+  0010 DSUB r3, r4, r2
+  0011 RET r3
+
+fn crate::rats [fn] params=0 regs=7
+  0000 INT r2, 1
+  0001 INT r3, 3
+  0002 RATNEW r0, r2, r3
+  0003 RMUL r2, r0, r0
+  0004 INT r5, 2
+  0005 INT r6, 1
+  0006 RATNEW r4, r5, r6
+  0007 RDIV r3, r0, r4
+  0008 RSUB r1, r2, r3
+  0009 RET r1
+
+fn crate::compare [fn] params=3 regs=7
+  0000 LT r3, r0, r1
+  0001 JMPNOT r3, @0004
+  0002 CONST r4, #14 0.5
+  0003 GE r3, r2, r4
+  0004 JMPIF r3, @0007
+  0005 EQ r5, r0, r1
+  0006 NOT r3, r5
+  0007 JMPIF r3, @0010
+  0008 INT r6, 3
+  0009 NE r3, r0, r6
+  0010 RET r3
+
+fn crate::main [fn, main] params=0 regs=28
+  0000 CONST r1, #15 "Arithmetic"
+  0001 INT r11, 1280
+  0002 INT r12, 720
+  0003 CALL r2, (r11, r12), std::screen::size
+  0004 FUNC r3, crate::Title
+  0005 FUNC r4, crate::GameView
+  0006 INT r5, 20
+  0007 INT r6, 3
+  0008 INT r7, 200
+  0009 INT r13, 26
+  0010 CONST r14, #17 std::screen::Color {255, 255, 255, 255}
+  0011 CALL r8, (r13, r14), std::narrative::text::text_style
+  0012 CONST r15, #18 crate::TEXT_SPEED
+  0013 CONST r16, #19 crate::AUTO_DELAY
+  0014 CONST r17, #20 crate::AUTO_DELAY_PER_CHAR
+  0015 CONST r18, #21 crate::SKIP_UNREAD
+  0016 CONST r19, #22 crate::MASTER
+  0017 CONST r20, #23 crate::MUSIC
+  0018 CONST r21, #24 crate::SOUND
+  0019 CONST r22, #25 crate::VOICE
+  0020 CONST r23, #26 crate::VOICE_SUSTAIN
+  0021 CONST r24, #27 crate::WAIT_FOR_VOICE
+  0022 CONST r25, #28 crate::WINDOW_OPACITY
+  0023 CONST r26, #29 crate::FULLSCREEN
+  0024 CONST r27, #30 crate::ANIMATIONS
+  0025 ADT r9, (r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27), std::system::Settings
+  0026 CALL r10, (), std::system::default_bindings
+  0027 ADT r0, (r1, r2, r3, r4, r5, r6, r7, r8, r9, r10), std::system::System
+  0028 RET r0
+
+fn crate::Title [fn] params=0 regs=5
+  0000 ADT r3, (), std::Option::None
+  0001 CLOSURE r4, (), crate::Title::{closure#0}
+  0002 ADT r2, (r3, r4), std::ui::TextProps
+  0003 CALLIMP r1, (r2), std::ui::text
+  0004 ADT r0, (r1), std::system::RootPage
+  0005 RET r0
+
+fn crate::GameView [fn] params=1 regs=5
+  0000 MOVE r4, r0
+  0001 CLOSURE r3, (r4), crate::GameView::{closure#0}
+  0002 ADT r2, (r3), std::ui::GameScreenProps
+  0003 CALLIMP r1, (r2), std::ui::game_screen
+  0004 RET r1
+
+fn crate::Title::{closure#0} [fn, closure] params=0 regs=1
+  0000 CONST r0, #32 "Title"
+  0001 RET r0
+
+fn crate::GameView::{closure#0} [fn, closure] params=1 regs=2
+  0000 MOVE r1, r0
+  0001 RET r1
+
+import std::ui::text [fn] params=1
+import std::ui::game_screen [fn] params=1
+static crate::TEXT_SPEED [setting] = std::time::Duration {30}
+static crate::AUTO_DELAY [setting] = std::time::Duration {1300}
+static crate::AUTO_DELAY_PER_CHAR [setting] = std::time::Duration {60}
+static crate::SKIP_UNREAD [setting] = false
+static crate::MASTER [setting] = std::system::Volume {100, false}
+static crate::MUSIC [setting] = std::system::Volume {60, false}
+static crate::SOUND [setting] = std::system::Volume {100, false}
+static crate::VOICE [setting] = std::system::Volume {100, false}
+static crate::VOICE_SUSTAIN [setting] = false
+static crate::WAIT_FOR_VOICE [setting] = true
+static crate::WINDOW_OPACITY [setting] = 80
+static crate::FULLSCREEN [setting] = false
+static crate::ANIMATIONS [setting] = true
+options max_call_depth=2048

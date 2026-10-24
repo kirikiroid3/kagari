@@ -1,0 +1,9 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/analysis/008__rng_stepless/main.kix
+---
+analysis/008__rng_stepless/main.kix:7:5: error[E5001]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
+--- resolutions ---
+analysis/008__rng_stepless/main.kix:8:17 rng_choose -> fn std::narrative::rng_choose
+analysis/008__rng_stepless/main.kix:8:30 Int -> prim Int

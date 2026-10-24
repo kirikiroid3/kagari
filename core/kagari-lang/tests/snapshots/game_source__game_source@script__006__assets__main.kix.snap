@@ -3,8 +3,8 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/script/006__assets/main.kix
 ---
-script/006__assets/main.kix:2:35: error[resolve/asset-not-found]: asset file `missing.png` not found
-script/006__assets/main.kix:3:33: error[resolve/empty-asset-path]: asset path must not be empty
+script/006__assets/main.kix:2:35: error[E1027]: asset file `missing.png` not found
+script/006__assets/main.kix:3:33: error[E1028]: asset path must not be empty
 --- resolutions ---
 script/006__assets/main.kix:1:15 ImageAsset -> struct std::ImageAsset
 script/006__assets/main.kix:1:28 asset -> fn std::asset

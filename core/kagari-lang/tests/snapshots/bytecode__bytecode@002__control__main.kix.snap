@@ -1,0 +1,269 @@
+---
+source: core/kagari-lang/tests/bytecode.rs
+expression: out
+input_file: core/kagari-lang/tests/bytecode/002__control/main.kix
+---
+002__control/main.kix:122:4: warning[W6001]: the game is never started: no reachable mode calls `nav::start` or `nav::load`
+--- bytecode ---
+fn crate::area [fn] params=1 regs=18
+  0000 MOVE r7, r0
+  0001 ISVAR r8, r7, crate::Shape::Dot
+  0002 JMPNOT r8, @0005
+  0003 INT r6, 0
+  0004 JMP @0034
+  0005 ISVAR r9, r7, crate::Shape::Line
+  0006 JMPNOT r9, @0013
+  0007 FIELD r1, r7, 0
+  0008 INT r11, 10
+  0009 GT r10, r1, r11
+  0010 JMPNOT r10, @0013
+  0011 INT r6, 10
+  0012 JMP @0034
+  0013 ISVAR r12, r7, crate::Shape::Line
+  0014 JMPNOT r12, @0018
+  0015 FIELD r2, r7, 0
+  0016 MOVE r6, r2
+  0017 JMP @0034
+  0018 ISVAR r13, r7, crate::Shape::Rect
+  0019 JMPNOT r13, @0027
+  0020 FIELD r3, r7, 0
+  0021 FIELD r14, r7, 1
+  0022 INT r15, 0
+  0023 EQ r16, r14, r15
+  0024 JMPNOT r16, @0027
+  0025 MOVE r6, r3
+  0026 JMP @0034
+  0027 ISVAR r17, r7, crate::Shape::Rect
+  0028 JMPNOT r17, @0033
+  0029 FIELD r4, r7, 0
+  0030 FIELD r5, r7, 1
+  0031 IMUL r6, r4, r5, u32
+  0032 JMP @0034
+  0033 UNREACHABLE
+  0034 RET r6
+
+fn crate::classify [fn] params=1 regs=21
+  0000 MOVE r3, r0
+  0001 FIELD r4, r3, 0
+  0002 INT r5, 0
+  0003 EQ r6, r4, r5
+  0004 JMPNOT r6, @0006
+  0005 JMP @0014
+  0006 FIELD r7, r3, 0
+  0007 INT r8, 1
+  0008 EQ r9, r7, r8
+  0009 JMPNOT r9, @0016
+  0010 FIELD r10, r3, 1
+  0011 BOOL r11, true
+  0012 EQ r12, r10, r11
+  0013 JMPNOT r12, @0016
+  0014 INT r2, 1
+  0015 JMP @0033
+  0016 FIELD r13, r3, 0
+  0017 INT r14, 2
+  0018 GE r15, r13, r14
+  0019 JMPNOT r15, @0029
+  0020 INT r16, 5
+  0021 LE r17, r13, r16
+  0022 JMPNOT r17, @0029
+  0023 FIELD r18, r3, 1
+  0024 BOOL r19, false
+  0025 EQ r20, r18, r19
+  0026 JMPNOT r20, @0029
+  0027 INT r2, 2
+  0028 JMP @0033
+  0029 FIELD r1, r3, 0
+  0030 MOVE r2, r1
+  0031 JMP @0033
+  0032 UNREACHABLE
+  0033 RET r2
+
+fn crate::loops [fn] params=1 regs=34
+  0000 INT r1, 0
+  0001 INT r11, 1
+  0002 IADD r1, r1, r11, u32
+  0003 GT r11, r1, r0
+  0004 JMPNOT r11, @0009
+  0005 MOVE r2, r1
+  0006 JMP @0011
+  0007 TUPLE r10, ()
+  0008 JMP @0010
+  0009 TUPLE r10, ()
+  0010 JMP @0001
+  0011 INT r12, 0
+  0012 INT r13, 3
+  0013 BOOL r14, true
+  0014 ADT r11, (r12, r13, r14), std::Range
+  0015 INT r15, 1
+  0016 FIELD r16, r11, 0
+  0017 FIELD r18, r11, 1
+  0018 FIELD r19, r11, 2
+  0019 LE r17, r16, r18
+  0020 JMPNOT r17, @0049
+  0021 MOVE r5, r16
+  0022 INT r22, 1
+  0023 INT r23, 2
+  0024 ARRAY r21, (r22, r23)
+  0025 INT r24, 1
+  0026 MOVE r27, r21
+  0027 LEN r28, r27
+  0028 INT r25, 0
+  0029 LT r26, r25, r28
+  0030 JMPNOT r26, @0044
+  0031 INDEX r29, r27, r25
+  0032 MOVE r6, r29
+  0033 EQ r32, r6, r5
+  0034 JMPNOT r32, @0038
+  0035 JMP @0045
+  0036 TUPLE r31, ()
+  0037 JMP @0039
+  0038 TUPLE r31, ()
+  0039 MOVE r31, r6
+  0040 IADD r1, r1, r31, u32
+  0041 TUPLE r30, ()
+  0042 IADD r25, r25, r24, i128
+  0043 JMP @0029
+  0044 TUPLE r20, ()
+  0045 EQ r17, r16, r18
+  0046 JMPIF r17, @0049
+  0047 IADD r16, r16, r15, i128
+  0048 JMP @0019
+  0049 TUPLE r10, ()
+  0050 VECNEW r10
+  0051 CELL r3, r10
+  0052 MOVE r11, r3
+  0053 MOVE r12, r2
+  0054 VECPUSH r11, r12
+  0055 TUPLE r10, ()
+  0056 MOVE r11, r3
+  0057 MOVE r12, r1
+  0058 VECPUSH r11, r12
+  0059 TUPLE r10, ()
+  0060 LOAD r11, r3
+  0061 INT r12, 1
+  0062 MOVE r15, r11
+  0063 LEN r16, r15
+  0064 INT r13, 0
+  0065 LT r14, r13, r16
+  0066 JMPNOT r14, @0074
+  0067 INDEX r17, r15, r13
+  0068 MOVE r7, r17
+  0069 MOVE r19, r7
+  0070 IADD r1, r1, r19, u32
+  0071 TUPLE r18, ()
+  0072 IADD r13, r13, r12, i128
+  0073 JMP @0065
+  0074 TUPLE r10, ()
+  0075 INT r10, 3
+  0076 ADT r4, (r10), std::Option::Some
+  0077 MOVE r11, r4
+  0078 ISVAR r12, r11, std::Option::Some
+  0079 JMPNOT r12, @0092
+  0080 FIELD r8, r11, 0
+  0081 INT r16, 0
+  0082 EQ r15, r8, r16
+  0083 JMPNOT r15, @0086
+  0084 ADT r14, (), std::Option::None
+  0085 JMP @0089
+  0086 INT r18, 1
+  0087 ISUB r17, r8, r18, u32
+  0088 ADT r14, (r17), std::Option::Some
+  0089 MOVE r4, r14
+  0090 TUPLE r13, ()
+  0091 JMP @0077
+  0092 TUPLE r10, ()
+  0093 MOVE r9, r1
+  0094 RET r9
+
+fn crate::order [fn] params=1 regs=6
+  0000 MOVE r1, r0
+  0001 MOVE r3, r1
+  0002 INT r5, 5
+  0003 MOVE r1, r5
+  0004 MOVE r4, r1
+  0005 IADD r2, r3, r4, i32
+  0006 RET r2
+
+fn crate::twice_first [fn] params=1 regs=8
+  0000 CELL r1, r0
+  0001 MOVE r5, r1
+  0002 INT r6, 0
+  0003 VECGET r4, r5, r6, std::Option
+  0004 ISVAR r7, r4, std::Option::Some
+  0005 JMPIF r7, @0007
+  0006 RET r4
+  0007 FIELD r2, r4, 0
+  0008 IADD r4, r2, r2, u32
+  0009 ADT r3, (r4), std::Option::Some
+  0010 RET r3
+
+fn crate::main [fn, main] params=0 regs=28
+  0000 CONST r1, #12 "Control"
+  0001 INT r11, 1280
+  0002 INT r12, 720
+  0003 CALL r2, (r11, r12), std::screen::size
+  0004 FUNC r3, crate::Title
+  0005 FUNC r4, crate::GameView
+  0006 INT r5, 20
+  0007 INT r6, 3
+  0008 INT r7, 200
+  0009 INT r13, 26
+  0010 CONST r14, #14 std::screen::Color {255, 255, 255, 255}
+  0011 CALL r8, (r13, r14), std::narrative::text::text_style
+  0012 CONST r15, #15 crate::TEXT_SPEED
+  0013 CONST r16, #16 crate::AUTO_DELAY
+  0014 CONST r17, #17 crate::AUTO_DELAY_PER_CHAR
+  0015 CONST r18, #18 crate::SKIP_UNREAD
+  0016 CONST r19, #19 crate::MASTER
+  0017 CONST r20, #20 crate::MUSIC
+  0018 CONST r21, #21 crate::SOUND
+  0019 CONST r22, #22 crate::VOICE
+  0020 CONST r23, #23 crate::VOICE_SUSTAIN
+  0021 CONST r24, #24 crate::WAIT_FOR_VOICE
+  0022 CONST r25, #25 crate::WINDOW_OPACITY
+  0023 CONST r26, #26 crate::FULLSCREEN
+  0024 CONST r27, #27 crate::ANIMATIONS
+  0025 ADT r9, (r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27), std::system::Settings
+  0026 CALL r10, (), std::system::default_bindings
+  0027 ADT r0, (r1, r2, r3, r4, r5, r6, r7, r8, r9, r10), std::system::System
+  0028 RET r0
+
+fn crate::Title [fn] params=0 regs=5
+  0000 ADT r3, (), std::Option::None
+  0001 CLOSURE r4, (), crate::Title::{closure#0}
+  0002 ADT r2, (r3, r4), std::ui::TextProps
+  0003 CALLIMP r1, (r2), std::ui::text
+  0004 ADT r0, (r1), std::system::RootPage
+  0005 RET r0
+
+fn crate::GameView [fn] params=1 regs=5
+  0000 MOVE r4, r0
+  0001 CLOSURE r3, (r4), crate::GameView::{closure#0}
+  0002 ADT r2, (r3), std::ui::GameScreenProps
+  0003 CALLIMP r1, (r2), std::ui::game_screen
+  0004 RET r1
+
+fn crate::Title::{closure#0} [fn, closure] params=0 regs=1
+  0000 CONST r0, #29 "Title"
+  0001 RET r0
+
+fn crate::GameView::{closure#0} [fn, closure] params=1 regs=2
+  0000 MOVE r1, r0
+  0001 RET r1
+
+import std::ui::text [fn] params=1
+import std::ui::game_screen [fn] params=1
+static crate::TEXT_SPEED [setting] = std::time::Duration {30}
+static crate::AUTO_DELAY [setting] = std::time::Duration {1300}
+static crate::AUTO_DELAY_PER_CHAR [setting] = std::time::Duration {60}
+static crate::SKIP_UNREAD [setting] = false
+static crate::MASTER [setting] = std::system::Volume {100, false}
+static crate::MUSIC [setting] = std::system::Volume {60, false}
+static crate::SOUND [setting] = std::system::Volume {100, false}
+static crate::VOICE [setting] = std::system::Volume {100, false}
+static crate::VOICE_SUSTAIN [setting] = false
+static crate::WAIT_FOR_VOICE [setting] = true
+static crate::WINDOW_OPACITY [setting] = 80
+static crate::FULLSCREEN [setting] = false
+static crate::ANIMATIONS [setting] = true
+options max_call_depth=2048

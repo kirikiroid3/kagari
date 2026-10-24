@@ -3,16 +3,16 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/analysis/001__system/main.kix
 ---
-analysis/001__system/main.kix:68:27: error[system/back-from-base]: `nav::back()` in the root page `Title` does nothing: a root page is a base of the mode stack
-analysis/001__system/main.kix:92:69: error[system/back-from-base]: `nav::back()` in the game mode does nothing: the game mode is a base of the mode stack
-analysis/001__system/main.kix:119:4: warning[system/unbounded-stack]: the overlays `Audio` and `Video` open each other: the mode stack can grow without bound
+analysis/001__system/main.kix:68:27: error[E6002]: `nav::back()` in the root page `Title` does nothing: a root page is a base of the mode stack
+analysis/001__system/main.kix:92:69: error[E6002]: `nav::back()` in the game mode does nothing: the game mode is a base of the mode stack
+analysis/001__system/main.kix:119:4: warning[W6004]: the overlays `Audio` and `Video` open each other: the mode stack can grow without bound
   note: analysis/001__system/main.kix:121:31: `Audio` opens `Video` here
   note: analysis/001__system/main.kix:128:31: `Video` opens `Audio` here
-analysis/001__system/main.kix:133:4: warning[system/unbounded-stack]: the overlay `Gallery` opens itself: the mode stack can grow without bound
+analysis/001__system/main.kix:133:4: warning[W6004]: the overlay `Gallery` opens itself: the mode stack can grow without bound
   note: analysis/001__system/main.kix:135:31: `Gallery` opens itself here
-analysis/001__system/main.kix:151:4: error[system/trapped-mode]: the dialog `ConfirmReset` cannot be left: none of its handlers calls `nav::back`, `nav::goto`, `nav::start`, `nav::load` or `nav::quit`
-analysis/001__system/main.kix:155:4: warning[system/unreachable-mode]: the overlay `Unused` is never shown: no reachable mode opens it
-analysis/001__system/main.kix:159:4: warning[system/unreachable-mode]: the dialog `Orphan` is never shown: no reachable mode opens it
+analysis/001__system/main.kix:151:4: error[E6003]: the dialog `ConfirmReset` cannot be left: none of its handlers calls `nav::back`, `nav::goto`, `nav::start`, `nav::load` or `nav::quit`
+analysis/001__system/main.kix:155:4: warning[W6001]: the overlay `Unused` is never shown: no reachable mode opens it
+analysis/001__system/main.kix:159:4: warning[W6001]: the dialog `Orphan` is never shown: no reachable mode opens it
 --- resolutions ---
 analysis/001__system/main.kix:11:31 Ending -> enum crate::story::Ending
 analysis/001__system/main.kix:12:9 Ending::Good -> variant crate::story::Ending::Good

@@ -211,6 +211,7 @@ impl Lowerer<'_> {
         let who = self.attr(&entries, "who", range);
         let voice = self.attr(&entries, "voice", range);
         let render = self.attr(&entries, "render", range);
+        let history = self.attr(&entries, "history", range);
         let text = entries
             .elements
             .first()
@@ -220,6 +221,7 @@ impl Lowerer<'_> {
             (Name::new_static("voice"), self.optional(voice, range)),
             (Name::new_static("render"), self.optional(render, range)),
             (Name::new_static("text"), self.optional(text, range)),
+            (Name::new_static("history"), self.optional(history, range)),
         ];
         let say = self.alloc(
             Expr::Record {

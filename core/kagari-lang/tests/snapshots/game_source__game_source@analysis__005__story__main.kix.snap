@@ -3,13 +3,13 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/analysis/005__story/main.kix
 ---
-analysis/005__story/main.kix:22:9: warning[analysis/unreachable-step]: this step is never reached
-analysis/005__story/main.kix:30:9: warning[analysis/unreachable-step]: this step is never reached
-analysis/005__story/main.kix:46:9: warning[analysis/unreachable-step]: this step is never reached
-analysis/005__story/main.kix:55:9: warning[analysis/unreachable-step]: this step is never reached
-analysis/005__story/main.kix:66:9: warning[analysis/unreachable-step]: this step is never reached
-analysis/005__story/main.kix:102:15: error[analysis/stuck-choice]: this choice can be reached with every arm hidden: the player would have nothing to select (for example when `KEY` is `false`, `KNOCKS` is `2`)
-analysis/005__story/main.kix:145:13: warning[analysis/unreachable-scene]: the scene `Epilogue` is never reached from an entry scene
+analysis/005__story/main.kix:22:9: warning[W5009]: this step is never reached
+analysis/005__story/main.kix:30:9: warning[W5009]: this step is never reached
+analysis/005__story/main.kix:46:9: warning[W5009]: this step is never reached
+analysis/005__story/main.kix:55:9: warning[W5009]: this step is never reached
+analysis/005__story/main.kix:66:9: warning[W5009]: this step is never reached
+analysis/005__story/main.kix:102:15: error[E5003]: this choice can be reached with every arm hidden: the player would have nothing to select (for example when `KEY` is `false`, `KNOCKS` is `2`)
+analysis/005__story/main.kix:145:13: warning[W5008]: the scene `Epilogue` is never reached from an entry scene
 --- resolutions ---
 analysis/005__story/main.kix:3:17 bool -> prim bool
 analysis/005__story/main.kix:4:20 Int -> prim Int

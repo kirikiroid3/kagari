@@ -24,9 +24,9 @@ use crate::item_tree::{ItemId, item_tree};
 use crate::signatures::{FnSig, ItemSig};
 use crate::ty::{FnDefId, FnRef};
 
+use super::Scenes;
 use super::cfg::{BlockId, Term};
 use super::exec::{Scene, Snapshot, Stop, run};
-use super::{STATE_CAP, Scenes};
 
 pub(super) type CtxId = usize;
 pub(super) type NodeId = usize;
@@ -76,6 +76,8 @@ pub(super) enum NodeKind {
     Step {
         expr: ExprId,
         render: Option<ConstValue>,
+        /// Whether the step is a `choice!`.
+        choice: bool,
         succ: Vec<Target>,
     },
     /// A scene call: the callee's context and, per exit of it, where the caller goes next.
@@ -83,6 +85,8 @@ pub(super) enum NodeKind {
         callee: CtxId,
         succ: Vec<(ExitId, Target)>,
     },
+    /// A random draw (`rng_choose`): per value of the drawn type, where the story goes next.
+    Rng { succ: Vec<Target> },
 }
 
 pub(super) struct Node {
@@ -149,6 +153,9 @@ struct Explorer<'a, 'c, 'db> {
     /// Choices reached with every arm hidden: scene, step, story variables of a witness.
     stuck: FxHashMap<(usize, ExprId), u32>,
     faults: Vec<Diagnostic>,
+    /// The inputs of the [`DomainCtx`] that enumerates argument values and random draws.
+    assets: FxHashMap<AssetKind, Vec<ConstValue>>,
+    functions: Vec<(ItemId, &'db FnSig)>,
 }
 
 /// Explores the story from every entry scene; `None` when there is nothing to explore.
@@ -196,17 +203,11 @@ pub(super) fn explore(
         states: 0,
         stuck: FxHashMap::default(),
         faults: Vec::new(),
+        assets: assets(db, ctx),
+        functions: functions(db, ctx),
     };
     let globals = explorer.out.globals.intern(initial);
-    let assets = assets(db, ctx);
-    let functions = functions(db, ctx);
-    let domain = DomainCtx {
-        sigs: ctx.sigs,
-        std: ctx.std,
-        texts: &[],
-        assets: &assets,
-        functions: &functions,
-    };
+    let mut roots = Vec::new();
     for &scene in &entries {
         let Some(data) = scenes.list.get(scene) else {
             continue;
@@ -219,7 +220,7 @@ pub(super) fn explore(
         let mut size: u64 = 1;
         let mut domains = Vec::with_capacity(params.len());
         for ty in &params {
-            let values = domain.values(ty, TABLE_DOMAIN_CAP);
+            let values = explorer.domain().values(ty, TABLE_DOMAIN_CAP);
             size = size.saturating_mul(values.as_ref().map_or(u64::MAX, |values| {
                 u64::try_from(values.len()).unwrap_or(u64::MAX)
             }));
@@ -246,9 +247,12 @@ pub(super) fn explore(
             args: Vec::new(),
         };
         for args in product(&domains) {
-            let root = explorer.context(scene, fn_ref.clone(), args, globals);
-            explorer.out.roots.push(root);
+            roots.push((scene, fn_ref.clone(), args));
         }
+    }
+    for (scene, fn_ref, args) in roots {
+        let root = explorer.context(scene, fn_ref, args, globals);
+        explorer.out.roots.push(root);
     }
     explorer.run(diagnostics, &entries);
     diagnostics.append(&mut explorer.faults);
@@ -257,6 +261,16 @@ pub(super) fn explore(
 }
 
 impl Explorer<'_, '_, '_> {
+    fn domain(&self) -> DomainCtx<'_> {
+        DomainCtx {
+            sigs: self.ctx.sigs,
+            std: self.ctx.std,
+            texts: &[],
+            assets: &self.assets,
+            functions: &self.functions,
+        }
+    }
+
     /// The context of `scene` entered with `args` and `globals`, explored once.
     fn context(
         &mut self,
@@ -289,8 +303,10 @@ impl Explorer<'_, '_, '_> {
     }
 
     fn run(&mut self, diagnostics: &mut Vec<Diagnostic>, entries: &[usize]) {
+        let cap = self.ctx.program.options(self.db).state_cap;
+        let limit = usize::try_from(cap).unwrap_or(usize::MAX);
         while let Some(task) = self.tasks.pop() {
-            if self.states > STATE_CAP {
+            if self.states > limit {
                 self.out.complete = false;
                 if let Some(data) = entries
                     .first()
@@ -302,7 +318,7 @@ impl Explorer<'_, '_, '_> {
                         DiagnosticCode::AnalysisTooManyStates,
                         format!(
                             "the story has too many states to analyze: more than the limit of \
-                             {STATE_CAP}, so unreachable steps and scenes are not reported"
+                             {cap}, so unreachable steps and scenes are not reported"
                         ),
                     ));
                 }
@@ -338,8 +354,11 @@ impl Explorer<'_, '_, '_> {
                     let Some((block, frame, globals)) = self.node_state(ctx, node) else {
                         continue;
                     };
-                    let Some(Term::Step { dest, next, .. }) = self.term(ctx, block) else {
-                        continue;
+                    let (dest, next) = match self.term(ctx, block) {
+                        Some(Term::Step { dest, next, .. } | Term::Rng { dest, next, .. }) => {
+                            (dest, next)
+                        }
+                        _ => continue,
                     };
                     let mut frame = frame;
                     if let Some(slot) = dest.and_then(|dest| frame.get_mut(dest)) {
@@ -347,7 +366,7 @@ impl Explorer<'_, '_, '_> {
                     }
                     let target = self.resume(ctx, next, frame, globals);
                     if let Some(Node {
-                        kind: NodeKind::Step { succ, .. },
+                        kind: NodeKind::Step { succ, .. } | NodeKind::Rng { succ, .. },
                         ..
                     }) = self.node_mut(ctx, node)
                         && let Some(slot) = succ.get_mut(outcome)
@@ -416,7 +435,7 @@ impl Explorer<'_, '_, '_> {
     fn callee(&self, ctx: CtxId, node: NodeId) -> Option<CtxId> {
         match self.out.contexts.get(ctx)?.nodes.get(node)?.kind {
             NodeKind::Call { callee, .. } => Some(callee),
-            NodeKind::Step { .. } => None,
+            NodeKind::Step { .. } | NodeKind::Rng { .. } => None,
         }
     }
 
@@ -494,6 +513,7 @@ impl Explorer<'_, '_, '_> {
                 if outcomes.is_empty() {
                     self.stuck.entry((scene_index, expr)).or_insert(globals);
                 }
+                let choice = matches!(&record, ConstValue::Adt { item, .. } if *item == self.ctx.std.choice.item);
                 let id = self.add_node(
                     ctx,
                     Node {
@@ -503,11 +523,66 @@ impl Explorer<'_, '_, '_> {
                         kind: NodeKind::Step {
                             expr,
                             render,
+                            choice,
                             succ: vec![Target::Dead; outcomes.len()],
                         },
                     },
                 );
                 for (outcome, value) in outcomes.into_iter().enumerate() {
+                    self.tasks.push(Task::Step {
+                        ctx,
+                        node: id,
+                        outcome,
+                        value,
+                    });
+                }
+                Target::Node(id)
+            }
+            Stop::Rng { block, ty } => {
+                let frame = self.out.frames.intern(snapshot.frame);
+                let globals = self.out.globals.intern(snapshot.globals);
+                if let Some(node) = self
+                    .out
+                    .contexts
+                    .get(ctx)
+                    .and_then(|context| context.node_index.get(&(block, frame, globals)))
+                {
+                    return Target::Node(*node);
+                }
+                let Some(Term::Rng { expr, .. }) = self.term(ctx, block) else {
+                    return Target::Dead;
+                };
+                let Some(values) = self.domain().values(&ty, TABLE_DOMAIN_CAP) else {
+                    self.out.complete = false;
+                    if let Some(data) = self.scenes.list.get(scene_index) {
+                        let diagnostic = data.diagnostic(
+                            self.db,
+                            expr,
+                            DiagnosticCode::AnalysisTooManyStates,
+                            format!(
+                                "this draw has too many values to analyze: more than the limit \
+                                 of {TABLE_DOMAIN_CAP}, so unreachable steps and scenes are not \
+                                 reported"
+                            ),
+                        );
+                        if !self.faults.contains(&diagnostic) {
+                            self.faults.push(diagnostic);
+                        }
+                    }
+                    return Target::Dead;
+                };
+                let id = self.add_node(
+                    ctx,
+                    Node {
+                        block,
+                        frame,
+                        globals,
+                        kind: NodeKind::Rng {
+                            succ: vec![Target::Dead; values.len()],
+                        },
+                    },
+                );
+                for (outcome, value) in values.into_iter().enumerate() {
                     self.tasks.push(Task::Step {
                         ctx,
                         node: id,

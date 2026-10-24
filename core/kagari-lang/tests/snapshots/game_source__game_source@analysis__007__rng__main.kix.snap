@@ -1,0 +1,11 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/analysis/007__rng/main.kix
+---
+no diagnostics
+--- resolutions ---
+analysis/007__rng/main.kix:12:11 rng_choose -> fn std::narrative::rng_choose
+analysis/007__rng/main.kix:12:24 Coin -> enum crate::Coin
+analysis/007__rng/main.kix:13:9 Coin::Heads -> variant crate::Coin::Heads
+analysis/007__rng/main.kix:14:9 Coin::Tails -> variant crate::Coin::Tails

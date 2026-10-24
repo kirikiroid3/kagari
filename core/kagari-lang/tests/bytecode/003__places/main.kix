@@ -1,0 +1,91 @@
+// Places: a field written through `&mut`, a `&mut self` method (autoref), `Vec::push` on a
+// local, `*r = v`, and field and index assignment on locals, which makes them cells.
+
+use std::narrative::text::text_style;
+use std::screen::size;
+use std::system::default_bindings;
+
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl Point {
+    fn shift(&mut self, dx: i32) {
+        self.x += dx;
+    }
+
+    fn sum(self) -> i32 {
+        self.x + self.y
+    }
+}
+
+fn nudge(p: &mut Point) {
+    p.y = p.y + 1;
+}
+
+fn places() -> i32 {
+    let mut p = Point { x: 1, y: 2 };
+    p.x = 5;
+    nudge(&mut p);
+    p.shift(3);
+    let mut xs = Vec::new();
+    xs.push(p.x);
+    let mut n: i32 = 0;
+    let r = &mut n;
+    *r = 7;
+    let mut grid = [1, 2, 3];
+    grid[1] = n;
+    p.sum() + grid[1]
+}
+
+static TEXT_SPEED: Setting<Duration> = setting(ms(30));
+static AUTO_DELAY: Setting<Duration> = setting(ms(1300));
+static AUTO_DELAY_PER_CHAR: Setting<Duration> = setting(ms(60));
+static SKIP_UNREAD: Setting<bool> = setting(false);
+static MASTER: Setting<Volume> = setting(volume(100));
+static MUSIC: Setting<Volume> = setting(volume(60));
+static SOUND: Setting<Volume> = setting(volume(100));
+static VOICE: Setting<Volume> = setting(volume(100));
+static VOICE_SUSTAIN: Setting<bool> = setting(false);
+static WAIT_FOR_VOICE: Setting<bool> = setting(true);
+static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
+static FULLSCREEN: Setting<bool> = setting(false);
+static ANIMATIONS: Setting<bool> = setting(true);
+
+fn main() -> System {
+    System {
+        title: "Places",
+        resolution: size(1280, 720),
+        start: Title,
+        game: GameView,
+        save_slots: 20,
+        auto_slots: 3,
+        backlog: 200,
+        text: text_style(26, WHITE),
+        settings: Settings {
+            text_speed: TEXT_SPEED,
+            auto_delay: AUTO_DELAY,
+            auto_delay_per_char: AUTO_DELAY_PER_CHAR,
+            skip_unread: SKIP_UNREAD,
+            master: MASTER,
+            music: MUSIC,
+            sound: SOUND,
+            voice: VOICE,
+            voice_sustain: VOICE_SUSTAIN,
+            wait_for_voice: WAIT_FOR_VOICE,
+            window_opacity: WINDOW_OPACITY,
+            fullscreen: FULLSCREEN,
+            animations: ANIMATIONS,
+        },
+        bindings: default_bindings(),
+    }
+}
+
+fn Title() -> RootPage {
+    RootPage(text!(t!["Title"]))
+}
+
+fn GameView(game: Narrative) -> Element {
+    game_screen!(game = game)
+}

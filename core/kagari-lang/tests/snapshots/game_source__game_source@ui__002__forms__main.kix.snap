@@ -3,8 +3,8 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/ui/002__forms/main.kix
 ---
-ui/002__forms/main.kix:19:40: error[resolve/unresolved-name]: cannot find `bakc` in `nav`
-ui/002__forms/main.kix:29:16: error[resolve/unresolved-name]: cannot find value `menu_bakground` in this scope
+ui/002__forms/main.kix:19:40: error[E1016]: cannot find `bakc` in `nav`
+ui/002__forms/main.kix:29:16: error[E1016]: cannot find value `menu_bakground` in this scope
 --- resolutions ---
 ui/002__forms/main.kix:10:9 game -> local game@10:9
 ui/002__forms/main.kix:10:15 Narrative -> struct std::narrative::Narrative

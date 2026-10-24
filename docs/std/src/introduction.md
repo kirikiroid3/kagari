@@ -29,7 +29,7 @@ Every item of the library follows these rules.
 2. **Units.**
    - Positions and lengths are `i32`/`u32` pixels in the design resolution `System::resolution`.
    - Times are `time::Duration`, whole milliseconds.
-   - Fractions (anchor, scale, opacity, volume, filter amounts) are `Decimal`, with literals like
+   - Fractions (anchor, scale, opacity, volume) are `Decimal`, with literals like
      `0.5`; opacity and volume range over `0.0..=1.0`.
    - Settings volumes are `Int<0, 100>`.
    - There are no unit strings, and there is no second scale for any quantity.

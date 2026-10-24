@@ -34,6 +34,7 @@ use kagari_syntax::TextRange;
 pub use const_exprs::{ConstExprs, ConstLocal, FileConstExprs, const_exprs, file_const_exprs};
 pub use interp::MAX_CALL_DEPTH;
 pub use num::{Decimal, Rat};
+pub(crate) use num::{int_bits, is_signed};
 pub use screen::{
     Camera, Channel, ChannelId, Cursor, CursorAnchor, Entity, EntityProp, Hud, LayerTarget,
     LogicalScreen, PendingChange, PropTarget, Scheduled, ScheduledKind, Screen, ScreenObj,
@@ -46,11 +47,11 @@ use interp::{BodyRef, ClosureValue, Ctx, ErrorKind, EvalError, Frame, GenericEnv
 use std_items::{Builtin, StdTable};
 
 /// The number of evaluation steps one top-level evaluation may take (*tentative*: a
-/// compiler setting). Running out is `eval/budget-exceeded`.
+/// compiler setting). Running out is `E4003`.
 pub const EVAL_STEP_BUDGET: u64 = 1_000_000;
 
 /// The largest number of argument combinations a tabulated call may have (*tentative*: a
-/// compiler setting). More is `eval/domain-too-large`.
+/// compiler setting). More is `E4004`.
 pub const TABLE_DOMAIN_CAP: u64 = 65_536;
 
 /// A const-evaluation error: its diagnostic code and message.

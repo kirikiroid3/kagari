@@ -1,0 +1,90 @@
+// Integer, Decimal and Rat arithmetic, comparisons and the boolean operators.
+
+use std::narrative::text::text_style;
+use std::screen::size;
+use std::system::default_bindings;
+
+fn ints(a: u8, b: i32) -> i32 {
+    let c: u8 = a * 2 + 1;
+    let d = b - 3 * b / 2 % 7;
+    let e = (b << 2) >> 1;
+    let f: u8 = (a & 15) | (a ^ 3);
+    let g: i32 = c.into();
+    let h: i32 = f.into();
+    -(d + e + g + h)
+}
+
+fn bounded(wide: u32) -> Int<0, 255> {
+    let mut n: Int<0, 5> = 4;
+    // Compound assignment computes in `i128` and saturates at the bounds.
+    n += 3;
+    let small: u8 = wide.saturate();
+    let back: Int<0, 255> = small.into();
+    back
+}
+
+fn decimals(x: Decimal) -> Decimal {
+    let third = 1.0 / 3.0;
+    let r = Rat::new(1, 3).to_decimal();
+    x * 0.5 + third - r
+}
+
+fn rats() -> Rat {
+    let a = Rat::new(1, 3);
+    a * a - a / Rat::new(2, 1)
+}
+
+fn compare(a: i32, b: i32, x: Decimal) -> bool {
+    (a < b && x >= 0.5) || !(a == b) || a != 3
+}
+
+static TEXT_SPEED: Setting<Duration> = setting(ms(30));
+static AUTO_DELAY: Setting<Duration> = setting(ms(1300));
+static AUTO_DELAY_PER_CHAR: Setting<Duration> = setting(ms(60));
+static SKIP_UNREAD: Setting<bool> = setting(false);
+static MASTER: Setting<Volume> = setting(volume(100));
+static MUSIC: Setting<Volume> = setting(volume(60));
+static SOUND: Setting<Volume> = setting(volume(100));
+static VOICE: Setting<Volume> = setting(volume(100));
+static VOICE_SUSTAIN: Setting<bool> = setting(false);
+static WAIT_FOR_VOICE: Setting<bool> = setting(true);
+static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
+static FULLSCREEN: Setting<bool> = setting(false);
+static ANIMATIONS: Setting<bool> = setting(true);
+
+fn main() -> System {
+    System {
+        title: "Arithmetic",
+        resolution: size(1280, 720),
+        start: Title,
+        game: GameView,
+        save_slots: 20,
+        auto_slots: 3,
+        backlog: 200,
+        text: text_style(26, WHITE),
+        settings: Settings {
+            text_speed: TEXT_SPEED,
+            auto_delay: AUTO_DELAY,
+            auto_delay_per_char: AUTO_DELAY_PER_CHAR,
+            skip_unread: SKIP_UNREAD,
+            master: MASTER,
+            music: MUSIC,
+            sound: SOUND,
+            voice: VOICE,
+            voice_sustain: VOICE_SUSTAIN,
+            wait_for_voice: WAIT_FOR_VOICE,
+            window_opacity: WINDOW_OPACITY,
+            fullscreen: FULLSCREEN,
+            animations: ANIMATIONS,
+        },
+        bindings: default_bindings(),
+    }
+}
+
+fn Title() -> RootPage {
+    RootPage(text!(t!["Title"]))
+}
+
+fn GameView(game: Narrative) -> Element {
+    game_screen!(game = game)
+}

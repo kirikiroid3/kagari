@@ -41,7 +41,9 @@ A game is compiled from one root file into one `.kagari` bytecode file.
    - *Reachability and liveness.* Unreachable steps and story variables that never influence
      anything are reported.
    - *System checks.* The [mode-graph checks](./system.md#system-checks).
-6. **Emit.** The story, the renders and the system code are compiled into bytecode.
+6. **Emit.** The story, the renders and the system code are compiled into
+   [bytecode](./bytecode.md), which is verified before it is written. Emit diagnostics are
+   `E7xxx`: a root file without `fn main()` is `E7001`.
 
 Stages 1–4 are cheap. Stage 5 is where the analyses described in the proposal run.
 
@@ -61,12 +63,12 @@ and the values of the story variables; instant code between two steps runs in th
 evaluator. Each scene is summarized per *context*, its arguments and the story variables when it
 is entered, as the set of values and story variables it can return with, so a scene called from
 many places in the same state is explored once. The exploration has a cap on the number of
-states (*tentative*: 200,000, a compiler setting). A story with more states, or an entry scene
+states: the state cap (default 200 000, `--state-cap`). A story with more states, or an entry scene
 whose arguments take more values than the [tabulation](./kinds.md#calling-const-fn-from-the-story)
-limit, gets the warning `analysis/too-many-states`: what was found is still reported, but the
+limit, gets the warning `W5006`: what was found is still reported, but the
 analyses that need every state (unreachable steps and scenes) are skipped. So is a path the
 analysis cannot follow, such as one that holds a closure capturing locals across a step; it is
-reported where it stops (`analysis/incomplete`, a warning).
+reported where it stops (`W5007`, a warning).
 
 On these states:
 
@@ -90,6 +92,28 @@ write, a call through a pointer or closure, or the ending of an entry scene. Eve
 variable is reported: never read, read only into variables that do not influence the story, or
 never used at all.
 
+## Compiler options
+
+| Option | Default | Meaning |
+| ------ | ------: | ------- |
+| `state_cap` (`--state-cap <n>`) | 200 000 | Most story states the analysis explores (`W5006` past it) |
+| `recursion_depth` (`--recursion-depth <n>`) | 2048 | Most nested calls at run time, counting every call frame (`fn`, closures, scenes, instant procedures); deeper is a [VM panic](./bytecode.md#panics). Written into the bytecode |
+| `keyframe_check` (`--keyframe-check`) | off | Runs the [keyframe-placement check](./presentation.md#keyframes) (`W5011`) |
+
+In Rust these are the fields of `kagari_lang::CompileOptions`, passed to
+`RootDatabase::program_with`.
+
+The `kagari` command-line tool (`cargo run -p kagari-cli -- …`) runs the compiler:
+
+```text
+kagari check <root> [--resolutions] [opts]   print the diagnostics; exit 1 on an error
+kagari build <root> [-o <out>] [opts]        write the bytecode (default: <root> with extension .kagari)
+kagari disasm <file> [--all]                 decode, verify and disassemble a .kagari file
+opts: --state-cap <n> --recursion-depth <n> --keyframe-check
+```
+
+Diagnostics are numbered; see the Kagari Diagnostics book.
+
 ## `.kagari` header
 
 A `.kagari` file starts with 16 magic bytes:
@@ -100,10 +124,10 @@ A `.kagari` file starts with 16 magic bytes:
 
 | Offset | Length | Content          | Meaning                                       |
 | -----: | -----: | ---------------- | --------------------------------------------- |
-|      0 |      4 | `....`           | Not fixed yet                                 |
+|      0 |      4 | `00 00 00 00`    | Zero bytes                                    |
 |      4 |      6 | `KAGARI` (ASCII) | Format identifier                             |
-|     10 |      2 | `..`             | Not fixed yet                                 |
+|     10 |      2 | `00 00`          | Zero bytes                                    |
 |     12 |      4 | `V000` (ASCII)   | Bytecode version: `V` and three decimal digits |
 
-The bytes shown as `.` and the layout after the header are not specified yet; see
-[Open Questions](./open-questions.md#bytecode-header).
+Once the format is stable, the version increases only on a breaking change. The layout after the
+header is specified in [The `.kagari` Format](./bytecode.md).

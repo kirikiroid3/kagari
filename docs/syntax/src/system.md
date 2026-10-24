@@ -99,7 +99,7 @@ fn GameView(game: Narrative) -> Element {
 | Field | Meaning |
 | ----- | ------- |
 | `title` | The window title |
-| `resolution` | The design resolution: positions and lengths in renders and UI are pixels of it |
+| `resolution` | The design resolution: positions and lengths in renders and UI are pixels of it. It is a constant fixed at game start; currently it must be |
 | `start` | The root page the system starts on, a `fn() -> RootPage` |
 | `game` | The view of the game mode, a `fn(Narrative) -> Element` |
 | `save_slots`, `auto_slots` | The number of manual and automatic save slots; fixed, so slot lists are finite |
@@ -107,6 +107,14 @@ fn GameView(game: Narrative) -> Element {
 | `text` | The default text style of `ui::label` and `text!` |
 | `settings` | The handles of the engine's settings; see [Settings and meta](#settings-and-meta) |
 | `bindings` | The input bindings; see [Bindings](#bindings) |
+
+`main` runs as ordinary bytecode, so its calls, like every call at run time, count toward the
+recursion depth: at most 2048 nested calls by default, set by the compiler option
+[`recursion_depth`](./compilation.md#compiler-options). Deeper recursion is a VM panic.
+
+**System music.** `std::system::set_music(track, fade)` sets the system music channel, heard
+while no game runs on the mode stack, for example on the title page; while a game runs, the game
+screen's music channel plays instead. `None` stops it. It is a `fn`, so only system code calls it.
 
 ## Components and signals
 
@@ -267,6 +275,9 @@ fn GalleryThumb(cg: ImageAsset) -> Element {
     button!{disabled = !seen_image(cg), image!(cg)}
 }
 ```
+
+`std::system::set_music` and the seen sets are the system's audio API; what is currently playing
+is not designed yet.
 
 ## The `Narrative` handle
 

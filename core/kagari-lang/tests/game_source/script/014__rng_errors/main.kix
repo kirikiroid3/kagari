@@ -1,0 +1,18 @@
+// `rng_choose` (stage 3): only scenes draw, and only types that implement `RandChoose`.
+
+enum Coin {
+    Heads,
+    Tails,
+}
+
+// Error: an instant procedure cannot draw.
+pushdown fn flip() -> Coin {
+    rng_choose::<Coin>()
+}
+
+#[scene]
+pushdown fn Words() {
+    // Error: an enum with fields is not `RandChoose`.
+    let _coin = rng_choose::<Option<Coin>>();
+    s!(t!["x"]);
+}

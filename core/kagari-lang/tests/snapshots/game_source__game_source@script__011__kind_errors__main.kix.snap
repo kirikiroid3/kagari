@@ -3,47 +3,47 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/script/011__kind_errors/main.kix
 ---
-script/011__kind_errors/main.kix:4:19: error[kind/not-finite]: the type of a story variable must be finite, but `u32` is not
-script/011__kind_errors/main.kix:5:33: error[kind/call-rule]: cannot call `fn` `start` from the initializer of the story variable `FROM_FN`: `const` code is pure and can call only `const fn`
+script/011__kind_errors/main.kix:4:19: error[E3008]: the type of a story variable must be finite, but `u32` is not
+script/011__kind_errors/main.kix:5:33: error[E3001]: cannot call `fn` `start` from the initializer of the story variable `FROM_FN`: `const` code is pure and can call only `const fn`
   note: script/011__kind_errors/main.kix:21:4: `start` is declared here
-script/011__kind_errors/main.kix:6:22: error[kind/bad-handle]: an immutable `static` must hold a `Setting<T>` or `Meta<T>` handle, but this is `u32`; use `const` for a constant or `static mut` for a story variable
-script/011__kind_errors/main.kix:10:39: error[kind/not-constant]: the initializer of a `const` must be a constant expression: an assignment is not a constant expression
-script/011__kind_errors/main.kix:11:17: error[kind/reference-in-item]: the type of a `const` cannot contain a reference, but this is `&u32`
-script/011__kind_errors/main.kix:17:1: error[kind/misplaced-attribute]: `#[scene]` is only allowed on a `pushdown fn`, but this is a `fn`
-script/011__kind_errors/main.kix:18:1: error[kind/misplaced-attribute]: `#[entry]` needs `#[scene]`: an entry scene is a `#[scene]` `pushdown fn`
-script/011__kind_errors/main.kix:19:1: error[kind/misplaced-attribute]: `#[must_use]` is only allowed on a struct or an enum, but this is a `fn`
-script/011__kind_errors/main.kix:26:5: error[kind/call-rule]: cannot call the scene `Main` from the `fn` `system`: the only way into the story is `nav::start` of an entry scene
+script/011__kind_errors/main.kix:6:22: error[E3011]: an immutable `static` must hold a `Setting<T>` or `Meta<T>` handle, but this is `u32`; use `const` for a constant or `static mut` for a story variable
+script/011__kind_errors/main.kix:10:39: error[E3010]: the initializer of a `const` must be a constant expression: an assignment is not a constant expression
+script/011__kind_errors/main.kix:11:17: error[E3012]: the type of a `const` cannot contain a reference, but this is `&u32`
+script/011__kind_errors/main.kix:17:1: error[E3018]: `#[scene]` is only allowed on a `pushdown fn`, but this is a `fn`
+script/011__kind_errors/main.kix:18:1: error[E3018]: `#[entry]` needs `#[scene]`: an entry scene is a `#[scene]` `pushdown fn`
+script/011__kind_errors/main.kix:19:1: error[E3018]: `#[must_use]` is only allowed on a struct or an enum, but this is a `fn`
+script/011__kind_errors/main.kix:26:5: error[E3001]: cannot call the scene `Main` from the `fn` `system`: the only way into the story is `nav::start` of an entry scene
   note: script/011__kind_errors/main.kix:45:13: `Main` is declared here
-script/011__kind_errors/main.kix:29:17: error[kind/story-variable-outside-story]: story variable `ROUTE` cannot be used in the `fn` `system`: only `pushdown fn` code may read or write story variables
+script/011__kind_errors/main.kix:29:17: error[E3007]: story variable `ROUTE` cannot be used in the `fn` `system`: only `pushdown fn` code may read or write story variables
   note: script/011__kind_errors/main.kix:3:12: `ROUTE` is declared here
-script/011__kind_errors/main.kix:34:14: error[kind/call-rule]: cannot call `fn` `Setting::get` from the `const fn` `render`: `const` code is pure and can call only `const fn`; in `const` code a `Setting` handle can only be passed as a value, as to `Entity::gate`
-script/011__kind_errors/main.kix:35:19: error[kind/meta-in-const]: meta field `CLEARED` cannot be used in the `const fn` `render`: meta is read by `fn` code and written by the story, never seen by `const` code
-script/011__kind_errors/main.kix:36:5: warning[kind/unused-must-use]: unused `Swap` that must be used: the change does not happen without `apply_animation`
-script/011__kind_errors/main.kix:58:25: error[kind/choice-id]: the choice id `map` is used twice in `Main`: a choice id must be unique within its function, since saves record it
+script/011__kind_errors/main.kix:34:14: error[E3001]: cannot call `fn` `Setting::get` from the `const fn` `render`: `const` code is pure and can call only `const fn`; in `const` code a `Setting` handle can only be passed as a value, as to `Entity::gate`
+script/011__kind_errors/main.kix:35:19: error[E3013]: meta field `CLEARED` cannot be used in the `const fn` `render`: meta is read by `fn` code and written by the story, never seen by `const` code
+script/011__kind_errors/main.kix:36:5: warning[W3023]: unused `Swap` that must be used: the change does not happen without `apply_animation`
+script/011__kind_errors/main.kix:58:25: error[E3019]: the choice id `map` is used twice in `Main`: a choice id must be unique within its function, since saves record it
   note: script/011__kind_errors/main.kix:48:18: first used here
-script/011__kind_errors/main.kix:58:68: error[kind/choice-arms]: `Map::A` is already an arm of this choice: each variant may be chosen at most once
+script/011__kind_errors/main.kix:58:68: error[E3020]: `Map::A` is already an arm of this choice: each variant may be chosen at most once
   note: script/011__kind_errors/main.kix:58:43: first used here
-script/011__kind_errors/main.kix:62:8: error[kind/ruby-readings]: a mono ruby needs one reading per character: `漢字` has 2 characters but 3 readings are given
-script/011__kind_errors/main.kix:66:14: error[kind/for-not-constant]: a `for` loop in the scene `Main` must iterate over an array or over a range whose bounds are constant expressions
-script/011__kind_errors/main.kix:74:14: error[kind/step-outside-scene]: only a scene can run a step: a `pushdown` closure cannot use `s!` or `choice!`; mark the function `#[scene]`
-script/011__kind_errors/main.kix:79:25: error[kind/text-in-entry]: the parameter types of an entry scene cannot contain `Text`, but this is `Text`: `fn` code can build runtime text
-script/011__kind_errors/main.kix:79:38: error[kind/not-finite]: parameter type `u32` is not finite: a scene can hold only finite types
-script/011__kind_errors/main.kix:86:5: error[kind/step-outside-scene]: only a scene can run a step: the instant procedure `visit` cannot use `s!` or `choice!`; mark the function `#[scene]`
-script/011__kind_errors/main.kix:87:5: error[kind/scene-call-outside-scene]: only a scene can call another scene: the instant procedure `visit` cannot call the scene `Other`
+script/011__kind_errors/main.kix:62:8: error[E3021]: a mono ruby needs one reading per character: `漢字` has 2 characters but 3 readings are given
+script/011__kind_errors/main.kix:66:14: error[E3006]: a `for` loop in the scene `Main` must iterate over an array or over a range whose bounds are constant expressions
+script/011__kind_errors/main.kix:74:14: error[E3002]: only a scene can run a step: a `pushdown` closure cannot use `s!` or `choice!`; mark the function `#[scene]`
+script/011__kind_errors/main.kix:79:25: error[E3009]: the parameter types of an entry scene cannot contain `Text`, but this is `Text`: `fn` code can build runtime text
+script/011__kind_errors/main.kix:79:38: error[E3008]: parameter type `u32` is not finite: a scene can hold only finite types
+script/011__kind_errors/main.kix:86:5: error[E3002]: only a scene can run a step: the instant procedure `visit` cannot use `s!` or `choice!`; mark the function `#[scene]`
+script/011__kind_errors/main.kix:87:5: error[E3003]: only a scene can call another scene: the instant procedure `visit` cannot call the scene `Other`
   note: script/011__kind_errors/main.kix:71:13: `Other` is declared here
-script/011__kind_errors/main.kix:88:5: error[kind/call-rule]: cannot call `fn` `start` from the instant procedure `visit`: the story can call only `pushdown fn` and `const fn`
+script/011__kind_errors/main.kix:88:5: error[E3001]: cannot call `fn` `start` from the instant procedure `visit`: the story can call only `pushdown fn` and `const fn`
   note: script/011__kind_errors/main.kix:21:4: `start` is declared here
-script/011__kind_errors/main.kix:89:5: error[kind/unbounded-loop]: `while` is not allowed in the instant procedure `visit`: an instant procedure has only bounded loops (`for` over an array or a range with constant bounds)
-script/011__kind_errors/main.kix:93:22: error[kind/instant-recursion]: instant procedures cannot recurse, but these calls form a cycle: `ping` → `pong` → `ping`; mark one of them `#[scene]` and pass through a step
-script/011__kind_errors/main.kix:97:27: error[kind/instant-recursion]: instant procedures cannot recurse, but these calls form a cycle: `again` → `again` (passed as a value to code that may call it); mark one of them `#[scene]` and pass through a step
-script/011__kind_errors/main.kix:104:9: error[kind/second-class-closure]: `g` cannot hold a closure in the instant procedure `twice`: closures in the story are second-class and can only be passed as arguments and called
-script/011__kind_errors/main.kix:114:14: error[kind/aliased-mut-argument]: `p` is passed as `&mut` and also as another argument of this call: in the story, a `&mut` argument cannot alias another argument
+script/011__kind_errors/main.kix:89:5: error[E3004]: `while` is not allowed in the instant procedure `visit`: an instant procedure has only bounded loops (`for` over an array or a range with constant bounds)
+script/011__kind_errors/main.kix:93:22: error[E3005]: instant procedures cannot recurse, but these calls form a cycle: `ping` → `pong` → `ping`; mark one of them `#[scene]` and pass through a step
+script/011__kind_errors/main.kix:97:27: error[E3005]: instant procedures cannot recurse, but these calls form a cycle: `again` → `again` (passed as a value to code that may call it); mark one of them `#[scene]` and pass through a step
+script/011__kind_errors/main.kix:104:9: error[E3015]: `g` cannot hold a closure in the instant procedure `twice`: closures in the story are second-class and can only be passed as arguments and called
+script/011__kind_errors/main.kix:114:14: error[E3016]: `p` is passed as `&mut` and also as another argument of this call: in the story, a `&mut` argument cannot alias another argument
   note: script/011__kind_errors/main.kix:114:11: the same place is also passed here
-script/011__kind_errors/main.kix:115:9: error[kind/second-class-reference]: `q` cannot hold a reference in the instant procedure `alias`: references in the story are second-class and can only be passed as arguments
-script/011__kind_errors/main.kix:118:37: error[kind/second-class-reference]: an instant procedure cannot return a reference: references in the story are second-class, and only a method whose receiver is a reference may return one
-script/011__kind_errors/main.kix:127:5: error[kind/immutable-place]: cannot assign to `b.x`, as `b` is not declared as mutable
+script/011__kind_errors/main.kix:115:9: error[E3014]: `q` cannot hold a reference in the instant procedure `alias`: references in the story are second-class and can only be passed as arguments
+script/011__kind_errors/main.kix:118:37: error[E3014]: an instant procedure cannot return a reference: references in the story are second-class, and only a method whose receiver is a reference may return one
+script/011__kind_errors/main.kix:127:5: error[E3017]: cannot assign to `b.x`, as `b` is not declared as mutable
   note: script/011__kind_errors/main.kix:125:9: consider changing this to be mutable
-script/011__kind_errors/main.kix:129:16: error[kind/not-finite]: this `const fn` call has runtime arguments, so it is tabulated, and its result must be finite, but `u32` is not
+script/011__kind_errors/main.kix:129:16: error[E3008]: this `const fn` call has runtime arguments, so it is tabulated, and its result must be finite, but `u32` is not
 --- resolutions ---
 script/011__kind_errors/main.kix:3:19 Int -> prim Int
 script/011__kind_errors/main.kix:4:19 u32 -> prim u32

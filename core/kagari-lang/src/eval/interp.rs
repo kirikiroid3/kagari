@@ -32,7 +32,7 @@ use super::value::{AssetKind, ConstValue, HandleKind, Text, adt_variants, item_n
 use super::{EVAL_STEP_BUDGET, Fault};
 
 /// Interpreted calls nested deeper than this, counted across the constants an evaluation
-/// needs, are `eval/budget-exceeded` ("recursion too deep").
+/// needs, are `E4003` ("recursion too deep").
 pub const MAX_CALL_DEPTH: u32 = 10_000;
 
 /// When less native stack than this is left, evaluation continues on a new segment.
@@ -229,7 +229,7 @@ pub(crate) fn subst_const(value: &Const, env: &GenericEnv) -> Const {
     }
 }
 
-fn subst_arg(arg: &GenericArg, env: &GenericEnv) -> GenericArg {
+pub(crate) fn subst_arg(arg: &GenericArg, env: &GenericEnv) -> GenericArg {
     match arg {
         GenericArg::Type(ty) => GenericArg::Type(subst_ty(ty, env)),
         GenericArg::Const(value) => GenericArg::Const(subst_const(value, env)),
@@ -1655,8 +1655,8 @@ impl<'c, 'db> Machine<'c, 'db> {
                                 "attempt to divide by zero",
                             )),
                             Err(false) => Err(fault(
-                                DiagnosticCode::EvalInexactDivision,
-                                format!("{a} / {b} has no exact `Decimal` value"),
+                                DiagnosticCode::EvalOverflow,
+                                format!("{a} / {b} overflows `Decimal`"),
                             )),
                         };
                     }

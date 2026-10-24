@@ -1,0 +1,14 @@
+[package]
+name = "kagari-cli"
+version = "0.1.0"
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "kagari"
+path = "src/main.rs"
+
+[dependencies]
+kagari-bytecode = { workspace = true }
+kagari-lang = { workspace = true }

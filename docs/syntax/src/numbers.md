@@ -24,9 +24,9 @@ static mut AFFECTION_MIO: Int<0, 5> = 0;
 ```
 
 `Int<lo, hi>` is a primitive type: an integer in a declared, inclusive range. `lo` and `hi` are
-constant expressions of type `i64` with `lo <= hi`. The analyzer represents a variable with as
-many bits as its range needs, so a counter from 0 to 5 costs 3 bits. Use the smallest range that
-fits.
+constant expressions of type `i64` with `lo <= hi`. There is no default range: every `Int` type
+states its bounds. The analyzer represents a variable with as many bits as its range needs, so a
+counter from 0 to 5 costs 3 bits. Use the smallest range that fits.
 
 An integer literal has type `Int<n, n>` and converts to any integer type whose range contains it:
 an `Int` type or a Rust integer. A suffix fixes the type: `5u8` is a `u8`.
@@ -45,9 +45,9 @@ integer type is explicit, see [Conversions](#conversions). Compound assignment s
 bounds of the variable: `x += 1` and `x -= 2` are `x = (x + 1).saturate()` and
 `x = (x - 2).saturate()`.
 
-Saturation keeps every step total. When the analyzer can prove that a reachable compound
-assignment hits a bound, it reports a warning, since a counter that silently saturates is often a
-sign that its range is too small.
+Saturation keeps every step total; it is defined behaviour, never a run-time panic. When the
+analyzer can prove that a reachable compound assignment hits a bound, it reports a warning, since a
+counter that silently saturates is often a sign that its range is too small.
 
 Patterns match `Int` values with literals and ranges, which is how thresholds are written:
 
@@ -90,8 +90,19 @@ The Turing-complete kinds have Rust's integer types with Rust's operators, and t
 - `Decimal` is an exact decimal number, for values that are naturally written in base ten, such
   as opacities, volumes or positions in a layout. A literal with a decimal point, such as `0.5`
   or `1.0`, is a `Decimal`. It replaces floats and is `Eq`.
-- `Rat` is an exact rational number: a numerator and a positive denominator in lowest terms.
+- `Rat` is an exact rational number: a numerator and a positive denominator in lowest terms,
+  both `i128`. There is no `Rat` literal; a value is written `Rat::new(num, den)`, which reduces
+  the fraction (`Rat::new(2, -4)` is `-1/2`); `den == 0` is a division by zero.
 
-*Tentative:* overflow of a Rust integer during compile-time evaluation is a compile error.
-Literal syntax for `Rat`, the precision of both types, their conversions, and runtime overflow are
-[open questions](./open-questions.md#numbers).
+`Rat::to_decimal` converts a `Rat` to a `Decimal`: it keeps the integer part and at most 7 digits
+after the point, truncating toward zero (`Rat::new(1, 3).to_decimal()` is `0.3333333`,
+`Rat::new(-2, 3).to_decimal()` is `-0.6666666`). `Decimal / Decimal` is computed exactly, as a
+rational, then converted the same way, so `1.0 / 3.0` is `0.3333333`.
+
+Overflow of a Rust integer, division by zero and a result outside the range of its type are a
+compile error during compile-time evaluation (`E4001`, `E4002`) and a [VM panic](./bytecode.md#panics)
+at run time: a defined stop of the game, handled by the runtime. Compound assignment on
+`Int<lo, hi>` still saturates.
+
+The precision of `Rat` and the conversions to integers are [open
+questions](./open-questions.md#numbers).

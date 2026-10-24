@@ -289,10 +289,19 @@ name = "kagari-bytecode"
 version = "0.1.0"
 
 [[package]]
+name = "kagari-cli"
+version = "0.1.0"
+dependencies = [
+ "kagari-bytecode",
+ "kagari-lang",
+]
+
+[[package]]
 name = "kagari-lang"
 version = "0.1.0"
 dependencies = [
  "insta",
+ "kagari-bytecode",
  "kagari-std",
  "kagari-syntax",
  "la-arena",

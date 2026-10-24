@@ -1,0 +1,16 @@
+// Random draws (stage 5): the analysis follows every value `rng_choose` can draw, so both
+// steps are reachable.
+
+enum Coin {
+    Heads,
+    Tails,
+}
+
+#[scene]
+#[entry]
+pushdown fn Toss() {
+    match rng_choose::<Coin>() {
+        Coin::Heads => s!(t!["heads"]),
+        Coin::Tails => s!(t!["tails"]),
+    }
+}

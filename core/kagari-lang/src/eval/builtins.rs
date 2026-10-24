@@ -7,6 +7,8 @@ use crate::diagnostic::DiagnosticCode;
 use crate::hir::ExprId;
 use crate::ty::{FnRef, GenericArg, Ty};
 
+use super::num::Rat;
+
 use super::Fault;
 use super::anim;
 use super::interp::{ErrorKind, Frame, Machine, Pending, Place, Value, int_range};
@@ -126,7 +128,7 @@ impl<'db> Machine<'_, 'db> {
     }
 
     fn pending(&mut self, place: &Place, change: PendingChange) -> Result<Value, ErrorKind> {
-        Screen::check_change(&change, self.std())?;
+        Screen::check_change(&change)?;
         // Touch the screen so a probe is detected where the change is made.
         self.screen_at(place)?;
         let cell = self.alloc(Value::Pending(Box::new(Pending {
@@ -332,6 +334,10 @@ impl<'db> Machine<'_, 'db> {
                 screen.stop_sounds(fade_out)?;
                 Ok(Value::unit())
             }
+            Builtin::ScreenReplayBgm => {
+                self.screen_receiver(&args)?.1.replay_music()?;
+                Ok(Value::unit())
+            }
             Builtin::ScreenWait => {
                 let duration = self.duration_arg(&args, 1)?;
                 let (_, screen) = self.screen_receiver(&args)?;
@@ -361,6 +367,7 @@ impl<'db> Machine<'_, 'db> {
             | Builtin::EntityRotation
             | Builtin::EntityOpacity
             | Builtin::EntityFilter
+            | Builtin::EntityShader
             | Builtin::EntityFill => {
                 let (place, id) = self.entity_receiver(&args)?;
                 let prop = match builtin {
@@ -369,6 +376,7 @@ impl<'db> Machine<'_, 'db> {
                     Builtin::EntityRotation => EntityProp::Rotation,
                     Builtin::EntityOpacity => EntityProp::Opacity,
                     Builtin::EntityFilter => EntityProp::Filter,
+                    Builtin::EntityShader => EntityProp::Shader,
                     _ => EntityProp::Fill,
                 };
                 Ok(Self::obj_ref(
@@ -608,6 +616,33 @@ impl<'db> Machine<'_, 'db> {
             Builtin::ToText => {
                 let value = self.const_arg(&args, 0)?;
                 to_text(&value).map(Value::Text).ok_or(ErrorKind::Abort)
+            }
+            Builtin::RatNew => {
+                let num = self.int_arg(&args, 0)?;
+                let den = self.int_arg(&args, 1)?;
+                if den == 0 {
+                    return Err(fault(
+                        DiagnosticCode::EvalDivisionByZero,
+                        "attempt to divide by zero",
+                    ));
+                }
+                Rat::new(num, den).map(Value::Rat).ok_or_else(|| {
+                    fault(
+                        DiagnosticCode::EvalOverflow,
+                        format!("`Rat::new({num}, {den})` overflows `Rat`"),
+                    )
+                })
+            }
+            Builtin::RatToDecimal => {
+                let Value::Rat(value) = self.deref_value(Self::arg(&args, 0)?.clone())? else {
+                    return Err(ErrorKind::Abort);
+                };
+                value.to_decimal().map(Value::Decimal).ok_or_else(|| {
+                    fault(
+                        DiagnosticCode::EvalOverflow,
+                        format!("`{value}` overflows `Decimal`"),
+                    )
+                })
             }
             Builtin::Setting | Builtin::Meta => {
                 let init = self.deref_value(Self::arg(&args, 0)?.clone())?;

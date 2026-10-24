@@ -1,0 +1,152 @@
+---
+source: core/kagari-lang/tests/bytecode.rs
+expression: out
+input_file: core/kagari-lang/tests/bytecode/004__closures/main.kix
+---
+no diagnostics
+--- bytecode ---
+fn crate::apply [fn] params=2 regs=5
+  0000 MOVE r3, r0
+  0001 MOVE r4, r1
+  0002 CALLVAL r2, (r4), r3, fn
+  0003 RET r2
+
+fn crate::double [fn] params=1 regs=3
+  0000 INT r2, 2
+  0001 IMUL r1, r0, r2, u32
+  0002 RET r1
+
+fn crate::closures [fn] params=2 regs=11
+  0000 MOVE r5, r0
+  0001 MOVE r6, r1
+  0002 CLOSURE r2, (r5, r6), crate::closures::{closure#0}
+  0003 FUNC r3, std::Option::Some
+  0004 MOVE r5, r3
+  0005 FUNC r7, crate::double
+  0006 MOVE r9, r2
+  0007 INT r10, 1
+  0008 CALLVAL r8, (r10), r9, fn
+  0009 CALL r6, (r7, r8), crate::apply
+  0010 CALLVAL r4, (r6), r5, const
+  0011 RET r4
+
+fn crate::Show [scene, entry] params=0 regs=3
+  0000 CONST r2, #17 std::narrative::Say {std::Option::None, std::Option::None, std::Option::Some {crate::Show::{closure#0}}, std::Option::Some {"Hello."}, …}
+  0001 STEP r1, r2
+  0002 TUPLE r0, ()
+  0003 RET r0
+
+fn crate::main [fn, main] params=0 regs=28
+  0000 CONST r1, #18 "Closures"
+  0001 INT r11, 1280
+  0002 INT r12, 720
+  0003 CALL r2, (r11, r12), std::screen::size
+  0004 FUNC r3, crate::Title
+  0005 FUNC r4, crate::GameView
+  0006 INT r5, 20
+  0007 INT r6, 3
+  0008 INT r7, 200
+  0009 INT r13, 26
+  0010 CONST r14, #20 std::screen::Color {255, 255, 255, 255}
+  0011 CALL r8, (r13, r14), std::narrative::text::text_style
+  0012 CONST r15, #21 crate::TEXT_SPEED
+  0013 CONST r16, #22 crate::AUTO_DELAY
+  0014 CONST r17, #23 crate::AUTO_DELAY_PER_CHAR
+  0015 CONST r18, #24 crate::SKIP_UNREAD
+  0016 CONST r19, #25 crate::MASTER
+  0017 CONST r20, #26 crate::MUSIC
+  0018 CONST r21, #27 crate::SOUND
+  0019 CONST r22, #28 crate::VOICE
+  0020 CONST r23, #29 crate::VOICE_SUSTAIN
+  0021 CONST r24, #30 crate::WAIT_FOR_VOICE
+  0022 CONST r25, #31 crate::WINDOW_OPACITY
+  0023 CONST r26, #32 crate::FULLSCREEN
+  0024 CONST r27, #33 crate::ANIMATIONS
+  0025 ADT r9, (r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27), std::system::Settings
+  0026 CALL r10, (), std::system::default_bindings
+  0027 ADT r0, (r1, r2, r3, r4, r5, r6, r7, r8, r9, r10), std::system::System
+  0028 RET r0
+
+fn crate::Title [fn] params=0 regs=4
+  0000 CLOSURE r3, (), crate::Title::{closure#3}
+  0001 ARRAY r2, (r3)
+  0002 CALLIMP r1, (r2), std::ui::column
+  0003 ADT r0, (r1), std::system::RootPage
+  0004 RET r0
+
+fn crate::GameView [fn] params=1 regs=5
+  0000 MOVE r4, r0
+  0001 CLOSURE r3, (r4), crate::GameView::{closure#0}
+  0002 ADT r2, (r3), std::ui::GameScreenProps
+  0003 CALLIMP r1, (r2), std::ui::game_screen
+  0004 RET r1
+
+fn crate::closures::{closure#0} [fn, closure] params=3 regs=5
+  0000 IADD r4, r2, r0, u32
+  0001 IADD r3, r4, r1, u32
+  0002 RET r3
+
+fn crate::Show::{closure#0} [const, closure] params=1 regs=10
+  0000 CELL r1, r0
+  0001 MOVE r9, r1
+  0002 CALL r8, (r9), std::screen::Screen::background
+  0003 MOVE r7, r8
+  0004 CALLIMP r6, (r7), std::screen::ImageLayer::clear
+  0005 MOVE r4, r6
+  0006 CALL r5, (), std::screen::anim::cut
+  0007 CALLIMP r3, (r4, r5), std::screen::Swap::apply_animation
+  0008 LOAD r2, r1
+  0009 RET r2
+
+fn crate::Title::{closure#3} [fn, closure] params=0 regs=8
+  0000 CLOSURE r6, (), crate::Title::{closure#2}
+  0001 ADT r2, (r6), std::Option::Some
+  0002 ADT r3, (), std::Option::None
+  0003 ADT r4, (), std::Option::None
+  0004 CLOSURE r7, (), crate::Title::{closure#0}
+  0005 ARRAY r5, (r7)
+  0006 ADT r1, (r2, r3, r4, r5), std::ui::ButtonProps
+  0007 CALLIMP r0, (r1), std::ui::button
+  0008 RET r0
+
+fn crate::GameView::{closure#0} [fn, closure] params=1 regs=2
+  0000 MOVE r1, r0
+  0001 RET r1
+
+fn crate::Title::{closure#2} [fn, closure] params=0 regs=4
+  0000 FUNC r1, crate::Show
+  0001 TUPLE r2, ()
+  0002 CLOSURE r3, (), crate::Title::{closure#1}
+  0003 CALLIMP r0, (r1, r2, r3), std::system::nav::start
+  0004 RET r0
+
+fn crate::Title::{closure#0} [fn, closure] params=0 regs=2
+  0000 CONST r1, #38 "Start"
+  0001 CALLIMP r0, (r1), std::ui::label
+  0002 RET r0
+
+fn crate::Title::{closure#1} [fn, closure] params=1 regs=2
+  0000 TUPLE r1, ()
+  0001 RET r1
+
+import std::ui::column [fn] params=1
+import std::ui::game_screen [fn] params=1
+import std::screen::ImageLayer::clear [const] params=1
+import std::screen::Swap::apply_animation [const] params=2
+import std::ui::button [fn] params=1
+import std::system::nav::start [fn] params=3
+import std::ui::label [fn] params=1
+static crate::TEXT_SPEED [setting] = std::time::Duration {30}
+static crate::AUTO_DELAY [setting] = std::time::Duration {1300}
+static crate::AUTO_DELAY_PER_CHAR [setting] = std::time::Duration {60}
+static crate::SKIP_UNREAD [setting] = false
+static crate::MASTER [setting] = std::system::Volume {100, false}
+static crate::MUSIC [setting] = std::system::Volume {60, false}
+static crate::SOUND [setting] = std::system::Volume {100, false}
+static crate::VOICE [setting] = std::system::Volume {100, false}
+static crate::VOICE_SUSTAIN [setting] = false
+static crate::WAIT_FOR_VOICE [setting] = true
+static crate::WINDOW_OPACITY [setting] = 80
+static crate::FULLSCREEN [setting] = false
+static crate::ANIMATIONS [setting] = true
+options max_call_depth=2048

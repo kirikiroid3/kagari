@@ -172,7 +172,9 @@ impl Screens<'_, '_, '_> {
                         continue;
                     };
                     match &data.kind {
-                        NodeKind::Step { expr, render, succ } => {
+                        NodeKind::Step {
+                            expr, render, succ, ..
+                        } => {
                             let step = (context.scene, *expr);
                             let set = self.step_sets.entry(step).or_default();
                             set.insert(screen);
@@ -187,6 +189,12 @@ impl Screens<'_, '_, '_> {
                             };
                             for target in succ {
                                 self.work.push((inst, *target, shown, producer));
+                            }
+                        }
+                        NodeKind::Rng { succ, .. } => {
+                            // A draw runs no render: every outcome sees the same screen.
+                            for target in succ {
+                                self.work.push((inst, *target, screen, producer));
                             }
                         }
                         NodeKind::Call { callee, succ } => {
@@ -241,7 +249,7 @@ impl Screens<'_, '_, '_> {
                                     .iter()
                                     .find(|(e, _)| *e == exit)
                                     .map(|(_, target)| *target),
-                                NodeKind::Step { .. } => None,
+                                NodeKind::Step { .. } | NodeKind::Rng { .. } => None,
                             });
                         if let Some(target) = target {
                             self.work.push((caller, target, screen, producer));
@@ -471,6 +479,7 @@ impl Screens<'_, '_, '_> {
                             stack.push((*callee, entered));
                         }
                     }
+                    NodeKind::Rng { .. } => {}
                 }
             }
         }
@@ -514,8 +523,9 @@ impl Screens<'_, '_, '_> {
                 self.db,
                 step.1,
                 DiagnosticCode::AnalysisInconsistentScreen,
-                "the screen this step shows depends on the path that reached it: insert a \
-                 keyframe after the paths merge, or choose the render by a story variable",
+                "the screen this step shows depends on the path that reached it: give this step \
+                 a keyframe render (one that does not read its input screen), or choose the \
+                 render by a story variable",
             );
             let note = if producers.len() > 1 {
                 "on one of the paths, the screen was last changed here"

@@ -204,7 +204,10 @@ reaches the dash.
 
 - A click during the reveal shows the full text at once, except that a `Pause::Click` still waits
   for its own click.
-- Text in the backlog is shown without pauses or reveal.
+- Text in the backlog is shown without pauses or reveal. Interpolated values are recorded as they
+  were shown, unless the step sets `history`.
+- Ruby dictionaries (ruby declared once for recurring words) are not planned: ruby is written at
+  each use in `t![…]`.
 
 ## `TextStyle`
 

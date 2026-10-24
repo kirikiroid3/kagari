@@ -3,18 +3,18 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/script/004__resolve_errors/main.kix
 ---
-script/004__resolve_errors/main.kix:2:13: error[resolve/unresolved-name]: cannot find value `nothing` in this scope
-script/004__resolve_errors/main.kix:3:17: error[resolve/unresolved-name]: cannot find type `Nothing` in this scope
-script/004__resolve_errors/main.kix:8:9: error[resolve/undeclared-label]: use of undeclared label `'nope`
-script/004__resolve_errors/main.kix:10:5: error[resolve/outside-loop]: `break` outside of a loop
-script/004__resolve_errors/main.kix:11:5: error[resolve/outside-loop]: `continue` outside of a loop
-script/004__resolve_errors/main.kix:15:13: error[resolve/unresolved-name]: no associated item named `nothing` in `Screen`
-script/004__resolve_errors/main.kix:18:22: error[resolve/self-outside-impl]: `Self` is only available in impls and traits
-script/004__resolve_errors/main.kix:20:1: error[item/unknown-attribute]: unknown attribute `#[foo]`
-script/004__resolve_errors/main.kix:23:1: error[item/builtin-outside-std]: `#[builtin]` is only allowed in the standard library
-script/004__resolve_errors/main.kix:26:4: error[item/missing-body]: function `y` has no body
-script/004__resolve_errors/main.kix:29:13: error[resolve/duplicate-binding]: identifier `x` is bound more than once in the same pattern
-script/004__resolve_errors/main.kix:31:19: error[resolve/inconsistent-binding]: variable `a` is not bound in all patterns
+script/004__resolve_errors/main.kix:2:13: error[E1016]: cannot find value `nothing` in this scope
+script/004__resolve_errors/main.kix:3:17: error[E1016]: cannot find type `Nothing` in this scope
+script/004__resolve_errors/main.kix:8:9: error[E1019]: use of undeclared label `'nope`
+script/004__resolve_errors/main.kix:10:5: error[E1020]: `break` outside of a loop
+script/004__resolve_errors/main.kix:11:5: error[E1020]: `continue` outside of a loop
+script/004__resolve_errors/main.kix:15:13: error[E1016]: no associated item named `nothing` in `Screen`
+script/004__resolve_errors/main.kix:18:22: error[E1021]: `Self` is only available in impls and traits
+script/004__resolve_errors/main.kix:20:1: error[E1006]: unknown attribute `#[foo]`
+script/004__resolve_errors/main.kix:23:1: error[E1008]: `#[builtin]` is only allowed in the standard library
+script/004__resolve_errors/main.kix:26:4: error[E1010]: function `y` has no body
+script/004__resolve_errors/main.kix:29:13: error[E1024]: identifier `x` is bound more than once in the same pattern
+script/004__resolve_errors/main.kix:31:19: error[E1025]: variable `a` is not bound in all patterns
 --- resolutions ---
 script/004__resolve_errors/main.kix:2:13 nothing -> unresolved
 script/004__resolve_errors/main.kix:3:9 _value -> local _value@3:9

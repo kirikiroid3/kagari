@@ -5,7 +5,7 @@
 
 use std::narrative::Mark;
 use std::narrative::text::{speed, text_style};
-use std::screen::{BOTTOM_CENTER, BlendMode, NO_FILTER};
+use std::screen::{BOTTOM_CENTER, BlendMode};
 use std::stage::{hide_all, side_face};
 
 // Characters and slots.
@@ -46,6 +46,7 @@ const BLINDS_RULE: ImageAsset = asset("rule_blinds.png");
 const KEY_ITEM: ImageAsset = asset("item_key.png");
 const THEME: AudioAsset = asset("bgm_theme.ogg");
 const KNOCK: AudioAsset = asset("se_knock.ogg");
+const MEMORY: ShaderAsset = asset("memory.wgsl");
 
 // Recipes.
 
@@ -60,13 +61,13 @@ const fn dip_to_black(screen: &mut Screen, next: ImageAsset) {
     screen.despawn(CURTAIN);
 }
 
-/// Tints the stage with a colour blend and sepia, for a memory.
+/// Tints the stage with a colour blend and a shader filter, for a memory.
 const fn flashback(mut screen: Screen) -> Screen {
     screen.entity(TINT).set_plane(Plane::Front);
     screen.entity(TINT).set_blend(BlendMode::Color);
     screen.entity(TINT).fill().change(hex(0x382000)).apply_animation(instant());
     screen.entity(TINT).opacity().change(0.6).apply_animation(tween(ms(800)));
-    screen.filter().change(NO_FILTER.sepia(0.5)).apply_animation(tween(ms(800)));
+    screen.filter().change(Some(MEMORY)).apply_animation(tween(ms(800)));
     screen
 }
 
@@ -74,7 +75,7 @@ const fn flashback(mut screen: Screen) -> Screen {
 const fn flashback_end(mut screen: Screen) -> Screen {
     screen.entity(TINT).opacity().change(0.0).apply_animation(tween(ms(800)));
     screen.despawn(TINT);
-    screen.filter().change(NO_FILTER).apply_animation(tween(ms(800)));
+    screen.filter().change(None).apply_animation(tween(ms(800)));
     screen
 }
 

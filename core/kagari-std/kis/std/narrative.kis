@@ -14,12 +14,18 @@ use crate::system::{GameOverlay, saves::SaveSlot};
 /// Runs step `s` and resumes with its output.
 #[builtin] pub pushdown fn push_step<S: Step>(s: S) -> S::Output;
 
+/// A value of `T` drawn by the story's PRNG (xoroshiro128++); only scenes can draw.
+#[builtin] pub pushdown fn rng_choose<T: RandChoose>() -> T;
+
 /// The step written `s!(…)`.
 pub struct Say {
     pub who: Option<Text>,
     pub voice: Option<VoiceAsset>,
     pub render: Option<Render>,
     pub text: Option<Text>,
+    /// The text the backlog records instead of `text`; `None` records `text` with its
+    /// interpolated values as they were shown.
+    pub history: Option<Text>,
 }
 
 impl Step for Say {

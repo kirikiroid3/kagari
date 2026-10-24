@@ -1,0 +1,10 @@
+// Termination (stage 5): a draw does not suspend for the player, so a loop whose only
+// suspension is `rng_choose` never passes a step.
+
+#[scene]
+#[entry]
+pushdown fn Spin() {
+    loop {
+        let _ = rng_choose::<Int<0, 2>>();
+    }
+}

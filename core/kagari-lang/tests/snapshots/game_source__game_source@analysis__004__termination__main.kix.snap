@@ -3,12 +3,12 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/analysis/004__termination/main.kix
 ---
-analysis/004__termination/main.kix:12:5: error[analysis/stepless-loop]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
-analysis/004__termination/main.kix:24:5: error[analysis/stepless-loop]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
-analysis/004__termination/main.kix:41:5: error[analysis/stepless-loop]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
-analysis/004__termination/main.kix:61:5: error[analysis/stepless-loop]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
-analysis/004__termination/main.kix:115:9: error[analysis/stepless-recursion]: the scene `Echo` can call itself before passing a step: the call stack would grow forever without input
-analysis/004__termination/main.kix:123:5: error[analysis/stepless-recursion]: the scenes `Ping` and `Pong` can call each other before passing a step: the call stack would grow forever without input
+analysis/004__termination/main.kix:12:5: error[E5001]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
+analysis/004__termination/main.kix:24:5: error[E5001]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
+analysis/004__termination/main.kix:41:5: error[E5001]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
+analysis/004__termination/main.kix:61:5: error[E5001]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
+analysis/004__termination/main.kix:115:9: error[E5002]: the scene `Echo` can call itself before passing a step: the call stack would grow forever without input
+analysis/004__termination/main.kix:123:5: error[E5002]: the scenes `Ping` and `Pong` can call each other before passing a step: the call stack would grow forever without input
   note: analysis/004__termination/main.kix:129:5: a call on the cycle
 --- resolutions ---
 analysis/004__termination/main.kix:3:18 bool -> prim bool

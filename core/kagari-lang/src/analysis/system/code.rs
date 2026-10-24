@@ -361,20 +361,7 @@ impl<'db> Ctx<'db> {
     /// and `game` fields name functions.
     pub(super) fn system_root(&mut self, sigs: &ProgramSignatures) -> Option<SystemRoot> {
         let root = *self.program.root(self.db);
-        let tree = item_tree(self.db, root);
-        let main = tree.top.iter().find_map(|&index| {
-            let data = tree.item(index)?;
-            let is_main = data.name.as_deref() == Some("main")
-                && matches!(
-                    data.kind,
-                    ItemKind::Fn {
-                        kind: FnKind::Plain,
-                        has_body: true,
-                        ..
-                    }
-                );
-            is_main.then_some(ItemId { file: root, index })
-        })?;
+        let main = main_fn(self.db, self.program)?;
         sigs.fn_sig(main)?;
         let body = file_hir(self.db, root)
             .bodies
@@ -410,6 +397,26 @@ impl<'db> Ctx<'db> {
             bindings,
         })
     }
+}
+
+/// `fn main` of the root module: the first top-level item of the root file named `main`
+/// that is a plain `fn` with a body.
+pub(crate) fn main_fn(db: &dyn Db, program: Program) -> Option<ItemId> {
+    let root = *program.root(db);
+    let tree = item_tree(db, root);
+    tree.top.iter().find_map(|&index| {
+        let data = tree.item(index)?;
+        let is_main = data.name.as_deref() == Some("main")
+            && matches!(
+                data.kind,
+                ItemKind::Fn {
+                    kind: FnKind::Plain,
+                    has_body: true,
+                    ..
+                }
+            );
+        is_main.then_some(ItemId { file: root, index })
+    })
 }
 
 /// The function a path expression names.

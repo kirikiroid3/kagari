@@ -1,0 +1,15 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/script/014__rng_errors/main.kix
+---
+script/014__rng_errors/main.kix:10:5: error[E3024]: only a scene can draw a random value: the instant procedure `flip` cannot call `rng_choose`
+script/014__rng_errors/main.kix:16:17: error[E2026]: the trait bound `Option<Coin>: RandChoose` is not satisfied
+--- resolutions ---
+script/014__rng_errors/main.kix:9:23 Coin -> enum crate::Coin
+script/014__rng_errors/main.kix:10:5 rng_choose -> fn std::narrative::rng_choose
+script/014__rng_errors/main.kix:10:18 Coin -> enum crate::Coin
+script/014__rng_errors/main.kix:16:9 _coin -> local _coin@16:9
+script/014__rng_errors/main.kix:16:17 rng_choose -> fn std::narrative::rng_choose
+script/014__rng_errors/main.kix:16:30 Option -> enum std::Option
+script/014__rng_errors/main.kix:16:37 Coin -> enum crate::Coin

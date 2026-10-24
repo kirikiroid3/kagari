@@ -1,0 +1,146 @@
+---
+source: core/kagari-lang/tests/bytecode.rs
+expression: out
+input_file: core/kagari-lang/tests/bytecode/003__places/main.kix
+---
+003__places/main.kix:89:4: warning[W6001]: the game is never started: no reachable mode calls `nav::start` or `nav::load`
+--- bytecode ---
+fn crate::Point::shift [fn] params=2 regs=7
+  0000 MOVE r3, r1
+  0001 MOVE r4, r0
+  0002 REFFIELD r5, r4, 0
+  0003 LOAD r6, r5
+  0004 IADD r6, r6, r3, i32
+  0005 STORE r5, r6
+  0006 TUPLE r2, ()
+  0007 RET r2
+
+fn crate::Point::sum [fn] params=1 regs=4
+  0000 FIELD r2, r0, 0
+  0001 FIELD r3, r0, 1
+  0002 IADD r1, r2, r3, i32
+  0003 RET r1
+
+fn crate::nudge [fn] params=1 regs=7
+  0000 FIELD r3, r0, 1
+  0001 INT r4, 1
+  0002 IADD r2, r3, r4, i32
+  0003 MOVE r5, r0
+  0004 REFFIELD r6, r5, 1
+  0005 STORE r6, r2
+  0006 TUPLE r1, ()
+  0007 RET r1
+
+fn crate::places [fn] params=0 regs=11
+  0000 INT r7, 1
+  0001 INT r8, 2
+  0002 ADT r6, (r7, r8), crate::Point
+  0003 CELL r0, r6
+  0004 INT r6, 5
+  0005 REFFIELD r7, r0, 0
+  0006 STORE r7, r6
+  0007 MOVE r7, r0
+  0008 CALL r6, (r7), crate::nudge
+  0009 MOVE r7, r0
+  0010 INT r8, 3
+  0011 CALL r6, (r7, r8), crate::Point::shift
+  0012 VECNEW r6
+  0013 CELL r1, r6
+  0014 MOVE r7, r1
+  0015 LOAD r9, r0
+  0016 FIELD r8, r9, 0
+  0017 VECPUSH r7, r8
+  0018 TUPLE r6, ()
+  0019 INT r6, 0
+  0020 CELL r2, r6
+  0021 MOVE r3, r2
+  0022 INT r6, 7
+  0023 MOVE r7, r3
+  0024 STORE r7, r6
+  0025 INT r7, 1
+  0026 INT r8, 2
+  0027 INT r9, 3
+  0028 ARRAY r6, (r7, r8, r9)
+  0029 CELL r4, r6
+  0030 LOAD r6, r2
+  0031 INT r7, 1
+  0032 REFINDEX r8, r4, r7
+  0033 STORE r8, r6
+  0034 LOAD r7, r0
+  0035 CALL r6, (r7), crate::Point::sum
+  0036 LOAD r9, r4
+  0037 INT r10, 1
+  0038 INDEX r8, r9, r10
+  0039 IADD r5, r6, r8, i32
+  0040 RET r5
+
+fn crate::main [fn, main] params=0 regs=28
+  0000 CONST r1, #12 "Places"
+  0001 INT r11, 1280
+  0002 INT r12, 720
+  0003 CALL r2, (r11, r12), std::screen::size
+  0004 FUNC r3, crate::Title
+  0005 FUNC r4, crate::GameView
+  0006 INT r5, 20
+  0007 INT r6, 3
+  0008 INT r7, 200
+  0009 INT r13, 26
+  0010 CONST r14, #14 std::screen::Color {255, 255, 255, 255}
+  0011 CALL r8, (r13, r14), std::narrative::text::text_style
+  0012 CONST r15, #15 crate::TEXT_SPEED
+  0013 CONST r16, #16 crate::AUTO_DELAY
+  0014 CONST r17, #17 crate::AUTO_DELAY_PER_CHAR
+  0015 CONST r18, #18 crate::SKIP_UNREAD
+  0016 CONST r19, #19 crate::MASTER
+  0017 CONST r20, #20 crate::MUSIC
+  0018 CONST r21, #21 crate::SOUND
+  0019 CONST r22, #22 crate::VOICE
+  0020 CONST r23, #23 crate::VOICE_SUSTAIN
+  0021 CONST r24, #24 crate::WAIT_FOR_VOICE
+  0022 CONST r25, #25 crate::WINDOW_OPACITY
+  0023 CONST r26, #26 crate::FULLSCREEN
+  0024 CONST r27, #27 crate::ANIMATIONS
+  0025 ADT r9, (r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27), std::system::Settings
+  0026 CALL r10, (), std::system::default_bindings
+  0027 ADT r0, (r1, r2, r3, r4, r5, r6, r7, r8, r9, r10), std::system::System
+  0028 RET r0
+
+fn crate::Title [fn] params=0 regs=5
+  0000 ADT r3, (), std::Option::None
+  0001 CLOSURE r4, (), crate::Title::{closure#0}
+  0002 ADT r2, (r3, r4), std::ui::TextProps
+  0003 CALLIMP r1, (r2), std::ui::text
+  0004 ADT r0, (r1), std::system::RootPage
+  0005 RET r0
+
+fn crate::GameView [fn] params=1 regs=5
+  0000 MOVE r4, r0
+  0001 CLOSURE r3, (r4), crate::GameView::{closure#0}
+  0002 ADT r2, (r3), std::ui::GameScreenProps
+  0003 CALLIMP r1, (r2), std::ui::game_screen
+  0004 RET r1
+
+fn crate::Title::{closure#0} [fn, closure] params=0 regs=1
+  0000 CONST r0, #29 "Title"
+  0001 RET r0
+
+fn crate::GameView::{closure#0} [fn, closure] params=1 regs=2
+  0000 MOVE r1, r0
+  0001 RET r1
+
+import std::ui::text [fn] params=1
+import std::ui::game_screen [fn] params=1
+static crate::TEXT_SPEED [setting] = std::time::Duration {30}
+static crate::AUTO_DELAY [setting] = std::time::Duration {1300}
+static crate::AUTO_DELAY_PER_CHAR [setting] = std::time::Duration {60}
+static crate::SKIP_UNREAD [setting] = false
+static crate::MASTER [setting] = std::system::Volume {100, false}
+static crate::MUSIC [setting] = std::system::Volume {60, false}
+static crate::SOUND [setting] = std::system::Volume {100, false}
+static crate::VOICE [setting] = std::system::Volume {100, false}
+static crate::VOICE_SUSTAIN [setting] = false
+static crate::WAIT_FOR_VOICE [setting] = true
+static crate::WINDOW_OPACITY [setting] = 80
+static crate::FULLSCREEN [setting] = false
+static crate::ANIMATIONS [setting] = true
+options max_call_depth=2048

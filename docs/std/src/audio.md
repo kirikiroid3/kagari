@@ -47,6 +47,26 @@ impl ChannelChange {
   run at the same time if `overlap` is true, one after the other if it is false.
 - `stop()` fades the current track out over `fade_out`.
 
+Music carries over between steps: a track that is already playing keeps playing across steps and
+never restarts on its own. A render restarts it from its start, at the timeline cursor, with
+`screen.replay_bgm()`. The replay is scheduled on the timeline only; the logical screen does not
+change, so it does not affect screen equality. Without a track, `replay_bgm()` does nothing.
+
+```kis
+#[builtin] pub const fn replay_bgm(&mut self);   // in impl Screen
+```
+
+## System music
+
+```kis
+/// Sets the system music channel: heard while no game runs on the mode stack; while a game
+/// runs, the game screen's music channel plays instead. `None` stops it.
+#[builtin] pub fn set_music(track: Option<crate::screen::audio::Loop>, fade: crate::screen::audio::AudioFade);
+```
+
+`std::system::set_music` is a `fn`: system code calls it, for example on the title page. See
+[System](./system.md).
+
 ## `Loop`
 
 ```kis

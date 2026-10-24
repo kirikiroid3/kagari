@@ -3,11 +3,11 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/script/005__patterns/main.kix
 ---
-script/005__patterns/main.kix:10:5: error[type/mismatched-types]: mismatched types: expected `()`, found `{integer}`
-script/005__patterns/main.kix:13:9: error[type/mismatched-types]: mismatched types: expected `Option<Route>`, found `Route`
-script/005__patterns/main.kix:13:20: error[type/mismatched-types]: mismatched types: expected `Option<Route>`, found `Route`
-script/005__patterns/main.kix:14:9: error[type/mismatched-types]: mismatched types: expected `Option<Route>`, found `Route`
-script/005__patterns/main.kix:18:5: error[type/mismatched-types]: mismatched types: expected `()`, found `u64`
+script/005__patterns/main.kix:10:5: error[E2001]: mismatched types: expected `()`, found `{integer}`
+script/005__patterns/main.kix:13:9: error[E2001]: mismatched types: expected `Option<Route>`, found `Route`
+script/005__patterns/main.kix:13:20: error[E2001]: mismatched types: expected `Option<Route>`, found `Route`
+script/005__patterns/main.kix:14:9: error[E2001]: mismatched types: expected `Option<Route>`, found `Route`
+script/005__patterns/main.kix:18:5: error[E2001]: mismatched types: expected `()`, found `u64`
 --- resolutions ---
 script/005__patterns/main.kix:3:16 Route -> enum crate::Route
 script/005__patterns/main.kix:3:24 Route::C -> variant crate::Route::C

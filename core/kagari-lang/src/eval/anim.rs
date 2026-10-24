@@ -1,7 +1,6 @@
 //! The const-evaluation rules on animation values and fractions
 //! (`docs/std/src/checks.md#const-evaluation-errors`): the Motion identity rule, easings
-//! used by applied animations, and `Decimal` fractions of opacity, volume, anchor and
-//! filters.
+//! used by applied animations, and `Decimal` fractions of opacity, volume and anchor.
 
 use std::cmp::Ordering;
 
@@ -29,33 +28,8 @@ pub fn check_fraction(value: &ConstValue, what: &str) -> Result<(), Fault> {
     }
 }
 
-fn check_non_negative(value: &ConstValue, what: &str) -> Result<(), Fault> {
-    match value.as_decimal() {
-        Some(decimal) if decimal.mantissa() < 0 => {
-            Err(fraction_fault(what, decimal, "at least 0.0"))
-        }
-        _ => Ok(()),
-    }
-}
-
 fn field<'v>(value: &'v ConstValue, info: &AdtInfo, name: &str) -> Option<&'v ConstValue> {
     value.field(info.field(name)?)
-}
-
-/// A `Filter`: grayscale and sepia are fractions, brightness, contrast and saturation are
-/// factors `>= 0`.
-pub fn check_filter(value: &ConstValue, std: &StdTable) -> Result<(), Fault> {
-    for name in ["grayscale", "sepia"] {
-        if let Some(amount) = field(value, &std.filter, name) {
-            check_fraction(amount, &format!("the filter's {name}"))?;
-        }
-    }
-    for name in ["brightness", "contrast", "saturation"] {
-        if let Some(amount) = field(value, &std.filter, name) {
-            check_non_negative(amount, &format!("the filter's {name}"))?;
-        }
-    }
-    Ok(())
 }
 
 /// An `Anchor`: both coordinates are fractions.

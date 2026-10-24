@@ -326,6 +326,7 @@ fn std_items(db: &dyn Db, maps: &DefMaps) -> StdItems {
             "VoiceAsset",
             "VideoAsset",
             "FontAsset",
+            "ShaderAsset",
         ]
         .iter()
         .filter_map(|name| ty(&[name]))
@@ -334,8 +335,10 @@ fn std_items(db: &dyn Db, maps: &DefMaps) -> StdItems {
         integer,
         asset: ty(&["Asset"]),
         step: ty(&["narrative", "Step"]),
+        rand_choose: ty(&["RandChoose"]),
         to_text: ty(&["narrative", "text", "ToText"]),
         push_step: value(&["narrative", "push_step"]),
+        rng_choose: value(&["narrative", "rng_choose"]),
         asset_fn: value(&["asset"]),
         to_text_fn: value(&["narrative", "text", "to_text"]),
         concat: value(&["narrative", "text", "concat"]),

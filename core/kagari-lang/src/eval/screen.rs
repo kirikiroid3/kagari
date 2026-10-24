@@ -3,7 +3,7 @@
 //! step-only state (timeline cursor, scheduled animations, one-shot sounds, choice menu,
 //! text start, despawning entities).
 //!
-//! Component values are std values ([`ConstValue`]s of `Point`, `Decimal`, `Filter`, …).
+//! Component values are std values ([`ConstValue`]s of `Point`, `Decimal`, `ShaderAsset`, …).
 //! Visible changes go through [`PendingChange`]s that only [`Screen::commit`] applies,
 //! which is what `apply_animation` does.
 
@@ -47,7 +47,7 @@ pub struct LogicalScreen {
     pub entities: BTreeMap<u32, Entity>,
     pub hud: Hud,
     pub camera: Camera,
-    /// The screen filter, a `Filter`.
+    /// The screen filter, an `Option<ShaderAsset>`.
     pub filter: ConstValue,
     pub music: Channel,
     pub ambience: [Channel; 4],
@@ -69,8 +69,10 @@ pub struct Entity {
     pub rotation: ConstValue,
     /// A `Decimal` in `0.0..=1.0`.
     pub opacity: ConstValue,
-    /// A `Filter`.
+    /// The filter, an `Option<ShaderAsset>`.
     pub filter: ConstValue,
+    /// The generated content, an `Option<ShaderAsset>`.
+    pub shader: ConstValue,
     /// A `Color`.
     pub fill: ConstValue,
     /// An `Option<Size>`.
@@ -181,6 +183,8 @@ pub enum ScheduledKind {
     Sound(ConstValue),
     /// `stop_sounds(fade_out)`.
     StopSounds { fade_out_ms: u32 },
+    /// `replay_bgm()`: the music channel's track restarts.
+    ReplayMusic,
 }
 
 /// What an animation applies to.
@@ -213,6 +217,7 @@ pub enum EntityProp {
     Rotation,
     Opacity,
     Filter,
+    Shader,
     Fill,
 }
 
@@ -259,30 +264,6 @@ fn decimal(value: Decimal) -> ConstValue {
     ConstValue::Decimal(value)
 }
 
-/// `NO_FILTER`.
-pub fn no_filter(std: &StdTable) -> ConstValue {
-    let values = [
-        ("grayscale", decimal(Decimal::ZERO)),
-        ("sepia", decimal(Decimal::ZERO)),
-        ("brightness", decimal(Decimal::ONE)),
-        ("contrast", decimal(Decimal::ONE)),
-        ("saturation", decimal(Decimal::ONE)),
-        ("blur", ConstValue::Int(0)),
-    ];
-    std.filter.make(
-        std.filter
-            .fields
-            .iter()
-            .map(|field| {
-                values
-                    .iter()
-                    .find(|(name, _)| name == field)
-                    .map_or(ConstValue::Int(0), |(_, value)| value.clone())
-            })
-            .collect(),
-    )
-}
-
 fn zero_angle(std: &StdTable) -> ConstValue {
     std.angle.make(vec![decimal(Decimal::ZERO)])
 }
@@ -300,7 +281,8 @@ impl Entity {
             scale: decimal(Decimal::ONE),
             rotation: zero_angle(std),
             opacity: decimal(Decimal::ZERO),
-            filter: no_filter(std),
+            filter: std.none(),
+            shader: std.none(),
             fill: std.color.make(vec![
                 ConstValue::Int(0),
                 ConstValue::Int(0),
@@ -326,6 +308,7 @@ impl Entity {
             EntityProp::Rotation => &mut self.rotation,
             EntityProp::Opacity => &mut self.opacity,
             EntityProp::Filter => &mut self.filter,
+            EntityProp::Shader => &mut self.shader,
             EntityProp::Fill => &mut self.fill,
         }
     }
@@ -364,7 +347,7 @@ impl Screen {
                     zoom: decimal(Decimal::ONE),
                     rotation: zero_angle(std),
                 },
-                filter: no_filter(std),
+                filter: std.none(),
                 music: Channel::silent(),
                 ambience: [
                     Channel::silent(),
@@ -496,9 +479,8 @@ impl Screen {
         }
     }
 
-    /// Checks the value a pending change will set: fractions for opacity and volume, the
-    /// filter amounts.
-    pub fn check_change(change: &PendingChange, std: &StdTable) -> Result<(), Fault> {
+    /// Checks the value a pending change will set: fractions for opacity and volume.
+    pub fn check_change(change: &PendingChange) -> Result<(), Fault> {
         match change {
             PendingChange::Prop(PropTarget::Entity(_, EntityProp::Opacity), value) => {
                 anim::check_fraction(value, "opacity")
@@ -506,10 +488,6 @@ impl Screen {
             PendingChange::Prop(PropTarget::ChannelVolume(_), value) => {
                 anim::check_fraction(value, "channel volume")
             }
-            PendingChange::Prop(
-                PropTarget::Entity(_, EntityProp::Filter) | PropTarget::ScreenFilter,
-                value,
-            ) => anim::check_filter(value, std),
             _ => Ok(()),
         }
     }
@@ -620,6 +598,19 @@ impl Screen {
     /// `stop_sounds(fade_out)`.
     pub fn stop_sounds(&mut self, fade_out_ms: u32) -> Result<(), Fault> {
         self.schedule(None, ScheduledKind::StopSounds { fade_out_ms }, 0)
+    }
+
+    /// `replay_bgm()`: restarts the music channel's track at the cursor; nothing when the
+    /// channel is silent. The logical screen does not change.
+    pub fn replay_music(&mut self) -> Result<(), Fault> {
+        if self.logical.music.track.is_none() {
+            return Ok(());
+        }
+        self.schedule(
+            Some(Target::Channel(ChannelId::Music)),
+            ScheduledKind::ReplayMusic,
+            0,
+        )
     }
 
     /// `wait(duration)`.

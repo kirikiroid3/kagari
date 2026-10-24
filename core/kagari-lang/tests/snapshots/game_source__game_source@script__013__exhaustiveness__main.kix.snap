@@ -3,25 +3,25 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/script/013__exhaustiveness/main.kix
 ---
-script/013__exhaustiveness/main.kix:84:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `Some(Route::B)` and `Some(Route::C)` not covered
-script/013__exhaustiveness/main.kix:91:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `6..=10` not covered
-script/013__exhaustiveness/main.kix:97:19: error[type/non-exhaustive-match]: non-exhaustive patterns: `0` and `6..=9` not covered
-script/013__exhaustiveness/main.kix:102:19: error[type/non-exhaustive-match]: non-exhaustive patterns: `i32::MIN..=-4` and `-2..=i32::MAX` not covered
-script/013__exhaustiveness/main.kix:105:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `0` and `10..=u64::MAX` not covered
-script/013__exhaustiveness/main.kix:111:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `Route::C` not covered
-script/013__exhaustiveness/main.kix:118:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `true` not covered
-script/013__exhaustiveness/main.kix:125:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `(false, false)` not covered
-script/013__exhaustiveness/main.kix:132:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `Point { x: 1..=u64::MAX, .. }` not covered
-script/013__exhaustiveness/main.kix:138:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `_` not covered
-script/013__exhaustiveness/main.kix:145:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `None`, `Some(None)`, `Some(Some(Route::B))` and 1 more not covered
-script/013__exhaustiveness/main.kix:152:11: error[type/non-exhaustive-match]: non-exhaustive patterns: `Map::B` not covered
-script/013__exhaustiveness/main.kix:175:9: warning[type/unreachable-pattern]: unreachable pattern
-script/013__exhaustiveness/main.kix:177:9: warning[type/unreachable-pattern]: unreachable pattern
-script/013__exhaustiveness/main.kix:182:9: warning[type/unreachable-pattern]: unreachable pattern
-script/013__exhaustiveness/main.kix:188:32: error[type/refutable-pattern]: refutable pattern in function argument: `Route::B` and `Route::C` not covered
-script/013__exhaustiveness/main.kix:189:9: error[type/refutable-pattern]: refutable pattern in local binding: `None` not covered
-script/013__exhaustiveness/main.kix:190:9: error[type/refutable-pattern]: refutable pattern in `for` loop binding: `0..=2` and `4` not covered
-script/013__exhaustiveness/main.kix:191:14: error[type/refutable-pattern]: refutable pattern in closure argument: `None` not covered
+script/013__exhaustiveness/main.kix:84:11: error[E2037]: non-exhaustive patterns: `Some(Route::B)` and `Some(Route::C)` not covered
+script/013__exhaustiveness/main.kix:91:11: error[E2037]: non-exhaustive patterns: `6..=10` not covered
+script/013__exhaustiveness/main.kix:97:19: error[E2037]: non-exhaustive patterns: `0` and `6..=9` not covered
+script/013__exhaustiveness/main.kix:102:19: error[E2037]: non-exhaustive patterns: `i32::MIN..=-4` and `-2..=i32::MAX` not covered
+script/013__exhaustiveness/main.kix:105:11: error[E2037]: non-exhaustive patterns: `0` and `10..=u64::MAX` not covered
+script/013__exhaustiveness/main.kix:111:11: error[E2037]: non-exhaustive patterns: `Route::C` not covered
+script/013__exhaustiveness/main.kix:118:11: error[E2037]: non-exhaustive patterns: `true` not covered
+script/013__exhaustiveness/main.kix:125:11: error[E2037]: non-exhaustive patterns: `(false, false)` not covered
+script/013__exhaustiveness/main.kix:132:11: error[E2037]: non-exhaustive patterns: `Point { x: 1..=u64::MAX, .. }` not covered
+script/013__exhaustiveness/main.kix:138:11: error[E2037]: non-exhaustive patterns: `_` not covered
+script/013__exhaustiveness/main.kix:145:11: error[E2037]: non-exhaustive patterns: `None`, `Some(None)`, `Some(Some(Route::B))` and 1 more not covered
+script/013__exhaustiveness/main.kix:152:11: error[E2037]: non-exhaustive patterns: `Map::B` not covered
+script/013__exhaustiveness/main.kix:175:9: warning[W2039]: unreachable pattern
+script/013__exhaustiveness/main.kix:177:9: warning[W2039]: unreachable pattern
+script/013__exhaustiveness/main.kix:182:9: warning[W2039]: unreachable pattern
+script/013__exhaustiveness/main.kix:188:32: error[E2038]: refutable pattern in function argument: `Route::B` and `Route::C` not covered
+script/013__exhaustiveness/main.kix:189:9: error[E2038]: refutable pattern in local binding: `None` not covered
+script/013__exhaustiveness/main.kix:190:9: error[E2038]: refutable pattern in `for` loop binding: `0..=2` and `4` not covered
+script/013__exhaustiveness/main.kix:191:14: error[E2038]: refutable pattern in closure argument: `None` not covered
 --- resolutions ---
 script/013__exhaustiveness/main.kix:6:19 u64 -> prim u64
 script/013__exhaustiveness/main.kix:6:27 u64 -> prim u64

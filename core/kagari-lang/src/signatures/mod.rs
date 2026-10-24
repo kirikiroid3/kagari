@@ -172,7 +172,7 @@ pub struct FieldDef {
 }
 
 /// Std items by role. `None` only when the std item is missing (already reported by
-/// resolution as `resolve/missing-std-item` where forms use it).
+/// resolution as `E1026` where forms use it).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct StdItems {
     // Types.
@@ -192,16 +192,18 @@ pub struct StdItems {
     pub choice: Option<ItemId>,
     pub choice_arm: Option<ItemId>,
     pub element: Option<ItemId>,
-    /// `ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset`.
+    /// `ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset`, `ShaderAsset`.
     pub assets: Vec<ItemId>,
     // Traits.
     pub eq: Option<ItemId>,
     pub integer: Option<ItemId>,
     pub asset: Option<ItemId>,
     pub step: Option<ItemId>,
+    pub rand_choose: Option<ItemId>,
     pub to_text: Option<ItemId>,
     // Functions.
     pub push_step: Option<ItemId>,
+    pub rng_choose: Option<ItemId>,
     pub asset_fn: Option<ItemId>,
     pub to_text_fn: Option<ItemId>,
     pub concat: Option<ItemId>,

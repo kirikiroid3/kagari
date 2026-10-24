@@ -95,8 +95,8 @@ impl Decimal {
         Some(Decimal::new(self.mantissa.checked_neg()?, self.scale))
     }
 
-    /// The exact quotient. `Err(true)` when `other` is zero, `Err(false)` when the quotient
-    /// has no finite decimal expansion or does not fit.
+    /// The quotient, computed exactly and then truncated as [`Rat::to_decimal`] does.
+    /// `Err(true)` when `other` is zero, `Err(false)` when the result does not fit.
     pub fn checked_div(self, other: Decimal) -> Result<Decimal, bool> {
         if other.mantissa == 0 {
             return Err(true);
@@ -239,32 +239,16 @@ impl Rat {
         Some(a.cmp(&b))
     }
 
-    /// The decimal with the same value, when the denominator has only the prime factors 2
-    /// and 5.
+    /// This value as a `Decimal`: keeps the integer part and at most 7 digits after the
+    /// point, truncating toward zero. `None` on overflow.
     pub fn to_decimal(self) -> Option<Decimal> {
-        let mut den = self.den;
-        let mut twos: u32 = 0;
-        let mut fives: u32 = 0;
-        while den.checked_rem(2) == Some(0) {
-            den = den.checked_div(2)?;
-            twos = twos.checked_add(1)?;
-        }
-        while den.checked_rem(5) == Some(0) {
-            den = den.checked_div(5)?;
-            fives = fives.checked_add(1)?;
-        }
-        if den != 1 {
-            return None;
-        }
-        let scale = twos.max(fives);
-        // num / (2^twos 5^fives) = num * 2^(scale-twos) * 5^(scale-fives) / 10^scale
-        let mantissa = self
-            .num
-            .checked_mul(2i128.checked_pow(scale.checked_sub(twos)?)?)?
-            .checked_mul(5i128.checked_pow(scale.checked_sub(fives)?)?)?;
-        Some(Decimal::new(mantissa, scale))
+        let scaled = self.num.checked_mul(10i128.checked_pow(DECIMAL_DIGITS)?)?;
+        Some(Decimal::new(scaled.checked_div(self.den)?, DECIMAL_DIGITS))
     }
 }
+
+/// The most digits after the point a `Rat` keeps when converted to a `Decimal`.
+pub const DECIMAL_DIGITS: u32 = 7;
 
 impl fmt::Display for Rat {
     /// `3/4`, `-1/2`, `5`.

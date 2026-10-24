@@ -3,12 +3,12 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/analysis/003__influence/main.kix
 ---
-analysis/003__influence/main.kix:7:12: warning[analysis/unused-story-variable]: the story variable `WRITE_ONLY` is never read: assignments to it have no effect
-analysis/003__influence/main.kix:8:12: warning[analysis/unused-story-variable]: the story variable `COUNTER` is never read: assignments to it have no effect
-analysis/003__influence/main.kix:9:12: warning[analysis/unused-story-variable]: the story variable `SOURCE` never influences the story: no condition, step, meta write or ending depends on its value
-analysis/003__influence/main.kix:10:12: warning[analysis/unused-story-variable]: the story variable `SINK` is never read: assignments to it have no effect
-analysis/003__influence/main.kix:11:12: warning[analysis/unused-story-variable]: the story variable `IGNORED` never influences the story: no condition, step, meta write or ending depends on its value
-analysis/003__influence/main.kix:12:12: warning[analysis/unused-story-variable]: the story variable `UNTOUCHED` is never used
+analysis/003__influence/main.kix:7:12: warning[W5010]: the story variable `WRITE_ONLY` is never read: assignments to it have no effect
+analysis/003__influence/main.kix:8:12: warning[W5010]: the story variable `COUNTER` is never read: assignments to it have no effect
+analysis/003__influence/main.kix:9:12: warning[W5010]: the story variable `SOURCE` never influences the story: no condition, step, meta write or ending depends on its value
+analysis/003__influence/main.kix:10:12: warning[W5010]: the story variable `SINK` is never read: assignments to it have no effect
+analysis/003__influence/main.kix:11:12: warning[W5010]: the story variable `IGNORED` never influences the story: no condition, step, meta write or ending depends on its value
+analysis/003__influence/main.kix:12:12: warning[W5010]: the story variable `UNTOUCHED` is never used
 --- resolutions ---
 analysis/003__influence/main.kix:7:24 bool -> prim bool
 analysis/003__influence/main.kix:8:21 Int -> prim Int

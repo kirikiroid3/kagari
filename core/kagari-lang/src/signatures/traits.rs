@@ -205,6 +205,15 @@ impl TraitSolver<'_> {
         if Some(trait_item) == self.sigs.std.eq {
             return self.structural_eq(ty, trait_item);
         }
+        if Some(trait_item) == self.sigs.std.rand_choose {
+            // Fieldless enums; `Int<lo, hi>` has an explicit impl, checked above.
+            return matches!(ty, Ty::Adt { item, .. } if self.sigs.adt(*item).is_some_and(|adt| {
+                adt.is_enum
+                    && !adt.builtin
+                    && !adt.variants.is_empty()
+                    && adt.variants.iter().all(|variant| variant.fields.is_empty())
+            }));
+        }
         false
     }
 

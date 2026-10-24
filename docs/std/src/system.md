@@ -298,6 +298,9 @@ fn Load() -> Overlay {
 #[builtin] pub fn seen_image(image: ImageAsset) -> bool;
 #[builtin] pub fn heard(audio: AudioAsset) -> bool;
 #[builtin] pub fn watched(video: VideoAsset) -> bool;
+/// Sets the system music channel: heard while no game runs on the mode stack; while a game
+/// runs, the game screen's music channel plays instead. `None` stops it.
+#[builtin] pub fn set_music(track: Option<crate::screen::audio::Loop>, fade: crate::screen::audio::AudioFade);
 ```
 
 These read engine-maintained meta:
@@ -308,6 +311,10 @@ These read engine-maintained meta:
 
 They are never reverted by load or rewind, just like read flags. They are reactive. They back the
 CG gallery, the music room and the movie room without any studio bookkeeping.
+
+`set_music(track, fade)` plays music outside the game: a music room or the title page sets the
+system music channel with it. It is heard only while no game runs on the mode stack. What is
+currently playing cannot be read yet.
 
 ### Gallery
 

@@ -226,5 +226,18 @@ a scene.
 
 ## Randomness
 
-The story may use a deterministic pseudo-random generator whose state is part of σ, so replay
-reproduces every draw. The API is an [open question](../open-questions.md#randomness).
+A scene draws a random value with `rng_choose::<T>()`, where `T: RandChoose`: a fieldless enum or
+an `Int<lo, hi>`. Only a scene may draw; a call from an instant procedure is `E3024`.
+
+```kix
+enum Coin { Heads, Tails }
+
+match rng_choose::<Coin>() {
+    Coin::Heads => s!(t!["Heads."]),
+    Coin::Tails => s!(t!["Tails."]),
+}
+```
+
+The PRNG is xoroshiro128++ (specified in [The `.kagari` Format](../bytecode.md#prng)). Its state
+is part of σ and its seed is in the save trace, so replay reproduces every draw. The analyzer
+treats each draw as a free choice over every value of `T`, like a choice of the player.

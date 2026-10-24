@@ -16,7 +16,22 @@ pub use self::text::{Mark, Text, TextEffect};
 ```
 
 `push_step` shows the step, waits for input, and returns what the input carried. It is one of the
-two `pushdown fn` of the library, and only a `#[scene]` may call it.
+three `pushdown fn` of the library, with `rng_choose` and `Meta::write`, and only a `#[scene]` may
+call it.
+
+## `rng_choose`
+
+```kis
+/// Types a story can draw at random: fieldless enums and `Int<lo, hi>`.
+#[builtin] pub trait RandChoose {}
+/// A value of `T` drawn by the story's PRNG (xoroshiro128++); only scenes can draw.
+#[builtin] pub pushdown fn rng_choose<T: RandChoose>() -> T;
+```
+
+`rng_choose::<T>()` draws a value of `T`: a variant of a fieldless enum, or an integer of an
+`Int<lo, hi>`, each with equal probability. Only a scene may call it (`E3024`). The PRNG state is
+part of the story state and its seed is in the save, so replay reproduces every draw; the analyzer
+treats each draw as a free choice over every value of `T`.
 
 ## `Say`
 
@@ -26,17 +41,23 @@ pub struct Say {
     pub voice: Option<VoiceAsset>,
     pub render: Option<Render>,
     pub text: Option<Text>,
+    /// The text the backlog records instead of `text`; `None` records `text` with its
+    /// interpolated values as they were shown.
+    pub history: Option<Text>,
 }
 impl Step for Say { type Output = (); }
 ```
 
-`s!(who = …, voice = …, render = …, t![…])` is `push_step(Say { … })`, with `None` for each absent
+`s!(who = …, voice = …, render = …, history = …, t![…])` is `push_step(Say { … })`, with `None` for each absent
 attribute.
 
 - `who` is the speaker name; without it the message is narration.
 - `voice` starts with the text and is bound to the line; see [Audio](./audio.md#voice).
 - `render` runs at step entry; see [Screen](./screen.md#step-entry).
 - A `Say` waits for `NextStep`, which carries no information and is not recorded in saves.
+- `history` is the text the backlog records. By default the backlog records `text` with its
+  interpolated values as they were when the line was shown; when `history` is set,
+  `Entry::Line(line).text` is the `history` text instead.
 
 ## `Choice`
 
@@ -114,6 +135,12 @@ static CLEARED_AZUSA: Meta<bool> = meta(false);
 Writes are never reverted by load or rewind. Meta reaches the story only through the arguments of
 an entry scene.
 
+## Timed input (planned)
+
+Timed input and auto play driven by the story are not supported yet. The planned API is a one-shot
+timer in `fn` code that calls a closure once after a `Duration`, in the spirit of JavaScript's
+`setTimeout`. There will be no repeating timer (no `setInterval` equivalent).
+
 ## The `Narrative` handle
 
 ```kis
@@ -170,7 +197,8 @@ pub enum PlayMode { Normal, Auto, Skip }
 - **`menu()`.** Its arms are the shown arms in order, with the disabled arms inserted at their
   `at` positions. A disabled arm has `arm: None`; `Arm` is an opaque handle for `select`.
 - **`history()`** is bounded by `System::backlog` and drops the oldest entries. `Entry::Chosen`
-  holds the text of a selected arm.
+  holds the text of a selected arm. An `Entry::Line` holds the text as it was shown, or the step's
+  `history` text when it has one.
 - **`PlayMode::Skip`** stops at unread text unless the `skip_unread` setting is on. It always stops
   at choices.
 - **`PlayMode::Auto`** advances after the `auto_delay` settings, and waits for the voice if

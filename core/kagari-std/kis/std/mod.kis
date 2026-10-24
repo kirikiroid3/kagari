@@ -14,6 +14,13 @@ pub mod system;
 #[builtin] pub struct Vec<T>;
 /// An exact rational number.
 #[builtin] pub struct Rat;
+impl Rat {
+    /// `num / den` in lowest terms; `den == 0` is a division by zero.
+    #[builtin] pub const fn new(num: i128, den: i128) -> Rat;
+    /// This value as a `Decimal`: the integer part and at most 7 digits after the point,
+    /// truncated toward zero.
+    #[builtin] pub const fn to_decimal(self) -> Decimal;
+}
 /// An exact decimal number, written `0.5`: the exact replacement for floats.
 #[builtin] pub struct Decimal;
 
@@ -62,6 +69,7 @@ impl Eq for AudioAsset {}
 impl Eq for VoiceAsset {}
 impl Eq for VideoAsset {}
 impl Eq for FontAsset {}
+impl Eq for ShaderAsset {}
 impl Eq for narrative::Text {}
 impl Eq for screen::Screen {}
 
@@ -86,6 +94,10 @@ impl Integer for usize {}
 impl Integer for isize {}
 impl<const LO: i64, const HI: i64> Integer for Int<LO, HI> {}
 
+/// Types a story can draw at random: fieldless enums and `Int<lo, hi>`.
+#[builtin] pub trait RandChoose {}
+impl<const LO: i64, const HI: i64> RandChoose for Int<LO, HI> {}
+
 /// Types whose values are exactly the asset constants of the program.
 #[builtin] pub trait Asset {}
 
@@ -99,11 +111,14 @@ impl<const LO: i64, const HI: i64> Integer for Int<LO, HI> {}
 #[builtin] pub struct VideoAsset;
 /// A font file.
 #[builtin] pub struct FontAsset;
+/// A WGSL shader file (`.wgsl`): a filter, or generated content such as weather or particles.
+#[builtin] pub struct ShaderAsset;
 impl Asset for ImageAsset {}
 impl Asset for AudioAsset {}
 impl Asset for VoiceAsset {}
 impl Asset for VideoAsset {}
 impl Asset for FontAsset {}
+impl Asset for ShaderAsset {}
 
 /// Loads the asset at `path`, a string literal relative to the file that names it.
 #[builtin] pub const fn asset<A: Asset>(path: narrative::Text) -> A;

@@ -2,7 +2,6 @@
 
 use std::narrative::Mark;
 use std::narrative::text::{concat, effect, mark};
-use std::screen::NO_FILTER;
 
 const A: EntityId = EntityId(3);
 const BG: ImageAsset = asset("bg.png");
@@ -92,10 +91,6 @@ const fn anchor(mut screen: Screen) -> Screen {
     screen.entity(A).set_anchor(Anchor { x: 0.5, y: 1.5 });
     screen
 }
-const fn grayscale(mut screen: Screen) -> Screen {
-    screen.filter().change(NO_FILTER.grayscale(2.0)).apply_animation(instant());
-    screen
-}
 
 // Keyframes and deltas.
 const fn fresh(_screen: Screen) -> Screen {
@@ -134,7 +129,6 @@ pushdown fn Start() {
     s!(render = opacity, t!["9"]);
     s!(render = volume, t!["10"]);
     s!(render = anchor, t!["11"]);
-    s!(render = grayscale, t!["12"]);
     s!(render = fresh, t!["Day " {DAY}]);
     s!(render = enter);
     s!(render = |_screen| Screen::empty());

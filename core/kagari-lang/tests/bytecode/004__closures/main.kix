@@ -1,0 +1,82 @@
+// Closures and function values: an `fn` closure capturing two locals, a call through an
+// `fn(u32) -> u32` pointer, a constructor used as a value, and an inline render closure.
+
+use std::narrative::text::text_style;
+use std::screen::size;
+use std::system::default_bindings;
+
+fn apply(f: fn(u32) -> u32, x: u32) -> u32 {
+    f(x)
+}
+
+fn double(x: u32) -> u32 {
+    x * 2
+}
+
+fn closures(a: u32, b: u32) -> Option<u32> {
+    let add = |x: u32| x + a + b;
+    let wrap: const fn(u32) -> Option<u32> = Some;
+    wrap(apply(double, add(1)))
+}
+
+#[scene]
+#[entry]
+pushdown fn Show() {
+    s!(render = |mut screen| {
+        screen.background().clear().apply_animation(cut());
+        screen
+    }, t!["Hello."]);
+}
+
+static TEXT_SPEED: Setting<Duration> = setting(ms(30));
+static AUTO_DELAY: Setting<Duration> = setting(ms(1300));
+static AUTO_DELAY_PER_CHAR: Setting<Duration> = setting(ms(60));
+static SKIP_UNREAD: Setting<bool> = setting(false);
+static MASTER: Setting<Volume> = setting(volume(100));
+static MUSIC: Setting<Volume> = setting(volume(60));
+static SOUND: Setting<Volume> = setting(volume(100));
+static VOICE: Setting<Volume> = setting(volume(100));
+static VOICE_SUSTAIN: Setting<bool> = setting(false);
+static WAIT_FOR_VOICE: Setting<bool> = setting(true);
+static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
+static FULLSCREEN: Setting<bool> = setting(false);
+static ANIMATIONS: Setting<bool> = setting(true);
+
+fn main() -> System {
+    System {
+        title: "Closures",
+        resolution: size(1280, 720),
+        start: Title,
+        game: GameView,
+        save_slots: 20,
+        auto_slots: 3,
+        backlog: 200,
+        text: text_style(26, WHITE),
+        settings: Settings {
+            text_speed: TEXT_SPEED,
+            auto_delay: AUTO_DELAY,
+            auto_delay_per_char: AUTO_DELAY_PER_CHAR,
+            skip_unread: SKIP_UNREAD,
+            master: MASTER,
+            music: MUSIC,
+            sound: SOUND,
+            voice: VOICE,
+            voice_sustain: VOICE_SUSTAIN,
+            wait_for_voice: WAIT_FOR_VOICE,
+            window_opacity: WINDOW_OPACITY,
+            fullscreen: FULLSCREEN,
+            animations: ANIMATIONS,
+        },
+        bindings: default_bindings(),
+    }
+}
+
+fn Title() -> RootPage {
+    RootPage(column![
+        button!{on_click = || nav::start(Show, (), |_end| ()), t!["Start"]},
+    ])
+}
+
+fn GameView(game: Narrative) -> Element {
+    game_screen!(game = game)
+}

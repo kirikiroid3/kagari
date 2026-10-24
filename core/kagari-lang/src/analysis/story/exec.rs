@@ -6,11 +6,11 @@ use rustc_hash::FxHashMap;
 use crate::eval::ConstValue;
 use crate::eval::interp::{
     BodyRef, Ctx, ErrorKind, EvalError, Exit, Frame, GenericEnv, Machine, Place, Value,
-    subst_fn_ref,
+    subst_fn_ref, subst_ty,
 };
 use crate::hir::ExprId;
 use crate::item_tree::ItemId;
-use crate::ty::FnRef;
+use crate::ty::{FnRef, Ty};
 
 use super::cfg::{BlockId, Callee, Instr, Slot, SlotKind, StoryBody, Term, WriteMode};
 
@@ -26,6 +26,11 @@ pub(super) enum Stop {
     Step {
         block: BlockId,
         record: ConstValue,
+    },
+    /// `rng_choose::<ty>()`: the story draws a value of `ty`.
+    Rng {
+        block: BlockId,
+        ty: Ty,
     },
     Call {
         block: BlockId,
@@ -457,6 +462,13 @@ impl Segment<'_, '_, '_> {
                 let record = self.freeze(&value)?;
                 Err(Stop::Step { block, record })
             }
+            Term::Rng { expr, ty, .. } => {
+                self.last = Some(*expr);
+                Err(Stop::Rng {
+                    block,
+                    ty: subst_ty(ty, &self.frame.env),
+                })
+            }
             Term::Call {
                 expr, callee, args, ..
             } => {
@@ -497,7 +509,9 @@ impl Segment<'_, '_, '_> {
     fn snapshot(&mut self, stop: &Stop, vars: &[ItemId]) -> Snapshot {
         let mut frame = vec![None; self.body.slots.len()];
         let block = match stop {
-            Stop::Step { block, .. } | Stop::Call { block, .. } => Some(*block),
+            Stop::Step { block, .. } | Stop::Rng { block, .. } | Stop::Call { block, .. } => {
+                Some(*block)
+            }
             _ => None,
         };
         if let Some(kept) = block.and_then(|block| self.body.kept.get(&block)) {

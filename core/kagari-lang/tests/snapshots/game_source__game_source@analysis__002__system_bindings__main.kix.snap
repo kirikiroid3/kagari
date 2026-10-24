@@ -3,7 +3,7 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/analysis/002__system_bindings/main.kix
 ---
-analysis/002__system_bindings/main.kix:82:4: warning[system/unreachable-mode]: the game overlay `History` is never shown: no reachable mode opens it
+analysis/002__system_bindings/main.kix:82:4: warning[W6001]: the game overlay `History` is never shown: no reachable mode opens it
 --- resolutions ---
 analysis/002__system_bindings/main.kix:11:20 Setting -> struct std::system::Setting
 analysis/002__system_bindings/main.kix:11:28 Duration -> struct std::time::Duration

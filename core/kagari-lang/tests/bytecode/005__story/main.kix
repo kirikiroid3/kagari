@@ -1,0 +1,112 @@
+// The story: story variables, an entry scene with steps, a choice with a delta render, a
+// scene call, an instant procedure, a random draw and a meta write.
+
+use std::narrative::text::text_style;
+use std::screen::size;
+use std::system::default_bindings;
+
+static mut VISITS: Int<0, 3> = 0;
+static mut ROUTE: Route = Route::Stay;
+static SEEN_END: Meta<bool> = meta(false);
+
+enum Route {
+    Stay,
+    Leave,
+}
+
+enum Coin {
+    Heads,
+    Tails,
+}
+
+const HERO: EntityId = EntityId(1);
+
+#[scene]
+#[entry]
+pushdown fn Start() {
+    s!(t!["It begins."]);
+    let route = choice!{
+        id = "route",
+        render = |mut screen| {
+            screen.entity(HERO).opacity().change(0.5).apply_animation(instant());
+            screen
+        },
+        t!["Stay"] => Route::Stay,
+        t!["Leave"] => Route::Leave,
+    };
+    match route {
+        Route::Stay => Visit(),
+        Route::Leave => ROUTE = Route::Leave,
+    }
+    count();
+    if VISITS > 0 && ROUTE == Route::Stay {
+        s!(t!["Welcome back."]);
+    }
+    match rng_choose::<Coin>() {
+        Coin::Heads => s!(t!["Heads."]),
+        Coin::Tails => s!(t!["Tails."]),
+    }
+    SEEN_END.write(true);
+}
+
+#[scene]
+pushdown fn Visit() {
+    s!(t!["You stay a while."]);
+}
+
+pushdown fn count() {
+    VISITS += 1;
+}
+
+static TEXT_SPEED: Setting<Duration> = setting(ms(30));
+static AUTO_DELAY: Setting<Duration> = setting(ms(1300));
+static AUTO_DELAY_PER_CHAR: Setting<Duration> = setting(ms(60));
+static SKIP_UNREAD: Setting<bool> = setting(false);
+static MASTER: Setting<Volume> = setting(volume(100));
+static MUSIC: Setting<Volume> = setting(volume(60));
+static SOUND: Setting<Volume> = setting(volume(100));
+static VOICE: Setting<Volume> = setting(volume(100));
+static VOICE_SUSTAIN: Setting<bool> = setting(false);
+static WAIT_FOR_VOICE: Setting<bool> = setting(true);
+static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
+static FULLSCREEN: Setting<bool> = setting(false);
+static ANIMATIONS: Setting<bool> = setting(true);
+
+fn main() -> System {
+    System {
+        title: "Story",
+        resolution: size(1280, 720),
+        start: Title,
+        game: GameView,
+        save_slots: 20,
+        auto_slots: 3,
+        backlog: 200,
+        text: text_style(26, WHITE),
+        settings: Settings {
+            text_speed: TEXT_SPEED,
+            auto_delay: AUTO_DELAY,
+            auto_delay_per_char: AUTO_DELAY_PER_CHAR,
+            skip_unread: SKIP_UNREAD,
+            master: MASTER,
+            music: MUSIC,
+            sound: SOUND,
+            voice: VOICE,
+            voice_sustain: VOICE_SUSTAIN,
+            wait_for_voice: WAIT_FOR_VOICE,
+            window_opacity: WINDOW_OPACITY,
+            fullscreen: FULLSCREEN,
+            animations: ANIMATIONS,
+        },
+        bindings: default_bindings(),
+    }
+}
+
+fn Title() -> RootPage {
+    RootPage(column![
+        button!{on_click = || nav::start(Start, (), |_end| ()), t!["Start"]},
+    ])
+}
+
+fn GameView(game: Narrative) -> Element {
+    game_screen!(game = game)
+}

@@ -58,6 +58,7 @@ push_step(Say {
     voice: Some(AZUSA_0072),
     render: Some(hanako_jumps),
     text: Some(t!["ぬっ"]),
+    history: None,
 });
 ```
 
@@ -79,12 +80,20 @@ s!(render = cg_fireworks);
 | `who` | `Text` | The speaker name as display text. Without `who`, the message is narration |
 | `voice` | `VoiceAsset` | The voice line played with the message |
 | `render` | `Render` | How the screen changes when the step is entered; see [Presentation](../presentation.md) |
+| `history` | `Text` | The text the backlog records instead of the message text |
 
 All attributes are optional. The element is at most one `t![…]`, the message text. An `s!` without
 text shows no message and still waits for input, for example after a render that shows a CG. A
 step without `render` leaves the screen unchanged.
 
 A step has **one speaker**. A conversation is a sequence of steps.
+
+By default the backlog records the line with its interpolated values as they were when it was
+shown. `history = t![…]` replaces the recorded text:
+
+```kix
+s!(who = "Azusa", history = t!["(Azusa names the date)"], t!["Today is day " {DAY} "."]);
+```
 
 `NextStep` carries no information, so save traces do not record it; only choices are recorded.
 
@@ -115,8 +124,8 @@ so `t![{DAY}]` is `to_text(DAY)`. These builtins are in `std::narrative::text`.
 - In `{expr}`, the type of `expr` must implement the standard trait `ToText`: `Text`, `String`,
   `Int<lo, hi>`, the Rust integers, `Rat` and `Decimal`. In the story, `to_text` of a finite
   runtime value is [tabulated](../kinds.md#calling-const-fn-from-the-story) like any other
-  `const fn` call, so the line stays a finite function of σ. Whether the backlog records
-  interpolated values is an [open question](../open-questions.md#text-interpolation).
+  `const fn` call, so the line stays a finite function of σ. The backlog records interpolated
+  values as they were shown, unless the step sets `history`.
 
 ### Text effects
 

@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use rustc_hash::FxHashMap;
 use salsa::Setter;
 
-use crate::input::{AssetFile, FilePath, Program, SourceFile};
+use crate::input::{AssetFile, CompileOptions, FilePath, Program, SourceFile};
 
 /// Reads source files and checks asset files, on disk or in memory (tests, the LSP).
 pub trait FileSystem: Send + Sync {
@@ -68,9 +68,14 @@ impl RootDatabase {
         }
     }
 
-    /// The program rooted at `root`.
+    /// The program rooted at `root`, with default options.
     pub fn program(&self, root: FilePath) -> Program {
-        Program::new(self, self.source_file(root))
+        self.program_with(root, CompileOptions::default())
+    }
+
+    /// The program rooted at `root`, compiled with `options`.
+    pub fn program_with(&self, root: FilePath, options: CompileOptions) -> Program {
+        Program::new(self, self.source_file(root), options)
     }
 
     /// Replace a file's text (`None` = missing). Creates the input if needed.

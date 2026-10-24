@@ -2,7 +2,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use kagari_lang::debug::{render_dump, resolution_dump};
-use kagari_lang::{FilePath, OsFileSystem, RootDatabase, check, render_diagnostics};
+use kagari_lang::{
+    DiagnosticCode, FilePath, OsFileSystem, RootDatabase, Severity, build, check,
+    render_diagnostics,
+};
 
 #[test]
 fn game_source() {
@@ -20,5 +23,23 @@ fn game_source() {
             out.push_str(&renders);
         }
         insta::assert_snapshot!(out);
+        // Every fixture without errors also emits verified bytecode (or has no `main`).
+        if !diags.iter().any(|diag| diag.severity == Severity::Error) {
+            let result = build(&db, program);
+            let errors: Vec<&kagari_lang::Diagnostic> = result
+                .diagnostics
+                .iter()
+                .filter(|diag| diag.severity == Severity::Error)
+                .collect();
+            assert!(
+                result.bytes.is_some()
+                    || errors
+                        .iter()
+                        .all(|diag| diag.code == DiagnosticCode::EmitMissingMain),
+                "{}: {}",
+                path.display(),
+                render_diagnostics(&db, &result.diagnostics, Some(&base))
+            );
+        }
     });
 }

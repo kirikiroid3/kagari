@@ -12,7 +12,7 @@
 
 mod influence;
 mod story;
-mod system;
+pub(crate) mod system;
 
 use crate::db::Db;
 use crate::diagnostic::Diagnostic;

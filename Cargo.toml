@@ -5,6 +5,7 @@ members = [
     "core/kagari-lang",
     "core/kagari-std",
     "core/kagari-syntax",
+    "tooling/kagari-cli",
     "tooling/kagari-lsp"
 ]
 
@@ -14,6 +15,8 @@ license = "Apache-2.0"
 edition = "2024"
 
 [workspace.dependencies]
+kagari-bytecode = { path = "core/kagari-bytecode" }
+kagari-lang = { path = "core/kagari-lang" }
 kagari-syntax = { path = "core/kagari-syntax" }
 kagari-std = { path = "core/kagari-std" }
 rowan = "0.17"
