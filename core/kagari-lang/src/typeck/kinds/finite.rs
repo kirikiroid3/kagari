@@ -4,7 +4,7 @@
 use crate::hir::FnPtrKind;
 use crate::item_tree::{FnKind, ItemId};
 use crate::signatures::subst::{Subst, subst_ty};
-use crate::ty::{FnDefId, GenericArg, Ty};
+use crate::ty::{FnDefId, GenericArg, GenericArgs, Ty, TyKind};
 
 use super::Env;
 
@@ -29,30 +29,30 @@ impl Env<'_> {
     }
 
     fn finite_in(&self, ty: &Ty, top_ref: bool, visiting: &mut Vec<Ty>) -> bool {
-        match ty {
-            Ty::Error
-            | Ty::Never
-            | Ty::Bool
-            | Ty::Bounded { .. }
-            | Ty::Param { .. }
-            | Ty::TraitSelf { .. }
-            | Ty::Projection { .. }
-            | Ty::Infer(_) => true,
-            Ty::Int(_) | Ty::Closure { .. } => false,
-            Ty::Tuple(items) => items
+        match ty.kind() {
+            TyKind::Error
+            | TyKind::Never
+            | TyKind::Bool
+            | TyKind::Bounded { .. }
+            | TyKind::Param { .. }
+            | TyKind::TraitSelf { .. }
+            | TyKind::Projection { .. }
+            | TyKind::Infer(_) => true,
+            TyKind::Int(_) | TyKind::Closure { .. } => false,
+            TyKind::Tuple(items) => items
                 .iter()
                 .all(|item| self.finite_in(item, false, visiting)),
-            Ty::Array { elem, .. } => self.finite_in(elem, false, visiting),
-            Ty::Ref { inner, .. } => top_ref && self.finite_in(inner, false, visiting),
-            Ty::FnPtr { kind, .. } => *kind != FnPtrKind::Plain,
-            Ty::FnDef(fn_ref) => match fn_ref.def {
+            TyKind::Array { elem, .. } => self.finite_in(elem, false, visiting),
+            TyKind::Ref { inner, .. } => top_ref && self.finite_in(inner, false, visiting),
+            TyKind::FnPtr { kind, .. } => *kind != FnPtrKind::Plain,
+            TyKind::FnDef(fn_ref) => match fn_ref.def {
                 FnDefId::Item(item) => self
                     .sigs
                     .fn_sig(item)
                     .is_none_or(|sig| sig.kind != FnKind::Plain),
                 FnDefId::StructCtor(_) | FnDefId::VariantCtor(..) => true,
             },
-            Ty::Adt { item, args } => {
+            TyKind::Adt { item, args } => {
                 let Some(adt) = self.sigs.adt(*item) else {
                     return true;
                 };
@@ -74,28 +74,32 @@ impl Env<'_> {
         self.contains(
             ty,
             &mut Vec::new(),
-            &|ty| matches!(ty, Ty::Adt { item, .. } if Some(*item) == text),
+            &|ty| matches!(ty.kind(), TyKind::Adt { item, .. } if Some(*item) == text),
         )
     }
 
     /// Whether `ty` contains a reference, looking through ADT fields and generic arguments
     /// but not into function signatures.
     pub(super) fn contains_ref(&self, ty: &Ty) -> bool {
-        self.contains(ty, &mut Vec::new(), &|ty| matches!(ty, Ty::Ref { .. }))
+        self.contains(ty, &mut Vec::new(), &|ty| {
+            matches!(ty.kind(), TyKind::Ref { .. })
+        })
     }
 
     /// Whether `ty` contains a closure type, looking through ADT fields and generic
     /// arguments but not into function signatures.
     pub(super) fn contains_closure(&self, ty: &Ty) -> bool {
-        self.contains(ty, &mut Vec::new(), &|ty| matches!(ty, Ty::Closure { .. }))
+        self.contains(ty, &mut Vec::new(), &|ty| {
+            matches!(ty.kind(), TyKind::Closure { .. })
+        })
     }
 
     /// Whether `ty` contains a `pushdown fn` pointer (which holds an instant procedure).
     pub(super) fn contains_instant_pointer(&self, ty: &Ty) -> bool {
         self.contains(ty, &mut Vec::new(), &|ty| {
             matches!(
-                ty,
-                Ty::FnPtr {
+                ty.kind(),
+                TyKind::FnPtr {
                     kind: FnPtrKind::Pushdown,
                     ..
                 }
@@ -107,12 +111,12 @@ impl Env<'_> {
         if hit(ty) {
             return true;
         }
-        match ty {
-            Ty::Tuple(items) => items.iter().any(|item| self.contains(item, visiting, hit)),
-            Ty::Array { elem, .. } | Ty::Ref { inner: elem, .. } => {
+        match ty.kind() {
+            TyKind::Tuple(items) => items.iter().any(|item| self.contains(item, visiting, hit)),
+            TyKind::Array { elem, .. } | TyKind::Ref { inner: elem, .. } => {
                 self.contains(elem, visiting, hit)
             }
-            Ty::Adt { item, args } => {
+            TyKind::Adt { item, args } => {
                 let in_args = args.iter().any(|arg| match arg {
                     GenericArg::Type(arg) => self.contains(arg, visiting, hit),
                     GenericArg::Const(_) => false,
@@ -144,10 +148,7 @@ impl Env<'_> {
         let Some(adt) = self.sigs.adt(item) else {
             return true;
         };
-        let key = Ty::Adt {
-            item,
-            args: args.to_vec(),
-        };
+        let key = Ty::adt(item, GenericArgs::new(args.to_vec()));
         if visiting.contains(&key) || visiting.len() > MAX_DEPTH {
             return on_cycle;
         }

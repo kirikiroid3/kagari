@@ -4,7 +4,11 @@
 //! Integer values and bounds are `i128` throughout the compiler; `u128` values above
 //! `i128::MAX` are out of range at compile time.
 
+use std::ops::Deref;
+use std::sync::LazyLock;
+
 use crate::hir::{ClosureKind, FnPtrKind, Name};
+use crate::intern::{Interned, internable};
 use crate::item_tree::ItemId;
 
 /// Rust's integer types.
@@ -107,6 +111,15 @@ pub enum Const {
 }
 
 impl Const {
+    fn flags(&self) -> TyFlags {
+        match self {
+            Const::Value(_) => TyFlags::EMPTY,
+            Const::Param { .. } => TyFlags::HAS_PARAM,
+            Const::Infer(_) => TyFlags::HAS_INFER,
+            Const::Error => TyFlags::HAS_ERROR,
+        }
+    }
+
     pub fn value(&self) -> Option<i128> {
         match self {
             Const::Value(value) => Some(*value),
@@ -120,6 +133,77 @@ impl Const {
 pub enum GenericArg {
     Type(Ty),
     Const(Const),
+}
+
+impl GenericArg {
+    fn flags(&self) -> TyFlags {
+        match self {
+            GenericArg::Type(ty) => ty.flags(),
+            GenericArg::Const(c) => c.flags(),
+        }
+    }
+}
+
+internable!(Box<[GenericArg]>);
+
+/// An interned list of generic arguments.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct GenericArgs(Interned<Box<[GenericArg]>>);
+
+static EMPTY_ARGS: LazyLock<GenericArgs> =
+    LazyLock::new(|| GenericArgs(Interned::new(Box::default())));
+
+impl GenericArgs {
+    pub fn new(args: Vec<GenericArg>) -> GenericArgs {
+        if args.is_empty() {
+            return GenericArgs::empty();
+        }
+        GenericArgs(Interned::new(args.into_boxed_slice()))
+    }
+
+    pub fn empty() -> GenericArgs {
+        EMPTY_ARGS.clone()
+    }
+
+    fn flags(&self) -> TyFlags {
+        self.iter()
+            .fold(TyFlags::EMPTY, |flags, arg| flags.union(arg.flags()))
+    }
+}
+
+impl Default for GenericArgs {
+    fn default() -> Self {
+        GenericArgs::empty()
+    }
+}
+
+impl Deref for GenericArgs {
+    type Target = [GenericArg];
+
+    fn deref(&self) -> &[GenericArg] {
+        &self.0
+    }
+}
+
+impl<'a> IntoIterator for &'a GenericArgs {
+    type Item = &'a GenericArg;
+    type IntoIter = std::slice::Iter<'a, GenericArg>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl FromIterator<GenericArg> for GenericArgs {
+    fn from_iter<I: IntoIterator<Item = GenericArg>>(iter: I) -> Self {
+        GenericArgs::new(iter.into_iter().collect())
+    }
+}
+
+impl std::fmt::Debug for GenericArgs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
 }
 
 /// A function-like definition.
@@ -141,7 +225,7 @@ pub struct FnRef {
     pub self_ty: Option<Ty>,
     /// The generics of the parent impl (or of the ADT, for constructors) first, then the
     /// function's own, in declaration order.
-    pub args: Vec<GenericArg>,
+    pub args: GenericArgs,
 }
 
 /// A struct or enum variant with the ADT's generic arguments.
@@ -150,13 +234,13 @@ pub struct CtorRef {
     pub adt: ItemId,
     /// `None` for a struct.
     pub variant: Option<u32>,
-    pub args: Vec<GenericArg>,
+    pub args: GenericArgs,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub enum Ty {
+/// The shape of a type; wrap it with [`Ty::new`].
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum TyKind {
     /// An error was reported; the type is unknown and checks on it are skipped.
-    #[default]
     Error,
     /// The type of `return`, `break`, `continue` and `loop` without `break`.
     Never,
@@ -169,34 +253,34 @@ pub enum Ty {
         hi: Const,
     },
     /// `()` is the empty tuple.
-    Tuple(Vec<Ty>),
+    Tuple(Box<[Ty]>),
     Array {
-        elem: Box<Ty>,
+        elem: Ty,
         len: Const,
     },
     /// A struct or enum, user-declared or from std (including `#[builtin]` ones such as
     /// `Text`, `Screen`, `Vec<T>`, `Decimal`).
     Adt {
         item: ItemId,
-        args: Vec<GenericArg>,
+        args: GenericArgs,
     },
     Ref {
         mutable: bool,
-        inner: Box<Ty>,
+        inner: Ty,
     },
     FnPtr {
         kind: FnPtrKind,
-        params: Vec<Ty>,
-        ret: Box<Ty>,
+        params: Box<[Ty]>,
+        ret: Ty,
     },
     /// `Fn(A) -> B`, `pushdown Fn(A) -> B`, `const Fn(A) -> B`.
     Closure {
         kind: ClosureKind,
-        params: Vec<Ty>,
-        ret: Box<Ty>,
+        params: Box<[Ty]>,
+        ret: Ty,
     },
     /// A named function or tuple constructor used as a value, before it coerces to a pointer.
-    FnDef(Box<FnRef>),
+    FnDef(FnRef),
     /// A generic type parameter.
     Param {
         owner: ItemId,
@@ -208,90 +292,230 @@ pub enum Ty {
     },
     /// An associated type that cannot be normalized yet: `S::Output` for a parameter `S`.
     Projection {
-        base: Box<Ty>,
+        base: Ty,
         trait_item: ItemId,
         name: Name,
     },
     Infer(InferVar),
 }
 
+/// What a type contains, computed once when it is interned.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct TyFlags(u8);
+
+impl TyFlags {
+    pub const EMPTY: TyFlags = TyFlags(0);
+    /// `Error` or `Const::Error`.
+    pub const HAS_ERROR: TyFlags = TyFlags(1);
+    /// `Infer` or `Const::Infer`.
+    pub const HAS_INFER: TyFlags = TyFlags(2);
+    /// `Param`, `TraitSelf` or `Const::Param`.
+    pub const HAS_PARAM: TyFlags = TyFlags(4);
+
+    pub fn union(self, other: TyFlags) -> TyFlags {
+        TyFlags(self.0 | other.0)
+    }
+
+    pub fn contains(self, other: TyFlags) -> bool {
+        self.0 & other.0 == other.0
+    }
+}
+
+/// An interned type with its flags.
+#[derive(Clone, Debug)]
+pub struct TyData {
+    kind: TyKind,
+    flags: TyFlags,
+}
+
+impl PartialEq for TyData {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
+}
+
+impl Eq for TyData {}
+
+impl std::hash::Hash for TyData {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.kind.hash(state);
+    }
+}
+
+internable!(TyData);
+
+/// A semantic type: an interned [`TyKind`]. Equality is a pointer comparison.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Ty(Interned<TyData>);
+
+static ERROR: LazyLock<Ty> = LazyLock::new(|| Ty::new(TyKind::Error));
+static NEVER: LazyLock<Ty> = LazyLock::new(|| Ty::new(TyKind::Never));
+static BOOL: LazyLock<Ty> = LazyLock::new(|| Ty::new(TyKind::Bool));
+static UNIT: LazyLock<Ty> = LazyLock::new(|| Ty::new(TyKind::Tuple(Box::default())));
+
+impl Default for Ty {
+    fn default() -> Self {
+        Ty::error()
+    }
+}
+
+impl std::fmt::Debug for Ty {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.kind().fmt(f)
+    }
+}
+
 impl Ty {
+    pub fn new(kind: TyKind) -> Ty {
+        let flags = kind_flags(&kind);
+        Ty(Interned::new(TyData { kind, flags }))
+    }
+
+    pub fn kind(&self) -> &TyKind {
+        &self.0.kind
+    }
+
+    pub fn flags(&self) -> TyFlags {
+        self.0.flags
+    }
+
+    pub fn error() -> Ty {
+        ERROR.clone()
+    }
+
+    pub fn never() -> Ty {
+        NEVER.clone()
+    }
+
+    pub fn bool() -> Ty {
+        BOOL.clone()
+    }
+
     pub fn unit() -> Ty {
-        Ty::Tuple(Vec::new())
+        UNIT.clone()
+    }
+
+    pub fn int(int: IntTy) -> Ty {
+        Ty::new(TyKind::Int(int))
+    }
+
+    pub fn tuple(fields: Vec<Ty>) -> Ty {
+        Ty::new(TyKind::Tuple(fields.into_boxed_slice()))
+    }
+
+    pub fn adt(item: ItemId, args: GenericArgs) -> Ty {
+        Ty::new(TyKind::Adt { item, args })
+    }
+
+    pub fn reference(mutable: bool, inner: Ty) -> Ty {
+        Ty::new(TyKind::Ref { mutable, inner })
+    }
+
+    pub fn infer(var: InferVar) -> Ty {
+        Ty::new(TyKind::Infer(var))
     }
 
     pub fn is_unit(&self) -> bool {
-        matches!(self, Ty::Tuple(fields) if fields.is_empty())
+        matches!(self.kind(), TyKind::Tuple(fields) if fields.is_empty())
+    }
+
+    pub fn is_error(&self) -> bool {
+        matches!(self.kind(), TyKind::Error)
+    }
+
+    pub fn is_never(&self) -> bool {
+        matches!(self.kind(), TyKind::Never)
     }
 
     pub fn bounded(lo: i128, hi: i128) -> Ty {
-        Ty::Bounded {
+        Ty::new(TyKind::Bounded {
             lo: Const::Value(lo),
             hi: Const::Value(hi),
-        }
+        })
     }
 
-    /// Whether the type contains `Ty::Error` or `Const::Error` anywhere.
+    /// Whether the type contains `TyKind::Error` or `Const::Error` anywhere.
     pub fn references_error(&self) -> bool {
-        let mut found = false;
-        self.walk(&mut |node| {
-            found |= matches!(node, TyNode::Ty(Ty::Error) | TyNode::Const(Const::Error));
-        });
-        found
+        self.flags().contains(TyFlags::HAS_ERROR)
     }
 
     /// Whether the type contains inference variables.
     pub fn has_infer(&self) -> bool {
-        let mut found = false;
-        self.walk(&mut |node| {
-            found |= matches!(
-                node,
-                TyNode::Ty(Ty::Infer(_)) | TyNode::Const(Const::Infer(_))
-            );
-        });
-        found
+        self.flags().contains(TyFlags::HAS_INFER)
+    }
+
+    /// Whether the type contains generic parameters (`Param`, `TraitSelf`, `Const::Param`).
+    pub fn has_param(&self) -> bool {
+        self.flags().contains(TyFlags::HAS_PARAM)
     }
 
     /// Visits every type and constant inside `self`, `self` included, outermost first.
     pub fn walk(&self, visit: &mut dyn FnMut(TyNode<'_>)) {
         visit(TyNode::Ty(self));
-        match self {
-            Ty::Error
-            | Ty::Never
-            | Ty::Bool
-            | Ty::Int(_)
-            | Ty::Param { .. }
-            | Ty::TraitSelf { .. }
-            | Ty::Infer(_) => {}
-            Ty::Bounded { lo, hi } => {
+        match self.kind() {
+            TyKind::Error
+            | TyKind::Never
+            | TyKind::Bool
+            | TyKind::Int(_)
+            | TyKind::Param { .. }
+            | TyKind::TraitSelf { .. }
+            | TyKind::Infer(_) => {}
+            TyKind::Bounded { lo, hi } => {
                 visit(TyNode::Const(lo));
                 visit(TyNode::Const(hi));
             }
-            Ty::Tuple(fields) => {
+            TyKind::Tuple(fields) => {
                 for field in fields {
                     field.walk(visit);
                 }
             }
-            Ty::Array { elem, len } => {
+            TyKind::Array { elem, len } => {
                 elem.walk(visit);
                 visit(TyNode::Const(len));
             }
-            Ty::Adt { args, .. } => walk_args(args, visit),
-            Ty::Ref { inner, .. } => inner.walk(visit),
-            Ty::FnPtr { params, ret, .. } | Ty::Closure { params, ret, .. } => {
+            TyKind::Adt { args, .. } => walk_args(args, visit),
+            TyKind::Ref { inner, .. } => inner.walk(visit),
+            TyKind::FnPtr { params, ret, .. } | TyKind::Closure { params, ret, .. } => {
                 for param in params {
                     param.walk(visit);
                 }
                 ret.walk(visit);
             }
-            Ty::FnDef(fn_ref) => {
+            TyKind::FnDef(fn_ref) => {
                 if let Some(self_ty) = &fn_ref.self_ty {
                     self_ty.walk(visit);
                 }
                 walk_args(&fn_ref.args, visit);
             }
-            Ty::Projection { base, .. } => base.walk(visit),
+            TyKind::Projection { base, .. } => base.walk(visit),
         }
+    }
+}
+
+fn kind_flags(kind: &TyKind) -> TyFlags {
+    let tys = |tys: &[Ty]| {
+        tys.iter()
+            .fold(TyFlags::EMPTY, |flags, ty| flags.union(ty.flags()))
+    };
+    match kind {
+        TyKind::Error => TyFlags::HAS_ERROR,
+        TyKind::Infer(_) => TyFlags::HAS_INFER,
+        TyKind::Param { .. } | TyKind::TraitSelf { .. } => TyFlags::HAS_PARAM,
+        TyKind::Never | TyKind::Bool | TyKind::Int(_) => TyFlags::EMPTY,
+        TyKind::Bounded { lo, hi } => lo.flags().union(hi.flags()),
+        TyKind::Tuple(fields) => tys(fields),
+        TyKind::Array { elem, len } => elem.flags().union(len.flags()),
+        TyKind::Adt { args, .. } => args.flags(),
+        TyKind::Ref { inner, .. } => inner.flags(),
+        TyKind::FnPtr { params, ret, .. } | TyKind::Closure { params, ret, .. } => {
+            tys(params).union(ret.flags())
+        }
+        TyKind::FnDef(fn_ref) => fn_ref
+            .self_ty
+            .as_ref()
+            .map_or(TyFlags::EMPTY, Ty::flags)
+            .union(fn_ref.args.flags()),
+        TyKind::Projection { base, .. } => base.flags(),
     }
 }
 

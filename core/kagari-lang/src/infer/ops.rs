@@ -1,11 +1,9 @@
 //! Operators: `Int` range arithmetic, Rust integers, booleans, comparisons and assignment.
 
-use kagari_syntax::TextRange;
-
 use super::ctx::{Expect, InferCtx, Obligation, ObligationKind};
-use crate::diagnostic::DiagnosticCode;
+use crate::diagnostic::{Anchor, DiagnosticCode};
 use crate::hir::{BinaryOp, ExprId};
-use crate::ty::{IntTy, Ty};
+use crate::ty::{IntTy, Ty, TyKind};
 
 fn op_text(op: BinaryOp) -> &'static str {
     match op {
@@ -111,26 +109,26 @@ impl InferCtx<'_> {
     ) -> Ty {
         match op {
             BinaryOp::And | BinaryOp::Or => {
-                self.infer_expr(lhs, Expect::Coerce(&Ty::Bool));
-                self.infer_expr(rhs, Expect::Coerce(&Ty::Bool));
-                Ty::Bool
+                self.infer_expr(lhs, Expect::Coerce(&Ty::bool()));
+                self.infer_expr(rhs, Expect::Coerce(&Ty::bool()));
+                Ty::bool()
             }
             BinaryOp::Eq | BinaryOp::Ne => {
                 let l = self.infer_expr(lhs, Expect::None);
                 let r = self.infer_expr(rhs, Expect::Hint(&l));
                 self.compare(expr, op, &l, &r, true);
-                Ty::Bool
+                Ty::bool()
             }
             BinaryOp::Lt | BinaryOp::Le | BinaryOp::Gt | BinaryOp::Ge => {
                 let l = self.infer_expr(lhs, Expect::None);
                 let r = self.infer_expr(rhs, Expect::Hint(&l));
                 self.compare(expr, op, &l, &r, false);
-                Ty::Bool
+                Ty::bool()
             }
             _ => {
                 let l = self.infer_expr(lhs, Expect::None);
                 let r = self.infer_expr(rhs, Expect::None);
-                let range = self.expr_range(expr);
+                let range = self.expr_anchor(expr);
                 self.arith(range, op, &l, &r)
             }
         }
@@ -144,14 +142,14 @@ impl InferCtx<'_> {
     }
 
     fn compare(&mut self, expr: ExprId, op: BinaryOp, l: &Ty, r: &Ty, eq: bool) {
-        let range = self.expr_range(expr);
+        let range = self.expr_anchor(expr);
         let ls = self.structurally_resolve(l);
         let rs = self.structurally_resolve(r);
         let l_lit = self.table.literal(l).is_some();
         let r_lit = self.table.literal(r).is_some();
-        let l_bounded = matches!(ls, Ty::Bounded { .. });
-        let r_bounded = matches!(rs, Ty::Bounded { .. });
-        if matches!(ls, Ty::Error) || matches!(rs, Ty::Error) {
+        let l_bounded = matches!(ls.kind(), TyKind::Bounded { .. });
+        let r_bounded = matches!(rs.kind(), TyKind::Bounded { .. });
+        if ls.is_error() || rs.is_error() {
             return;
         }
         if l_lit && r_lit {
@@ -161,7 +159,8 @@ impl InferCtx<'_> {
         } else if l_lit && r_bounded {
             self.fix_literal_to_int(l);
         } else if l_bounded && r_bounded {
-        } else if (l_bounded && matches!(rs, Ty::Int(_))) || (r_bounded && matches!(ls, Ty::Int(_)))
+        } else if (l_bounded && matches!(rs.kind(), TyKind::Int(_)))
+            || (r_bounded && matches!(ls.kind(), TyKind::Int(_)))
         {
             self.int_mix(range, l, r);
             return;
@@ -174,7 +173,7 @@ impl InferCtx<'_> {
                 self.obligations.push(Obligation {
                     ty: l.clone(),
                     trait_item: eq_trait,
-                    range,
+                    anchor: range,
                     kind: ObligationKind::Eq,
                 });
             }
@@ -182,9 +181,9 @@ impl InferCtx<'_> {
         }
         let resolved = self.structurally_resolve(l);
         let std = &self.sigs.std;
-        let orderable = match &resolved {
-            Ty::Int(_) | Ty::Bounded { .. } | Ty::Error | Ty::Infer(_) => true,
-            Ty::Adt { item, .. } => Some(*item) == std.decimal || Some(*item) == std.rat,
+        let orderable = match resolved.kind() {
+            TyKind::Int(_) | TyKind::Bounded { .. } | TyKind::Error | TyKind::Infer(_) => true,
+            TyKind::Adt { item, .. } => Some(*item) == std.decimal || Some(*item) == std.rat,
             _ => false,
         };
         if !orderable {
@@ -197,7 +196,7 @@ impl InferCtx<'_> {
         }
     }
 
-    fn int_mix(&mut self, range: TextRange, l: &Ty, r: &Ty) {
+    fn int_mix(&mut self, range: Anchor, l: &Ty, r: &Ty) {
         let message = format!(
             "cannot mix `{}` and `{}`; convert one side with `.into()` or `.saturate()`",
             self.show(l),
@@ -206,7 +205,7 @@ impl InferCtx<'_> {
         self.diag(range, DiagnosticCode::TypeIntMix, message);
     }
 
-    fn bad_operands(&mut self, range: TextRange, op: BinaryOp, l: &Ty, r: &Ty) {
+    fn bad_operands(&mut self, range: Anchor, op: BinaryOp, l: &Ty, r: &Ty) {
         let message = format!(
             "cannot apply `{}` to `{}` and `{}`",
             op_text(op),
@@ -217,39 +216,39 @@ impl InferCtx<'_> {
     }
 
     /// The result type of an arithmetic or bitwise operator.
-    pub(crate) fn arith(&mut self, range: TextRange, op: BinaryOp, l: &Ty, r: &Ty) -> Ty {
+    pub(crate) fn arith(&mut self, range: Anchor, op: BinaryOp, l: &Ty, r: &Ty) -> Ty {
         let ls = self.structurally_resolve(l);
         let rs = self.structurally_resolve(r);
-        if matches!(ls, Ty::Error) || matches!(rs, Ty::Error) {
-            return Ty::Error;
+        if ls.is_error() || rs.is_error() {
+            return Ty::error();
         }
         let l_lit = self.table.literal(l);
         let r_lit = self.table.literal(r);
         let std = &self.sigs.std;
-        let exact = |ty: &Ty| matches!(ty, Ty::Adt { item, .. } if Some(*item) == std.decimal || Some(*item) == std.rat);
-        match (&ls, &rs) {
-            (Ty::Bool, Ty::Bool)
+        let exact = |ty: &TyKind| matches!(ty, TyKind::Adt { item, .. } if Some(*item) == std.decimal || Some(*item) == std.rat);
+        match (ls.kind(), rs.kind()) {
+            (TyKind::Bool, TyKind::Bool)
                 if matches!(op, BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor) =>
             {
-                Ty::Bool
+                Ty::bool()
             }
-            (Ty::Int(a), Ty::Int(b)) => {
+            (TyKind::Int(a), TyKind::Int(b)) => {
                 if !is_shift(op) && a != b {
                     self.mismatch(range, &ls, &rs);
                 }
-                Ty::Int(*a)
+                Ty::int(*a)
             }
-            (Ty::Int(a), _) if r_lit.is_some() => {
-                self.table.unify(r, &Ty::Int(*a));
-                Ty::Int(*a)
+            (TyKind::Int(a), _) if r_lit.is_some() => {
+                self.table.unify(r, &Ty::int(*a));
+                Ty::int(*a)
             }
-            (_, Ty::Int(b)) if l_lit.is_some() => {
-                self.table.unify(l, &Ty::Int(*b));
-                Ty::Int(*b)
+            (_, TyKind::Int(b)) if l_lit.is_some() => {
+                self.table.unify(l, &Ty::int(*b));
+                Ty::int(*b)
             }
             _ if l_lit.is_some() && r_lit.is_some() => {
                 let (Some((_, a)), Some((_, b))) = (l_lit, r_lit) else {
-                    return Ty::Error;
+                    return Ty::error();
                 };
                 if is_bitwise(op) {
                     self.table.unify(l, r);
@@ -263,13 +262,13 @@ impl InferCtx<'_> {
                     }
                     Err(error) => {
                         self.range_error(range, error, r);
-                        Ty::Error
+                        Ty::error()
                     }
                 }
             }
-            (Ty::Bounded { .. }, _) | (_, Ty::Bounded { .. })
-                if (matches!(ls, Ty::Bounded { .. }) || l_lit.is_some())
-                    && (matches!(rs, Ty::Bounded { .. }) || r_lit.is_some()) =>
+            (TyKind::Bounded { .. }, _) | (_, TyKind::Bounded { .. })
+                if (matches!(ls.kind(), TyKind::Bounded { .. }) || l_lit.is_some())
+                    && (matches!(rs.kind(), TyKind::Bounded { .. }) || r_lit.is_some()) =>
             {
                 self.fix_literal_to_int(l);
                 self.fix_literal_to_int(r);
@@ -280,7 +279,7 @@ impl InferCtx<'_> {
                         self.show(l)
                     );
                     self.diag(range, DiagnosticCode::TypeBadOperands, message);
-                    return Ty::Error;
+                    return Ty::error();
                 }
                 let (Some(a), Some(b)) = (self.bounded_range(l), self.bounded_range(r)) else {
                     let message = format!(
@@ -290,36 +289,36 @@ impl InferCtx<'_> {
                         self.show(r)
                     );
                     self.diag(range, DiagnosticCode::TypeBadOperands, message);
-                    return Ty::Error;
+                    return Ty::error();
                 };
                 match range_op(op, a, b) {
                     Ok((lo, hi)) => Ty::bounded(lo, hi),
                     Err(error) => {
                         self.range_error(range, error, r);
-                        Ty::Error
+                        Ty::error()
                     }
                 }
             }
-            (Ty::Bounded { .. }, Ty::Int(_)) | (Ty::Int(_), Ty::Bounded { .. }) => {
+            (TyKind::Bounded { .. }, TyKind::Int(_)) | (TyKind::Int(_), TyKind::Bounded { .. }) => {
                 self.int_mix(range, l, r);
-                Ty::Error
+                Ty::error()
             }
             (a, b) if exact(a) && a == b && !is_bitwise(op) => ls.clone(),
-            (Ty::Infer(_), _) | (_, Ty::Infer(_)) if l_lit.is_none() || r_lit.is_none() => {
+            (TyKind::Infer(_), _) | (_, TyKind::Infer(_)) if l_lit.is_none() || r_lit.is_none() => {
                 if !self.try_unify(l, r) {
                     self.bad_operands(range, op, l, r);
-                    return Ty::Error;
+                    return Ty::error();
                 }
                 l.clone()
             }
             _ => {
                 self.bad_operands(range, op, l, r);
-                Ty::Error
+                Ty::error()
             }
         }
     }
 
-    fn range_error(&mut self, range: TextRange, error: RangeError, divisor: &Ty) {
+    fn range_error(&mut self, range: Anchor, error: RangeError, divisor: &Ty) {
         match error {
             RangeError::Zero => {
                 let message = format!(
@@ -338,23 +337,23 @@ impl InferCtx<'_> {
 
     /// `-x`.
     pub(crate) fn negate(&mut self, expr: ExprId, ty: &Ty) -> Ty {
-        let range = self.expr_range(expr);
+        let range = self.expr_anchor(expr);
         let resolved = self.structurally_resolve(ty);
         if let Some((_, literal)) = self.table.literal(ty) {
             let (Some(lo), Some(hi)) = (literal.hi.checked_neg(), literal.lo.checked_neg()) else {
-                return Ty::Error;
+                return Ty::error();
             };
             let result = self.table.new_literal(lo, hi, expr);
             self.link(vec![ty.clone(), result.clone()]);
             return result;
         }
         let std = &self.sigs.std;
-        match &resolved {
-            Ty::Error | Ty::Infer(_) => resolved.clone(),
-            Ty::Bounded { .. } => match self.bounded_range(&resolved) {
+        match resolved.kind() {
+            TyKind::Error | TyKind::Infer(_) => resolved.clone(),
+            TyKind::Bounded { .. } => match self.bounded_range(&resolved) {
                 Some((lo, hi)) => match (hi.checked_neg(), lo.checked_neg()) {
                     (Some(lo), Some(hi)) => Ty::bounded(lo, hi),
-                    _ => Ty::Error,
+                    _ => Ty::error(),
                 },
                 None => {
                     self.diag(
@@ -362,17 +361,17 @@ impl InferCtx<'_> {
                         DiagnosticCode::TypeBadOperands,
                         "cannot negate an `Int` with generic bounds",
                     );
-                    Ty::Error
+                    Ty::error()
                 }
             },
-            Ty::Int(int) if IntTy::min(*int) < 0 => resolved.clone(),
-            Ty::Adt { item, .. } if Some(*item) == std.decimal || Some(*item) == std.rat => {
+            TyKind::Int(int) if IntTy::min(*int) < 0 => resolved.clone(),
+            TyKind::Adt { item, .. } if Some(*item) == std.decimal || Some(*item) == std.rat => {
                 resolved.clone()
             }
-            other => {
-                let message = format!("cannot negate `{}`", self.show(other));
+            _ => {
+                let message = format!("cannot negate `{}`", self.show(&resolved));
                 self.diag(range, DiagnosticCode::TypeBadOperands, message);
-                Ty::Error
+                Ty::error()
             }
         }
     }
@@ -391,14 +390,14 @@ impl InferCtx<'_> {
             return;
         };
         let value_ty = self.infer_expr(value, Expect::None);
-        let range = self.expr_range(expr);
+        let range = self.expr_anchor(expr);
         let resolved = self.structurally_resolve(&target_ty);
-        if let Ty::Bounded { .. } = resolved {
+        if let TyKind::Bounded { .. } = resolved.kind() {
             // Compound assignment on an `Int` saturates, so any `Int` right side is fine.
             self.fix_literal_to_int(&value_ty);
             let value_resolved = self.structurally_resolve(&value_ty);
-            match value_resolved {
-                Ty::Bounded { .. } => {
+            match value_resolved.kind() {
+                TyKind::Bounded { .. } => {
                     if is_bitwise(op) {
                         let message = format!(
                             "`{}=` needs Rust integers; `{}` is a bounded integer",
@@ -414,18 +413,17 @@ impl InferCtx<'_> {
                         self.range_error(range, RangeError::Zero, &value_ty);
                     }
                 }
-                Ty::Int(_) => self.int_mix(range, &target_ty, &value_ty),
-                Ty::Error => {}
+                TyKind::Int(_) => self.int_mix(range, &target_ty, &value_ty),
+                TyKind::Error => {}
                 _ => {
-                    let value_range = self.expr_range(value);
+                    let value_range = self.expr_anchor(value);
                     self.mismatch(value_range, &target_ty, &value_ty);
                 }
             }
             return;
         }
         let result = self.arith(range, op, &target_ty, &value_ty);
-        if !matches!(self.table.shallow(&result), Ty::Error) && !self.try_unify(&result, &target_ty)
-        {
+        if !self.table.shallow(&result).is_error() && !self.try_unify(&result, &target_ty) {
             self.mismatch(range, &target_ty, &result);
         }
     }

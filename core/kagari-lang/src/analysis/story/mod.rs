@@ -1,23 +1,23 @@
 //! The story as a recursive state machine over finite data.
 //!
-//! 1. Every scene body is lowered to a control-flow graph whose suspension points are the
-//!    steps and the scene calls ([`cfg`]).
+//! 1. Every scene body is a MIR body whose suspension terminators are the steps, the
+//!    random draws and the scene calls; [`liveness`] computes what each suspension keeps.
 //! 2. [`termination`] checks that every loop and every cycle of calls passes a step.
 //! 3. [`explore`] computes the reachable states from every entry scene and every argument
 //!    value, summarizing each scene per entry state (call/return, as in the reachability
-//!    of recursive state machines). A state is a position, the live slots of the scene's
+//!    of recursive state machines). A state is a position, the kept locals of the scene's
 //!    frame and the values of the story variables. Instant code between two suspensions
-//!    runs in the const-evaluation interpreter ([`exec`]). This finds stuck choices and
-//!    errors in story code, and leaves unreached steps and scenes.
+//!    runs in the MIR executor ([`segment`]). This finds stuck choices and errors in story
+//!    code, and leaves unreached steps and scenes.
 //! 4. [`screens`] runs the renders over the reachable states: the screens that reach each
 //!    step (bounded by [`SCREEN_CAP`]), and whether the screen a step shows is determined by
 //!    the story state (consistency).
 
-mod cfg;
-mod exec;
 mod explore;
 mod keyframes;
+mod liveness;
 mod screens;
+mod segment;
 mod termination;
 #[cfg(test)]
 mod tests;
@@ -26,29 +26,40 @@ use rustc_hash::FxHashMap;
 
 use crate::db::Db;
 use crate::def_map::{CrateId, def_maps};
-use crate::diagnostic::{Diagnostic, DiagnosticCode};
-use crate::eval::interp::{BodyRef, Ctx};
-use crate::eval::std_items::StdTable;
+use crate::diagnostic::{Anchor, Diag, DiagnosticCode, NodeId, Owner};
+use crate::eval::std_items::std_table;
 use crate::hir::ExprId;
 use crate::input::Program;
+use crate::item_tree::ItemIndex;
 use crate::item_tree::{FnKind, ItemId, ItemKind, item_tree};
+use crate::mir::{BasicBlock, ItemMir, LocalSet, item_mir};
 use crate::signatures::program_signatures;
 
-use cfg::StoryBody;
+use explore::StoryCx;
+use liveness::scene_kept;
+use segment::SceneBody;
 
 /// The most distinct screens that may reach one step (*tentative*: the cap is an open
 /// question). A render that makes a step's set grow past it is `E5005`.
 pub const SCREEN_CAP: usize = 64;
 
-/// A lowered scene.
+/// A scene with its MIR.
 struct SceneData<'db> {
     pub item: ItemId,
-    pub b: BodyRef<'db>,
-    pub body: StoryBody,
+    pub mir: &'db ItemMir,
+    /// The kept locals of every suspension block of `mir.main`.
+    pub kept: &'db FxHashMap<BasicBlock, LocalSet>,
     pub game: bool,
 }
 
-impl SceneData<'_> {
+impl<'db> SceneData<'db> {
+    pub fn body(&self) -> SceneBody<'db> {
+        SceneBody {
+            body: &self.mir.main,
+            kept: self.kept,
+        }
+    }
+
     pub fn name(&self, db: &dyn Db) -> String {
         item_tree(db, self.item.file)
             .item(self.item.index)
@@ -57,19 +68,18 @@ impl SceneData<'_> {
             .unwrap_or_default()
     }
 
+    /// The anchor of an expression of the scene's body.
+    pub fn anchor(&self, expr: ExprId) -> Anchor {
+        Anchor::Node(Owner::Body(self.item), NodeId::Expr(expr))
+    }
+
     pub fn diagnostic(
         &self,
-        db: &dyn Db,
         expr: ExprId,
         code: DiagnosticCode,
         message: impl Into<String>,
-    ) -> Diagnostic {
-        Diagnostic::new(
-            self.item.file.path(db).clone(),
-            self.b.body.store.expr_range(expr),
-            code,
-            message,
-        )
+    ) -> Diag {
+        Diag::new(self.anchor(expr), code, message)
     }
 }
 
@@ -79,12 +89,17 @@ struct Scenes<'db> {
     pub index: FxHashMap<ItemId, usize>,
 }
 
-pub(super) fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
-    let Some(std) = StdTable::new(db, program) else {
+pub(super) fn check(db: &dyn Db, program: Program) -> Vec<Diag> {
+    let Some(std) = std_table(db, program).as_ref() else {
         return Vec::new();
     };
     let sigs = program_signatures(db, program);
-    let ctx = Ctx::new(db, program, &std, sigs);
+    let cx = StoryCx {
+        db,
+        program,
+        std,
+        sigs,
+    };
     let maps = def_maps(db, program);
     let mut scenes = Scenes {
         list: Vec::new(),
@@ -94,7 +109,7 @@ pub(super) fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
     for &(file, krate) in &maps.files {
         let tree = item_tree(db, file);
         for (index, data) in tree.items.iter().enumerate() {
-            let Ok(index) = u32::try_from(index) else {
+            let Some(index) = ItemIndex::from_usize(index) else {
                 continue;
             };
             let item = ItemId { file, index };
@@ -105,15 +120,17 @@ pub(super) fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
                     has_body: true,
                     ..
                 } if sigs.fn_sig(item).is_some_and(|sig| sig.scene) => {
-                    let Some(b) = ctx.body(item) else {
+                    let (Some(mir), Some(kept)) = (
+                        item_mir(db, program, item).as_ref(),
+                        scene_kept(db, program, item).as_ref(),
+                    ) else {
                         continue;
                     };
-                    let body = cfg::lower(b, sigs, std.push_step, std.rng_choose);
                     scenes.index.insert(item, scenes.list.len());
                     scenes.list.push(SceneData {
                         item,
-                        b,
-                        body,
+                        mir,
+                        kept,
                         game: krate == CrateId::Game,
                     });
                 }
@@ -122,13 +139,13 @@ pub(super) fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
         }
     }
     let mut out = Vec::new();
-    if !termination::check(db, &scenes, sigs, &mut out) {
+    if !termination::check(db, program, &scenes, sigs, &mut out) {
         // The other analyses run the story, which must reach its steps.
         return out;
     }
-    let explored = explore::explore(db, &ctx, &scenes, &vars, &mut out);
+    let explored = explore::explore(cx, &scenes, &vars, &mut out);
     if let Some(explored) = explored {
-        screens::check(db, &ctx, &scenes, &explored, &mut out);
+        screens::check(cx, &scenes, &explored, &mut out);
         explored.report_reachability(db, &scenes, &mut out);
         if program.options(db).keyframe_check {
             out.extend(keyframes::check(db, program, &explored, &scenes));

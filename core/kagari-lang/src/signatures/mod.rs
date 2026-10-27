@@ -15,7 +15,7 @@ mod traits;
 use rustc_hash::FxHashMap;
 
 use crate::db::Db;
-use crate::diagnostic::Diagnostic;
+use crate::diagnostic::Diag;
 use crate::hir::{Name, SelfParamKind};
 use crate::input::Program;
 use crate::item_tree::{FnKind, ItemId, Shape};
@@ -33,7 +33,7 @@ pub struct ProgramSignatures {
     /// Every item of every loaded file (game and std) that has a signature.
     pub items: FxHashMap<ItemId, ItemSig>,
     pub std: StdItems,
-    pub diagnostics: Vec<Diagnostic>,
+    pub diagnostics: Vec<Diag>,
 }
 
 impl ProgramSignatures {

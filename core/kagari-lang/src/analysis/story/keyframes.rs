@@ -6,14 +6,14 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::db::Db;
-use crate::diagnostic::{Diagnostic, DiagnosticCode};
+use crate::diagnostic::{Diag, DiagnosticCode};
 use crate::eval::{ConstValue, RenderId, RenderInfo, const_eval};
 use crate::hir::ExprId;
 use crate::input::Program;
 use crate::ty::{FnDefId, FnRef};
 
 use super::Scenes;
-use super::explore::{CtxId, Explored, NodeKind, Target};
+use super::explore::{CtxId, ExitId, Explored, NodeKind, Target};
 
 /// A step: its scene (index into `Scenes::list`) and its `push_step` call.
 type StepRef = (usize, ExprId);
@@ -23,16 +23,16 @@ pub(super) fn check(
     program: Program,
     explored: &Explored,
     scenes: &Scenes<'_>,
-) -> Vec<Diagnostic> {
+) -> Vec<Diag> {
     let renders = &const_eval(db, program).renders;
     let mut reported: FxHashSet<StepRef> = FxHashSet::default();
     let mut out = Vec::new();
-    let mut report = |step: StepRef, message: String, out: &mut Vec<Diagnostic>| {
+    let mut report = |step: StepRef, message: String, out: &mut Vec<Diag>| {
         let Some(data) = scenes.list.get(step.0) else {
             return;
         };
         if data.game && reported.insert(step) {
-            out.push(data.diagnostic(db, step.1, DiagnosticCode::AnalysisMissingKeyframe, message));
+            out.push(data.diagnostic(step.1, DiagnosticCode::AnalysisMissingKeyframe, message));
         }
     };
     for context in &explored.contexts {
@@ -56,7 +56,7 @@ pub(super) fn check(
         }
     }
     for &root in &explored.roots {
-        let Some(context) = explored.contexts.get(root) else {
+        let Some(context) = explored.context(root) else {
             continue;
         };
         let Some(name) = scenes.list.get(context.scene).map(|data| data.name(db)) else {
@@ -101,13 +101,13 @@ struct First<'a> {
     explored: &'a Explored,
     steps: Vec<(StepRef, Option<ConstValue>)>,
     /// Per visited `(context, target)`, the exits of that context reached from it.
-    memo: FxHashMap<(CtxId, Target), Vec<usize>>,
+    memo: FxHashMap<(CtxId, Target), Vec<ExitId>>,
 }
 
 impl First<'_> {
     /// Records the first steps from `target` in `ctx`; returns the exits of `ctx` reached
     /// without a step.
-    fn from(&mut self, ctx: CtxId, target: Target) -> Vec<usize> {
+    fn from(&mut self, ctx: CtxId, target: Target) -> Vec<ExitId> {
         if let Some(exits) = self.memo.get(&(ctx, target)) {
             return exits.clone();
         }
@@ -119,10 +119,10 @@ impl First<'_> {
             Target::Exit(exit) => exits.push(exit),
             Target::Dead => {}
             Target::Node(node) => {
-                let Some(context) = explored.contexts.get(ctx) else {
+                let Some(context) = explored.context(ctx) else {
                     return exits;
                 };
-                match context.nodes.get(node).map(|node| &node.kind) {
+                match context.node(node).map(|node| &node.kind) {
                     Some(NodeKind::Step { expr, render, .. }) => {
                         let step = ((context.scene, *expr), render.clone());
                         if !self.steps.contains(&step) {
@@ -140,8 +140,7 @@ impl First<'_> {
                     }
                     Some(NodeKind::Call { callee, succ }) => {
                         let entry = explored
-                            .contexts
-                            .get(*callee)
+                            .context(*callee)
                             .map_or(Target::Dead, |callee| callee.entry);
                         for callee_exit in self.from(*callee, entry) {
                             for (exit, next) in succ {

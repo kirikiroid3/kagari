@@ -7,7 +7,7 @@ use crate::infer::{Coercion, ReceiverAdjust, ValueRef};
 use crate::item_tree::ItemId;
 use crate::resolve::LocalId;
 use crate::signatures::ItemSig;
-use crate::ty::Ty;
+use crate::ty::{Ty, TyKind};
 
 use super::body::BodyChecker;
 
@@ -84,8 +84,8 @@ impl Place {
 /// The number of references `ty` is behind, and whether they are all `&mut`.
 fn ref_chain(mut ty: &Ty, count: u32) -> bool {
     for _ in 0..count {
-        match ty {
-            Ty::Ref { mutable, inner } => {
+        match ty.kind() {
+            TyKind::Ref { mutable, inner } => {
                 if !mutable {
                     return false;
                 }
@@ -99,7 +99,7 @@ fn ref_chain(mut ty: &Ty, count: u32) -> bool {
 
 fn ref_depth(mut ty: &Ty) -> u32 {
     let mut depth = 0u32;
-    while let Ty::Ref { inner, .. } = ty {
+    while let TyKind::Ref { inner, .. } = ty.kind() {
         depth = depth.saturating_add(1);
         ty = inner;
     }
@@ -190,14 +190,17 @@ impl BodyChecker<'_, '_> {
         if self.ty(target).is_none() {
             return;
         }
-        let src = self.src(target);
+        let mut anchors = Vec::new();
         let direct = matches!(self.store.expr(target), Expr::Path(_));
         let (message, binding) = match (self.place_mut(target), access) {
             (PlaceMut::Mutable, _) | (PlaceMut::Temporary | PlaceMut::Const(_), Access::Borrow) => {
                 return;
             }
             (PlaceMut::Temporary, Access::Assign) => (
-                format!("invalid left-hand side of assignment: `{src}` is a temporary value"),
+                format!(
+                    "invalid left-hand side of assignment: `{}` is a temporary value",
+                    self.src(&mut anchors, target)
+                ),
                 None,
             ),
             (PlaceMut::Const(item), Access::Assign) => (
@@ -219,11 +222,17 @@ impl BodyChecker<'_, '_> {
                 None,
             ),
             (PlaceMut::Shared, Access::Assign) => (
-                format!("cannot assign to `{src}`, which is behind a `&` reference"),
+                format!(
+                    "cannot assign to `{}`, which is behind a `&` reference",
+                    self.src(&mut anchors, target)
+                ),
                 None,
             ),
             (PlaceMut::Shared, Access::Borrow) => (
-                format!("cannot borrow `{src}` as mutable, as it is behind a `&` reference"),
+                format!(
+                    "cannot borrow `{}` as mutable, as it is behind a `&` reference",
+                    self.src(&mut anchors, target)
+                ),
                 None,
             ),
             (PlaceMut::Local(local), access) => {
@@ -235,34 +244,33 @@ impl BodyChecker<'_, '_> {
                     (Access::Assign, true) => {
                         format!("cannot assign twice to immutable variable `{name}`")
                     }
-                    (Access::Assign, false) => {
-                        format!("cannot assign to `{src}`, as `{name}` is not declared as mutable")
-                    }
+                    (Access::Assign, false) => format!(
+                        "cannot assign to `{}`, as `{name}` is not declared as mutable",
+                        self.src(&mut anchors, target)
+                    ),
                     (Access::Borrow, true) => {
                         format!(
                             "cannot borrow `{name}` as mutable, as it is not declared as mutable"
                         )
                     }
                     (Access::Borrow, false) => format!(
-                        "cannot borrow `{src}` as mutable, as `{name}` is not declared as mutable"
+                        "cannot borrow `{}` as mutable, as `{name}` is not declared as mutable",
+                        self.src(&mut anchors, target)
                     ),
                 };
                 (message, Some(local))
             }
         };
         let mut diag = self.diag(
-            self.range(target),
+            self.anchor(target),
             DiagnosticCode::KindImmutablePlace,
             message,
         );
+        diag.message_anchors = anchors;
         if let Some(local) = binding
             && let Some(pat) = self.res.locals[local].pat
         {
-            diag = diag.with_related(
-                self.path.clone(),
-                self.store.pat_range(pat),
-                "consider changing this to be mutable",
-            );
+            diag = diag.with_related(self.pat_anchor(pat), "consider changing this to be mutable");
         }
         self.report(diag);
     }
@@ -274,12 +282,14 @@ impl BodyChecker<'_, '_> {
             return;
         }
         if self.through(receiver, derefs) == PlaceMut::Shared {
-            let src = self.src(receiver);
-            let diag = self.diag(
-                self.range(receiver),
+            let mut anchors = Vec::new();
+            let src = self.src(&mut anchors, receiver);
+            let mut diag = self.diag(
+                self.anchor(receiver),
                 DiagnosticCode::KindImmutablePlace,
                 format!("cannot borrow `*{src}` as mutable, as it is behind a `&` reference"),
             );
+            diag.message_anchors = anchors;
             self.report(diag);
         }
     }
@@ -304,8 +314,8 @@ impl BodyChecker<'_, '_> {
                 }
                 _ => {
                     let place = self.place(expr)?;
-                    match self.ty(expr)? {
-                        Ty::Ref { mutable, .. } => {
+                    match self.ty(expr)?.kind() {
+                        TyKind::Ref { mutable, .. } => {
                             let shared = matches!(
                                 self.infer.coercions.get(&expr),
                                 Some((Coercion::MutToShared, _))
@@ -337,21 +347,19 @@ impl BodyChecker<'_, '_> {
                 Expr::Ref { expr: inner, .. } => *inner,
                 _ => borrowed,
             };
-            let diag = self
+            let mut anchors = Vec::new();
+            let mut diag = self
                 .diag(
-                    self.range(*later),
+                    self.anchor(*later),
                     DiagnosticCode::KindAliasedMut,
                     format!(
                         "`{}` is passed as `&mut` and also as another argument of this call: in \
                          the story, a `&mut` argument cannot alias another argument",
-                        self.src(place)
+                        self.src(&mut anchors, place)
                     ),
                 )
-                .with_related(
-                    self.path.clone(),
-                    self.range(*first),
-                    "the same place is also passed here",
-                );
+                .with_related(self.anchor(*first), "the same place is also passed here");
+            diag.message_anchors = anchors;
             self.report(diag);
         }
     }

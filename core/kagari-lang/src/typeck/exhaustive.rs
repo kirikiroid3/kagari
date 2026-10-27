@@ -19,17 +19,17 @@
 
 use crate::db::Db;
 use crate::def_map::Def;
-use crate::diagnostic::{Diagnostic, DiagnosticCode};
+use crate::diagnostic::{Anchor, Diag, DiagnosticCode, NodeId, Owner};
 use crate::hir::{
     self, ArrayExpr, Body, Expr, ExprId, Literal, MatchArm, Name, Pat, PatBound, PatId, Stmt,
-    UnaryOp, file_hir,
+    UnaryOp, body_of,
 };
 use crate::infer::{InferenceResult, ValueRef, inference};
-use crate::input::{FilePath, Program, SourceFile};
+use crate::input::Program;
 use crate::item_tree::{ItemId, ItemKind, Shape, item_tree};
-use crate::resolve::{BodyResolution, Resolution, file_resolution};
+use crate::resolve::{BodyResolution, Resolution, body_resolution};
 use crate::signatures::{AdtDef, StdItems, fold_const_expr, program_signatures};
-use crate::ty::{Const, FnDefId, GenericArg, IntTy, Ty};
+use crate::ty::{Const, FnDefId, GenericArg, IntTy, Ty, TyKind};
 
 /// Exhaustiveness and refutability diagnostics of one body.
 pub fn check_body(
@@ -39,53 +39,29 @@ pub fn check_body(
     body: &hir::Body,
     resolution: &BodyResolution,
     inference: &InferenceResult,
-) -> Vec<Diagnostic> {
+) -> Vec<Diag> {
     let env = DbEnv {
         db,
         program,
         signatures: program_signatures(db, program),
     };
-    check_body_in(
-        &env,
-        item.file.path(db).clone(),
-        body,
-        resolution,
-        inference,
-    )
+    check_body_in(&env, Owner::Body(item), body, resolution, inference)
 }
 
-/// Exhaustiveness and refutability diagnostics of every item of `file` with a body and an
+/// Exhaustiveness and refutability diagnostics of `item`, when it has a body and an
 /// inference result.
 #[salsa::tracked(returns(ref))]
-pub fn file_pattern_checks(db: &dyn Db, program: Program, file: SourceFile) -> Vec<Diagnostic> {
-    let hir = file_hir(db, file);
-    let resolution = file_resolution(db, program, file);
-    let mut out = Vec::new();
-    for (index, body) in hir.bodies.iter().enumerate() {
-        let Some(body) = body else {
-            continue;
-        };
-        let Ok(index_u32) = u32::try_from(index) else {
-            continue;
-        };
-        let item = ItemId {
-            file,
-            index: index_u32,
-        };
-        let Some(body_resolution) = resolution
-            .items
-            .get(index)
-            .and_then(Option::as_ref)
-            .and_then(|item| item.body.as_ref())
-        else {
-            continue;
-        };
-        let Some(result) = inference(db, program, item) else {
-            continue;
-        };
-        out.extend(check_body(db, program, item, body, body_resolution, result));
-    }
-    out
+pub fn pattern_checks(db: &dyn Db, program: Program, item: ItemId) -> Vec<Diag> {
+    let Some(body) = body_of(db, item) else {
+        return Vec::new();
+    };
+    let Some(body_resolution) = body_resolution(db, program, item).body.as_ref() else {
+        return Vec::new();
+    };
+    let Some(result) = inference(db, program, item) else {
+        return Vec::new();
+    };
+    check_body(db, program, item, body, body_resolution, result)
 }
 
 // ---- program access ----
@@ -136,7 +112,7 @@ impl PatEnv for DbEnv<'_> {
         fold_const_expr(
             self.db,
             self.program,
-            init.item,
+            Owner::Body(init.item),
             &init.body.store,
             &init.resolution.store,
             expr,
@@ -150,14 +126,8 @@ impl PatEnv for DbEnv<'_> {
         if !matches!(data.kind, ItemKind::Const { .. }) {
             return None;
         }
-        let index = item.index as usize;
-        let body = file_hir(self.db, item.file).bodies.get(index)?.as_ref()?;
-        let resolution = file_resolution(self.db, self.program, item.file)
-            .items
-            .get(index)?
-            .as_ref()?
-            .body
-            .as_ref()?;
+        let body = body_of(self.db, item)?;
+        let resolution = body_resolution(self.db, self.program, item).body.as_ref()?;
         Some(ConstBody {
             item,
             body,
@@ -185,7 +155,7 @@ impl IntRange {
 /// What an opaque constructor is: equal keys denote the same value.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum OpaqueKey {
-    Str(String),
+    Str(std::sync::Arc<str>),
     Decimal(String),
     Int(i128),
     Bool(bool),
@@ -269,7 +239,7 @@ const MAX_CONST_DEPTH: u32 = 32;
 const MAX_INHABITED_DEPTH: u32 = 8;
 
 fn peel(mut ty: &Ty) -> &Ty {
-    while let Ty::Ref { inner, .. } = ty {
+    while let TyKind::Ref { inner, .. } = ty.kind() {
         ty = inner;
     }
     ty
@@ -277,59 +247,59 @@ fn peel(mut ty: &Ty) -> &Ty {
 
 /// `ty` with the generic parameters of `owner` replaced by `args`.
 fn subst(ty: &Ty, owner: ItemId, args: &[GenericArg]) -> Ty {
-    let types = |tys: &[Ty]| tys.iter().map(|ty| subst(ty, owner, args)).collect();
-    match ty {
-        Ty::Param { owner: o, index } if *o == owner => match args.get(*index as usize) {
+    let types = |tys: &[Ty]| -> Box<[Ty]> { tys.iter().map(|ty| subst(ty, owner, args)).collect() };
+    match ty.kind() {
+        TyKind::Param { owner: o, index } if *o == owner => match args.get(*index as usize) {
             Some(GenericArg::Type(arg)) => arg.clone(),
-            _ => Ty::Error,
+            _ => Ty::error(),
         },
-        Ty::Bounded { lo, hi } => Ty::Bounded {
+        TyKind::Bounded { lo, hi } => Ty::new(TyKind::Bounded {
             lo: subst_const(lo, owner, args),
             hi: subst_const(hi, owner, args),
-        },
-        Ty::Tuple(fields) => Ty::Tuple(types(fields)),
-        Ty::Array { elem, len } => Ty::Array {
-            elem: Box::new(subst(elem, owner, args)),
+        }),
+        TyKind::Tuple(fields) => Ty::new(TyKind::Tuple(types(fields))),
+        TyKind::Array { elem, len } => Ty::new(TyKind::Array {
+            elem: subst(elem, owner, args),
             len: subst_const(len, owner, args),
-        },
-        Ty::Adt { item, args: inner } => Ty::Adt {
+        }),
+        TyKind::Adt { item, args: inner } => Ty::new(TyKind::Adt {
             item: *item,
             args: inner
                 .iter()
                 .map(|arg| subst_arg(arg, owner, args))
                 .collect(),
-        },
-        Ty::Ref { mutable, inner } => Ty::Ref {
+        }),
+        TyKind::Ref { mutable, inner } => Ty::new(TyKind::Ref {
             mutable: *mutable,
-            inner: Box::new(subst(inner, owner, args)),
-        },
-        Ty::FnPtr { kind, params, ret } => Ty::FnPtr {
+            inner: subst(inner, owner, args),
+        }),
+        TyKind::FnPtr { kind, params, ret } => Ty::new(TyKind::FnPtr {
             kind: *kind,
             params: types(params),
-            ret: Box::new(subst(ret, owner, args)),
-        },
-        Ty::Closure { kind, params, ret } => Ty::Closure {
+            ret: subst(ret, owner, args),
+        }),
+        TyKind::Closure { kind, params, ret } => Ty::new(TyKind::Closure {
             kind: *kind,
             params: types(params),
-            ret: Box::new(subst(ret, owner, args)),
-        },
-        Ty::Projection {
+            ret: subst(ret, owner, args),
+        }),
+        TyKind::Projection {
             base,
             trait_item,
             name,
-        } => Ty::Projection {
-            base: Box::new(subst(base, owner, args)),
+        } => Ty::new(TyKind::Projection {
+            base: subst(base, owner, args),
             trait_item: *trait_item,
             name: name.clone(),
-        },
-        Ty::Error
-        | Ty::Never
-        | Ty::Bool
-        | Ty::Int(_)
-        | Ty::FnDef(_)
-        | Ty::Param { .. }
-        | Ty::TraitSelf { .. }
-        | Ty::Infer(_) => ty.clone(),
+        }),
+        TyKind::Error
+        | TyKind::Never
+        | TyKind::Bool
+        | TyKind::Int(_)
+        | TyKind::FnDef(_)
+        | TyKind::Param { .. }
+        | TyKind::TraitSelf { .. }
+        | TyKind::Infer(_) => ty.clone(),
     }
 }
 
@@ -463,23 +433,23 @@ struct Cx<'a> {
 
 impl Cx<'_> {
     fn ctor_set(&self, ty: &Ty) -> CtorSet {
-        match peel(ty) {
-            Ty::Bool => CtorSet::Bool,
-            Ty::Int(int) => CtorSet::Int(IntRange {
+        match peel(ty).kind() {
+            TyKind::Bool => CtorSet::Bool,
+            TyKind::Int(int) => CtorSet::Int(IntRange {
                 lo: IntTy::min(*int),
                 hi: IntTy::max(*int),
             }),
-            Ty::Bounded {
+            TyKind::Bounded {
                 lo: Const::Value(lo),
                 hi: Const::Value(hi),
             } if lo <= hi => CtorSet::Int(IntRange { lo: *lo, hi: *hi }),
-            Ty::Never => CtorSet::Variants(Vec::new()),
-            Ty::Tuple(_) => CtorSet::Single,
-            Ty::Array {
+            TyKind::Never => CtorSet::Variants(Vec::new()),
+            TyKind::Tuple(_) => CtorSet::Single,
+            TyKind::Array {
                 len: Const::Value(len),
                 ..
             } if (0..=MAX_ARRAY_FIELDS).contains(len) => CtorSet::Single,
-            Ty::Adt { item, args } => match self.env.adt(*item) {
+            TyKind::Adt { item, args } => match self.env.adt(*item) {
                 Some(adt) if !adt.builtin && adt.is_enum => CtorSet::Variants(
                     adt.variants
                         .iter()
@@ -505,14 +475,14 @@ impl Cx<'_> {
             return false;
         }
         let depth = depth.saturating_add(1);
-        match ty {
-            Ty::Never => true,
-            Ty::Tuple(fields) => fields.iter().any(|field| self.is_uninhabited(field, depth)),
-            Ty::Array {
+        match ty.kind() {
+            TyKind::Never => true,
+            TyKind::Tuple(fields) => fields.iter().any(|field| self.is_uninhabited(field, depth)),
+            TyKind::Array {
                 elem,
                 len: Const::Value(len),
             } => *len > 0 && self.is_uninhabited(elem, depth),
-            Ty::Adt { item, args } => match self.env.adt(*item) {
+            TyKind::Adt { item, args } => match self.env.adt(*item) {
                 Some(adt) if !adt.builtin => {
                     let variant_empty = |variant: &crate::signatures::VariantDef| {
                         variant
@@ -534,20 +504,20 @@ impl Cx<'_> {
 
     /// The types of the fields of `ctor` on `ty`.
     fn field_tys(&self, ctor: &Ctor, ty: &Ty) -> Vec<Ty> {
-        match (ctor, peel(ty)) {
-            (Ctor::Single, Ty::Tuple(fields)) => fields.clone(),
+        match (ctor, peel(ty).kind()) {
+            (Ctor::Single, TyKind::Tuple(fields)) => fields.to_vec(),
             (
                 Ctor::Single,
-                Ty::Array {
+                TyKind::Array {
                     elem,
                     len: Const::Value(len),
                 },
             ) => {
                 let count = usize::try_from(*len).unwrap_or(0);
-                vec![elem.as_ref().clone(); count]
+                vec![elem.clone(); count]
             }
-            (Ctor::Single, Ty::Adt { item, args }) => self.variant_field_tys(*item, 0, args),
-            (Ctor::Variant(index), Ty::Adt { item, args }) => {
+            (Ctor::Single, TyKind::Adt { item, args }) => self.variant_field_tys(*item, 0, args),
+            (Ctor::Variant(index), TyKind::Adt { item, args }) => {
                 self.variant_field_tys(*item, *index, args)
             }
             _ => Vec::new(),
@@ -780,8 +750,8 @@ impl Cx<'_> {
                     .map_or_else(|| "_".to_owned(), |name| name.to_string()),
                 OpaqueKey::Unique(_) => "_".to_owned(),
             },
-            Ctor::Single => match peel(ty) {
-                Ty::Tuple(tys) => {
+            Ctor::Single => match peel(ty).kind() {
+                TyKind::Tuple(tys) => {
                     let fields = self.print_fields(&pat.fields, tys);
                     if fields.len() == 1 {
                         format!("({},)", fields.join(", "))
@@ -789,15 +759,15 @@ impl Cx<'_> {
                         format!("({})", fields.join(", "))
                     }
                 }
-                Ty::Array { .. } => {
+                TyKind::Array { .. } => {
                     let tys = self.field_tys(&pat.ctor, ty);
                     format!("[{}]", self.print_fields(&pat.fields, &tys).join(", "))
                 }
-                Ty::Adt { item, .. } => self.print_variant(*item, 0, false, pat, ty),
+                TyKind::Adt { item, .. } => self.print_variant(*item, 0, false, pat, ty),
                 _ => "_".to_owned(),
             },
-            Ctor::Variant(index) => match peel(ty) {
-                Ty::Adt { item, .. } => self.print_variant(*item, *index, true, pat, ty),
+            Ctor::Variant(index) => match peel(ty).kind() {
+                TyKind::Adt { item, .. } => self.print_variant(*item, *index, true, pat, ty),
                 _ => "_".to_owned(),
             },
         }
@@ -868,9 +838,9 @@ impl Cx<'_> {
 
 /// `5`, `6..=10`, `i32::MIN..=-1`, `6..=i32::MAX`.
 fn print_int(range: IntRange, ty: &Ty) -> String {
-    let bound = |value: i128| match ty {
-        Ty::Int(int) if value == IntTy::max(*int) => format!("{}::MAX", int.name()),
-        Ty::Int(int) if value == IntTy::min(*int) && value != 0 => {
+    let bound = |value: i128| match ty.kind() {
+        TyKind::Int(int) if value == IntTy::max(*int) => format!("{}::MAX", int.name()),
+        TyKind::Int(int) if value == IntTy::min(*int) && value != 0 => {
             format!("{}::MIN", int.name())
         }
         _ => value.to_string(),
@@ -932,14 +902,14 @@ enum BoundValue {
 
 fn check_body_in(
     env: &dyn PatEnv,
-    file: FilePath,
+    owner: Owner,
     body: &Body,
     resolution: &BodyResolution,
     inference: &InferenceResult,
-) -> Vec<Diagnostic> {
+) -> Vec<Diag> {
     let mut checker = Checker {
         cx: Cx { env },
-        file,
+        owner,
         body,
         resolution,
         inference,
@@ -952,12 +922,12 @@ fn check_body_in(
 
 struct Checker<'a> {
     cx: Cx<'a>,
-    file: FilePath,
+    owner: Owner,
     body: &'a Body,
     resolution: &'a BodyResolution,
     inference: &'a InferenceResult,
     next_unique: u32,
-    diagnostics: Vec<Diagnostic>,
+    diagnostics: Vec<Diag>,
 }
 
 impl<'a> Checker<'a> {
@@ -1006,9 +976,8 @@ impl<'a> Checker<'a> {
         for (arm, pat) in arms.iter().zip(lowered) {
             let row = vec![pat];
             if !self.cx.is_useful(&rows, &row, &tys) {
-                self.diagnostics.push(Diagnostic::new(
-                    self.file.clone(),
-                    self.body.store.pat_range(arm.pat),
+                self.diagnostics.push(Diag::new(
+                    Anchor::Node(self.owner, NodeId::Pat(arm.pat)),
                     DiagnosticCode::TypeUnreachablePattern,
                     "unreachable pattern",
                 ));
@@ -1018,9 +987,8 @@ impl<'a> Checker<'a> {
             }
         }
         if let Some(list) = self.missing(&rows, ty) {
-            self.diagnostics.push(Diagnostic::new(
-                self.file.clone(),
-                self.body.store.expr_range(scrutinee),
+            self.diagnostics.push(Diag::new(
+                Anchor::Node(self.owner, NodeId::Expr(scrutinee)),
                 DiagnosticCode::TypeNonExhaustiveMatch,
                 format!("non-exhaustive patterns: {list} not covered"),
             ));
@@ -1035,9 +1003,8 @@ impl<'a> Checker<'a> {
             return;
         };
         if let Some(list) = self.missing(&[vec![lowered]], ty) {
-            self.diagnostics.push(Diagnostic::new(
-                self.file.clone(),
-                self.body.store.pat_range(pat),
+            self.diagnostics.push(Diag::new(
+                Anchor::Node(self.owner, NodeId::Pat(pat)),
                 DiagnosticCode::TypeRefutablePattern,
                 format!(
                     "refutable pattern in {}: {list} not covered",
@@ -1102,7 +1069,7 @@ impl<'a> Checker<'a> {
                 inclusive,
             } => self.lower_range(pat, start.as_ref(), end.as_ref(), *inclusive, ty),
             Pat::Tuple(pats) => {
-                let Ty::Tuple(tys) = peel(ty) else {
+                let TyKind::Tuple(tys) = peel(ty).kind() else {
                     return None;
                 };
                 let fields = self.lower_seq(pats, tys)?;
@@ -1195,7 +1162,7 @@ impl<'a> Checker<'a> {
     }
 
     fn ctor_field_names(&self, ctor: &Ctor, ty: &Ty) -> Option<Vec<Name>> {
-        let Ty::Adt { item, .. } = peel(ty) else {
+        let TyKind::Adt { item, .. } = peel(ty).kind() else {
             return None;
         };
         let index = match ctor {
@@ -1307,7 +1274,7 @@ impl Cx<'_> {
     /// The constructor of struct `adt` (`variant` `None`) or of its variant, when `ty` is
     /// that ADT, with the constructor's field types.
     fn ctor_for(&self, adt: ItemId, variant: Option<u32>, ty: &Ty) -> Option<(Ctor, Vec<Ty>)> {
-        let Ty::Adt { item, .. } = peel(ty) else {
+        let TyKind::Adt { item, .. } = peel(ty).kind() else {
             return None;
         };
         if *item != adt {
@@ -1414,7 +1381,7 @@ impl Cx<'_> {
                 }
             }
             Expr::Tuple(elems) => {
-                let Ty::Tuple(tys) = peel(ty) else {
+                let TyKind::Tuple(tys) = peel(ty).kind() else {
                     return None;
                 };
                 let fields = self.lower_const_fields(init, elems, tys, depth)?;
@@ -1424,7 +1391,9 @@ impl Cx<'_> {
                 })
             }
             Expr::Array(ArrayExpr::List(elems)) => {
-                if !matches!(peel(ty), Ty::Array { .. }) || self.ctor_set(ty) != CtorSet::Single {
+                if !matches!(peel(ty).kind(), TyKind::Array { .. })
+                    || self.ctor_set(ty) != CtorSet::Single
+                {
                     return None;
                 }
                 let tys = self.field_tys(&Ctor::Single, ty);

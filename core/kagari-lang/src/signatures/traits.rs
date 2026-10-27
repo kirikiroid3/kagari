@@ -10,7 +10,7 @@ use crate::def_map::{DefMaps, PrimType, TypeKey, def_maps};
 use crate::hir::Name;
 use crate::input::Program;
 use crate::item_tree::{ItemId, ItemKind, item_tree};
-use crate::ty::{GenericArg, IntTy, Ty};
+use crate::ty::{GenericArg, IntTy, Ty, TyKind};
 
 /// The trait bounds of the generic parameters in scope: `(owner, index)` → traits.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -70,11 +70,11 @@ pub fn implements(
 }
 
 pub(crate) fn type_key(ty: &Ty) -> Option<TypeKey> {
-    Some(match ty {
-        Ty::Adt { item, .. } => TypeKey::Item(*item),
-        Ty::Bool => TypeKey::Prim(PrimType::Bool),
-        Ty::Bounded { .. } => TypeKey::Prim(PrimType::Int),
-        Ty::Int(int) => TypeKey::Prim(match int {
+    Some(match ty.kind() {
+        TyKind::Adt { item, .. } => TypeKey::Item(*item),
+        TyKind::Bool => TypeKey::Prim(PrimType::Bool),
+        TyKind::Bounded { .. } => TypeKey::Prim(PrimType::Int),
+        TyKind::Int(int) => TypeKey::Prim(match int {
             IntTy::U8 => PrimType::U8,
             IntTy::U16 => PrimType::U16,
             IntTy::U32 => PrimType::U32,
@@ -113,7 +113,7 @@ pub(crate) fn match_impl(
             .zip(&generics.params)
             .map(|(arg, param)| {
                 arg.unwrap_or(match param.kind {
-                    GenericParamDefKind::Type { .. } => GenericArg::Type(Ty::Error),
+                    GenericParamDefKind::Type { .. } => GenericArg::Type(Ty::error()),
                     GenericParamDefKind::Const { .. } => GenericArg::Const(crate::ty::Const::Error),
                 })
             })
@@ -191,12 +191,12 @@ pub(crate) struct TraitSolver<'a> {
 
 impl TraitSolver<'_> {
     pub(crate) fn implements(&mut self, ty: &Ty, trait_item: ItemId) -> bool {
-        match ty {
-            Ty::Error | Ty::Infer(_) | Ty::Never => return true,
-            Ty::Param { owner, index } => {
+        match ty.kind() {
+            TyKind::Error | TyKind::Infer(_) | TyKind::Never => return true,
+            TyKind::Param { owner, index } => {
                 return self.env.bounds_of(*owner, *index).contains(&trait_item);
             }
-            Ty::TraitSelf { trait_item: own } => return *own == trait_item,
+            TyKind::TraitSelf { trait_item: own } => return *own == trait_item,
             _ => {}
         }
         if self.explicit_impl(ty, trait_item) {
@@ -207,7 +207,7 @@ impl TraitSolver<'_> {
         }
         if Some(trait_item) == self.sigs.std.rand_choose {
             // Fieldless enums; `Int<lo, hi>` has an explicit impl, checked above.
-            return matches!(ty, Ty::Adt { item, .. } if self.sigs.adt(*item).is_some_and(|adt| {
+            return matches!(ty.kind(), TyKind::Adt { item, .. } if self.sigs.adt(*item).is_some_and(|adt| {
                 adt.is_enum
                     && !adt.builtin
                     && !adt.variants.is_empty()
@@ -246,13 +246,17 @@ impl TraitSolver<'_> {
     }
 
     fn structural_eq(&mut self, ty: &Ty, eq: ItemId) -> bool {
-        match ty {
-            Ty::Bool | Ty::Int(_) | Ty::Bounded { .. } | Ty::FnPtr { .. } | Ty::FnDef(_) => true,
-            Ty::Closure { .. } | Ty::Projection { .. } => false,
-            Ty::Tuple(fields) => fields.iter().all(|field| self.implements(field, eq)),
-            Ty::Array { elem, .. } => self.implements(elem, eq),
-            Ty::Ref { inner, .. } => self.implements(inner, eq),
-            Ty::Adt { item, args } => {
+        match ty.kind() {
+            TyKind::Bool
+            | TyKind::Int(_)
+            | TyKind::Bounded { .. }
+            | TyKind::FnPtr { .. }
+            | TyKind::FnDef(_) => true,
+            TyKind::Closure { .. } | TyKind::Projection { .. } => false,
+            TyKind::Tuple(fields) => fields.iter().all(|field| self.implements(field, eq)),
+            TyKind::Array { elem, .. } => self.implements(elem, eq),
+            TyKind::Ref { inner, .. } => self.implements(inner, eq),
+            TyKind::Adt { item, args } => {
                 let Some(adt) = self.sigs.adt(*item) else {
                     return true;
                 };
@@ -277,7 +281,11 @@ impl TraitSolver<'_> {
                 self.visiting.remove(ty);
                 all
             }
-            Ty::Error | Ty::Never | Ty::Infer(_) | Ty::Param { .. } | Ty::TraitSelf { .. } => true,
+            TyKind::Error
+            | TyKind::Never
+            | TyKind::Infer(_)
+            | TyKind::Param { .. }
+            | TyKind::TraitSelf { .. } => true,
         }
     }
 }

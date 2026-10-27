@@ -3,50 +3,36 @@
 
 mod forms;
 pub mod lower;
+pub mod source_map;
 
-use kagari_syntax::TextRange;
 use la_arena::{Arena, ArenaMap, Idx};
 use smol_str::SmolStr;
 
+use crate::db::Db;
 use crate::item_tree::ItemId;
 
-pub use lower::{FileHir, file_hir};
+pub use lower::{body, body_source_map, signature, signature_source_map};
+pub use source_map::StoreSourceMap;
 
 pub type Name = SmolStr;
 pub type ExprId = Idx<Expr>;
 pub type PatId = Idx<Pat>;
 pub type TypeRefId = Idx<TypeRef>;
 
-/// Expressions, patterns and types of one body or signature, with their source ranges.
+/// Expressions, patterns and types of one body or signature. Their source ranges are in
+/// the store's [`StoreSourceMap`].
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ExprStore {
     pub exprs: Arena<Expr>,
     pub pats: Arena<Pat>,
     pub types: Arena<TypeRef>,
-    pub expr_ranges: ArenaMap<ExprId, TextRange>,
-    pub pat_ranges: ArenaMap<PatId, TextRange>,
-    pub type_ranges: ArenaMap<TypeRefId, TextRange>,
+    /// The position of each expression in a pre-order walk of the source: an order of
+    /// expressions by where they start that is unaffected by edits elsewhere. Expressions
+    /// synthesized by form desugaring share the position of their form.
+    pub source_order: ArenaMap<ExprId, u32>,
 }
 
 impl ExprStore {
-    pub fn alloc_expr(&mut self, expr: Expr, range: TextRange) -> ExprId {
-        let id = self.exprs.alloc(expr);
-        self.expr_ranges.insert(id, range);
-        id
-    }
-
-    pub fn alloc_pat(&mut self, pat: Pat, range: TextRange) -> PatId {
-        let id = self.pats.alloc(pat);
-        self.pat_ranges.insert(id, range);
-        id
-    }
-
-    pub fn alloc_type(&mut self, ty: TypeRef, range: TextRange) -> TypeRefId {
-        let id = self.types.alloc(ty);
-        self.type_ranges.insert(id, range);
-        id
-    }
-
     /// Ids always come from this store, so indexing never fails.
     pub fn expr(&self, id: ExprId) -> &Expr {
         &self.exprs[id]
@@ -60,16 +46,9 @@ impl ExprStore {
         &self.types[id]
     }
 
-    pub fn expr_range(&self, id: ExprId) -> TextRange {
-        self.expr_ranges.get(id).copied().unwrap_or_default()
-    }
-
-    pub fn pat_range(&self, id: PatId) -> TextRange {
-        self.pat_ranges.get(id).copied().unwrap_or_default()
-    }
-
-    pub fn type_range(&self, id: TypeRefId) -> TextRange {
-        self.type_ranges.get(id).copied().unwrap_or_default()
+    /// See [`ExprStore::source_order`].
+    pub fn source_order(&self, id: ExprId) -> u32 {
+        self.source_order.get(id).copied().unwrap_or_default()
     }
 }
 
@@ -122,7 +101,6 @@ pub enum PathKind {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PathSegment {
     pub name: Name,
-    pub range: TextRange,
     pub args: Option<GenericArgs>,
 }
 
@@ -293,7 +271,7 @@ pub enum Literal {
         suffix: Option<SmolStr>,
     },
     Decimal(SmolStr),
-    String(String),
+    String(std::sync::Arc<str>),
     Bool(bool),
 }
 
@@ -306,7 +284,7 @@ pub enum Expr {
         stmts: Vec<Stmt>,
         tail: Option<ExprId>,
         /// The item-tree block scope, when the block contains items.
-        scope: Option<u32>,
+        scope: Option<crate::item_tree::BlockIndex>,
     },
     If {
         cond: Condition,
@@ -487,12 +465,13 @@ pub struct Signature {
     pub store: ExprStore,
     pub generics: Vec<GenericParam>,
     pub kind: SignatureKind,
+    /// Whether the `self` parameter of a `fn` is `mut self` (by value).
+    pub self_mutable: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GenericParam {
     pub name: Name,
-    pub range: TextRange,
     pub kind: GenericParamKind,
 }
 
@@ -540,4 +519,22 @@ pub enum SignatureKind {
         bounds: Vec<TypeRefId>,
     },
     None,
+}
+
+/// The signature of an item.
+pub fn signature_of(db: &dyn Db, item: ItemId) -> Option<&Signature> {
+    signature(db, item.file, item.index).as_ref()
+}
+
+/// The body of a `fn`, `const` or `static` item.
+pub fn body_of(db: &dyn Db, item: ItemId) -> Option<&Body> {
+    body(db, item.file, item.index).as_ref()
+}
+
+pub fn signature_source_map_of(db: &dyn Db, item: ItemId) -> Option<&StoreSourceMap> {
+    signature_source_map(db, item.file, item.index).as_ref()
+}
+
+pub fn body_source_map_of(db: &dyn Db, item: ItemId) -> Option<&StoreSourceMap> {
+    body_source_map(db, item.file, item.index).as_ref()
 }

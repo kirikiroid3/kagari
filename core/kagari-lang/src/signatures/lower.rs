@@ -1,21 +1,22 @@
 //! Lowering of HIR type references to semantic types, shared by item signatures and bodies.
 
-use kagari_syntax::TextRange;
+use crate::diagnostic::{Anchor, Diag, NodeId, Owner};
 use rustc_hash::FxHashMap;
 
 use super::consts::{fold_const_expr, fold_const_item};
 use super::subst::{Subst, subst_ty};
 use crate::db::Db;
+use crate::def_map::def_maps;
 use crate::def_map::{Def, PrimType, Resolution};
-use crate::diagnostic::{Diagnostic, DiagnosticCode};
+use crate::diagnostic::DiagnosticCode;
 use crate::hir::{
     ExprStore, GenericArg as HirGenericArg, GenericArgs, GenericParamKind, Name, Signature,
-    SignatureKind, TypeRef, TypeRefId, file_hir,
+    SignatureKind, TypeRef, TypeRefId, signature_of,
 };
 use crate::input::Program;
 use crate::item_tree::{ItemId, ItemKind, item_tree};
-use crate::resolve::{StoreResolution, file_resolution};
-use crate::ty::{Const, GenericArg, IntTy, Ty};
+use crate::resolve::{StoreResolution, signature_resolution};
+use crate::ty::{Const, GenericArg, IntTy, Ty, TyKind};
 
 /// The Rust integer type of a primitive, `None` for `bool` and `Int`.
 pub(crate) fn prim_int(prim: PrimType) -> Option<IntTy> {
@@ -49,28 +50,31 @@ pub(crate) fn item_signature(
     program: Program,
     item: ItemId,
 ) -> Option<(&Signature, &StoreResolution)> {
-    let signature = file_hir(db, item.file)
-        .signatures
-        .get(item.index as usize)?
-        .as_ref()?;
-    let res = file_resolution(db, program, item.file)
-        .items
-        .get(item.index as usize)?
-        .as_ref()?;
-    Some((signature, &res.signature))
+    if !def_maps(db, program).file_modules.contains_key(&item.file) {
+        return None;
+    }
+    let signature = signature_of(db, item)?;
+    Some((signature, &signature_resolution(db, program, item).store))
 }
 
-/// Where a type reference lives: an expression store of `owner` and its resolution.
+/// Where a type reference lives: the expression store `src` (an item's signature or body)
+/// and its resolution.
 #[derive(Clone, Copy)]
 pub(crate) struct Scope<'s> {
-    pub owner: ItemId,
+    pub src: Owner,
     pub store: &'s ExprStore,
     pub res: &'s StoreResolution,
 }
 
+impl Scope<'_> {
+    pub(crate) fn node(&self, node: NodeId) -> Anchor {
+        Anchor::Node(self.src, node)
+    }
+}
+
 /// Where lowering reports, and what `_` lowers to.
 pub(crate) struct Sink<'h> {
-    pub diags: Vec<Diagnostic>,
+    pub diags: Vec<Diag>,
     /// Diagnostics are dropped: the types are reported where they are declared.
     pub quiet: bool,
     /// Makes a fresh inference variable (a constant one when the flag is set) for `_`;
@@ -113,7 +117,7 @@ pub(crate) struct TyLowerer<'a> {
     alias_stack: Vec<ItemId>,
     impl_stack: Vec<ItemId>,
     /// Alias cycles, kept even when the lowering that finds them is quiet.
-    pub cycle_diags: Vec<Diagnostic>,
+    pub cycle_diags: Vec<Diag>,
 }
 
 impl<'a> TyLowerer<'a> {
@@ -131,43 +135,36 @@ impl<'a> TyLowerer<'a> {
 
     fn diag(
         &self,
-        scope: Scope<'_>,
         sink: &mut Sink<'_>,
-        range: TextRange,
+        anchor: Anchor,
         code: DiagnosticCode,
         message: impl Into<String>,
     ) {
         if !sink.quiet {
-            sink.diags.push(Diagnostic::new(
-                scope.owner.file.path(self.db).clone(),
-                range,
-                code,
-                message,
-            ));
+            sink.diags.push(Diag::new(anchor, code, message));
         }
     }
 
     pub(crate) fn lower(&mut self, scope: Scope<'_>, id: TypeRefId, sink: &mut Sink<'_>) -> Ty {
-        let range = scope.store.type_range(id);
+        let range = scope.node(NodeId::Type(id));
         match scope.store.type_ref(id) {
-            TypeRef::Missing => Ty::Error,
+            TypeRef::Missing => Ty::error(),
             TypeRef::Infer => match sink.hole_arg(false) {
                 Some(GenericArg::Type(ty)) => ty,
-                Some(GenericArg::Const(_)) => Ty::Error,
+                Some(GenericArg::Const(_)) => Ty::error(),
                 None => {
                     self.diag(
-                        scope,
                         sink,
                         range,
                         DiagnosticCode::TypeInferInSignature,
                         "the placeholder `_` is not allowed in item signatures",
                     );
-                    Ty::Error
+                    Ty::error()
                 }
             },
             TypeRef::Path(path) => {
                 let Some(resolution) = scope.res.types.get(&id) else {
-                    return Ty::Error;
+                    return Ty::error();
                 };
                 let args = path
                     .segments
@@ -175,24 +172,20 @@ impl<'a> TyLowerer<'a> {
                     .and_then(|segment| segment.args.as_ref());
                 self.lower_resolution(scope, resolution, args, range, sink)
             }
-            TypeRef::Tuple(fields) => Ty::Tuple(
+            TypeRef::Tuple(fields) => Ty::new(TyKind::Tuple(
                 fields
                     .iter()
                     .map(|&field| self.lower(scope, field, sink))
                     .collect(),
-            ),
+            )),
             TypeRef::Array { elem, len } => {
                 let elem = self.lower(scope, *elem, sink);
                 let len = self.fold(scope, *len, sink);
-                Ty::Array {
-                    elem: Box::new(elem),
-                    len,
-                }
+                Ty::new(TyKind::Array { elem, len })
             }
-            TypeRef::Ref { mutable, inner } => Ty::Ref {
-                mutable: *mutable,
-                inner: Box::new(self.lower(scope, *inner, sink)),
-            },
+            TypeRef::Ref { mutable, inner } => {
+                Ty::reference(*mutable, self.lower(scope, *inner, sink))
+            }
             TypeRef::FnPtr { kind, params, ret } => {
                 let params = params
                     .iter()
@@ -202,11 +195,11 @@ impl<'a> TyLowerer<'a> {
                     Some(ret) => self.lower(scope, *ret, sink),
                     None => Ty::unit(),
                 };
-                Ty::FnPtr {
+                Ty::new(TyKind::FnPtr {
                     kind: *kind,
                     params,
-                    ret: Box::new(ret),
-                }
+                    ret,
+                })
             }
             TypeRef::Closure { kind, params, ret } => {
                 let params = params
@@ -217,11 +210,11 @@ impl<'a> TyLowerer<'a> {
                     Some(ret) => self.lower(scope, *ret, sink),
                     None => Ty::unit(),
                 };
-                Ty::Closure {
+                Ty::new(TyKind::Closure {
                     kind: *kind,
                     params,
-                    ret: Box::new(ret),
-                }
+                    ret,
+                })
             }
         }
     }
@@ -236,7 +229,7 @@ impl<'a> TyLowerer<'a> {
         let value = fold_const_expr(
             self.db,
             self.program,
-            scope.owner,
+            scope.src,
             scope.store,
             scope.res,
             expr,
@@ -255,7 +248,7 @@ impl<'a> TyLowerer<'a> {
         scope: Scope<'_>,
         resolution: &Resolution,
         args: Option<&GenericArgs>,
-        range: TextRange,
+        range: Anchor,
         sink: &mut Sink<'_>,
     ) -> Ty {
         match resolution {
@@ -263,16 +256,16 @@ impl<'a> TyLowerer<'a> {
             Resolution::Def(Def::Item(item)) => {
                 let tree = item_tree(self.db, item.file);
                 let Some(data) = tree.item(item.index) else {
-                    return Ty::Error;
+                    return Ty::error();
                 };
                 match &data.kind {
                     ItemKind::Struct { .. } | ItemKind::Enum { .. } => {
                         let args = self.lower_args(scope, *item, args, range, sink);
-                        Ty::Adt { item: *item, args }
+                        Ty::adt(*item, crate::ty::GenericArgs::new(args))
                     }
                     ItemKind::TypeAlias { .. } => {
                         let args = self.lower_args(scope, *item, args, range, sink);
-                        self.expand_alias(scope, *item, &args, range, sink)
+                        self.expand_alias(*item, &args, range, sink)
                     }
                     kind => {
                         let what = match kind {
@@ -284,13 +277,12 @@ impl<'a> TyLowerer<'a> {
                         };
                         let name = data.name.clone().unwrap_or_default();
                         self.diag(
-                            scope,
                             sink,
                             range,
                             DiagnosticCode::TypeExpectedType,
                             format!("expected a type, found {what} `{name}`"),
                         );
-                        Ty::Error
+                        Ty::error()
                     }
                 }
             }
@@ -301,39 +293,35 @@ impl<'a> TyLowerer<'a> {
                 {
                     Some(ItemKind::Enum { variants }) => variants
                         .get(*index as usize)
-                        .map(|(name, _, _)| name.clone())
+                        .map(|(name, _)| name.clone())
                         .unwrap_or_default(),
                     _ => Name::default(),
                 };
                 self.diag(
-                    scope,
                     sink,
                     range,
                     DiagnosticCode::TypeExpectedType,
                     format!("expected a type, found enum variant `{variant}`"),
                 );
-                Ty::Error
+                Ty::error()
             }
             Resolution::Def(Def::Module(_)) => {
                 self.diag(
-                    scope,
                     sink,
                     range,
                     DiagnosticCode::TypeExpectedType,
                     "expected a type, found a module",
                 );
-                Ty::Error
+                Ty::error()
             }
-            Resolution::GenericParam { owner, index } => Ty::Param {
+            Resolution::GenericParam { owner, index } => Ty::new(TyKind::Param {
                 owner: *owner,
                 index: *index,
-            },
+            }),
             Resolution::SelfType(owner) => self.self_type(*owner),
-            Resolution::Assoc(item) => self.assoc_type(scope, *item, range, sink),
-            Resolution::Deferred { base, rest } => {
-                self.deferred_type(scope, base, rest, range, sink)
-            }
-            Resolution::Local(_) | Resolution::Error => Ty::Error,
+            Resolution::Assoc(item) => self.assoc_type(*item, range, sink),
+            Resolution::Deferred { base, rest } => self.deferred_type(base, rest, range, sink),
+            Resolution::Local(_) | Resolution::Error => Ty::error(),
         }
     }
 
@@ -342,13 +330,12 @@ impl<'a> TyLowerer<'a> {
         scope: Scope<'_>,
         prim: PrimType,
         args: Option<&GenericArgs>,
-        range: TextRange,
+        range: Anchor,
         sink: &mut Sink<'_>,
     ) -> Ty {
         if prim != PrimType::Int {
             if args.is_some() {
                 self.diag(
-                    scope,
                     sink,
                     range,
                     DiagnosticCode::TypeWrongGenericCount,
@@ -356,23 +343,21 @@ impl<'a> TyLowerer<'a> {
                 );
             }
             return match prim_int(prim) {
-                Some(int) => Ty::Int(int),
-                None => Ty::Bool,
+                Some(int) => Ty::int(int),
+                None => Ty::bool(),
             };
         }
         let Some(GenericArgs(args)) = args else {
             self.diag(
-                scope,
                 sink,
                 range,
                 DiagnosticCode::TypeWrongGenericCount,
                 "`Int` needs two bounds: `Int<lo, hi>`",
             );
-            return Ty::Error;
+            return Ty::error();
         };
         let [lo, hi] = args.as_slice() else {
             self.diag(
-                scope,
                 sink,
                 range,
                 DiagnosticCode::TypeWrongGenericCount,
@@ -381,7 +366,7 @@ impl<'a> TyLowerer<'a> {
                     args.len()
                 ),
             );
-            return Ty::Error;
+            return Ty::error();
         };
         let lo = self.lower_const_arg(scope, lo, sink);
         let hi = self.lower_const_arg(scope, hi, sink);
@@ -391,20 +376,18 @@ impl<'a> TyLowerer<'a> {
                 && !i64_range.contains(value)
             {
                 self.diag(
-                    scope,
                     sink,
                     range,
                     DiagnosticCode::TypeBadIntBounds,
                     format!("the bound `{value}` of `Int` does not fit in `i64`"),
                 );
-                return Ty::Error;
+                return Ty::error();
             }
         }
         if let (Const::Value(lo), Const::Value(hi)) = (&lo, &hi)
             && lo > hi
         {
             self.diag(
-                scope,
                 sink,
                 range,
                 DiagnosticCode::TypeBadIntBounds,
@@ -412,9 +395,9 @@ impl<'a> TyLowerer<'a> {
                     "`Int<{lo}, {hi}>` is empty: the lower bound is greater than the upper bound"
                 ),
             );
-            return Ty::Error;
+            return Ty::error();
         }
-        Ty::Bounded { lo, hi }
+        Ty::new(TyKind::Bounded { lo, hi })
     }
 
     /// The generic arguments for `def`'s own parameters; missing or extra arguments are
@@ -424,7 +407,7 @@ impl<'a> TyLowerer<'a> {
         scope: Scope<'_>,
         def: ItemId,
         args: Option<&GenericArgs>,
-        range: TextRange,
+        range: Anchor,
         sink: &mut Sink<'_>,
     ) -> Vec<GenericArg> {
         let params: Vec<bool> = match item_signature(self.db, self.program, def) {
@@ -441,7 +424,7 @@ impl<'a> TyLowerer<'a> {
                 .iter()
                 .map(|&is_const| {
                     sink.hole_arg(is_const)
-                        .unwrap_or(GenericArg::Type(Ty::Error))
+                        .unwrap_or(GenericArg::Type(Ty::error()))
                 })
                 .collect();
         }
@@ -459,13 +442,7 @@ impl<'a> TyLowerer<'a> {
                     were(given.len())
                 )
             };
-            self.diag(
-                scope,
-                sink,
-                range,
-                DiagnosticCode::TypeWrongGenericCount,
-                message,
-            );
+            self.diag(sink, range, DiagnosticCode::TypeWrongGenericCount, message);
         }
         params
             .iter()
@@ -474,7 +451,7 @@ impl<'a> TyLowerer<'a> {
                 Some(arg) if is_const => GenericArg::Const(self.lower_const_arg(scope, arg, sink)),
                 Some(arg) => GenericArg::Type(self.lower_type_arg(scope, arg, sink)),
                 None if is_const => GenericArg::Const(Const::Error),
-                None => GenericArg::Type(Ty::Error),
+                None => GenericArg::Type(Ty::error()),
             })
             .collect()
     }
@@ -490,26 +467,24 @@ impl<'a> TyLowerer<'a> {
                 self.lower(scope, ty, sink)
             }
             HirGenericArg::Type(ty) => {
-                let range = scope.store.type_range(ty);
+                let range = scope.node(NodeId::Type(ty));
                 self.diag(
-                    scope,
                     sink,
                     range,
                     DiagnosticCode::TypeExpectedType,
                     "expected a type, found a constant",
                 );
-                Ty::Error
+                Ty::error()
             }
             HirGenericArg::Const(expr) => {
-                let range = scope.store.expr_range(expr);
+                let range = scope.node(NodeId::Expr(expr));
                 self.diag(
-                    scope,
                     sink,
                     range,
                     DiagnosticCode::TypeExpectedType,
                     "expected a type, found a constant",
                 );
-                Ty::Error
+                Ty::error()
             }
         }
     }
@@ -523,7 +498,7 @@ impl<'a> TyLowerer<'a> {
         match *arg {
             HirGenericArg::Const(expr) => self.fold(scope, expr, sink),
             HirGenericArg::Type(ty) => {
-                let range = scope.store.type_range(ty);
+                let range = scope.node(NodeId::Type(ty));
                 match scope.res.const_args.get(&ty) {
                     Some(Resolution::GenericParam { owner, index }) => Const::Param {
                         owner: *owner,
@@ -531,14 +506,8 @@ impl<'a> TyLowerer<'a> {
                     },
                     Some(Resolution::Def(Def::Item(item)) | Resolution::Assoc(item)) => {
                         let mut diags = Vec::new();
-                        let value = fold_const_item(
-                            self.db,
-                            self.program,
-                            scope.owner,
-                            *item,
-                            range,
-                            &mut diags,
-                        );
+                        let value =
+                            fold_const_item(self.db, self.program, *item, range, &mut diags);
                         if !sink.quiet {
                             sink.diags.extend(diags);
                         }
@@ -547,7 +516,6 @@ impl<'a> TyLowerer<'a> {
                     Some(Resolution::Error) => Const::Error,
                     Some(_) => {
                         self.diag(
-                            scope,
                             sink,
                             range,
                             DiagnosticCode::TypeUnsupportedConst,
@@ -566,7 +534,6 @@ impl<'a> TyLowerer<'a> {
                     None => {
                         if !matches!(scope.res.types.get(&ty), Some(Resolution::Error)) {
                             self.diag(
-                                scope,
                                 sink,
                                 range,
                                 DiagnosticCode::TypeExpectedConst,
@@ -585,9 +552,9 @@ impl<'a> TyLowerer<'a> {
             .item(owner.index)
             .map(|data| &data.kind)
         {
-            Some(ItemKind::Trait { .. }) => Ty::TraitSelf { trait_item: owner },
+            Some(ItemKind::Trait { .. }) => Ty::new(TyKind::TraitSelf { trait_item: owner }),
             Some(ItemKind::Impl { .. }) => self.impl_self_ty(owner),
-            _ => Ty::Error,
+            _ => Ty::error(),
         }
     }
 
@@ -597,16 +564,16 @@ impl<'a> TyLowerer<'a> {
             return ty.clone();
         }
         if self.impl_stack.contains(&impl_item) {
-            return Ty::Error;
+            return Ty::error();
         }
         let Some((signature, res)) = item_signature(self.db, self.program, impl_item) else {
-            return Ty::Error;
+            return Ty::error();
         };
         let SignatureKind::Impl { self_ty, .. } = &signature.kind else {
-            return Ty::Error;
+            return Ty::error();
         };
         let scope = Scope {
-            owner: impl_item,
+            src: Owner::Signature(impl_item),
             store: &signature.store,
             res,
         };
@@ -619,32 +586,26 @@ impl<'a> TyLowerer<'a> {
 
     /// The value of a type alias with its own generic parameters; `None` for an associated
     /// type declared in a trait.
-    pub(crate) fn alias_value(
-        &mut self,
-        alias: ItemId,
-        user: Scope<'_>,
-        range: TextRange,
-    ) -> Option<Ty> {
+    pub(crate) fn alias_value(&mut self, alias: ItemId, range: Anchor) -> Option<Ty> {
         if let Some(value) = self.alias_values.get(&alias) {
             return value.clone();
         }
         if self.alias_stack.contains(&alias) {
             let name = item_name(self.db, alias);
-            self.cycle_diags.push(Diagnostic::new(
-                user.owner.file.path(self.db).clone(),
+            self.cycle_diags.push(Diag::new(
                 range,
                 DiagnosticCode::TypeAliasCycle,
                 format!("cycle detected when expanding type alias `{name}`"),
             ));
-            return Some(Ty::Error);
+            return Some(Ty::error());
         }
         let (signature, res) = item_signature(self.db, self.program, alias)?;
         let SignatureKind::TypeAlias { value, .. } = &signature.kind else {
-            return Some(Ty::Error);
+            return Some(Ty::error());
         };
         let value = value.map(|value| {
             let scope = Scope {
-                owner: alias,
+                src: Owner::Signature(alias),
                 store: &signature.store,
                 res,
             };
@@ -673,13 +634,12 @@ impl<'a> TyLowerer<'a> {
 
     fn expand_alias(
         &mut self,
-        scope: Scope<'_>,
         alias: ItemId,
         args: &[GenericArg],
-        range: TextRange,
+        range: Anchor,
         sink: &mut Sink<'_>,
     ) -> Ty {
-        match self.alias_value(alias, scope, range) {
+        match self.alias_value(alias, range) {
             Some(value) => subst_ty(
                 &value,
                 &Subst {
@@ -691,24 +651,17 @@ impl<'a> TyLowerer<'a> {
             None => {
                 let name = item_name(self.db, alias);
                 self.diag(
-                    scope,
                     sink,
                     range,
                     DiagnosticCode::TypeExpectedType,
                     format!("associated type `{name}` has no value here"),
                 );
-                Ty::Error
+                Ty::error()
             }
         }
     }
 
-    fn assoc_type(
-        &mut self,
-        scope: Scope<'_>,
-        item: ItemId,
-        range: TextRange,
-        sink: &mut Sink<'_>,
-    ) -> Ty {
+    fn assoc_type(&mut self, item: ItemId, range: Anchor, sink: &mut Sink<'_>) -> Ty {
         let is_alias = matches!(
             item_tree(self.db, item.file)
                 .item(item.index)
@@ -718,54 +671,53 @@ impl<'a> TyLowerer<'a> {
         if !is_alias {
             let name = item_name(self.db, item);
             self.diag(
-                scope,
                 sink,
                 range,
                 DiagnosticCode::TypeExpectedType,
                 format!("expected a type, found `{name}`"),
             );
-            return Ty::Error;
+            return Ty::error();
         }
-        self.expand_alias(scope, item, &[], range, sink)
+        self.expand_alias(item, &[], range, sink)
     }
 
     fn deferred_type(
         &mut self,
-        scope: Scope<'_>,
         base: &Resolution,
         rest: &[Name],
-        range: TextRange,
+        range: Anchor,
         sink: &mut Sink<'_>,
     ) -> Ty {
         let [name] = rest else {
             self.diag(
-                scope,
                 sink,
                 range,
                 DiagnosticCode::TypeExpectedType,
                 "ambiguous associated type",
             );
-            return Ty::Error;
+            return Ty::error();
         };
         let (base_ty, traits) = match base {
             Resolution::GenericParam { owner, index } => (
-                Ty::Param {
+                Ty::new(TyKind::Param {
                     owner: *owner,
                     index: *index,
-                },
+                }),
                 self.param_bounds(*owner, *index),
             ),
-            Resolution::SelfType(owner) => (Ty::TraitSelf { trait_item: *owner }, vec![*owner]),
-            Resolution::Error => return Ty::Error,
+            Resolution::SelfType(owner) => (
+                Ty::new(TyKind::TraitSelf { trait_item: *owner }),
+                vec![*owner],
+            ),
+            Resolution::Error => return Ty::error(),
             _ => {
                 self.diag(
-                    scope,
                     sink,
                     range,
                     DiagnosticCode::TypeExpectedType,
                     "ambiguous associated type",
                 );
-                return Ty::Error;
+                return Ty::error();
             }
         };
         let found = traits.into_iter().find(|&trait_item| {
@@ -773,14 +725,13 @@ impl<'a> TyLowerer<'a> {
                 .is_some_and(|assoc| assoc_is_type(self.db, assoc))
         });
         match found {
-            Some(trait_item) => Ty::Projection {
-                base: Box::new(base_ty),
+            Some(trait_item) => Ty::new(TyKind::Projection {
+                base: base_ty,
                 trait_item,
                 name: name.clone(),
-            },
+            }),
             None => {
                 self.diag(
-                    scope,
                     sink,
                     range,
                     DiagnosticCode::TypeExpectedType,
@@ -788,7 +739,7 @@ impl<'a> TyLowerer<'a> {
                         "associated type `{name}` not found: no bound of the parameter declares it"
                     ),
                 );
-                Ty::Error
+                Ty::error()
             }
         }
     }

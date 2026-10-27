@@ -43,6 +43,8 @@ static FULLSCREEN: Setting<bool> = setting(false);
 static ANIMATIONS: Setting<bool> = setting(true);
 
 fn main() -> System {
+    // Only functions reachable from `main` or an entry scene are emitted.
+    let _ = closures(1, 2);
     System {
         title: "Closures",
         resolution: size(1280, 720),

@@ -6,6 +6,7 @@ use rustc_hash::FxHashMap;
 use crate::db::Db;
 use crate::def_map::{CrateId, TypeKey, def_maps};
 use crate::input::{FilePath, Program, SourceFile};
+use crate::item_tree::ItemIndex;
 use crate::item_tree::{FnKind, ItemId, ItemKind, ItemParent, Shape, item_tree};
 
 use super::value::{AssetKind, ConstValue, adt_variants};
@@ -331,7 +332,7 @@ impl AdtInfo {
         ConstValue::Adt {
             item: self.item,
             variant: self.variant(variant).unwrap_or(0),
-            fields: Vec::new(),
+            fields: imbl::Vector::new(),
         }
     }
 
@@ -340,7 +341,7 @@ impl AdtInfo {
         ConstValue::Adt {
             item: self.item,
             variant: 0,
-            fields,
+            fields: fields.into(),
         }
     }
 }
@@ -388,141 +389,142 @@ pub struct StdTable {
     pub builtins: FxHashMap<ItemId, Builtin>,
 }
 
-impl StdTable {
-    /// `None` when a std item the evaluator needs is missing (std failed to load).
-    pub fn new(db: &dyn Db, program: Program) -> Option<StdTable> {
-        let maps = def_maps(db, program);
-        let std_files: FxHashMap<String, SourceFile> = maps
-            .files
-            .iter()
-            .filter(|(_, krate)| *krate == CrateId::Std)
-            .filter_map(|(file, _)| match file.path(db) {
-                FilePath::Std(name) => Some((name.clone(), *file)),
-                FilePath::Disk(_) => None,
+/// The std items the evaluator needs; `None` when one is missing (std failed to load).
+#[salsa::tracked(returns(ref))]
+pub fn std_table(db: &dyn Db, program: Program) -> Option<StdTable> {
+    let maps = def_maps(db, program);
+    let std_files: FxHashMap<std::sync::Arc<str>, SourceFile> = maps
+        .files
+        .iter()
+        .filter(|(_, krate)| *krate == CrateId::Std)
+        .filter_map(|(file, _)| match file.path(db) {
+            FilePath::Std(name) => Some((name.clone(), *file)),
+            FilePath::Disk(_) => None,
+        })
+        .collect();
+    let find = |file: &str, name: &str| -> Option<ItemId> {
+        let source = *std_files.get(file)?;
+        let tree = item_tree(db, source);
+        tree.top.iter().find_map(|&index| {
+            let item = tree.item(index)?;
+            (item.name.as_deref() == Some(name)).then_some(ItemId {
+                file: source,
+                index,
             })
-            .collect();
-        let find = |file: &str, name: &str| -> Option<ItemId> {
-            let source = *std_files.get(file)?;
-            let tree = item_tree(db, source);
-            tree.top.iter().find_map(|&index| {
-                let item = tree.item(index)?;
-                (item.name.as_deref() == Some(name)).then_some(ItemId {
-                    file: source,
-                    index,
-                })
-            })
+        })
+    };
+    let adt = |file: &str, name: &str| -> Option<AdtInfo> {
+        let item = find(file, name)?;
+        let variants = adt_variants(db, item);
+        let fields = match variants.first() {
+            Some((_, Shape::Record(names))) if variants.len() == 1 => {
+                names.iter().map(|name| name.to_string()).collect()
+            }
+            _ => Vec::new(),
         };
-        let adt = |file: &str, name: &str| -> Option<AdtInfo> {
-            let item = find(file, name)?;
-            let variants = adt_variants(db, item);
-            let fields = match variants.first() {
-                Some((_, Shape::Record(names))) if variants.len() == 1 => {
-                    names.iter().map(|name| name.to_string()).collect()
-                }
-                _ => Vec::new(),
+        Some(AdtInfo {
+            item,
+            variants: variants.into_iter().map(|(name, _)| name).collect(),
+            fields,
+        })
+    };
+    let mut assets = Vec::new();
+    for kind in AssetKind::ALL {
+        assets.push((find("mod.kis", kind.type_name())?, kind));
+    }
+    let mut builtins = FxHashMap::default();
+    for (name, &file) in &std_files {
+        let tree = item_tree(db, file);
+        for (index, item) in tree.items.iter().enumerate() {
+            let ItemKind::Fn { has_body, kind, .. } = item.kind else {
+                continue;
             };
-            Some(AdtInfo {
-                item,
-                variants: variants.into_iter().map(|(name, _)| name).collect(),
-                fields,
-            })
-        };
-        let mut assets = Vec::new();
-        for kind in AssetKind::ALL {
-            assets.push((find("mod.kis", kind.type_name())?, kind));
-        }
-        let mut builtins = FxHashMap::default();
-        for (name, &file) in &std_files {
-            let tree = item_tree(db, file);
-            for (index, item) in tree.items.iter().enumerate() {
-                let ItemKind::Fn { has_body, kind, .. } = item.kind else {
-                    continue;
-                };
-                if has_body {
-                    continue;
-                }
-                let Ok(index) = u32::try_from(index) else {
-                    continue;
-                };
-                let owner = match item.parent {
-                    ItemParent::Item(parent) => {
-                        let parent_id = ItemId {
-                            file,
-                            index: parent,
-                        };
-                        match tree.item(parent).map(|data| &data.kind) {
-                            Some(ItemKind::Impl { .. }) => match maps.impl_keys.get(&parent_id) {
-                                Some(TypeKey::Item(ty)) => item_tree(db, ty.file)
-                                    .item(ty.index)
-                                    .and_then(|data| data.name.clone())
-                                    .map(|name| name.to_string())
-                                    .unwrap_or_default(),
-                                _ => String::new(),
-                            },
-                            _ => tree
-                                .item(parent)
+            if has_body {
+                continue;
+            }
+            let Some(index) = ItemIndex::from_usize(index) else {
+                continue;
+            };
+            let owner = match item.parent {
+                ItemParent::Item(parent) => {
+                    let parent_id = ItemId {
+                        file,
+                        index: parent,
+                    };
+                    match tree.item(parent).map(|data| &data.kind) {
+                        Some(ItemKind::Impl { .. }) => match maps.impl_keys.get(&parent_id) {
+                            Some(TypeKey::Item(ty)) => item_tree(db, ty.file)
+                                .item(ty.index)
                                 .and_then(|data| data.name.clone())
                                 .map(|name| name.to_string())
                                 .unwrap_or_default(),
-                        }
+                            _ => String::new(),
+                        },
+                        _ => tree
+                            .item(parent)
+                            .and_then(|data| data.name.clone())
+                            .map(|name| name.to_string())
+                            .unwrap_or_default(),
                     }
-                    _ => String::new(),
-                };
-                let fn_name = item.name.as_deref().unwrap_or_default();
-                let builtin = BUILTINS
-                    .iter()
-                    .find(|(file, ty, func, _)| {
-                        file == name && *ty == owner.as_str() && *func == fn_name
-                    })
-                    .map(|entry| entry.3);
-                let builtin = match (builtin, kind) {
-                    (Some(builtin), FnKind::Const) => builtin,
-                    _ => Builtin::Runtime,
-                };
-                builtins.insert(ItemId { file, index }, builtin);
-            }
+                }
+                _ => String::new(),
+            };
+            let fn_name = item.name.as_deref().unwrap_or_default();
+            let builtin = BUILTINS
+                .iter()
+                .find(|(file, ty, func, _)| {
+                    *file == &**name && *ty == owner.as_str() && *func == fn_name
+                })
+                .map(|entry| entry.3);
+            let builtin = match (builtin, kind) {
+                (Some(builtin), FnKind::Const) => builtin,
+                _ => Builtin::Runtime,
+            };
+            builtins.insert(ItemId { file, index }, builtin);
         }
-        Some(StdTable {
-            option: adt("mod.kis", "Option")?,
-            result: adt("mod.kis", "Result")?,
-            range: adt("mod.kis", "Range")?,
-            text: find("narrative/text.kis", "Text")?,
-            screen: find("screen.kis", "Screen")?,
-            entity_id: adt("screen.kis", "EntityId")?,
-            part: adt("screen.kis", "Part")?,
-            point: adt("screen.kis", "Point")?,
-            offset: adt("screen.kis", "Offset")?,
-            size: adt("screen.kis", "Size")?,
-            anchor: adt("screen.kis", "Anchor")?,
-            angle: adt("screen.kis", "Angle")?,
-            color: adt("screen.kis", "Color")?,
-            plane: adt("screen.kis", "Plane")?,
-            visibility: adt("screen.kis", "Visibility")?,
-            flip: adt("screen.kis", "Flip")?,
-            blend_mode: adt("screen.kis", "BlendMode")?,
-            valign: adt("screen.kis", "VAlign")?,
-            mark: adt("narrative/text.kis", "Mark")?,
-            text_effect: adt("narrative/text.kis", "TextEffect")?,
-            duration: adt("time.kis", "Duration")?,
-            easing: adt("screen/anim.kis", "Easing")?,
-            tween: adt("screen/anim.kis", "Tween")?,
-            transition: adt("screen/anim.kis", "Transition")?,
-            motion: adt("screen/anim.kis", "Motion")?,
-            motion_key: adt("screen/anim.kis", "MotionKey")?,
-            sound: adt("screen/audio.kis", "Sound")?,
-            say: adt("narrative.kis", "Say")?,
-            choice: adt("narrative.kis", "Choice")?,
-            choice_arm: adt("narrative.kis", "ChoiceArm")?,
-            setting: find("system.kis", "Setting")?,
-            meta: find("narrative.kis", "Meta")?,
-            push_step: find("narrative.kis", "push_step")?,
-            rng_choose: find("narrative.kis", "rng_choose")?,
-            time_file: *std_files.get("time.kis")?,
-            assets,
-            builtins,
-        })
     }
+    Some(StdTable {
+        option: adt("mod.kis", "Option")?,
+        result: adt("mod.kis", "Result")?,
+        range: adt("mod.kis", "Range")?,
+        text: find("narrative/text.kis", "Text")?,
+        screen: find("screen.kis", "Screen")?,
+        entity_id: adt("screen.kis", "EntityId")?,
+        part: adt("screen.kis", "Part")?,
+        point: adt("screen.kis", "Point")?,
+        offset: adt("screen.kis", "Offset")?,
+        size: adt("screen.kis", "Size")?,
+        anchor: adt("screen.kis", "Anchor")?,
+        angle: adt("screen.kis", "Angle")?,
+        color: adt("screen.kis", "Color")?,
+        plane: adt("screen.kis", "Plane")?,
+        visibility: adt("screen.kis", "Visibility")?,
+        flip: adt("screen.kis", "Flip")?,
+        blend_mode: adt("screen.kis", "BlendMode")?,
+        valign: adt("screen.kis", "VAlign")?,
+        mark: adt("narrative/text.kis", "Mark")?,
+        text_effect: adt("narrative/text.kis", "TextEffect")?,
+        duration: adt("time.kis", "Duration")?,
+        easing: adt("screen/anim.kis", "Easing")?,
+        tween: adt("screen/anim.kis", "Tween")?,
+        transition: adt("screen/anim.kis", "Transition")?,
+        motion: adt("screen/anim.kis", "Motion")?,
+        motion_key: adt("screen/anim.kis", "MotionKey")?,
+        sound: adt("screen/audio.kis", "Sound")?,
+        say: adt("narrative.kis", "Say")?,
+        choice: adt("narrative.kis", "Choice")?,
+        choice_arm: adt("narrative.kis", "ChoiceArm")?,
+        setting: find("system.kis", "Setting")?,
+        meta: find("narrative.kis", "Meta")?,
+        push_step: find("narrative.kis", "push_step")?,
+        rng_choose: find("narrative.kis", "rng_choose")?,
+        time_file: *std_files.get("time.kis")?,
+        assets,
+        builtins,
+    })
+}
 
+impl StdTable {
     pub fn builtin(&self, item: ItemId) -> Option<Builtin> {
         self.builtins.get(&item).copied()
     }
@@ -542,7 +544,7 @@ impl StdTable {
         ConstValue::Adt {
             item: self.option.item,
             variant: self.option.variant("Some").unwrap_or(1),
-            fields: vec![value],
+            fields: imbl::vector![value],
         }
     }
 
@@ -555,7 +557,7 @@ impl StdTable {
                 fields,
             } if *item == self.option.item => {
                 if Some(*variant) == self.option.variant("Some") {
-                    Some(fields.first())
+                    Some(fields.front())
                 } else {
                     Some(None)
                 }

@@ -5,162 +5,163 @@ input_file: core/kagari-lang/tests/bytecode/005__story/main.kix
 ---
 no diagnostics
 --- bytecode ---
-fn crate::Start [scene, entry] params=0 regs=12
-  0000 CONST r3, #17 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"It begins."}, …}
-  0001 STEP r2, r3
-  0002 CONST r2, #27 std::narrative::Choice {"route", std::Option::Some {crate::Start::{closure#0}}, [std::narrative::ChoiceArm {"Stay", true, crate::Route::Stay}, std::narrative::ChoiceArm {"Leave", true, crate::Route::Leave}]}
-  0003 STEP r0, r2
-  0004 MOVE r3, r0
-  0005 ISVAR r4, r3, crate::Route::Stay
-  0006 JMPNOT r4, @0009
-  0007 CALL r2, (), crate::Visit
-  0008 JMP @0017
-  0009 ISVAR r5, r3, crate::Route::Leave
-  0010 JMPNOT r5, @0016
-  0011 ADT r6, (), crate::Route::Leave
-  0012 REFSTAT r7, crate::ROUTE
-  0013 STORE r7, r6
-  0014 TUPLE r2, ()
-  0015 JMP @0017
-  0016 UNREACHABLE
-  0017 CALL r2, (), crate::count
-  0018 REFSTAT r5, crate::VISITS
-  0019 LOAD r4, r5
-  0020 INT r6, 0
-  0021 GT r3, r4, r6
-  0022 JMPNOT r3, @0027
-  0023 REFSTAT r8, crate::ROUTE
-  0024 LOAD r7, r8
-  0025 ADT r9, (), crate::Route::Stay
-  0026 EQ r3, r7, r9
-  0027 JMPNOT r3, @0032
-  0028 CONST r11, #30 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"Welcome back."}, …}
-  0029 STEP r10, r11
-  0030 TUPLE r2, ()
-  0031 JMP @0033
-  0032 TUPLE r2, ()
-  0033 RAND r3, crate::Coin
-  0034 ISVAR r4, r3, crate::Coin::Heads
-  0035 JMPNOT r4, @0039
-  0036 CONST r5, #33 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"Heads."}, …}
-  0037 STEP r2, r5
-  0038 JMP @0045
-  0039 ISVAR r6, r3, crate::Coin::Tails
-  0040 JMPNOT r6, @0044
-  0041 CONST r7, #36 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"Tails."}, …}
-  0042 STEP r2, r7
-  0043 JMP @0045
-  0044 UNREACHABLE
-  0045 CONST r5, #37 crate::SEEN_END
-  0046 CELL r6, r5
-  0047 MOVE r3, r6
-  0048 BOOL r4, true
-  0049 CALLIMP r2, (r3, r4), std::narrative::Meta::write
-  0050 TUPLE r1, ()
-  0051 RET r1
+fn crate::Start [scene, entry] params=0 regs=6
+  0000 CELL r0, r4
+  0001 CONST r4, #17 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"It begins."}, …}
+  0002 STEP r5, r4
+  0003 CONST r4, #27 std::narrative::Choice {"route", std::Option::Some {crate::Start::{closure#0}}, [std::narrative::ChoiceArm {"Stay", true, crate::Route::Stay}, std::narrative::ChoiceArm {"Leave", true, crate::Route::Leave}]}
+  0004 STEP r1, r4
+  0005 ISVAR r4, r1, crate::Route::Leave
+  0006 JMPIF r4, @0009
+  0007 CALL r4, (), crate::Visit
+  0008 JMP @0012
+  0009 ADT r4, (), crate::Route::Leave
+  0010 REFSTAT r5, crate::ROUTE
+  0011 STORE r5, r4
+  0012 CALL r4, (), crate::count
+  0013 REFSTAT r4, crate::VISITS
+  0014 INT r5, 0
+  0015 GT r1, r4, r5
+  0016 JMPNOT r1, @0023
+  0017 ADT r1, (), crate::Route::Stay
+  0018 REFSTAT r4, crate::ROUTE
+  0019 EQ r1, r4, r1
+  0020 JMPNOT r1, @0023
+  0021 BOOL r1, true
+  0022 JMP @0024
+  0023 BOOL r1, false
+  0024 JMPNOT r1, @0027
+  0025 CONST r4, #30 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"Welcome back."}, …}
+  0026 STEP r5, r4
+  0027 RAND r1, crate::Coin
+  0028 ISVAR r4, r1, crate::Coin::Tails
+  0029 JMPIF r4, @0033
+  0030 CONST r4, #33 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"Heads."}, …}
+  0031 STEP r5, r4
+  0032 JMP @0035
+  0033 CONST r4, #36 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"Tails."}, …}
+  0034 STEP r5, r4
+  0035 CONST r4, #37 crate::SEEN_END
+  0036 STORE r0, r4
+  0037 MOVE r2, r0
+  0038 BOOL r4, true
+  0039 MOVE r3, r4
+  0040 CALLIMP r5, (r2, r3), std::narrative::Meta::write
+  0041 TUPLE r1, ()
+  0042 RET r1
+
+fn crate::main [fn, main] params=0 regs=16
+  0000 INT r3, 1280
+  0001 INT r4, 720
+  0002 CALL r0, (r3, r4), std::screen::size
+  0003 INT r3, 26
+  0004 CONST r4, #39 std::screen::Color {255, 255, 255, 255}
+  0005 CALL r1, (r3, r4), std::narrative::text::text_style
+  0006 CONST r3, #40 crate::TEXT_SPEED
+  0007 CONST r4, #41 crate::AUTO_DELAY
+  0008 CONST r5, #42 crate::AUTO_DELAY_PER_CHAR
+  0009 CONST r6, #43 crate::SKIP_UNREAD
+  0010 CONST r7, #44 crate::MASTER
+  0011 CONST r8, #45 crate::MUSIC
+  0012 CONST r9, #46 crate::SOUND
+  0013 CONST r10, #47 crate::VOICE
+  0014 CONST r11, #48 crate::VOICE_SUSTAIN
+  0015 CONST r12, #49 crate::WAIT_FOR_VOICE
+  0016 CONST r13, #50 crate::WINDOW_OPACITY
+  0017 CONST r14, #51 crate::FULLSCREEN
+  0018 CONST r15, #52 crate::ANIMATIONS
+  0019 ADT r2, (r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15), std::system::Settings
+  0020 CALL r12, (), std::system::default_bindings
+  0021 CONST r3, #53 "Story"
+  0022 MOVE r4, r0
+  0023 FUNC r5, crate::Title
+  0024 FUNC r6, crate::GameView
+  0025 INT r7, 20
+  0026 INT r8, 3
+  0027 INT r9, 200
+  0028 MOVE r10, r1
+  0029 MOVE r11, r2
+  0030 ADT r0, (r3, r4, r5, r6, r7, r8, r9, r10, r11, r12), std::system::System
+  0031 RET r0
+
+fn crate::Start::{closure#0} [const, closure] params=1 regs=6
+  0000 CELL r1, r0
+  0001 MOVE r3, r1
+  0002 CONST r5, #55 std::screen::EntityId {1}
+  0003 MOVE r4, r5
+  0004 CALLIMP r2, (r3, r4), std::screen::Screen::entity
+  0005 MOVE r3, r2
+  0006 CALLIMP r2, (r3), std::screen::Entity::opacity
+  0007 MOVE r3, r2
+  0008 CONST r5, #56 0.5
+  0009 MOVE r4, r5
+  0010 CALLIMP r2, (r3, r4), std::screen::Prop::change
+  0011 CALL r4, (), std::screen::anim::instant
+  0012 MOVE r3, r2
+  0013 CALLIMP r5, (r3, r4), std::screen::Change::apply_animation
+  0014 LOAD r2, r1
+  0015 RET r2
 
 fn crate::Visit [scene] params=0 regs=3
-  0000 CONST r2, #40 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"You stay a while."}, …}
-  0001 STEP r1, r2
+  0000 CONST r1, #59 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"You stay a while."}, …}
+  0001 STEP r2, r1
   0002 TUPLE r0, ()
   0003 RET r0
 
-fn crate::count [instant] params=0 regs=4
-  0000 INT r1, 1
-  0001 REFSTAT r2, crate::VISITS
-  0002 LOAD r3, r2
-  0003 IADD r3, r3, r1, i128
-  0004 ICLAMP r3, r3, Int<0,3>
-  0005 STORE r2, r3
+fn crate::count [instant] params=0 regs=3
+  0000 REFSTAT r1, crate::VISITS
+  0001 INT r2, 1
+  0002 IADD r0, r1, r2, i128
+  0003 ICLAMP r1, r0, Int<0,3>
+  0004 REFSTAT r2, crate::VISITS
+  0005 STORE r2, r1
   0006 TUPLE r0, ()
   0007 RET r0
 
-fn crate::main [fn, main] params=0 regs=28
-  0000 CONST r1, #41 "Story"
-  0001 INT r11, 1280
-  0002 INT r12, 720
-  0003 CALL r2, (r11, r12), std::screen::size
-  0004 FUNC r3, crate::Title
-  0005 FUNC r4, crate::GameView
-  0006 INT r5, 20
-  0007 INT r6, 3
-  0008 INT r7, 200
-  0009 INT r13, 26
-  0010 CONST r14, #43 std::screen::Color {255, 255, 255, 255}
-  0011 CALL r8, (r13, r14), std::narrative::text::text_style
-  0012 CONST r15, #44 crate::TEXT_SPEED
-  0013 CONST r16, #45 crate::AUTO_DELAY
-  0014 CONST r17, #46 crate::AUTO_DELAY_PER_CHAR
-  0015 CONST r18, #47 crate::SKIP_UNREAD
-  0016 CONST r19, #48 crate::MASTER
-  0017 CONST r20, #49 crate::MUSIC
-  0018 CONST r21, #50 crate::SOUND
-  0019 CONST r22, #51 crate::VOICE
-  0020 CONST r23, #52 crate::VOICE_SUSTAIN
-  0021 CONST r24, #53 crate::WAIT_FOR_VOICE
-  0022 CONST r25, #54 crate::WINDOW_OPACITY
-  0023 CONST r26, #55 crate::FULLSCREEN
-  0024 CONST r27, #56 crate::ANIMATIONS
-  0025 ADT r9, (r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27), std::system::Settings
-  0026 CALL r10, (), std::system::default_bindings
-  0027 ADT r0, (r1, r2, r3, r4, r5, r6, r7, r8, r9, r10), std::system::System
-  0028 RET r0
-
-fn crate::Title [fn] params=0 regs=4
-  0000 CLOSURE r3, (), crate::Title::{closure#3}
-  0001 ARRAY r2, (r3)
-  0002 CALLIMP r1, (r2), std::ui::column
+fn crate::Title [fn] params=0 regs=2
+  0000 CLOSURE r1, (), crate::Title::{closure#3}
+  0001 ARRAY r1, (r1)
+  0002 CALLIMP r1, (r1), std::ui::column
   0003 ADT r0, (r1), std::system::RootPage
   0004 RET r0
 
-fn crate::GameView [fn] params=1 regs=5
-  0000 MOVE r4, r0
-  0001 CLOSURE r3, (r4), crate::GameView::{closure#0}
-  0002 ADT r2, (r3), std::ui::GameScreenProps
+fn crate::GameView [fn] params=1 regs=3
+  0000 MOVE r2, r0
+  0001 CLOSURE r2, (r2), crate::GameView::{closure#0}
+  0002 ADT r2, (r2), std::ui::GameScreenProps
   0003 CALLIMP r1, (r2), std::ui::game_screen
   0004 RET r1
 
-fn crate::Start::{closure#0} [const, closure] params=1 regs=14
-  0000 CELL r1, r0
-  0001 MOVE r12, r1
-  0002 CONST r13, #58 std::screen::EntityId {1}
-  0003 CALLIMP r11, (r12, r13), std::screen::Screen::entity
-  0004 MOVE r10, r11
-  0005 CALLIMP r9, (r10), std::screen::Entity::opacity
-  0006 MOVE r7, r9
-  0007 CONST r8, #59 0.5
-  0008 CALLIMP r6, (r7, r8), std::screen::Prop::change
-  0009 MOVE r4, r6
-  0010 CALL r5, (), std::screen::anim::instant
-  0011 CALLIMP r3, (r4, r5), std::screen::Change::apply_animation
-  0012 LOAD r2, r1
-  0013 RET r2
-
-fn crate::Title::{closure#3} [fn, closure] params=0 regs=8
-  0000 CLOSURE r6, (), crate::Title::{closure#2}
-  0001 ADT r2, (r6), std::Option::Some
-  0002 ADT r3, (), std::Option::None
-  0003 ADT r4, (), std::Option::None
-  0004 CLOSURE r7, (), crate::Title::{closure#0}
-  0005 ARRAY r5, (r7)
-  0006 ADT r1, (r2, r3, r4, r5), std::ui::ButtonProps
-  0007 CALLIMP r0, (r1), std::ui::button
-  0008 RET r0
+fn crate::Title::{closure#3} [fn, closure] params=0 regs=7
+  0000 CLOSURE r3, (), crate::Title::{closure#2}
+  0001 ADT r0, (r3), std::Option::Some
+  0002 ADT r1, (), std::Option::None
+  0003 ADT r2, (), std::Option::None
+  0004 CLOSURE r3, (), crate::Title::{closure#0}
+  0005 ARRAY r6, (r3)
+  0006 MOVE r3, r0
+  0007 MOVE r4, r1
+  0008 MOVE r5, r2
+  0009 ADT r3, (r3, r4, r5, r6), std::ui::ButtonProps
+  0010 CALLIMP r0, (r3), std::ui::button
+  0011 RET r0
 
 fn crate::GameView::{closure#0} [fn, closure] params=1 regs=2
   0000 MOVE r1, r0
   0001 RET r1
 
-fn crate::Title::{closure#2} [fn, closure] params=0 regs=4
-  0000 FUNC r1, crate::Start
-  0001 TUPLE r2, ()
-  0002 CLOSURE r3, (), crate::Title::{closure#1}
-  0003 CALLIMP r0, (r1, r2, r3), std::system::nav::start
-  0004 RET r0
+fn crate::Title::{closure#2} [fn, closure] params=0 regs=5
+  0000 TUPLE r0, ()
+  0001 CLOSURE r3, (), crate::Title::{closure#1}
+  0002 FUNC r4, crate::Start
+  0003 MOVE r1, r4
+  0004 MOVE r2, r0
+  0005 CALLIMP r0, (r1, r2, r3), std::system::nav::start
+  0006 RET r0
 
-fn crate::Title::{closure#0} [fn, closure] params=0 regs=2
-  0000 CONST r1, #62 "Start"
-  0001 CALLIMP r0, (r1), std::ui::label
+fn crate::Title::{closure#0} [fn, closure] params=0 regs=3
+  0000 CONST r2, #62 "Start"
+  0001 CALLIMP r0, (r2), std::ui::label
   0002 RET r0
 
 fn crate::Title::{closure#1} [fn, closure] params=1 regs=2
@@ -168,12 +169,12 @@ fn crate::Title::{closure#1} [fn, closure] params=1 regs=2
   0001 RET r1
 
 import std::narrative::Meta::write [instant] params=2
-import std::ui::column [fn] params=1
-import std::ui::game_screen [fn] params=1
 import std::screen::Screen::entity [const] params=2
 import std::screen::Entity::opacity [const] params=1
 import std::screen::Prop::change [const] params=2
 import std::screen::Change::apply_animation [const] params=2
+import std::ui::column [fn] params=1
+import std::ui::game_screen [fn] params=1
 import std::ui::button [fn] params=1
 import std::system::nav::start [fn] params=3
 import std::ui::label [fn] params=1

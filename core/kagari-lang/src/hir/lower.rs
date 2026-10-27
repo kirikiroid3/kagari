@@ -2,6 +2,7 @@
 
 use kagari_syntax::ast::{self, AstNode, HasGenericParams, HasName};
 use kagari_syntax::{SyntaxNode, TextRange};
+use smallvec::SmallVec;
 
 use super::{
     ArrayExpr, BinaryOp, Body, ClosureKind, Condition, ExprStore, FieldName, FnPtrKind, GenericArg,
@@ -9,85 +10,138 @@ use super::{
     Path, PathKind, PathSegment, SelfParamKind, Signature, SignatureKind, Stmt, TypeRef, TypeRefId,
     UnaryOp,
 };
-use super::{Expr, ExprId};
+use super::{Expr, ExprId, StoreSourceMap};
 use crate::db::Db;
+use crate::diagnostic::NodeId;
 use crate::input::SourceFile;
-use crate::item_tree::{ItemId, ItemTree, item_tree, name_text};
+use crate::item_tree::{ItemId, ItemIndex, ItemSourceMap, item_source_map, name_text};
 use crate::parse_query::parse;
 
-/// The signatures and bodies of every item of a file, indexed like `ItemTree::items`.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct FileHir {
-    pub signatures: Vec<Option<Signature>>,
-    pub bodies: Vec<Option<Body>>,
+/// The source ranges of a path's segments.
+pub(crate) type SegmentRanges = SmallVec<[TextRange; 2]>;
+
+/// The signatures and bodies of every item of a file with their source maps, indexed like
+/// `ItemTree::items`. Only the projections below read it: a semantic query reading it would
+/// re-run on every edit of the file.
+#[derive(Debug, Default)]
+pub struct FileHirRaw {
+    pub signatures: Vec<Option<(Signature, StoreSourceMap)>>,
+    pub bodies: Vec<Option<(Body, StoreSourceMap)>>,
 }
 
-#[salsa::tracked(returns(ref))]
-pub fn file_hir(db: &dyn Db, file: SourceFile) -> FileHir {
+#[salsa::tracked(returns(ref), no_eq)]
+pub fn file_hir_raw(db: &dyn Db, file: SourceFile) -> FileHirRaw {
     let root = parse(db, file).syntax_node();
-    let tree = item_tree(db, file);
-    let mut out = FileHir::default();
-    for item in &tree.items {
+    let items = item_source_map(db, file);
+    let mut out = FileHirRaw::default();
+    for item in &items.items {
         let node = item.ptr.to_node(&root);
-        let mut lowerer = Lowerer {
-            file,
-            tree,
-            store: ExprStore::default(),
-        };
-        let signature = lowerer.lower_signature(&node);
-        let body = lower_body(file, tree, &node);
+        let signature = Lowerer::new(file, items).lower_signature(&node);
+        let body = Lowerer::new(file, items).lower_body(&node);
         out.signatures.push(signature);
         out.bodies.push(body);
     }
     out
 }
 
-fn lower_body(file: SourceFile, tree: &ItemTree, node: &SyntaxNode) -> Option<Body> {
-    let mut lowerer = Lowerer {
-        file,
-        tree,
-        store: ExprStore::default(),
-    };
-    let (params, has_self, self_mutable, value) = if let Some(it) = ast::Fn::cast(node.clone()) {
-        let body = it.body()?;
-        let param_list = it.param_list();
-        let self_param = param_list.as_ref().and_then(|list| list.self_param());
-        let has_self = self_param.is_some();
-        let self_mutable = self_param
-            .is_some_and(|param| param.amp_token().is_none() && param.mut_token().is_some());
-        let params = param_list
-            .into_iter()
-            .flat_map(|list| list.params())
-            .map(|param| {
-                let range = param.syntax().text_range();
-                lowerer.lower_pat_opt(param.pat(), range)
-            })
-            .collect();
-        (
-            params,
-            has_self,
-            self_mutable,
-            lowerer.lower_expr(ast::Expr::BlockExpr(body)),
-        )
-    } else if let Some(it) = ast::Const::cast(node.clone()) {
-        (Vec::new(), false, false, lowerer.lower_expr(it.body()?))
-    } else {
-        let it = ast::Static::cast(node.clone())?;
-        (Vec::new(), false, false, lowerer.lower_expr(it.body()?))
-    };
-    Some(Body {
-        store: lowerer.store,
-        params,
-        has_self,
-        self_mutable,
-        value,
-    })
+/// The signature of an item; see also [`super::signature_of`].
+#[salsa::tracked(returns(ref))]
+pub fn signature(db: &dyn Db, file: SourceFile, index: ItemIndex) -> Option<Signature> {
+    let (signature, _) = file_hir_raw(db, file)
+        .signatures
+        .get(index.idx())?
+        .as_ref()?;
+    Some(signature.clone())
+}
+
+#[salsa::tracked(returns(ref))]
+pub fn signature_source_map(
+    db: &dyn Db,
+    file: SourceFile,
+    index: ItemIndex,
+) -> Option<StoreSourceMap> {
+    let (_, map) = file_hir_raw(db, file)
+        .signatures
+        .get(index.idx())?
+        .as_ref()?;
+    Some(map.clone())
+}
+
+/// The body of an item; see also [`super::body_of`].
+#[salsa::tracked(returns(ref))]
+pub fn body(db: &dyn Db, file: SourceFile, index: ItemIndex) -> Option<Body> {
+    let (body, _) = file_hir_raw(db, file).bodies.get(index.idx())?.as_ref()?;
+    Some(body.clone())
+}
+
+#[salsa::tracked(returns(ref))]
+pub fn body_source_map(db: &dyn Db, file: SourceFile, index: ItemIndex) -> Option<StoreSourceMap> {
+    let (_, map) = file_hir_raw(db, file).bodies.get(index.idx())?.as_ref()?;
+    Some(map.clone())
+}
+
+impl<'a> Lowerer<'a> {
+    fn new(file: SourceFile, items: &'a ItemSourceMap) -> Lowerer<'a> {
+        Lowerer {
+            file,
+            items,
+            store: ExprStore::default(),
+            map: StoreSourceMap::default(),
+            next_order: 0,
+            order: 0,
+        }
+    }
+
+    fn lower_body(mut self, node: &SyntaxNode) -> Option<(Body, StoreSourceMap)> {
+        let (params, has_self, self_mutable, value) = if let Some(it) = ast::Fn::cast(node.clone())
+        {
+            let body = it.body()?;
+            let param_list = it.param_list();
+            let self_param = param_list.as_ref().and_then(|list| list.self_param());
+            let has_self = self_param.is_some();
+            let self_mutable = self_param
+                .is_some_and(|param| param.amp_token().is_none() && param.mut_token().is_some());
+            let params = param_list
+                .into_iter()
+                .flat_map(|list| list.params())
+                .map(|param| {
+                    let range = param.syntax().text_range();
+                    self.lower_pat_opt(param.pat(), range)
+                })
+                .collect();
+            (
+                params,
+                has_self,
+                self_mutable,
+                self.lower_expr(ast::Expr::BlockExpr(body)),
+            )
+        } else if let Some(it) = ast::Const::cast(node.clone()) {
+            (Vec::new(), false, false, self.lower_expr(it.body()?))
+        } else {
+            let it = ast::Static::cast(node.clone())?;
+            (Vec::new(), false, false, self.lower_expr(it.body()?))
+        };
+        Some((
+            Body {
+                store: self.store,
+                params,
+                has_self,
+                self_mutable,
+                value,
+            },
+            self.map,
+        ))
+    }
 }
 
 pub(super) struct Lowerer<'a> {
     pub(super) file: SourceFile,
-    pub(super) tree: &'a ItemTree,
+    items: &'a ItemSourceMap,
     pub(super) store: ExprStore,
+    map: StoreSourceMap,
+    next_order: u32,
+    /// The source order of the expression being lowered (see `ExprStore::source_order`).
+    order: u32,
 }
 
 fn range_of(node: &impl AstNode) -> TextRange {
@@ -111,7 +165,7 @@ fn label_name(token: &kagari_syntax::SyntaxToken) -> Name {
 pub(crate) fn lower_path(
     path: &ast::Path,
     args: &mut dyn FnMut(ast::GenericArgList) -> Option<GenericArgs>,
-) -> Option<Path> {
+) -> Option<(Path, SegmentRanges)> {
     let mut segments = Vec::new();
     let mut current = Some(path.clone());
     while let Some(path) = current {
@@ -122,6 +176,7 @@ pub(crate) fn lower_path(
     let count = segments.len();
     let mut kind = PathKind::Plain;
     let mut out: Vec<PathSegment> = Vec::new();
+    let mut ranges = SegmentRanges::new();
     for (index, segment) in segments.into_iter().enumerate() {
         let range = first_token_range(segment.syntax());
         let name = match segment.kind()? {
@@ -149,17 +204,43 @@ pub(crate) fn lower_path(
             ast::PathSegmentKind::SelfTypeKw => Name::new_static("Self"),
         };
         let args = segment.generic_arg_list().and_then(&mut *args);
-        out.push(PathSegment { name, range, args });
+        out.push(PathSegment { name, args });
+        ranges.push(range);
     }
-    Some(Path {
-        kind,
-        segments: out,
-    })
+    Some((
+        Path {
+            kind,
+            segments: out,
+        },
+        ranges,
+    ))
 }
 
 impl Lowerer<'_> {
     pub(super) fn alloc(&mut self, expr: Expr, range: TextRange) -> ExprId {
-        self.store.alloc_expr(expr, range)
+        let id = self.store.exprs.alloc(expr);
+        self.map.exprs.insert(id, range);
+        self.store.source_order.insert(id, self.order);
+        id
+    }
+
+    fn alloc_pat(&mut self, pat: Pat, range: TextRange) -> PatId {
+        let id = self.store.pats.alloc(pat);
+        self.map.pats.insert(id, range);
+        id
+    }
+
+    fn alloc_type(&mut self, ty: TypeRef, range: TextRange) -> TypeRefId {
+        let id = self.store.types.alloc(ty);
+        self.map.types.insert(id, range);
+        id
+    }
+
+    /// Records the segment ranges of the path `node` owns.
+    fn segments(&mut self, node: NodeId, ranges: SegmentRanges) {
+        if !ranges.is_empty() {
+            self.map.segments.insert(node, ranges);
+        }
     }
 
     pub(super) fn missing(&mut self, range: TextRange) -> ExprId {
@@ -168,7 +249,7 @@ impl Lowerer<'_> {
 
     // ---- signatures ----
 
-    fn lower_signature(&mut self, node: &SyntaxNode) -> Option<Signature> {
+    fn lower_signature(mut self, node: &SyntaxNode) -> Option<(Signature, StoreSourceMap)> {
         let item = ast::Item::cast(node.clone())?;
         let generics = match &item {
             ast::Item::Fn(it) => self.lower_generics(it.generic_param_list()),
@@ -182,9 +263,16 @@ impl Lowerer<'_> {
             }
         };
         let range = node.text_range();
+        let mut self_mutable = false;
         let kind = match &item {
             ast::Item::Fn(it) => {
                 let param_list = it.param_list();
+                self_mutable = param_list
+                    .as_ref()
+                    .and_then(|list| list.self_param())
+                    .is_some_and(|param| {
+                        param.amp_token().is_none() && param.mut_token().is_some()
+                    });
                 let self_param =
                     param_list
                         .as_ref()
@@ -244,11 +332,15 @@ impl Lowerer<'_> {
             },
             ast::Item::Mod(_) | ast::Item::Use(_) => SignatureKind::None,
         };
-        Some(Signature {
-            store: std::mem::take(&mut self.store),
-            generics,
-            kind,
-        })
+        Some((
+            Signature {
+                store: self.store,
+                generics,
+                kind,
+                self_mutable,
+            },
+            self.map,
+        ))
     }
 
     fn lower_generics(&mut self, list: Option<ast::GenericParamList>) -> Vec<GenericParam> {
@@ -259,9 +351,9 @@ impl Lowerer<'_> {
             .filter_map(|param| match param {
                 ast::GenericParam::TypeParam(param) => {
                     let name = param.name()?;
+                    self.map.generic_params.push(range_of(&name));
                     Some(GenericParam {
                         name: name_text(&name),
-                        range: range_of(&name),
                         kind: GenericParamKind::Type {
                             bounds: self.lower_bounds(param.type_bound_list()),
                         },
@@ -270,9 +362,9 @@ impl Lowerer<'_> {
                 ast::GenericParam::ConstParam(param) => {
                     let name = param.name()?;
                     let range = range_of(&param);
+                    self.map.generic_params.push(range_of(&name));
                     Some(GenericParam {
                         name: name_text(&name),
-                        range: range_of(&name),
                         kind: GenericParamKind::Const {
                             ty: self.lower_type_opt(param.ty(), range),
                         },
@@ -325,7 +417,7 @@ impl Lowerer<'_> {
 
     // ---- paths and types ----
 
-    pub(super) fn lower_path(&mut self, path: &ast::Path) -> Option<Path> {
+    pub(super) fn lower_path(&mut self, path: &ast::Path) -> Option<(Path, SegmentRanges)> {
         lower_path(path, &mut |list| Some(self.lower_generic_args(list)))
     }
 
@@ -349,15 +441,19 @@ impl Lowerer<'_> {
     fn lower_type_opt(&mut self, ty: Option<ast::Type>, range: TextRange) -> TypeRefId {
         match ty {
             Some(ty) => self.lower_type(ty),
-            None => self.store.alloc_type(TypeRef::Missing, range),
+            None => self.alloc_type(TypeRef::Missing, range),
         }
     }
 
     pub(super) fn lower_type(&mut self, ty: ast::Type) -> TypeRefId {
         let range = range_of(&ty);
+        let mut segments = SegmentRanges::new();
         let lowered = match ty {
             ast::Type::PathType(it) => match it.path().and_then(|path| self.lower_path(&path)) {
-                Some(path) => TypeRef::Path(path),
+                Some((path, ranges)) => {
+                    segments = ranges;
+                    TypeRef::Path(path)
+                }
                 None => TypeRef::Missing,
             },
             ast::Type::TupleType(it) => {
@@ -399,7 +495,9 @@ impl Lowerer<'_> {
                 }
             }
         };
-        self.store.alloc_type(lowered, range)
+        let id = self.alloc_type(lowered, range);
+        self.segments(NodeId::Type(id), segments);
+        id
     }
 
     fn lower_fn_type_parts(
@@ -427,12 +525,14 @@ impl Lowerer<'_> {
     pub(super) fn lower_pat_opt(&mut self, pat: Option<ast::Pat>, range: TextRange) -> PatId {
         match pat {
             Some(pat) => self.lower_pat(pat),
-            None => self.store.alloc_pat(Pat::Missing, range),
+            None => self.alloc_pat(Pat::Missing, range),
         }
     }
 
     fn lower_pat(&mut self, pat: ast::Pat) -> PatId {
         let range = range_of(&pat);
+        let mut segments = SegmentRanges::new();
+        let mut bounds = [SegmentRanges::new(), SegmentRanges::new()];
         let lowered = match pat {
             ast::Pat::WildcardPat(_) => Pat::Wild,
             ast::Pat::IdentPat(it) => match it.name() {
@@ -443,7 +543,10 @@ impl Lowerer<'_> {
                 None => Pat::Missing,
             },
             ast::Pat::PathPat(it) => match it.path().and_then(|path| self.lower_path(&path)) {
-                Some(path) => Pat::Path(path),
+                Some((path, ranges)) => {
+                    segments = ranges;
+                    Pat::Path(path)
+                }
                 None => Pat::Missing,
             },
             ast::Pat::LiteralPat(it) => match it.literal().and_then(|lit| lower_literal(&lit)) {
@@ -453,25 +556,37 @@ impl Lowerer<'_> {
                 },
                 None => Pat::Missing,
             },
-            ast::Pat::RangePat(it) => Pat::Range {
-                start: it.start().and_then(|pat| self.lower_pat_bound(pat)),
-                end: it.end().and_then(|pat| self.lower_pat_bound(pat)),
-                inclusive: it.is_inclusive(),
-            },
+            ast::Pat::RangePat(it) => {
+                let mut bound = |pat: Option<ast::Pat>, slot: &mut SegmentRanges| {
+                    let (bound, ranges) = self.lower_pat_bound(pat?)?;
+                    *slot = ranges;
+                    Some(bound)
+                };
+                let [start_ranges, end_ranges] = &mut bounds;
+                Pat::Range {
+                    start: bound(it.start(), start_ranges),
+                    end: bound(it.end(), end_ranges),
+                    inclusive: it.is_inclusive(),
+                }
+            }
             ast::Pat::TuplePat(it) => {
                 Pat::Tuple(it.fields().map(|pat| self.lower_pat(pat)).collect())
             }
             ast::Pat::TupleStructPat(it) => {
                 match it.path().and_then(|path| self.lower_path(&path)) {
-                    Some(path) => Pat::TupleStruct {
-                        path,
-                        pats: it.fields().map(|pat| self.lower_pat(pat)).collect(),
-                    },
+                    Some((path, ranges)) => {
+                        segments = ranges;
+                        Pat::TupleStruct {
+                            path,
+                            pats: it.fields().map(|pat| self.lower_pat(pat)).collect(),
+                        }
+                    }
                     None => Pat::Missing,
                 }
             }
             ast::Pat::RecordPat(it) => match it.path().and_then(|path| self.lower_path(&path)) {
-                Some(path) => {
+                Some((path, ranges)) => {
+                    segments = ranges;
                     let fields = it
                         .record_pat_field_list()
                         .into_iter()
@@ -497,26 +612,39 @@ impl Lowerer<'_> {
             ast::Pat::OrPat(it) => Pat::Or(it.pats().map(|pat| self.lower_pat(pat)).collect()),
             ast::Pat::ParenPat(it) => return self.lower_pat_opt(it.pat(), range),
         };
-        self.store.alloc_pat(lowered, range)
+        let id = self.alloc_pat(lowered, range);
+        self.segments(NodeId::Pat(id), segments);
+        let [start, end] = bounds;
+        self.segments(NodeId::PatBound(id, 0), start);
+        self.segments(NodeId::PatBound(id, 1), end);
+        id
     }
 
-    fn lower_pat_bound(&mut self, pat: ast::Pat) -> Option<PatBound> {
+    fn lower_pat_bound(&mut self, pat: ast::Pat) -> Option<(PatBound, SegmentRanges)> {
         match pat {
-            ast::Pat::LiteralPat(it) => Some(PatBound::Lit {
-                lit: lower_literal(&it.literal()?)?,
-                negated: it.minus_token().is_some(),
-            }),
-            ast::Pat::PathPat(it) => Some(PatBound::Path(self.lower_path(&it.path()?)?)),
+            ast::Pat::LiteralPat(it) => Some((
+                PatBound::Lit {
+                    lit: lower_literal(&it.literal()?)?,
+                    negated: it.minus_token().is_some(),
+                },
+                SegmentRanges::new(),
+            )),
+            ast::Pat::PathPat(it) => {
+                let (path, ranges) = self.lower_path(&it.path()?)?;
+                Some((PatBound::Path(path), ranges))
+            }
             ast::Pat::IdentPat(it) => {
                 let name = it.name()?;
-                Some(PatBound::Path(Path {
-                    kind: PathKind::Plain,
-                    segments: vec![PathSegment {
-                        name: name_text(&name),
-                        range: range_of(&name),
-                        args: None,
-                    }],
-                }))
+                Some((
+                    PatBound::Path(Path {
+                        kind: PathKind::Plain,
+                        segments: vec![PathSegment {
+                            name: name_text(&name),
+                            args: None,
+                        }],
+                    }),
+                    SmallVec::from_elem(range_of(&name), 1),
+                ))
             }
             _ => None,
         }
@@ -532,14 +660,27 @@ impl Lowerer<'_> {
     }
 
     pub(super) fn lower_expr(&mut self, expr: ast::Expr) -> ExprId {
+        let order = self.next_order;
+        self.next_order = self.next_order.saturating_add(1);
+        let outer = std::mem::replace(&mut self.order, order);
+        let id = self.lower_expr_inner(expr);
+        self.order = outer;
+        id
+    }
+
+    fn lower_expr_inner(&mut self, expr: ast::Expr) -> ExprId {
         let range = range_of(&expr);
+        let mut segments = SegmentRanges::new();
         let lowered = match expr {
             ast::Expr::Literal(it) => match lower_literal(&it) {
                 Some(lit) => Expr::Literal(lit),
                 None => Expr::Missing,
             },
             ast::Expr::PathExpr(it) => match it.path().and_then(|path| self.lower_path(&path)) {
-                Some(path) => Expr::Path(path),
+                Some((path, ranges)) => {
+                    segments = ranges;
+                    Expr::Path(path)
+                }
                 None => Expr::Missing,
             },
             ast::Expr::ParenExpr(it) => return self.lower_expr_opt(it.expr(), range),
@@ -563,7 +704,8 @@ impl Lowerer<'_> {
                 )),
             },
             ast::Expr::RecordExpr(it) => match it.path().and_then(|path| self.lower_path(&path)) {
-                Some(path) => {
+                Some((path, ranges)) => {
+                    segments = ranges;
                     let fields = it
                         .record_expr_field_list()
                         .into_iter()
@@ -575,17 +717,18 @@ impl Lowerer<'_> {
                                 Some(expr) => self.lower_expr(expr),
                                 None => {
                                     let range = range_of(&name_ref);
-                                    self.alloc(
+                                    let id = self.alloc(
                                         Expr::Path(Path {
                                             kind: PathKind::Plain,
                                             segments: vec![PathSegment {
                                                 name: name.clone(),
-                                                range,
                                                 args: None,
                                             }],
                                         }),
                                         range,
-                                    )
+                                    );
+                                    self.segments(NodeId::Expr(id), SmallVec::from_elem(range, 1));
+                                    id
                                 }
                             };
                             Some((name, value))
@@ -796,7 +939,9 @@ impl Lowerer<'_> {
             ast::Expr::FormExpr(it) => return self.lower_form(&it),
             ast::Expr::TextForm(it) => return self.lower_text_form(&it),
         };
-        self.alloc(lowered, range)
+        let id = self.alloc(lowered, range);
+        self.segments(NodeId::Expr(id), segments);
+        id
     }
 
     fn lower_args(&mut self, list: Option<ast::ArgList>) -> Vec<ExprId> {
@@ -848,7 +993,7 @@ impl Lowerer<'_> {
                 }
                 ast::Stmt::Item(item) => {
                     let ptr = crate::item_tree::SyntaxPtr::new(item.syntax());
-                    if let Some(&index) = self.tree.item_by_ptr.get(&ptr) {
+                    if let Some(&index) = self.items.item_by_ptr.get(&ptr) {
                         stmts.push(Stmt::Item(ItemId {
                             file: self.file,
                             index,
@@ -859,7 +1004,7 @@ impl Lowerer<'_> {
         }
         let tail = block.tail_expr().map(|expr| self.lower_expr(expr));
         let scope = self
-            .tree
+            .items
             .block_by_ptr
             .get(&crate::item_tree::SyntaxPtr::new(block.syntax()))
             .copied();
@@ -892,7 +1037,7 @@ pub(super) fn lower_literal(lit: &ast::Literal) -> Option<Literal> {
             }
         }
         ast::LiteralKind::Decimal => Literal::Decimal(lit.decimal_text()?.as_str().into()),
-        ast::LiteralKind::Str => Literal::String(lit.string_value()?),
+        ast::LiteralKind::Str => Literal::String(lit.string_value()?.into()),
         ast::LiteralKind::Bool(value) => Literal::Bool(value),
     })
 }

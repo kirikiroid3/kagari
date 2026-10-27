@@ -15,13 +15,13 @@ mod story;
 pub(crate) mod system;
 
 use crate::db::Db;
-use crate::diagnostic::Diagnostic;
+use crate::diagnostic::Diag;
 use crate::input::Program;
 
 /// The results of stage 5 for a whole program.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Analysis {
-    pub diagnostics: Vec<Diagnostic>,
+    pub diagnostics: Vec<Diag>,
 }
 
 #[salsa::tracked(returns(ref))]
@@ -29,14 +29,5 @@ pub fn analysis(db: &dyn Db, program: Program) -> Analysis {
     let mut diagnostics = story::check(db, program);
     diagnostics.extend(influence::check(db, program));
     diagnostics.extend(system::check(db, program));
-    diagnostics.sort_by(|a, b| {
-        (&a.file, a.range.start(), a.code.as_str(), &a.message).cmp(&(
-            &b.file,
-            b.range.start(),
-            b.code.as_str(),
-            &b.message,
-        ))
-    });
-    diagnostics.dedup();
     Analysis { diagnostics }
 }

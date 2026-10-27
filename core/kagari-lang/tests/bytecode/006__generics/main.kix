@@ -25,6 +25,8 @@ static FULLSCREEN: Setting<bool> = setting(false);
 static ANIMATIONS: Setting<bool> = setting(true);
 
 fn main() -> System {
+    // Only functions reachable from `main` or an entry scene are emitted.
+    let _ = styled();
     System {
         title: "Generics",
         resolution: size(1280, 720),

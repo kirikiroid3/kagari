@@ -5,11 +5,12 @@ use kagari_syntax::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::db::Db;
-use crate::diagnostic::{Diagnostic, DiagnosticCode};
-use crate::hir::{Name, Path, PathKind, SignatureKind, TypeRef, file_hir};
+use crate::diagnostic::{Anchor, Diag, DiagnosticCode, NodeId, Owner};
+use crate::hir::{Name, Path, PathKind, SignatureKind, TypeRef, signature_of};
 use crate::input::{FilePath, Program, SourceFile};
 use crate::item_tree::{
-    Import, ItemId, ItemKind, ItemParent, ItemTree, Shape, Visibility, item_tree,
+    BlockIndex, Import, ItemId, ItemIndex, ItemKind, ItemParent, ItemTree, Shape, Visibility,
+    item_tree,
 };
 use crate::module_files::{ModFile, lookup_mod_file};
 use crate::resolve::LocalId;
@@ -20,17 +21,22 @@ pub enum CrateId {
     Std,
 }
 
+crate::item_tree::index_newtype!(
+    /// An index into a crate's modules.
+    ModuleIndex
+);
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ModuleId {
     pub krate: CrateId,
-    pub index: u32,
+    pub index: ModuleIndex,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ModuleOrigin {
     File(SourceFile),
-    Inline { file: SourceFile, item: u32 },
-    Block { file: SourceFile, block: u32 },
+    Inline { file: SourceFile, item: ItemIndex },
+    Block { file: SourceFile, block: BlockIndex },
 }
 
 impl ModuleOrigin {
@@ -79,22 +85,25 @@ pub struct ScopeEntry {
     pub defined_in: ModuleId,
     pub source: EntrySource,
     /// Other definitions supplied for the same name by glob imports.
-    pub ambiguous: Vec<(Def, TextRange)>,
+    pub ambiguous: Vec<(Def, Anchor)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EntrySource {
-    Definition(TextRange),
-    Import(TextRange),
-    Glob(TextRange),
+    Definition(ItemId),
+    /// A named import: the `use` item and the import's index in it.
+    Import(ItemId, u32),
+    /// A glob import: the `use` item and the import's index in it.
+    Glob(ItemId, u32),
 }
 
 impl EntrySource {
-    pub fn range(self) -> TextRange {
+    pub fn anchor(self) -> Anchor {
         match self {
-            EntrySource::Definition(range)
-            | EntrySource::Import(range)
-            | EntrySource::Glob(range) => range,
+            EntrySource::Definition(item) => Anchor::ItemName(item),
+            EntrySource::Import(item, index) | EntrySource::Glob(item, index) => {
+                Anchor::Import(item, index)
+            }
         }
     }
 }
@@ -211,7 +220,7 @@ pub enum Resolution {
 pub struct PathResolution {
     pub resolved: Option<Resolution>,
     pub failed_segment: Option<usize>,
-    pub diagnostics: Vec<Diagnostic>,
+    pub diagnostics: Vec<Diag>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -221,8 +230,8 @@ pub struct DefMaps {
     /// Every loaded file, in load order.
     pub files: Vec<(SourceFile, CrateId)>,
     pub file_modules: FxHashMap<SourceFile, ModuleId>,
-    pub inline_modules: FxHashMap<(SourceFile, u32), ModuleId>,
-    pub block_modules: FxHashMap<(SourceFile, u32), ModuleId>,
+    pub inline_modules: FxHashMap<(SourceFile, ItemIndex), ModuleId>,
+    pub block_modules: FxHashMap<(SourceFile, BlockIndex), ModuleId>,
     pub inherent: FxHashMap<TypeKey, FxHashMap<Name, ItemId>>,
     pub trait_impls: FxHashMap<TypeKey, Vec<ItemId>>,
     /// The type each impl is for.
@@ -231,7 +240,7 @@ pub struct DefMaps {
     /// trait impl take the trait's visibility.
     pub impl_traits: FxHashMap<ItemId, ItemId>,
     pub prelude: Option<ModuleId>,
-    pub diagnostics: Vec<Diagnostic>,
+    pub diagnostics: Vec<Diag>,
 }
 
 impl DefMaps {
@@ -251,13 +260,11 @@ impl DefMaps {
 
     /// Module ids are only created by the collector, so indexing never fails.
     pub fn module(&self, id: ModuleId) -> &ModuleData {
-        &self.crate_map(id.krate).modules[id.index as usize]
+        &self.crate_map(id.krate).modules[id.index.idx()]
     }
 
     fn module_mut(&mut self, id: ModuleId) -> Option<&mut ModuleData> {
-        self.crate_map_mut(id.krate)
-            .modules
-            .get_mut(id.index as usize)
+        self.crate_map_mut(id.krate).modules.get_mut(id.index.idx())
     }
 
     pub fn crate_root(&self, krate: CrateId) -> ModuleId {
@@ -353,14 +360,14 @@ pub fn def_maps(db: &dyn Db, program: Program) -> DefMaps {
                 modules: Vec::new(),
                 root: ModuleId {
                     krate: CrateId::Game,
-                    index: 0,
+                    index: ModuleIndex(0),
                 },
             },
             std: CrateDefMap {
                 modules: Vec::new(),
                 root: ModuleId {
                     krate: CrateId::Std,
-                    index: 0,
+                    index: ModuleIndex(0),
                 },
             },
             files: Vec::new(),
@@ -380,21 +387,19 @@ pub fn def_maps(db: &dyn Db, program: Program) -> DefMaps {
         impls: Vec::new(),
     };
 
-    let std_root = db.source_file(FilePath::Std(kagari_std::ROOT.to_owned()));
+    let std_root = db.source_file(FilePath::Std(kagari_std::ROOT.into()));
     collector.collect_crate(CrateId::Std, std_root);
     let root = program.root(db);
     let root_path = root.path(db);
-    if root.text(db).is_none() {
-        collector.maps.diagnostics.push(Diagnostic::new(
-            root_path.clone(),
-            TextRange::default(),
+    if !crate::input::file_exists(db, *root) {
+        collector.maps.diagnostics.push(Diag::new(
+            Anchor::Text(*root, TextRange::default()),
             DiagnosticCode::ModuleFileNotFound,
             "cannot read the root file",
         ));
     } else if !matches!(root_path.extension(), Some("kis" | "kix")) {
-        collector.maps.diagnostics.push(Diagnostic::new(
-            root_path.clone(),
-            TextRange::default(),
+        collector.maps.diagnostics.push(Diag::new(
+            Anchor::Text(*root, TextRange::default()),
             DiagnosticCode::ModuleBadRoot,
             "the root file must be a `.kis` or `.kix` file",
         ));
@@ -417,20 +422,23 @@ pub fn def_maps(db: &dyn Db, program: Program) -> DefMaps {
 
 struct PendingImport {
     module: ModuleId,
-    file: SourceFile,
+    /// The `use` item and the import's index in it.
+    use_item: ItemId,
+    index: u32,
     import: Import,
     vis: Visibility,
     types_done: bool,
     values_done: bool,
     /// Set when the import resolved to an item it may not see.
-    private: Option<Diagnostic>,
+    private: Option<Diag>,
 }
 
 struct Glob {
     importer: ModuleId,
     source: GlobSource,
     vis: Visibility,
-    range: TextRange,
+    use_item: ItemId,
+    index: u32,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -451,7 +459,7 @@ struct Collector<'db> {
 impl Collector<'_> {
     fn alloc_module(&mut self, krate: CrateId, data: ModuleData) -> ModuleId {
         let map = self.maps.crate_map_mut(krate);
-        let index = u32::try_from(map.modules.len()).unwrap_or(u32::MAX);
+        let index = ModuleIndex(u32::try_from(map.modules.len()).unwrap_or(u32::MAX));
         map.modules.push(data);
         ModuleId { krate, index }
     }
@@ -504,7 +512,7 @@ impl Collector<'_> {
         is_crate_root: bool,
         inline_path: &[Name],
         module: ModuleId,
-        items: &[u32],
+        items: &[ItemIndex],
     ) {
         let tree = item_tree(self.db, file);
         for &index in items {
@@ -521,14 +529,14 @@ impl Collector<'_> {
         is_crate_root: bool,
         inline_path: &[Name],
         module: ModuleId,
-        index: u32,
+        index: ItemIndex,
     ) {
         let Some(item) = tree.item(index) else {
             return;
         };
         let id = ItemId { file, index };
         let def = Def::Item(id);
-        let range = item.name_range;
+        let range = Anchor::ItemName(id);
         match &item.kind {
             ItemKind::Mod { inline } => {
                 let Some(name) = item.name.clone() else {
@@ -576,40 +584,34 @@ impl Collector<'_> {
                     name,
                     Def::Module(child),
                     item.vis,
-                    range,
+                    id,
                 );
             }
             ItemKind::Struct { shape } => {
                 if let Some(name) = item.name.clone() {
                     if !matches!(shape, Shape::Record(_)) {
-                        self.define(
-                            module,
-                            Namespace::Values,
-                            name.clone(),
-                            def,
-                            item.vis,
-                            range,
-                        );
+                        self.define(module, Namespace::Values, name.clone(), def, item.vis, id);
                     }
-                    self.define(module, Namespace::Types, name, def, item.vis, range);
+                    self.define(module, Namespace::Types, name, def, item.vis, id);
                 }
             }
             ItemKind::Enum { .. } | ItemKind::Trait { .. } | ItemKind::TypeAlias { .. } => {
                 if let Some(name) = item.name.clone() {
-                    self.define(module, Namespace::Types, name, def, item.vis, range);
+                    self.define(module, Namespace::Types, name, def, item.vis, id);
                 }
             }
             ItemKind::Fn { .. } | ItemKind::Const { .. } | ItemKind::Static { .. } => {
                 if let Some(name) = item.name.clone() {
-                    self.define(module, Namespace::Values, name, def, item.vis, range);
+                    self.define(module, Namespace::Values, name, def, item.vis, id);
                 }
             }
             ItemKind::Impl { .. } => self.impls.push((id, module)),
             ItemKind::Use { imports } => {
-                for import in imports {
+                for (import_index, import) in imports.iter().enumerate() {
                     self.imports.push(PendingImport {
                         module,
-                        file,
+                        use_item: id,
+                        index: u32::try_from(import_index).unwrap_or(u32::MAX),
                         import: import.clone(),
                         vis: item.vis,
                         types_done: false,
@@ -627,17 +629,15 @@ impl Collector<'_> {
         is_crate_root: bool,
         inline_path: &[Name],
         name: &Name,
-        range: TextRange,
+        anchor: Anchor,
     ) -> Option<SourceFile> {
-        let path = file.path(self.db).clone();
         match lookup_mod_file(self.db, file, is_crate_root, inline_path, name) {
             ModFile::Found(child) => {
                 if self.loaded.insert(child) {
                     Some(child)
                 } else {
-                    self.maps.diagnostics.push(Diagnostic::new(
-                        path,
-                        range,
+                    self.maps.diagnostics.push(Diag::new(
+                        anchor,
                         DiagnosticCode::ModuleFileReused,
                         "file is already loaded as another module",
                     ));
@@ -646,9 +646,8 @@ impl Collector<'_> {
             }
             ModFile::NotFound(candidates) => {
                 let shown: Vec<String> = candidates.iter().map(|c| format!("`{c}`")).collect();
-                self.maps.diagnostics.push(Diagnostic::new(
-                    path,
-                    range,
+                self.maps.diagnostics.push(Diag::new(
+                    anchor,
                     DiagnosticCode::ModuleFileNotFound,
                     format!(
                         "file not found for module `{name}`; expected one of {}",
@@ -659,9 +658,8 @@ impl Collector<'_> {
             }
             ModFile::Ambiguous(found) => {
                 let shown: Vec<String> = found.iter().map(|c| format!("`{c}`")).collect();
-                self.maps.diagnostics.push(Diagnostic::new(
-                    path,
-                    range,
+                self.maps.diagnostics.push(Diag::new(
+                    anchor,
                     DiagnosticCode::ModuleAmbiguousFile,
                     format!(
                         "module `{name}` has more than one file: {}",
@@ -679,7 +677,9 @@ impl Collector<'_> {
         for (file, krate) in files {
             let tree = item_tree(self.db, file);
             for (index, block) in tree.blocks.iter().enumerate() {
-                let index = u32::try_from(index).unwrap_or(u32::MAX);
+                let Some(index) = BlockIndex::from_usize(index) else {
+                    continue;
+                };
                 let parent = match block.parent_block {
                     Some(parent) => self.maps.block_modules.get(&(file, parent)).copied(),
                     None => Some(self.maps.module_of_item(
@@ -706,10 +706,6 @@ impl Collector<'_> {
         }
     }
 
-    fn file_path(&self, module: ModuleId) -> FilePath {
-        self.maps.module_file(module).path(self.db).clone()
-    }
-
     /// Defines `name` in `module`. Definitions and named imports clash; globs never replace them.
     fn define(
         &mut self,
@@ -718,9 +714,9 @@ impl Collector<'_> {
         name: Name,
         def: Def,
         vis: Visibility,
-        range: TextRange,
+        item: ItemId,
     ) {
-        self.insert(module, ns, name, def, vis, EntrySource::Definition(range));
+        self.insert(module, ns, name, def, vis, EntrySource::Definition(item));
     }
 
     /// Returns whether the scope changed.
@@ -733,7 +729,6 @@ impl Collector<'_> {
         vis: Visibility,
         source: EntrySource,
     ) -> bool {
-        let path = self.file_path(module);
         let Some(data) = self.maps.module_mut(module) else {
             return false;
         };
@@ -751,32 +746,30 @@ impl Collector<'_> {
                 true
             }
             Some(existing) => match (existing.source, source) {
-                (EntrySource::Glob(_), EntrySource::Glob(range)) => {
+                (EntrySource::Glob(..), EntrySource::Glob(..)) => {
                     if existing.def != def && !existing.ambiguous.iter().any(|(d, _)| *d == def) {
-                        existing.ambiguous.push((def, range));
+                        existing.ambiguous.push((def, source.anchor()));
                         true
                     } else {
                         false
                     }
                 }
-                (EntrySource::Glob(_), _) => {
+                (EntrySource::Glob(..), _) => {
                     *existing = entry;
                     true
                 }
-                (_, EntrySource::Glob(_)) => false,
+                (_, EntrySource::Glob(..)) => false,
                 (first, _) => {
-                    if existing.def == def && matches!(source, EntrySource::Import(_)) {
+                    if existing.def == def && matches!(source, EntrySource::Import(..)) {
                         return false;
                     }
-                    let first = first.range();
                     self.maps.diagnostics.push(
-                        Diagnostic::new(
-                            path.clone(),
-                            source.range(),
+                        Diag::new(
+                            source.anchor(),
                             DiagnosticCode::ResolveDuplicate,
                             format!("`{name}` is defined multiple times"),
                         )
-                        .with_related(path, first, "first defined here"),
+                        .with_related(first.anchor(), "first defined here"),
                     );
                     false
                 }
@@ -802,20 +795,24 @@ impl Collector<'_> {
             if let Some(private) = import.private {
                 self.maps.diagnostics.push(private);
             } else if !import.types_done && !import.values_done {
+                let (use_item, import_index) = (import.use_item, import.index);
                 let failed = resolve_module_path(
                     &self.maps,
                     self.db,
                     import.module,
                     &import.import.path,
                     Namespace::Types,
+                    &|segment| Anchor::ImportSegment(use_item, import_index, segment),
                 )
                 .failed_segment;
-                let range = failed
-                    .and_then(|index| import.import.path.segments.get(index))
-                    .map_or(import.import.range, |segment| segment.range);
-                self.maps.diagnostics.push(Diagnostic::new(
-                    import.file.path(self.db).clone(),
-                    range,
+                let anchor = failed
+                    .filter(|&index| index < import.import.path.segments.len())
+                    .and_then(|index| u32::try_from(index).ok())
+                    .map_or(Anchor::Import(use_item, import_index), |segment| {
+                        Anchor::ImportSegment(use_item, import_index, segment)
+                    });
+                self.maps.diagnostics.push(Diag::new(
+                    anchor,
                     DiagnosticCode::ResolveUnresolvedImport,
                     format!("unresolved import `{}`", import.import.path.display()),
                 ));
@@ -834,12 +831,20 @@ impl Collector<'_> {
         let module = pending.module;
         let import = pending.import.clone();
         let vis = pending.vis;
+        let (use_item, import_index) = (pending.use_item, pending.index);
+        let at = |segment| Anchor::ImportSegment(use_item, import_index, segment);
         if import.glob {
             if pending.types_done {
                 return false;
             }
-            let result =
-                resolve_module_path(&self.maps, self.db, module, &import.path, Namespace::Types);
+            let result = resolve_module_path(
+                &self.maps,
+                self.db,
+                module,
+                &import.path,
+                Namespace::Types,
+                &at,
+            );
             let source = match result.resolved {
                 Some(Resolution::Def(Def::Module(source))) => GlobSource::Module(source),
                 Some(Resolution::Def(Def::Item(item)))
@@ -862,7 +867,8 @@ impl Collector<'_> {
                 importer: module,
                 source,
                 vis,
-                range: import.range,
+                use_item,
+                index: import_index,
             });
             return true;
         }
@@ -882,7 +888,7 @@ impl Collector<'_> {
             if done {
                 continue;
             }
-            let result = resolve_module_path(&self.maps, self.db, module, &import.path, ns);
+            let result = resolve_module_path(&self.maps, self.db, module, &import.path, ns, &at);
             let Some(Resolution::Def(def)) = result.resolved else {
                 continue;
             };
@@ -908,7 +914,7 @@ impl Collector<'_> {
                 name.clone(),
                 def,
                 vis,
-                EntrySource::Import(import.range),
+                EntrySource::Import(use_item, import_index),
             );
             changed = true;
         }
@@ -919,7 +925,8 @@ impl Collector<'_> {
         let Some(glob) = self.globs.get(index) else {
             return false;
         };
-        let (importer, source, vis, range) = (glob.importer, glob.source, glob.vis, glob.range);
+        let (importer, source, vis) = (glob.importer, glob.source, glob.vis);
+        let entry_source = EntrySource::Glob(glob.use_item, glob.index);
         let mut entries: Vec<(Namespace, Name, Def)> = Vec::new();
         match source {
             GlobSource::Module(source) => {
@@ -937,7 +944,7 @@ impl Collector<'_> {
                     .item(item.index)
                     .map(|i| &i.kind)
                 {
-                    for (index, (name, _, shape)) in variants.iter().enumerate() {
+                    for (index, (name, shape)) in variants.iter().enumerate() {
                         let def = Def::Variant {
                             enum_item: item,
                             index: u32::try_from(index).unwrap_or(u32::MAX),
@@ -953,7 +960,7 @@ impl Collector<'_> {
         entries.sort_by(|a, b| a.1.cmp(&b.1));
         let mut changed = false;
         for (ns, name, def) in entries {
-            changed |= self.insert(importer, ns, name, def, vis, EntrySource::Glob(range));
+            changed |= self.insert(importer, ns, name, def, vis, entry_source);
         }
         changed
     }
@@ -970,21 +977,29 @@ impl Collector<'_> {
     fn collect_impls(&mut self) {
         let impls = std::mem::take(&mut self.impls);
         for (impl_id, module) in impls {
-            let hir = file_hir(self.db, impl_id.file);
-            let Some(Some(signature)) = hir.signatures.get(impl_id.index as usize) else {
+            let Some(signature) = signature_of(self.db, impl_id) else {
                 continue;
             };
             let SignatureKind::Impl { trait_ref, self_ty } = &signature.kind else {
                 continue;
             };
-            let path = self.maps.module_file(module).path(self.db).clone();
+            let owner = Owner::Signature(impl_id);
+            let type_anchor = |ty| Anchor::Node(owner, NodeId::Type(ty));
             // Unresolved traits are reported by name resolution.
             let trait_item = trait_ref.and_then(|trait_ref| {
                 let TypeRef::Path(trait_path) = signature.store.type_ref(trait_ref) else {
                     return None;
                 };
-                match resolve_module_path(&self.maps, self.db, module, trait_path, Namespace::Types)
-                    .resolved
+                let at = |segment| Anchor::Segment(owner, NodeId::Type(trait_ref), segment);
+                match resolve_module_path(
+                    &self.maps,
+                    self.db,
+                    module,
+                    trait_path,
+                    Namespace::Types,
+                    &at,
+                )
+                .resolved
                 {
                     Some(Resolution::Def(Def::Item(item))) => Some(item),
                     _ => None,
@@ -999,22 +1014,23 @@ impl Collector<'_> {
                 } else {
                     "only the standard library implements traits"
                 };
-                self.maps.diagnostics.push(Diagnostic::new(
-                    path.clone(),
-                    signature.store.type_range(*trait_ref),
+                self.maps.diagnostics.push(Diag::new(
+                    type_anchor(*trait_ref),
                     DiagnosticCode::ResolveTraitImplOutsideStd,
                     message,
                 ));
             }
-            let range = signature.store.type_range(*self_ty);
+            let anchor = type_anchor(*self_ty);
             let key = match signature.store.type_ref(*self_ty) {
                 TypeRef::Path(type_path) => {
+                    let self_ty = *self_ty;
                     let result = resolve_module_path(
                         &self.maps,
                         self.db,
                         module,
                         type_path,
                         Namespace::Types,
+                        &|segment| Anchor::Segment(owner, NodeId::Type(self_ty), segment),
                     );
                     match result.resolved {
                         // Unresolved targets are reported by name resolution.
@@ -1026,9 +1042,8 @@ impl Collector<'_> {
             };
             let key = match key {
                 Some(TypeKey::Prim(_)) if module.krate != CrateId::Std && trait_ref.is_none() => {
-                    self.maps.diagnostics.push(Diagnostic::new(
-                        path,
-                        range,
+                    self.maps.diagnostics.push(Diag::new(
+                        anchor,
                         DiagnosticCode::ResolveBadImplTarget,
                         "inherent impls on primitive types are only allowed in the standard library",
                     ));
@@ -1036,9 +1051,8 @@ impl Collector<'_> {
                 }
                 Some(key) => key,
                 None => {
-                    self.maps.diagnostics.push(Diagnostic::new(
-                        path,
-                        range,
+                    self.maps.diagnostics.push(Diag::new(
+                        anchor,
                         DiagnosticCode::ResolveBadImplTarget,
                         "`impl` target must be a struct, enum or primitive type",
                     ));
@@ -1071,22 +1085,13 @@ impl Collector<'_> {
                 };
                 let map = self.maps.inherent.entry(key).or_default();
                 if let Some(first) = map.get(&name).copied() {
-                    let first_range = item_tree(self.db, first.file)
-                        .item(first.index)
-                        .map_or_else(TextRange::default, |item| item.name_range);
-                    let first_path = first.file.path(self.db).clone();
                     self.maps.diagnostics.push(
-                        Diagnostic::new(
-                            impl_id.file.path(self.db).clone(),
-                            data.name_range,
+                        Diag::new(
+                            Anchor::ItemName(assoc_id),
                             DiagnosticCode::ResolveDuplicate,
                             format!("`{name}` is defined multiple times"),
                         )
-                        .with_related(
-                            first_path,
-                            first_range,
-                            "first defined here",
-                        ),
+                        .with_related(Anchor::ItemName(first), "first defined here"),
                     );
                 } else {
                     map.insert(name, assoc_id);
@@ -1113,8 +1118,7 @@ pub fn type_key(maps: &DefMaps, db: &dyn Db, resolution: &Resolution) -> Option<
                         if !visited.insert(item) {
                             return None;
                         }
-                        let hir = file_hir(db, item.file);
-                        let signature = hir.signatures.get(item.index as usize)?.as_ref()?;
+                        let signature = signature_of(db, item)?;
                         let SignatureKind::TypeAlias {
                             value: Some(value), ..
                         } = &signature.kind
@@ -1125,8 +1129,16 @@ pub fn type_key(maps: &DefMaps, db: &dyn Db, resolution: &Resolution) -> Option<
                             return None;
                         };
                         let module = maps.module_of_item(db, item);
-                        current = resolve_module_path(maps, db, module, path, Namespace::Types)
-                            .resolved?;
+                        let (owner, value) = (Owner::Signature(item), *value);
+                        current = resolve_module_path(
+                            maps,
+                            db,
+                            module,
+                            path,
+                            Namespace::Types,
+                            &|segment| Anchor::Segment(owner, NodeId::Type(value), segment),
+                        )
+                        .resolved?;
                     }
                     _ => return None,
                 }
@@ -1154,8 +1166,9 @@ pub fn resolve_module_path(
     from: ModuleId,
     path: &Path,
     ns: Namespace,
+    at: &dyn Fn(u32) -> Anchor,
 ) -> PathResolution {
-    let file = maps.module_file(from).path(db).clone();
+    let file = maps.module_file(from);
     let mut result = PathResolution::default();
     let last = path.segments.len().saturating_sub(1);
     let (base, start) = match path.kind {
@@ -1167,13 +1180,8 @@ pub fn resolve_module_path(
                 match maps.module(module).parent {
                     Some(parent) => module = maps.named_module(parent),
                     None => {
-                        let range = path
-                            .segments
-                            .first()
-                            .map_or_else(TextRange::default, |segment| segment.range);
-                        result.diagnostics.push(Diagnostic::new(
-                            file,
-                            range,
+                        result.diagnostics.push(Diag::new(
+                            at(0),
                             DiagnosticCode::ResolveUnresolvedName,
                             "there are too many leading `super` keywords",
                         ));
@@ -1192,13 +1200,17 @@ pub fn resolve_module_path(
                     .iter()
                     .map(|name| crate::hir::PathSegment {
                         name: Name::new(name),
-                        range: TextRange::default(),
                         args: None,
                     })
                     .collect(),
             };
             lang.segments.extend(path.segments.iter().cloned());
             let std = maps.std_root();
+            let prefix = u32::try_from(item.std_path().len()).unwrap_or(u32::MAX);
+            let lang_at = |segment: u32| match segment.checked_sub(prefix) {
+                Some(segment) => at(segment),
+                None => Anchor::Text(file, TextRange::default()),
+            };
             let inner = resolve_rest(
                 maps,
                 db,
@@ -1207,11 +1219,11 @@ pub fn resolve_module_path(
                 &lang,
                 0,
                 ns,
+                &lang_at,
             );
             if inner.resolved.is_none() {
-                result.diagnostics.push(Diagnostic::new(
-                    file,
-                    TextRange::default(),
+                result.diagnostics.push(Diag::new(
+                    Anchor::Text(file, TextRange::default()),
                     DiagnosticCode::ResolveMissingStdItem,
                     format!(
                         "standard library item `std::{}` is missing",
@@ -1231,7 +1243,7 @@ pub fn resolve_module_path(
                 Some((resolution, diag)) => {
                     result
                         .diagnostics
-                        .extend(diag.map(|note| note.into_diagnostic(file.clone(), first.range)));
+                        .extend(diag.map(|note| note.into_diagnostic(at(0))));
                     (resolution, 1)
                 }
                 None => {
@@ -1239,9 +1251,8 @@ pub fn resolve_module_path(
                         Namespace::Types => "type",
                         Namespace::Values => "value",
                     };
-                    result.diagnostics.push(Diagnostic::new(
-                        file,
-                        first.range,
+                    result.diagnostics.push(Diag::new(
+                        at(0),
                         DiagnosticCode::ResolveUnresolvedName,
                         format!("cannot find {what} `{}` in this scope", first.name),
                     ));
@@ -1251,7 +1262,7 @@ pub fn resolve_module_path(
             }
         }
     };
-    let rest = resolve_rest(maps, db, from, base, path, start, ns);
+    let rest = resolve_rest(maps, db, from, base, path, start, ns, at);
     result.resolved = rest.resolved;
     result.failed_segment = rest.failed_segment;
     result.diagnostics.extend(rest.diagnostics);
@@ -1259,22 +1270,10 @@ pub fn resolve_module_path(
 }
 
 /// The resolution of a scope entry, plus an ambiguity note when globs disagree on it.
-fn entry_lookup(
-    maps: &DefMaps,
-    db: &dyn Db,
-    module: ModuleId,
-    entry: &ScopeEntry,
-    name: &Name,
-) -> (Resolution, Option<AmbiguityNote>) {
+fn entry_lookup(entry: &ScopeEntry, name: &Name) -> (Resolution, Option<AmbiguityNote>) {
     let note = (!entry.ambiguous.is_empty()).then(|| {
-        let path = maps.module_file(module).path(db).clone();
-        let mut candidates = vec![(path.clone(), entry.source.range())];
-        candidates.extend(
-            entry
-                .ambiguous
-                .iter()
-                .map(|(_, range)| (path.clone(), *range)),
-        );
+        let mut candidates = vec![entry.source.anchor()];
+        candidates.extend(entry.ambiguous.iter().map(|(_, anchor)| *anchor));
         AmbiguityNote {
             name: name.clone(),
             candidates,
@@ -1286,7 +1285,7 @@ fn entry_lookup(
 /// The first segment of a plain path, looked up lexically from `from`.
 pub(crate) fn resolve_first_segment(
     maps: &DefMaps,
-    db: &dyn Db,
+    _db: &dyn Db,
     from: ModuleId,
     name: &Name,
     ns: Namespace,
@@ -1295,7 +1294,7 @@ pub(crate) fn resolve_first_segment(
     loop {
         let data = maps.module(module);
         if let Some(entry) = data.scope(ns).get(name) {
-            return Some(entry_lookup(maps, db, module, entry, name));
+            return Some(entry_lookup(entry, name));
         }
         match (data.is_block(), data.parent) {
             (true, Some(parent)) => module = parent,
@@ -1321,20 +1320,18 @@ pub(crate) fn resolve_first_segment(
 /// A name supplied by several glob imports; reported where the name is used.
 pub(crate) struct AmbiguityNote {
     name: Name,
-    candidates: Vec<(FilePath, TextRange)>,
+    candidates: Vec<Anchor>,
 }
 
 impl AmbiguityNote {
-    pub(crate) fn into_diagnostic(self, file: FilePath, range: TextRange) -> Diagnostic {
-        let mut diag = Diagnostic::new(
-            file,
-            range,
+    pub(crate) fn into_diagnostic(self, anchor: Anchor) -> Diag {
+        let mut diag = Diag::new(
+            anchor,
             DiagnosticCode::ResolveAmbiguous,
             format!("`{}` is ambiguous", self.name),
         );
-        for (path, candidate) in self.candidates {
+        for candidate in self.candidates {
             diag = diag.with_related(
-                path,
                 candidate,
                 format!("`{}` could refer to the item imported here", self.name),
             );
@@ -1344,6 +1341,7 @@ impl AmbiguityNote {
 }
 
 /// Resolves `path.segments[start..]` starting from `base`.
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_rest(
     maps: &DefMaps,
     db: &dyn Db,
@@ -1352,39 +1350,36 @@ pub fn resolve_rest(
     path: &Path,
     start: usize,
     ns: Namespace,
+    at: &dyn Fn(u32) -> Anchor,
 ) -> PathResolution {
-    let file = maps.module_file(from).path(db).clone();
     let mut result = PathResolution::default();
     let last = path.segments.len().saturating_sub(1);
     let mut current = base;
     for (index, segment) in path.segments.iter().enumerate().skip(start) {
         let seg_ns = if index == last { ns } else { Namespace::Types };
         let name = &segment.name;
+        let anchor = at(u32::try_from(index).unwrap_or(u32::MAX));
         let prefix = || path_prefix(path, index);
         let next = match &current {
             Resolution::Def(Def::Module(module)) => {
                 match maps.module(*module).scope(seg_ns).get(name) {
                     Some(entry) => {
                         if !maps.is_visible(entry.vis, entry.defined_in, from) {
-                            result.diagnostics.push(Diagnostic::new(
-                                file.clone(),
-                                segment.range,
+                            result.diagnostics.push(Diag::new(
+                                anchor,
                                 DiagnosticCode::ResolvePrivate,
                                 format!("`{name}` is private"),
                             ));
                         }
-                        let (resolution, note) = entry_lookup(maps, db, *module, entry, name);
+                        let (resolution, note) = entry_lookup(entry, name);
                         if let Some(note) = note {
-                            result
-                                .diagnostics
-                                .push(note.into_diagnostic(file.clone(), segment.range));
+                            result.diagnostics.push(note.into_diagnostic(anchor));
                         }
                         Some(resolution)
                     }
                     None => {
-                        result.diagnostics.push(Diagnostic::new(
-                            file.clone(),
-                            segment.range,
+                        result.diagnostics.push(Diag::new(
+                            anchor,
                             DiagnosticCode::ResolveUnresolvedName,
                             format!("cannot find `{name}` in `{}`", prefix()),
                         ));
@@ -1398,7 +1393,7 @@ pub fn resolve_rest(
                     Some(ItemKind::Enum { variants }) => {
                         let variant = variants
                             .iter()
-                            .position(|(variant, _, _)| variant == name)
+                            .position(|(variant, _)| variant == name)
                             .map(|position| {
                                 Resolution::Def(Def::Variant {
                                     enum_item: *item,
@@ -1412,8 +1407,7 @@ pub fn resolve_rest(
                                 from,
                                 Some(TypeKey::Item(*item)),
                                 name,
-                                segment,
-                                &file,
+                                anchor,
                                 &mut result,
                                 &prefix(),
                             )
@@ -1425,8 +1419,7 @@ pub fn resolve_rest(
                         from,
                         Some(TypeKey::Item(*item)),
                         name,
-                        segment,
-                        &file,
+                        anchor,
                         &mut result,
                         &prefix(),
                     ),
@@ -1437,8 +1430,7 @@ pub fn resolve_rest(
                             from,
                             Some(key),
                             name,
-                            segment,
-                            &file,
+                            anchor,
                             &mut result,
                             &prefix(),
                         ),
@@ -1454,9 +1446,8 @@ pub fn resolve_rest(
                                 index: assoc,
                             })),
                             None => {
-                                result.diagnostics.push(Diagnostic::new(
-                                    file.clone(),
-                                    segment.range,
+                                result.diagnostics.push(Diag::new(
+                                    anchor,
                                     DiagnosticCode::ResolveUnresolvedName,
                                     format!("no associated item named `{name}` in `{}`", prefix()),
                                 ));
@@ -1465,9 +1456,8 @@ pub fn resolve_rest(
                         }
                     }
                     _ => {
-                        result.diagnostics.push(Diagnostic::new(
-                            file.clone(),
-                            segment.range,
+                        result.diagnostics.push(Diag::new(
+                            anchor,
                             DiagnosticCode::ResolveUnresolvedName,
                             format!("cannot find `{name}` in `{}`", prefix()),
                         ));
@@ -1481,8 +1471,7 @@ pub fn resolve_rest(
                 from,
                 Some(TypeKey::Prim(*prim)),
                 name,
-                segment,
-                &file,
+                anchor,
                 &mut result,
                 &prefix(),
             ),
@@ -1498,8 +1487,7 @@ pub fn resolve_rest(
                         from,
                         Some(*key),
                         name,
-                        segment,
-                        &file,
+                        anchor,
                         &mut result,
                         &prefix(),
                     ),
@@ -1513,9 +1501,8 @@ pub fn resolve_rest(
             | Resolution::Assoc(_)
             | Resolution::Local(_)
             | Resolution::Error => {
-                result.diagnostics.push(Diagnostic::new(
-                    file.clone(),
-                    segment.range,
+                result.diagnostics.push(Diag::new(
+                    anchor,
                     DiagnosticCode::ResolveUnresolvedName,
                     format!("cannot find `{name}` in `{}`", prefix()),
                 ));
@@ -1560,8 +1547,7 @@ fn assoc_lookup(
     from: ModuleId,
     key: Option<TypeKey>,
     name: &Name,
-    segment: &crate::hir::PathSegment,
-    file: &FilePath,
+    anchor: Anchor,
     result: &mut PathResolution,
     prefix: &str,
 ) -> Option<Resolution> {
@@ -1603,9 +1589,8 @@ fn assoc_lookup(
                     from,
                 )
             {
-                result.diagnostics.push(Diagnostic::new(
-                    file.clone(),
-                    segment.range,
+                result.diagnostics.push(Diag::new(
+                    anchor,
                     DiagnosticCode::ResolvePrivate,
                     format!("`{name}` is private"),
                 ));
@@ -1613,9 +1598,8 @@ fn assoc_lookup(
             Some(Resolution::Assoc(assoc))
         }
         None => {
-            result.diagnostics.push(Diagnostic::new(
-                file.clone(),
-                segment.range,
+            result.diagnostics.push(Diag::new(
+                anchor,
                 DiagnosticCode::ResolveUnresolvedName,
                 format!("no associated item named `{name}` in `{prefix}`"),
             ));

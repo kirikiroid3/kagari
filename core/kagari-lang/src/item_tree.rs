@@ -7,7 +7,7 @@ use rowan::ast::SyntaxNodePtr;
 use rustc_hash::FxHashMap;
 
 use crate::db::Db;
-use crate::diagnostic::DiagnosticCode;
+use crate::diagnostic::{Anchor, Diag, DiagnosticCode};
 use crate::hir::lower::lower_path;
 use crate::hir::{Name, Path, PathKind};
 use crate::input::{FilePath, SourceFile};
@@ -15,11 +15,39 @@ use crate::parse_query::parse;
 
 pub type SyntaxPtr = SyntaxNodePtr<kagari_syntax::KagariLanguage>;
 
+macro_rules! index_newtype {
+    ($(#[$meta:meta])* $name:ident) => {
+        $(#[$meta])*
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+        pub struct $name(u32);
+
+        impl $name {
+            pub fn idx(self) -> usize {
+                self.0 as usize
+            }
+
+            pub fn from_usize(index: usize) -> Option<Self> {
+                u32::try_from(index).ok().map(Self)
+            }
+        }
+    };
+}
+pub(crate) use index_newtype;
+
+index_newtype!(
+    /// An index into [`ItemTree::items`].
+    ItemIndex
+);
+index_newtype!(
+    /// An index into [`ItemTree::blocks`].
+    BlockIndex
+);
+
 /// An item of a file: `(file, index into ItemTree::items)`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ItemId {
     pub file: SourceFile,
-    pub index: u32,
+    pub index: ItemIndex,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -27,38 +55,71 @@ pub struct ItemTree {
     /// Every item of the file, in pre-order.
     pub items: Vec<Item>,
     /// The file's top-level items.
-    pub top: Vec<u32>,
+    pub top: Vec<ItemIndex>,
     /// Blocks that directly contain items.
     pub blocks: Vec<BlockScope>,
-    pub item_by_ptr: FxHashMap<SyntaxPtr, u32>,
-    pub block_by_ptr: FxHashMap<SyntaxPtr, u32>,
-    pub diagnostics: Vec<(TextRange, DiagnosticCode, String)>,
+}
+
+/// Where the items and item blocks of a file are in its text, indexed like
+/// [`ItemTree::items`] and [`ItemTree::blocks`].
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ItemSourceMap {
+    pub items: Vec<ItemSrc>,
+    pub blocks: Vec<SyntaxPtr>,
+    pub item_by_ptr: FxHashMap<SyntaxPtr, ItemIndex>,
+    pub block_by_ptr: FxHashMap<SyntaxPtr, BlockIndex>,
+}
+
+/// The source of one item.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ItemSrc {
+    pub ptr: SyntaxPtr,
+    /// The name, or the whole item when it has none.
+    pub name: TextRange,
+    /// Indexed like [`Item::attrs`].
+    pub attrs: Vec<TextRange>,
+    /// The names of an enum's variants.
+    pub variants: Vec<TextRange>,
+    /// The imports of a `use` item: each import's range and its path segments' ranges.
+    pub imports: Vec<(TextRange, Vec<TextRange>)>,
+}
+
+/// An item tree with its source map and the item-level diagnostics. Only the projections
+/// below read it: a semantic query reading it would re-run on every edit of the file.
+#[derive(Debug, Default)]
+pub struct ItemTreeRaw {
+    pub tree: ItemTree,
+    pub source_map: ItemSourceMap,
+    pub diagnostics: Vec<Diag>,
 }
 
 impl ItemTree {
-    pub fn item(&self, index: u32) -> Option<&Item> {
-        self.items.get(index as usize)
+    pub fn item(&self, index: ItemIndex) -> Option<&Item> {
+        self.items.get(index.idx())
     }
 
-    pub fn block(&self, index: u32) -> Option<&BlockScope> {
-        self.blocks.get(index as usize)
+    pub fn block(&self, index: BlockIndex) -> Option<&BlockScope> {
+        self.blocks.get(index.idx())
+    }
+
+    /// Every item index of the file, in pre-order.
+    pub fn indices(&self) -> impl Iterator<Item = ItemIndex> + use<> {
+        (0..self.items.len()).filter_map(ItemIndex::from_usize)
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Item {
     pub name: Option<Name>,
-    pub name_range: TextRange,
-    pub ptr: SyntaxPtr,
     pub vis: Visibility,
-    pub attrs: Vec<(Name, TextRange)>,
+    pub attrs: Vec<Name>,
     pub kind: ItemKind,
     pub parent: ItemParent,
 }
 
 impl Item {
     pub fn has_attr(&self, name: &str) -> bool {
-        self.attrs.iter().any(|(attr, _)| attr == name)
+        self.attrs.iter().any(|attr| attr == name)
     }
 
     pub fn kind_name(&self) -> &'static str {
@@ -87,8 +148,8 @@ pub enum Visibility {
 pub enum ItemParent {
     File,
     /// An inline module, impl or trait.
-    Item(u32),
-    Block(u32),
+    Item(ItemIndex),
+    Block(BlockIndex),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -116,7 +177,7 @@ pub enum ItemKind {
         shape: Shape,
     },
     Enum {
-        variants: Vec<(Name, TextRange, Shape)>,
+        variants: Vec<(Name, Shape)>,
     },
     TypeAlias {
         has_value: bool,
@@ -128,15 +189,15 @@ pub enum ItemKind {
         mutable: bool,
     },
     Trait {
-        items: Vec<u32>,
+        items: Vec<ItemIndex>,
     },
     Impl {
-        items: Vec<u32>,
+        items: Vec<ItemIndex>,
         has_trait: bool,
     },
     Mod {
         /// The items of an inline module; `None` for `mod foo;`.
-        inline: Option<Vec<u32>>,
+        inline: Option<Vec<ItemIndex>>,
     },
     Use {
         imports: Vec<Import>,
@@ -149,7 +210,6 @@ pub struct Import {
     pub path: Path,
     pub alias: Option<Name>,
     pub glob: bool,
-    pub range: TextRange,
 }
 
 impl Import {
@@ -163,20 +223,20 @@ impl Import {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockScope {
-    pub ptr: SyntaxPtr,
     /// The `fn`, `const` or `static` whose body contains the block.
-    pub owner: u32,
-    pub parent_block: Option<u32>,
-    pub items: Vec<u32>,
+    pub owner: ItemIndex,
+    pub parent_block: Option<BlockIndex>,
+    pub items: Vec<ItemIndex>,
 }
 
 const KNOWN_ATTRIBUTES: &[&str] = &["scene", "entry", "must_use", "builtin"];
 
-#[salsa::tracked(returns(ref))]
-pub fn item_tree(db: &dyn Db, file: SourceFile) -> ItemTree {
+#[salsa::tracked(returns(ref), no_eq)]
+pub fn item_tree_raw(db: &dyn Db, file: SourceFile) -> ItemTreeRaw {
     let root = parse(db, file).tree();
     let mut ctx = Ctx {
-        tree: ItemTree::default(),
+        out: ItemTreeRaw::default(),
+        file,
         in_std: matches!(file.path(db), FilePath::Std(_)),
     };
     let mut top = Vec::new();
@@ -185,12 +245,30 @@ pub fn item_tree(db: &dyn Db, file: SourceFile) -> ItemTree {
             top.push(index);
         }
     }
-    ctx.tree.top = top;
-    ctx.tree
+    ctx.out.tree.top = top;
+    ctx.out
+}
+
+/// The items of a file, without text ranges.
+#[salsa::tracked(returns(ref))]
+pub fn item_tree(db: &dyn Db, file: SourceFile) -> ItemTree {
+    item_tree_raw(db, file).tree.clone()
+}
+
+#[salsa::tracked(returns(ref))]
+pub fn item_source_map(db: &dyn Db, file: SourceFile) -> ItemSourceMap {
+    item_tree_raw(db, file).source_map.clone()
+}
+
+/// The item-level diagnostics of a file (unknown attributes, missing bodies, …).
+#[salsa::tracked(returns(ref))]
+pub fn item_tree_diagnostics(db: &dyn Db, file: SourceFile) -> Vec<Diag> {
+    item_tree_raw(db, file).diagnostics.clone()
 }
 
 struct Ctx {
-    tree: ItemTree,
+    out: ItemTreeRaw,
+    file: SourceFile,
     in_std: bool,
 }
 
@@ -227,14 +305,17 @@ fn shape_of(record: Option<ast::RecordFieldList>, tuple: Option<ast::TupleFieldL
 
 impl Ctx {
     fn diag(&mut self, range: TextRange, code: DiagnosticCode, message: String) {
-        self.tree.diagnostics.push((range, code, message));
+        self.out
+            .diagnostics
+            .push(Diag::new(Anchor::Text(self.file, range), code, message));
     }
 
-    fn lower_item(&mut self, item: ast::Item, parent: ItemParent) -> Option<u32> {
+    fn lower_item(&mut self, item: ast::Item, parent: ItemParent) -> Option<ItemIndex> {
         let syntax = item.syntax().clone();
         let range = syntax.text_range();
         let attrs = self.lower_attrs(item.attrs());
         let builtin = attrs.iter().any(|(name, _)| name == "builtin");
+        let (attrs, attr_ranges): (Vec<Name>, Vec<TextRange>) = attrs.into_iter().unzip();
         let vis = if item.visibility().is_some() {
             Visibility::Public
         } else {
@@ -253,6 +334,8 @@ impl Ctx {
             ast::Item::Impl(_) | ast::Item::Use(_) => (None, range),
         };
         let shown = name.clone().unwrap_or_default();
+        let mut variant_ranges = Vec::new();
+        let mut import_ranges = Vec::new();
 
         let kind = match &item {
             ast::Item::Fn(it) => {
@@ -295,21 +378,24 @@ impl Ctx {
                 }
                 ItemKind::Struct { shape }
             }
-            ast::Item::Enum(it) => ItemKind::Enum {
-                variants: it
+            ast::Item::Enum(it) => {
+                let mut variants = Vec::new();
+                for variant in it
                     .variant_list()
                     .into_iter()
                     .flat_map(|list| list.variants())
-                    .filter_map(|variant| {
-                        let name = variant.name()?;
-                        Some((
-                            name_text(&name),
-                            name.syntax().text_range(),
-                            shape_of(variant.record_field_list(), variant.tuple_field_list()),
-                        ))
-                    })
-                    .collect(),
-            },
+                {
+                    let Some(name) = variant.name() else {
+                        continue;
+                    };
+                    variant_ranges.push(name.syntax().text_range());
+                    variants.push((
+                        name_text(&name),
+                        shape_of(variant.record_field_list(), variant.tuple_field_list()),
+                    ));
+                }
+                ItemKind::Enum { variants }
+            }
             ast::Item::TypeAlias(it) => {
                 let has_value = it.ty().is_some();
                 if !has_value && !in_trait {
@@ -372,35 +458,42 @@ impl Ctx {
                 if let Some(tree) = it.use_tree() {
                     flatten_use_tree(&tree, &empty_path(), &mut imports);
                 }
+                let (imports, ranges): (Vec<Import>, Vec<_>) = imports.into_iter().unzip();
+                import_ranges = ranges;
                 ItemKind::Use { imports }
             }
         };
 
-        let index = len_u32(self.tree.items.len());
+        let index = ItemIndex(len_u32(self.out.tree.items.len()));
         let ptr = SyntaxPtr::new(&syntax);
-        self.tree.items.push(Item {
+        self.out.tree.items.push(Item {
             name,
-            name_range,
-            ptr,
             vis,
             attrs,
             kind,
             parent,
         });
-        self.tree.item_by_ptr.insert(ptr, index);
+        self.out.source_map.items.push(ItemSrc {
+            ptr,
+            name: name_range,
+            attrs: attr_ranges,
+            variants: variant_ranges,
+            imports: import_ranges,
+        });
+        self.out.source_map.item_by_ptr.insert(ptr, index);
 
         // Children: inline module items, associated items, bodies.
         match &item {
             ast::Item::Mod(it) => {
                 if let Some(list) = it.item_list() {
-                    let children: Vec<u32> = list
+                    let children: Vec<ItemIndex> = list
                         .items()
                         .filter_map(|child| self.lower_item(child, ItemParent::Item(index)))
                         .collect();
                     if let Some(Item {
                         kind: ItemKind::Mod { inline },
                         ..
-                    }) = self.tree.items.get_mut(index as usize)
+                    }) = self.out.tree.items.get_mut(index.idx())
                     {
                         *inline = Some(children);
                     }
@@ -411,7 +504,7 @@ impl Ctx {
                 if let Some(Item {
                     kind: ItemKind::Trait { items },
                     ..
-                }) = self.tree.items.get_mut(index as usize)
+                }) = self.out.tree.items.get_mut(index.idx())
                 {
                     *items = children;
                 }
@@ -421,7 +514,7 @@ impl Ctx {
                 if let Some(Item {
                     kind: ItemKind::Impl { items, .. },
                     ..
-                }) = self.tree.items.get_mut(index as usize)
+                }) = self.out.tree.items.get_mut(index.idx())
                 {
                     *items = children;
                 }
@@ -449,7 +542,11 @@ impl Ctx {
         Some(index)
     }
 
-    fn lower_assoc_items(&mut self, list: Option<ast::AssocItemList>, owner: u32) -> Vec<u32> {
+    fn lower_assoc_items(
+        &mut self,
+        list: Option<ast::AssocItemList>,
+        owner: ItemIndex,
+    ) -> Vec<ItemIndex> {
         let Some(list) = list else {
             return Vec::new();
         };
@@ -468,7 +565,7 @@ impl Ctx {
     fn parent_is_trait(&self, parent: ItemParent) -> bool {
         match parent {
             ItemParent::Item(index) => matches!(
-                self.tree.items.get(index as usize).map(|item| &item.kind),
+                self.out.tree.items.get(index.idx()).map(|item| &item.kind),
                 Some(ItemKind::Trait { .. })
             ),
             ItemParent::File | ItemParent::Block(_) => false,
@@ -476,21 +573,21 @@ impl Ctx {
     }
 
     /// Finds blocks with items in the body (or initializer) of item `owner`.
-    fn walk_body(&mut self, node: &SyntaxNode, owner: u32, current: Option<u32>) {
+    fn walk_body(&mut self, node: &SyntaxNode, owner: ItemIndex, current: Option<BlockIndex>) {
         if ast::BlockExpr::can_cast(node.kind()) {
             let has_items = node
                 .children()
                 .any(|child| ast::Item::can_cast(child.kind()));
             if has_items {
-                let index = len_u32(self.tree.blocks.len());
+                let index = BlockIndex(len_u32(self.out.tree.blocks.len()));
                 let ptr = SyntaxPtr::new(node);
-                self.tree.blocks.push(BlockScope {
-                    ptr,
+                self.out.tree.blocks.push(BlockScope {
                     owner,
                     parent_block: current,
                     items: Vec::new(),
                 });
-                self.tree.block_by_ptr.insert(ptr, index);
+                self.out.source_map.blocks.push(ptr);
+                self.out.source_map.block_by_ptr.insert(ptr, index);
                 let mut items = Vec::new();
                 for child in node.children() {
                     if let Some(item) = ast::Item::cast(child.clone()) {
@@ -501,7 +598,7 @@ impl Ctx {
                         self.walk_body(&child, owner, Some(index));
                     }
                 }
-                if let Some(block) = self.tree.blocks.get_mut(index as usize) {
+                if let Some(block) = self.out.tree.blocks.get_mut(index.idx()) {
                     block.items = items;
                 }
                 return;
@@ -549,21 +646,32 @@ impl Ctx {
     }
 }
 
-fn empty_path() -> Path {
-    Path {
-        kind: PathKind::Plain,
-        segments: Vec::new(),
-    }
+/// A path with the ranges of its segments.
+type RangedPath = (Path, Vec<TextRange>);
+
+fn empty_path() -> RangedPath {
+    (
+        Path {
+            kind: PathKind::Plain,
+            segments: Vec::new(),
+        },
+        Vec::new(),
+    )
+}
+
+fn is_empty_path(path: &Path) -> bool {
+    path.kind == PathKind::Plain && path.segments.is_empty()
 }
 
 /// `prefix` followed by `rest` (whose own kind is used only when `prefix` is empty).
-fn join_paths(prefix: &Path, rest: Path) -> Path {
-    if prefix.kind == PathKind::Plain && prefix.segments.is_empty() {
+fn join_paths(prefix: &RangedPath, rest: RangedPath) -> RangedPath {
+    if is_empty_path(&prefix.0) {
         return rest;
     }
-    let mut joined = prefix.clone();
-    joined.segments.extend(rest.segments);
-    joined
+    let (mut joined, mut ranges) = prefix.clone();
+    joined.segments.extend(rest.0.segments);
+    ranges.extend(rest.1);
+    (joined, ranges)
 }
 
 fn is_self_path(path: &Path) -> bool {
@@ -575,43 +683,48 @@ fn is_self_path(path: &Path) -> bool {
             .is_some_and(|segment| segment.name == "self")
 }
 
-fn flatten_use_tree(tree: &ast::UseTree, prefix: &Path, out: &mut Vec<Import>) {
+/// Flattens a use tree into imports, each with its range and its path segments' ranges.
+fn flatten_use_tree(
+    tree: &ast::UseTree,
+    prefix: &RangedPath,
+    out: &mut Vec<(Import, (TextRange, Vec<TextRange>))>,
+) {
     let range = tree.syntax().text_range();
     let own = tree
         .path()
         .and_then(|path| lower_path(&path, &mut |_| None))
-        .unwrap_or_else(empty_path);
+        .map_or_else(empty_path, |(path, ranges)| (path, ranges.to_vec()));
     let alias = tree
         .rename()
         .and_then(|rename| rename.name())
         .map(|name| name_text(&name));
-    if tree.star_token().is_some() {
-        out.push(Import {
-            path: join_paths(prefix, own),
+    let (path, segments) = if tree.star_token().is_some() {
+        let (path, segments) = join_paths(prefix, own);
+        let import = Import {
+            path,
             alias: None,
             glob: true,
-            range,
-        });
+        };
+        out.push((import, (range, segments)));
+        return;
     } else if let Some(list) = tree.use_tree_list() {
         let base = join_paths(prefix, own);
         for sub in list.use_trees() {
             flatten_use_tree(&sub, &base, out);
         }
-    } else if is_self_path(&own) && !(prefix.kind == PathKind::Plain && prefix.segments.is_empty())
-    {
+        return;
+    } else if is_self_path(&own.0) && !is_empty_path(&prefix.0) {
         // `a::{self}` imports `a` itself.
-        out.push(Import {
-            path: prefix.clone(),
-            alias,
-            glob: false,
-            range,
-        });
-    } else if !own.segments.is_empty() || own.kind != PathKind::Plain {
-        out.push(Import {
-            path: join_paths(prefix, own),
-            alias,
-            glob: false,
-            range,
-        });
-    }
+        prefix.clone()
+    } else if !is_empty_path(&own.0) {
+        join_paths(prefix, own)
+    } else {
+        return;
+    };
+    let import = Import {
+        path,
+        alias,
+        glob: false,
+    };
+    out.push((import, (range, segments)));
 }

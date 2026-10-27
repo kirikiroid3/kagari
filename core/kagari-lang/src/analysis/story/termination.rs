@@ -9,57 +9,81 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::db::Db;
-use crate::diagnostic::{Diagnostic, DiagnosticCode};
-use crate::hir::ExprId;
+use crate::diagnostic::{Diag, DiagnosticCode};
+use crate::hir::{Expr, ExprId, body_of};
+use crate::infer::inference;
+use crate::input::Program;
+use crate::mir::{BasicBlock, Body, Callee, Terminator, item_mir};
 use crate::signatures::ProgramSignatures;
-use crate::ty::{FnDefId, Ty, TyNode};
+use crate::ty::{FnDefId, Ty, TyKind, TyNode};
 
 use super::Scenes;
-use super::cfg::{BlockId, Callee, StoryBody, Term};
 
-/// The scenes a call can reach: its callee, or every scene a `scene fn` pointer of its
-/// type can hold. A parameter or return type that mentions a generic parameter (on either
+/// The scenes a call can reach: its callee, or every scene a `scene fn` pointer of type
+/// `ty` can hold. A parameter or return type that mentions a generic parameter (on either
 /// side) matches any type in that position; the other positions must be equal.
-pub(super) fn callees(
+fn callees(
     scenes: &Scenes<'_>,
     sigs: &ProgramSignatures,
     callee: &Callee,
+    ty: Option<&Ty>,
 ) -> Vec<usize> {
     let has_params = |ty: &Ty| {
         let mut found = false;
-        ty.walk(&mut |node| found |= matches!(node, TyNode::Ty(Ty::Param { .. })));
+        ty.walk(&mut |node| {
+            found |= matches!(node, TyNode::Ty(t) if matches!(t.kind(), TyKind::Param { .. }))
+        });
         found
     };
     let compatible = |a: &Ty, b: &Ty| a == b || has_params(a) || has_params(b);
     match callee {
-        Callee::Direct(fn_ref) => match fn_ref.def {
+        Callee::Fn(fn_ref) | Callee::Builtin(_, fn_ref) => match fn_ref.def {
             FnDefId::Item(item) => scenes.index.get(&item).copied().into_iter().collect(),
             _ => Vec::new(),
         },
-        Callee::Value {
-            ty: Ty::FnPtr { params, ret, .. },
-            ..
-        } => scenes
-            .list
-            .iter()
-            .enumerate()
-            .filter(|(_, scene)| {
-                sigs.fn_sig(scene.item).is_some_and(|sig| {
-                    sig.params.len() == params.len()
-                        && sig.params.iter().zip(params).all(|(a, b)| compatible(a, b))
-                        && compatible(&sig.ret, ret)
+        Callee::Value(_) => match ty.map(Ty::kind) {
+            Some(TyKind::FnPtr { params, ret, .. }) => scenes
+                .list
+                .iter()
+                .enumerate()
+                .filter(|(_, scene)| {
+                    sigs.fn_sig(scene.item).is_some_and(|sig| {
+                        sig.params.len() == params.len()
+                            && sig
+                                .params
+                                .iter()
+                                .zip(params.iter())
+                                .all(|(a, b)| compatible(a, b))
+                            && compatible(&sig.ret, ret)
+                    })
                 })
-            })
-            .map(|(index, _)| index)
-            .collect(),
-        // Not a pointer type: stage 3 rejected the call already.
-        Callee::Value { .. } => Vec::new(),
+                .map(|(index, _)| index)
+                .collect(),
+            // Not a pointer type: stage 3 rejected the call already.
+            _ => Vec::new(),
+        },
     }
+}
+
+/// The type of the callee expression of the call `call` in `scene`'s body.
+fn callee_ty(
+    db: &dyn Db,
+    program: Program,
+    scene: crate::item_tree::ItemId,
+    call: ExprId,
+) -> Option<Ty> {
+    let body = body_of(db, scene)?;
+    let Expr::Call { callee, .. } = body.store.expr(call) else {
+        return None;
+    };
+    inference(db, program, scene)?
+        .expr_types
+        .get(*callee)
+        .cloned()
 }
 
 /// What a scene reaches from `start` without passing a step.
 struct Reach {
-    blocks: FxHashSet<BlockId>,
     returns: bool,
     /// Scene calls reached: the callee and the call expression.
     calls: Vec<(usize, ExprId)>,
@@ -67,33 +91,41 @@ struct Reach {
     cycles: bool,
 }
 
+/// The scene calls of a body: the callees and the call expression of each call block.
+type Calls = FxHashMap<BasicBlock, (Vec<usize>, Option<ExprId>)>;
+
 /// `within`: the blocks of a loop body, outside which the search stops (leaving the loop
 /// and entering it again on a lap of an enclosing loop is not a path around it).
 fn reach(
-    body: &StoryBody,
-    calls: &FxHashMap<BlockId, Vec<usize>>,
+    body: &Body,
+    calls: &Calls,
     may_return: &[bool],
-    start: BlockId,
-    within: Option<&FxHashSet<BlockId>>,
+    start: BasicBlock,
+    within: Option<&FxHashSet<BasicBlock>>,
 ) -> Reach {
     let mut out = Reach {
-        blocks: FxHashSet::default(),
         returns: false,
         calls: Vec::new(),
         cycles: false,
     };
+    let mut seen = FxHashSet::default();
     let mut stack = vec![start];
-    out.blocks.insert(start);
+    seen.insert(start);
     while let Some(block) = stack.pop() {
-        let Some(data) = body.blocks.get(block) else {
+        let Some(data) = body.block(block) else {
             continue;
         };
-        let mut next = match &data.term {
-            Term::Step { .. } => Vec::new(),
-            Term::Call { expr, next, .. } => {
-                let targets = calls.get(&block).map(Vec::as_slice).unwrap_or_default();
-                out.calls
-                    .extend(targets.iter().map(|target| (*target, *expr)));
+        let next: Vec<BasicBlock> = match &data.term {
+            Terminator::Step { .. } => Vec::new(),
+            Terminator::SceneCall { next, .. } => {
+                let (targets, expr) = calls
+                    .get(&block)
+                    .map(|(targets, expr)| (targets.as_slice(), *expr))
+                    .unwrap_or_default();
+                if let Some(expr) = expr {
+                    out.calls
+                        .extend(targets.iter().map(|target| (*target, expr)));
+                }
                 if targets
                     .iter()
                     .any(|target| may_return.get(*target).copied().unwrap_or(false))
@@ -103,14 +135,12 @@ fn reach(
                     Vec::new()
                 }
             }
-            Term::Return { .. } => {
+            Terminator::Return => {
                 out.returns = true;
                 Vec::new()
             }
-            term => StoryBody::successors(term),
+            term => term.successors().to_vec(),
         };
-        // An atomic `break`, `continue` or `return` leaves before the terminator runs.
-        next.extend(data.exits.iter().flatten().copied());
         for next in next {
             if within.is_some_and(|region| !region.contains(&next)) {
                 continue;
@@ -118,7 +148,7 @@ fn reach(
             if next == start {
                 out.cycles = true;
             }
-            if out.blocks.insert(next) {
+            if seen.insert(next) {
                 stack.push(next);
             }
         }
@@ -129,21 +159,40 @@ fn reach(
 /// Reports stepless loops and stepless call cycles; returns whether there were none.
 pub(super) fn check(
     db: &dyn Db,
+    program: Program,
     scenes: &Scenes<'_>,
     sigs: &ProgramSignatures,
-    out: &mut Vec<Diagnostic>,
+    out: &mut Vec<Diag>,
 ) -> bool {
-    let calls: Vec<FxHashMap<BlockId, Vec<usize>>> = scenes
+    let mirs: Vec<_> = scenes
         .list
         .iter()
-        .map(|scene| {
-            scene
-                .body
+        .map(|scene| item_mir(db, program, scene.item).as_ref())
+        .collect();
+    let calls: Vec<Calls> = scenes
+        .list
+        .iter()
+        .zip(&mirs)
+        .map(|(scene, mir)| {
+            let Some(mir) = mir else {
+                return Calls::default();
+            };
+            mir.main
                 .blocks
                 .iter()
-                .enumerate()
                 .filter_map(|(block, data)| match &data.term {
-                    Term::Call { callee, .. } => Some((block, callees(scenes, sigs, callee))),
+                    Terminator::SceneCall { callee, .. } => {
+                        let ty = match callee {
+                            Callee::Value(_) => data
+                                .term_src
+                                .and_then(|call| callee_ty(db, program, scene.item, call)),
+                            _ => None,
+                        };
+                        Some((
+                            block,
+                            (callees(scenes, sigs, callee, ty.as_ref()), data.term_src),
+                        ))
+                    }
                     _ => None,
                 })
                 .collect()
@@ -152,21 +201,14 @@ pub(super) fn check(
     let mut may_return = vec![false; scenes.list.len()];
     loop {
         let mut changed = false;
-        for (index, scene) in scenes.list.iter().enumerate() {
+        for (index, mir) in mirs.iter().enumerate() {
             if may_return.get(index).copied().unwrap_or(true) {
                 continue;
             }
-            let Some(scene_calls) = calls.get(index) else {
+            let (Some(mir), Some(scene_calls)) = (mir, calls.get(index)) else {
                 continue;
             };
-            if reach(
-                &scene.body,
-                scene_calls,
-                &may_return,
-                scene.body.entry,
-                None,
-            )
-            .returns
+            if reach(&mir.main, scene_calls, &may_return, mir.main.entry, None).returns
                 && let Some(flag) = may_return.get_mut(index)
             {
                 *flag = true;
@@ -180,34 +222,26 @@ pub(super) fn check(
 
     let before = out.len();
     let mut edges: Vec<Vec<(usize, ExprId)>> = Vec::with_capacity(scenes.list.len());
-    for (index, scene) in scenes.list.iter().enumerate() {
-        let Some(scene_calls) = calls.get(index) else {
+    for (index, (scene, mir)) in scenes.list.iter().zip(&mirs).enumerate() {
+        let (Some(mir), Some(scene_calls)) = (mir, calls.get(index)) else {
             edges.push(Vec::new());
             continue;
         };
-        for (expr, header, region) in &scene.body.loops {
-            if reach(&scene.body, scene_calls, &may_return, *header, Some(region)).cycles
-                && scene.game
+        let body = &mir.main;
+        for info in &mir.loops {
+            let region: FxHashSet<BasicBlock> = info.region.iter().copied().collect();
+            if scene.game
+                && reach(body, scene_calls, &may_return, info.header, Some(&region)).cycles
             {
                 out.push(scene.diagnostic(
-                    db,
-                    *expr,
+                    info.src,
                     DiagnosticCode::AnalysisSteplessLoop,
                     "this loop can repeat without passing a step: every path around a loop \
                      in a scene must run `s!`, `choice!` or a scene that runs one",
                 ));
             }
         }
-        edges.push(
-            reach(
-                &scene.body,
-                scene_calls,
-                &may_return,
-                scene.body.entry,
-                None,
-            )
-            .calls,
-        );
+        edges.push(reach(body, scene_calls, &may_return, body.entry, None).calls);
     }
 
     for component in strongly_connected(&edges) {
@@ -225,10 +259,11 @@ pub(super) fn check(
             continue;
         }
         sites.sort_by_key(|(from, expr)| {
-            let scene = scenes.list.get(*from);
+            let item = scenes.list.get(*from).map(|scene| scene.item);
             (
-                scene.map(|scene| scene.item.index),
-                scene.map(|scene| scene.b.body.store.expr_range(*expr).start()),
+                item.map(|item| item.index),
+                item.and_then(|item| body_of(db, item))
+                    .map(|body| body.store.source_order(*expr)),
             )
         });
         let Some(&(first_scene, first_expr)) = sites.first() else {
@@ -260,18 +295,13 @@ pub(super) fn check(
             )
         };
         let mut diagnostic = scene.diagnostic(
-            db,
             first_expr,
             DiagnosticCode::AnalysisSteplessRecursion,
             message,
         );
         for &(from, expr) in sites.iter().skip(1) {
             if let Some(other) = scenes.list.get(from) {
-                diagnostic = diagnostic.with_related(
-                    other.b.item.file.path(db).clone(),
-                    other.b.body.store.expr_range(expr),
-                    "a call on the cycle",
-                );
+                diagnostic = diagnostic.with_related(other.anchor(expr), "a call on the cycle");
             }
         }
         out.push(diagnostic);

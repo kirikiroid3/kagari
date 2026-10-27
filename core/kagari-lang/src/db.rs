@@ -68,6 +68,19 @@ impl RootDatabase {
         }
     }
 
+    /// A database that reports every salsa event to `callback` (tests of incrementality).
+    pub fn with_event_callback(
+        fs: Arc<dyn FileSystem>,
+        callback: Box<dyn Fn(salsa::Event) + Send + Sync>,
+    ) -> Self {
+        RootDatabase {
+            storage: salsa::Storage::new(Some(callback)),
+            files: Arc::default(),
+            assets: Arc::default(),
+            fs,
+        }
+    }
+
     /// The program rooted at `root`, with default options.
     pub fn program(&self, root: FilePath) -> Program {
         self.program_with(root, CompileOptions::default())

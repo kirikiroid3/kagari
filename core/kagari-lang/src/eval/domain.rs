@@ -6,9 +6,9 @@ use rustc_hash::FxHashMap;
 use crate::hir::FnPtrKind;
 use crate::item_tree::{FnKind, ItemId};
 use crate::signatures::{FnSig, ProgramSignatures};
-use crate::ty::{FnDefId, FnRef, GenericArg, Ty};
+use crate::ty::{FnDefId, FnRef, GenericArg, GenericArgs, Ty, TyKind};
 
-use super::interp::{GenericEnv, subst_ty};
+use super::machine::value::{GenericEnv, subst_ty};
 use super::std_items::StdTable;
 use super::value::{AssetKind, ConstValue, Text};
 
@@ -40,9 +40,9 @@ impl DomainCtx<'_> {
             return None;
         }
         let depth = depth.saturating_add(1);
-        match ty {
-            Ty::Bool => Some(2),
-            Ty::Bounded { lo, hi } => {
+        match ty.kind() {
+            TyKind::Bool => Some(2),
+            TyKind::Bounded { lo, hi } => {
                 let (lo, hi) = (lo.value()?, hi.value()?);
                 if hi < lo {
                     return Some(0);
@@ -53,18 +53,18 @@ impl DomainCtx<'_> {
                         .saturating_add(1),
                 )
             }
-            Ty::Tuple(fields) => fields.iter().try_fold(1u64, |acc, field| {
+            TyKind::Tuple(fields) => fields.iter().try_fold(1u64, |acc, field| {
                 Some(acc.saturating_mul(self.size_at(field, depth)?))
             }),
-            Ty::Array { elem, len } => {
+            TyKind::Array { elem, len } => {
                 let len = u32::try_from(len.value()?).ok()?;
                 Some(self.size_at(elem, depth)?.saturating_pow(len))
             }
-            Ty::Ref { inner, .. } => self.size_at(inner, depth),
-            Ty::FnPtr { kind, params, ret } => Some(
+            TyKind::Ref { inner, .. } => self.size_at(inner, depth),
+            TyKind::FnPtr { kind, params, ret } => Some(
                 u64::try_from(self.functions_of(*kind, params, ret)?.len()).unwrap_or(u64::MAX),
             ),
-            Ty::Adt { item, args } => {
+            TyKind::Adt { item, args } => {
                 if *item == self.std.text {
                     return Some(u64::try_from(self.texts.len()).unwrap_or(u64::MAX));
                 }
@@ -101,9 +101,9 @@ impl DomainCtx<'_> {
             return None;
         }
         let depth = depth.saturating_add(1);
-        match ty {
-            Ty::Bool => Some(vec![ConstValue::Bool(false), ConstValue::Bool(true)]),
-            Ty::Bounded { lo, hi } => {
+        match ty.kind() {
+            TyKind::Bool => Some(vec![ConstValue::Bool(false), ConstValue::Bool(true)]),
+            TyKind::Bounded { lo, hi } => {
                 let (lo, hi) = (lo.value()?, hi.value()?);
                 let mut out = Vec::new();
                 let mut value = lo;
@@ -116,7 +116,7 @@ impl DomainCtx<'_> {
                 }
                 Some(out)
             }
-            Ty::Tuple(fields) => {
+            TyKind::Tuple(fields) => {
                 let domains = fields
                     .iter()
                     .map(|field| self.values_at(field, depth))
@@ -124,35 +124,35 @@ impl DomainCtx<'_> {
                 Some(
                     product(&domains)
                         .into_iter()
-                        .map(ConstValue::Tuple)
+                        .map(|items| ConstValue::Tuple(items.into()))
                         .collect(),
                 )
             }
-            Ty::Array { elem, len } => {
+            TyKind::Array { elem, len } => {
                 let len = usize::try_from(len.value()?).ok()?;
                 let elems = self.values_at(elem, depth)?;
                 let domains = vec![elems; len];
                 Some(
                     product(&domains)
                         .into_iter()
-                        .map(ConstValue::Array)
+                        .map(|items| ConstValue::Array(items.into()))
                         .collect(),
                 )
             }
-            Ty::Ref { inner, .. } => self.values_at(inner, depth),
-            Ty::FnPtr { kind, params, ret } => Some(
+            TyKind::Ref { inner, .. } => self.values_at(inner, depth),
+            TyKind::FnPtr { kind, params, ret } => Some(
                 self.functions_of(*kind, params, ret)?
                     .into_iter()
                     .map(|item| {
                         ConstValue::Fn(FnRef {
                             def: FnDefId::Item(item),
                             self_ty: None,
-                            args: Vec::new(),
+                            args: GenericArgs::empty(),
                         })
                     })
                     .collect(),
             ),
-            Ty::Adt { item, args } => {
+            TyKind::Adt { item, args } => {
                 if *item == self.std.text {
                     return Some(self.texts.iter().cloned().map(ConstValue::Text).collect());
                 }
@@ -175,7 +175,7 @@ impl DomainCtx<'_> {
                     out.extend(product(&domains).into_iter().map(|fields| ConstValue::Adt {
                         item: *item,
                         variant,
-                        fields,
+                        fields: fields.into(),
                     }));
                 }
                 Some(out)

@@ -42,8 +42,9 @@ A game is compiled from one root file into one `.kagari` bytecode file.
      anything are reported.
    - *System checks.* The [mode-graph checks](./system.md#system-checks).
 6. **Emit.** The story, the renders and the system code are compiled into
-   [bytecode](./bytecode.md), which is verified before it is written. Emit diagnostics are
-   `E7xxx`: a root file without `fn main()` is `E7001`.
+   [bytecode](./bytecode.md), which is verified before it is written. Only the functions reachable
+   from `fn main`, the entry scenes and the statics (by calls or as function values) are emitted.
+   Emit diagnostics are `E7xxx`: a root file without `fn main()` is `E7001`.
 
 Stages 1–4 are cheap. Stage 5 is where the analyses described in the proposal run.
 

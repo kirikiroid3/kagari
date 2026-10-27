@@ -22,26 +22,27 @@
 //!   count as pushes.
 
 pub(crate) mod code;
+mod summary;
 
 use std::collections::VecDeque;
 
-use kagari_syntax::TextRange;
 use rustc_hash::FxHashSet;
 
 use crate::db::Db;
 use crate::def_map::{CrateId, def_maps};
-use crate::diagnostic::{Diagnostic, DiagnosticCode};
+use crate::diagnostic::{Anchor, Diag, DiagnosticCode};
 use crate::hir::Name;
 use crate::input::{Program, SourceFile};
+use crate::item_tree::ItemIndex;
 use crate::item_tree::{ItemId, ItemKind, item_tree};
 use crate::signatures::{ProgramSignatures, program_signatures};
 
-use code::{BindingAction, Code, Ctx, SystemRoot, SystemStd};
+use code::{BindingAction, Code, Ctx, SystemRoot};
 
-pub(super) fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
+pub(super) fn check(db: &dyn Db, program: Program) -> Vec<Diag> {
     let maps = def_maps(db, program);
     let sigs = program_signatures(db, program);
-    let Some(std) = SystemStd::new(db, maps, sigs) else {
+    let Some(std) = summary::system_std(db, program).as_ref() else {
         return Vec::new();
     };
     let mut ctx = Ctx::new(db, program, maps, std);
@@ -124,13 +125,15 @@ impl OpKind {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Op {
     kind: OpKind,
     /// The function named as the target, when the argument is a path to one.
     target: Option<ItemId>,
-    file: SourceFile,
-    range: TextRange,
+    anchor: Anchor,
+    /// Where the operation sits in its file (item index, source order); orders the notes
+    /// of a diagnostic.
+    order: (ItemIndex, u32),
 }
 
 /// A mode of the graph: a component, or the game mode.
@@ -138,14 +141,12 @@ struct Node {
     item: ItemId,
     kind: ModeKind,
     name: Name,
-    name_range: TextRange,
     /// Whether the component is game code (diagnostics are reported only there).
     game_code: bool,
     code: Code,
 }
 
-struct Graph<'db> {
-    db: &'db dyn Db,
+struct Graph {
     /// The components, and the game mode when `main` names it, in source order.
     nodes: Vec<Node>,
     /// The start page.
@@ -154,8 +155,8 @@ struct Graph<'db> {
     files: Vec<(SourceFile, CrateId)>,
 }
 
-impl<'db> Graph<'db> {
-    fn new(ctx: &mut Ctx<'db>, sigs: &ProgramSignatures, root: Option<&SystemRoot>) -> Graph<'db> {
+impl Graph {
+    fn new(ctx: &mut Ctx<'_>, sigs: &ProgramSignatures, root: Option<&SystemRoot>) -> Graph {
         let files = ctx.maps.files.clone();
         let mut items = Vec::new();
         for &(file, krate) in &files {
@@ -167,7 +168,7 @@ impl<'db> Graph<'db> {
                 let ItemKind::Fn { has_body: true, .. } = data.kind else {
                     continue;
                 };
-                let Ok(index) = u32::try_from(index) else {
+                let Some(index) = ItemIndex::from_usize(index) else {
                     continue;
                 };
                 let item = ItemId { file, index };
@@ -189,14 +190,13 @@ impl<'db> Graph<'db> {
         items.sort_by_key(|(item, _)| order(item));
         let mut nodes = Vec::new();
         for (item, kind) in items {
-            let Some((name, name_range)) = ctx.item_name(item) else {
+            let Some(name) = ctx.item_name(item) else {
                 continue;
             };
             nodes.push(Node {
                 item,
                 kind,
                 name,
-                name_range,
                 game_code: files.contains(&(item.file, CrateId::Game)),
                 code: ctx.code(&[item]),
             });
@@ -207,7 +207,6 @@ impl<'db> Graph<'db> {
                 .position(|node| node.item == root.start && node.kind == ModeKind::RootPage)
         });
         Graph {
-            db: ctx.db,
             nodes,
             start,
             files,
@@ -232,20 +231,14 @@ impl<'db> Graph<'db> {
     }
 
     /// A diagnostic at a mode's name, when the mode is game code.
-    fn at_node(&self, node: &Node, code: DiagnosticCode, message: String) -> Option<Diagnostic> {
-        node.game_code.then(|| {
-            Diagnostic::new(
-                node.item.file.path(self.db).clone(),
-                node.name_range,
-                code,
-                message,
-            )
-        })
+    fn at_node(&self, node: &Node, code: DiagnosticCode, message: String) -> Option<Diag> {
+        node.game_code
+            .then(|| Diag::new(Anchor::ItemName(node.item), code, message))
     }
 
     /// `nav::back()` in the code of a root page or of the game mode, once per call site and
     /// named after the first such mode in source order. Exit handlers run in the game mode.
-    fn back_from_base(&self, diagnostics: &mut Vec<Diagnostic>) {
+    fn back_from_base(&self, diagnostics: &mut Vec<Diag>) {
         let game_message = "`nav::back()` in the game mode does nothing: the game mode is a base \
                             of the mode stack";
         let backs = |ops: &[Op]| -> Vec<Op> {
@@ -287,12 +280,11 @@ impl<'db> Graph<'db> {
         );
         let mut seen = FxHashSet::default();
         for (op, message) in sites {
-            if !self.is_game_file(op.file) || !seen.insert((op.file, op.range)) {
+            if !self.is_game_file(op.anchor.file()) || !seen.insert(op.anchor) {
                 continue;
             }
-            diagnostics.push(Diagnostic::new(
-                op.file.path(self.db).clone(),
-                op.range,
+            diagnostics.push(Diag::new(
+                op.anchor,
                 DiagnosticCode::SystemBackFromBase,
                 message,
             ));
@@ -301,7 +293,7 @@ impl<'db> Graph<'db> {
 
     /// Cycles of pushes between overlays, game overlays and dialogs, one warning per
     /// strongly connected component at its first mode in source order.
-    fn unbounded_stack(&self, diagnostics: &mut Vec<Diagnostic>) {
+    fn unbounded_stack(&self, diagnostics: &mut Vec<Diag>) {
         let mut edges: Vec<Vec<(usize, Op)>> = self.nodes.iter().map(|_| Vec::new()).collect();
         for (from, node) in self.nodes.iter().enumerate() {
             if !node.kind.is_pushed() {
@@ -370,10 +362,10 @@ impl<'db> Graph<'db> {
                     "the {plural} {names} open each other: the mode stack can grow without bound"
                 )
             };
-            let mut notes: Vec<(usize, TextRange, SourceFile, String)> = Vec::new();
+            let mut notes: Vec<(usize, (ItemIndex, u32), Anchor, String)> = Vec::new();
             for &from in &component {
                 for (to, op) in &edges[from] {
-                    if !component.contains(to) || !self.is_game_file(op.file) {
+                    if !component.contains(to) || !self.is_game_file(op.anchor.file()) {
                         continue;
                     }
                     let from_name = &self.nodes[from].name;
@@ -382,18 +374,18 @@ impl<'db> Graph<'db> {
                     } else {
                         format!("`{from_name}` opens `{}` here", self.nodes[*to].name)
                     };
-                    notes.push((self.file_order(op.file), op.range, op.file, note));
+                    notes.push((self.file_order(op.anchor.file()), op.order, op.anchor, note));
                 }
             }
-            notes.sort_by(|a, b| (a.0, a.1.start(), &a.3).cmp(&(b.0, b.1.start(), &b.3)));
+            notes.sort_by(|a, b| (a.0, a.1, &a.3).cmp(&(b.0, b.1, &b.3)));
             notes.dedup();
             let Some(mut diagnostic) =
                 self.at_node(node, DiagnosticCode::SystemUnboundedStack, message)
             else {
                 continue;
             };
-            for (_, range, file, note) in notes {
-                diagnostic = diagnostic.with_related(file.path(self.db).clone(), range, note);
+            for (_, _, anchor, note) in notes {
+                diagnostic = diagnostic.with_related(anchor, note);
             }
             diagnostics.push(diagnostic);
         }
@@ -401,7 +393,7 @@ impl<'db> Graph<'db> {
 
     /// Modes no path from the start page shows, and reachable pushed modes that cannot be
     /// left.
-    fn reachability(&self, root: &SystemRoot, diagnostics: &mut Vec<Diagnostic>) {
+    fn reachability(&self, root: &SystemRoot, diagnostics: &mut Vec<Diag>) {
         let Some(start) = self.start else {
             return;
         };

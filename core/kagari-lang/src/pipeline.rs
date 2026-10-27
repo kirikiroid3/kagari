@@ -7,12 +7,12 @@ use crate::def_map::def_maps;
 use crate::diagnostic::{Diagnostic, DiagnosticCode, Severity};
 use crate::eval::const_eval;
 use crate::input::Program;
-use crate::item_tree::item_tree;
+use crate::item_tree::item_tree_diagnostics;
 use crate::parse_query::parse;
-use crate::resolve::file_resolution;
+use crate::resolve::{body_resolution, signature_resolution};
 use crate::signatures::program_signatures;
-use crate::typeck::exhaustive::file_pattern_checks;
-use crate::typeck::kinds::{file_kind_checks, instant_recursion};
+use crate::typeck::exhaustive::pattern_checks;
+use crate::typeck::kinds::{instant_recursion, kind_checks};
 
 /// Every diagnostic of the program and the standard library, sorted by location and
 /// deduplicated. Stage 5 runs only on a program without errors from stages 1–4: its
@@ -20,8 +20,17 @@ use crate::typeck::kinds::{file_kind_checks, instant_recursion};
 #[salsa::tracked(returns(ref))]
 pub fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
     let maps = def_maps(db, program);
-    let mut diags = maps.diagnostics.clone();
-    diags.extend(program_signatures(db, program).diagnostics.iter().cloned());
+    let mut diags: Vec<Diagnostic> = maps
+        .diagnostics
+        .iter()
+        .map(|diag| diag.resolve(db))
+        .collect();
+    diags.extend(
+        program_signatures(db, program)
+            .diagnostics
+            .iter()
+            .map(|diag| diag.resolve(db)),
+    );
     for &(file, _) in &maps.files {
         let path = file.path(db);
         if file.text(db).is_some() {
@@ -35,37 +44,47 @@ pub fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
             }));
         }
         diags.extend(
-            item_tree(db, file)
-                .diagnostics
+            item_tree_diagnostics(db, file)
                 .iter()
-                .map(|(range, code, message)| {
-                    Diagnostic::new(path.clone(), *range, *code, message.clone())
-                }),
+                .map(|diag| diag.resolve(db)),
         );
-        diags.extend(
-            file_resolution(db, program, file)
-                .diagnostics
-                .iter()
-                .cloned(),
-        );
-        diags.extend(
-            crate::infer::file_inference(db, program, file)
-                .diagnostics
-                .iter()
-                .cloned(),
-        );
-        diags.extend(file_pattern_checks(db, program, file).iter().cloned());
-        diags.extend(
-            file_kind_checks(db, program, file)
-                .diagnostics
-                .iter()
-                .cloned(),
-        );
+        for index in crate::item_tree::item_tree(db, file).indices() {
+            let item = crate::item_tree::ItemId { file, index };
+            let sig = &signature_resolution(db, program, item).diagnostics;
+            let body = &body_resolution(db, program, item).diagnostics;
+            diags.extend(sig.iter().chain(body).map(|diag| diag.resolve(db)));
+        }
+        for item in crate::item_tree::item_tree(db, file).indices() {
+            let item = crate::item_tree::ItemId { file, index: item };
+            if let Some(out) = crate::infer::infer(db, program, item) {
+                diags.extend(out.diagnostics.iter().map(|diag| diag.resolve(db)));
+            }
+        }
+        for index in crate::item_tree::item_tree(db, file).indices() {
+            let item = crate::item_tree::ItemId { file, index };
+            let patterns = pattern_checks(db, program, item);
+            let kinds = &kind_checks(db, program, item).diagnostics;
+            diags.extend(patterns.iter().chain(kinds).map(|diag| diag.resolve(db)));
+        }
     }
-    diags.extend(instant_recursion(db, program).iter().cloned());
-    diags.extend(const_eval(db, program).diagnostics.iter().cloned());
+    diags.extend(
+        instant_recursion(db, program)
+            .iter()
+            .map(|diag| diag.resolve(db)),
+    );
+    diags.extend(
+        const_eval(db, program)
+            .diagnostics
+            .iter()
+            .map(|diag| diag.resolve(db)),
+    );
     if !diags.iter().any(|diag| diag.severity == Severity::Error) {
-        diags.extend(analysis(db, program).diagnostics.iter().cloned());
+        diags.extend(
+            analysis(db, program)
+                .diagnostics
+                .iter()
+                .map(|diag| diag.resolve(db)),
+        );
     }
     diags.sort_by(|a, b| {
         (

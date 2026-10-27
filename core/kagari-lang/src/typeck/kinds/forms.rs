@@ -10,7 +10,7 @@ use crate::infer::ValueRef;
 use crate::item_tree::{ItemId, Shape};
 use crate::resolve::LocalId;
 use crate::signatures::{ItemSig, assoc_parent};
-use crate::ty::Ty;
+use crate::ty::{Ty, TyKind};
 
 use super::body::{BodyChecker, MustUseLocal};
 
@@ -39,7 +39,7 @@ impl BodyChecker<'_, '_> {
 
     /// A string literal, unique among the choices of the function.
     fn choice_id(&mut self, id: ExprId) {
-        let range = self.range(id);
+        let range = self.anchor(id);
         match self.store.expr(id) {
             Expr::Literal(Literal::String(text)) => {
                 if let Some(&first) = self.choice_ids.get(text) {
@@ -53,7 +53,7 @@ impl BodyChecker<'_, '_> {
                                 self.env.fn_path(self.item)
                             ),
                         )
-                        .with_related(self.path.clone(), first, "first used here");
+                        .with_related(first, "first used here");
                     self.report(diag);
                 } else {
                     self.choice_ids.insert(text.clone(), range);
@@ -82,7 +82,7 @@ impl BodyChecker<'_, '_> {
             _ if self.ty(arms).is_none() => return,
             _ => {
                 let diag = self.diag(
-                    self.range(arms),
+                    self.anchor(arms),
                     DiagnosticCode::KindChoiceArms,
                     "the `arms` of a choice must be an array literal of `ChoiceArm { … }` records",
                 );
@@ -110,7 +110,7 @@ impl BodyChecker<'_, '_> {
                 _ if self.ty(arm).is_none() => continue,
                 _ => {
                     let diag = self.diag(
-                        self.range(arm),
+                        self.anchor(arm),
                         DiagnosticCode::KindChoiceArms,
                         "an arm of a choice must be a `ChoiceArm { … }` record",
                     );
@@ -133,7 +133,7 @@ impl BodyChecker<'_, '_> {
         if matches!(self.store.expr(value), Expr::Missing) || self.ty(value).is_none() {
             return;
         }
-        let range = self.range(value);
+        let range = self.anchor(value);
         let variant = match (self.store.expr(value), self.infer.paths.get(&value)) {
             (Expr::Path(_), Some(ValueRef::Ctor(ctor))) => ctor.variant.and_then(|variant| {
                 let adt = self.env.sigs.adt(ctor.adt)?;
@@ -158,17 +158,19 @@ impl BodyChecker<'_, '_> {
             None => *first = Some(adt),
         }
         if let Some(&previous) = seen.get(&variant) {
-            let diag = self
+            let mut anchors = Vec::new();
+            let mut diag = self
                 .diag(
                     range,
                     DiagnosticCode::KindChoiceArms,
                     format!(
                         "`{}` is already an arm of this choice: each variant may be chosen at \
                          most once",
-                        self.src(value)
+                        self.src(&mut anchors, value)
                     ),
                 )
-                .with_related(self.path.clone(), self.range(previous), "first used here");
+                .with_related(self.anchor(previous), "first used here");
+            diag.message_anchors = anchors;
             self.report(diag);
         } else {
             seen.insert(variant, value);
@@ -186,7 +188,7 @@ impl BodyChecker<'_, '_> {
             _ if self.ty(*base).is_none() => return,
             _ => {
                 let diag = self.diag(
-                    self.range(*base),
+                    self.anchor(*base),
                     DiagnosticCode::KindRubyReadings,
                     "the base text of a ruby must be a string literal",
                 );
@@ -200,7 +202,7 @@ impl BodyChecker<'_, '_> {
             _ if self.ty(*readings).is_none() => return,
             _ => {
                 let diag = self.diag(
-                    self.range(*readings),
+                    self.anchor(*readings),
                     DiagnosticCode::KindRubyReadings,
                     "the readings of a mono ruby must be an array literal",
                 );
@@ -213,7 +215,7 @@ impl BodyChecker<'_, '_> {
             return;
         }
         let diag = self.diag(
-            self.range(expr),
+            self.anchor(expr),
             DiagnosticCode::KindRubyReadings,
             format!(
                 "a mono ruby needs one reading per character: `{text}` has {} but {} given",
@@ -235,7 +237,7 @@ impl BodyChecker<'_, '_> {
             return None;
         }
         let diag = self.diag(
-            self.range(effect),
+            self.anchor(effect),
             DiagnosticCode::KindEffectNotConstant,
             "the effect of a text effect must be a constant expression",
         );
@@ -247,11 +249,13 @@ impl BodyChecker<'_, '_> {
 
     /// The `#[must_use]` ADT of `ty` or of the value it references.
     fn must_use_adt(&self, mut ty: &Ty) -> Option<ItemId> {
-        while let Ty::Ref { inner, .. } = ty {
+        while let TyKind::Ref { inner, .. } = ty.kind() {
             ty = inner;
         }
-        match ty {
-            Ty::Adt { item, .. } if self.env.sigs.adt(*item).is_some_and(|adt| adt.must_use) => {
+        match ty.kind() {
+            TyKind::Adt { item, .. }
+                if self.env.sigs.adt(*item).is_some_and(|adt| adt.must_use) =>
+            {
                 Some(*item)
             }
             _ => None,
@@ -262,7 +266,7 @@ impl BodyChecker<'_, '_> {
     /// `apply_animation`". The methods of the type itself complete it.
     fn unused_message(&self, ty: &Ty, adt: ItemId) -> String {
         let mut inner = ty;
-        while let Ty::Ref { inner: next, .. } = inner {
+        while let TyKind::Ref { inner: next, .. } = inner.kind() {
             inner = next;
         }
         let mut message = format!("unused `{}` that must be used", self.env.show(inner));
@@ -297,7 +301,11 @@ impl BodyChecker<'_, '_> {
             return;
         };
         let message = self.unused_message(ty, adt);
-        let diag = self.diag(self.range(expr), DiagnosticCode::KindUnusedMustUse, message);
+        let diag = self.diag(
+            self.anchor(expr),
+            DiagnosticCode::KindUnusedMustUse,
+            message,
+        );
         self.report(diag);
     }
 
@@ -331,10 +339,10 @@ impl BodyChecker<'_, '_> {
         };
         let owner =
             assoc_parent(self.env.db, method).and_then(|parent| match self.env.sigs.get(parent) {
-                Some(ItemSig::Impl {
-                    self_ty: Ty::Adt { item, .. },
-                    ..
-                }) => Some(*item),
+                Some(ItemSig::Impl { self_ty, .. }) => match self_ty.kind() {
+                    TyKind::Adt { item, .. } => Some(*item),
+                    _ => None,
+                },
                 _ => None,
             });
         if owner == Some(entry.adt) {
@@ -353,7 +361,7 @@ impl BodyChecker<'_, '_> {
         for (pat, ty, adt) in unused {
             let message = self.unused_message(&ty, adt);
             let diag = self.diag(
-                self.store.pat_range(pat),
+                self.pat_anchor(pat),
                 DiagnosticCode::KindUnusedMustUse,
                 message,
             );

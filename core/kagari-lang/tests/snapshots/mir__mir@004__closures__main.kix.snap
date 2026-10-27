@@ -1,0 +1,334 @@
+---
+source: core/kagari-lang/tests/mir.rs
+expression: out
+input_file: core/kagari-lang/tests/bytecode/004__closures/main.kix
+---
+fn crate::apply(_1: fn(u32) -> u32, _2: u32) -> u32 {
+    let mut _0: u32; // return
+    let _1: fn(u32) -> u32; // f
+    let _2: u32; // x
+    bb0 (entry): {
+        _0 = (copy _1)(copy _2);
+        return;
+    }
+}
+
+fn crate::double(_1: u32) -> u32 {
+    let mut _0: u32; // return
+    let _1: u32; // x
+    bb0 (entry): {
+        _0 = IntBin::<u32>(Mul, copy _1, const 2);
+        return;
+    }
+}
+
+fn crate::closures(_1: u32, _2: u32) -> Option<u32> {
+    let mut _0: Option<u32>; // return
+    let _1: u32; // a
+    let _2: u32; // b
+    let _3: Fn(u32) -> u32; // add
+    let _4: const fn(u32) -> Option<u32>; // wrap
+    let _5: const fn(u32) -> Option<u32>; // temp
+    let _6: u32; // temp
+    let _7: u32; // temp
+    bb0 (entry): {
+        _3 = {closure#0}(copy _1, copy _2);
+        _4 = fn std::Option::Some::<u32>;
+        _5 = copy _4;
+        _7 = (copy _3)(const 1);
+        _6 = crate::apply(fn crate::double, copy _7);
+        _0 = (copy _5)(copy _6);
+        return;
+    }
+}
+
+fn crate::closures::{closure#0}(_1: u32, _2: u32, _3: u32) -> u32 {
+    let mut _0: u32; // return
+    let _1: u32; // a
+    let _2: u32; // b
+    let _3: u32; // x
+    let _4: u32; // temp
+    bb0 (entry): {
+        _4 = IntBin::<u32>(Add, copy _3, copy _1);
+        _0 = IntBin::<u32>(Add, copy _4, copy _2);
+        return;
+    }
+}
+
+scene crate::Show() -> () {
+    let mut _0: (); // return
+    let _1: (); // temp
+    bb0 (entry): {
+        _1 = step(const {promoted#0}) -> bb1;
+    }
+    bb1: {
+        _0 = const ();
+        return;
+    }
+}
+
+const fn crate::Show::{closure#0}(_1: Screen) -> Screen {
+    let mut _0: Screen; // return
+    let mut _1: Screen; // screen cell
+    let _2: &mut Swap; // temp
+    let _3: &mut Swap; // temp
+    let _4: &mut ImageLayer; // temp
+    let _5: &mut ImageLayer; // temp
+    let _6: &mut Screen; // temp
+    let _7: Transition; // temp
+    let _8: (); // temp
+    bb0 (entry): {
+        _6 = &mut _1;
+        _5 = std::screen::Screen::background(copy _6);
+        _4 = &mut (*_5);
+        _3 = builtin[ImageLayerClear] std::screen::ImageLayer::clear(copy _4);
+        _2 = &mut (*_3);
+        _7 = std::screen::anim::cut();
+        _8 = builtin[SwapApplyAnimation] std::screen::Swap::apply_animation(copy _2, copy _7);
+        _0 = copy _1;
+        return;
+    }
+}
+
+const crate::Show::{promoted#0}() -> Say {
+    let mut _0: Say; // return
+    let _1: Option<Text>; // temp
+    let _2: Option<VoiceAsset>; // temp
+    let _3: Option<const fn(Screen) -> Screen>; // temp
+    let _4: const fn(Screen) -> Screen; // temp
+    let _5: Option<Text>; // temp
+    let _6: Option<Text>; // temp
+    bb0 (entry): {
+        _1 = std::Option::None::<Text>;
+        _2 = std::Option::None::<VoiceAsset>;
+        _4 = {closure#0}();
+        _3 = std::Option::Some::<const fn(Screen) -> Screen>(copy _4);
+        _5 = std::Option::Some::<Text>(const "Hello.");
+        _6 = std::Option::None::<Text>;
+        _0 = std::narrative::Say { copy _1, copy _2, copy _3, copy _5, copy _6 };
+        return;
+    }
+}
+
+const crate::TEXT_SPEED() -> Setting<Duration> {
+    let mut _0: Setting<Duration>; // return
+    let _1: Duration; // temp
+    bb0 (entry): {
+        _1 = std::time::ms(const 30);
+        _0 = builtin[Setting] std::system::setting::<Duration>(copy _1);
+        return;
+    }
+}
+
+const crate::AUTO_DELAY() -> Setting<Duration> {
+    let mut _0: Setting<Duration>; // return
+    let _1: Duration; // temp
+    bb0 (entry): {
+        _1 = std::time::ms(const 1300);
+        _0 = builtin[Setting] std::system::setting::<Duration>(copy _1);
+        return;
+    }
+}
+
+const crate::AUTO_DELAY_PER_CHAR() -> Setting<Duration> {
+    let mut _0: Setting<Duration>; // return
+    let _1: Duration; // temp
+    bb0 (entry): {
+        _1 = std::time::ms(const 60);
+        _0 = builtin[Setting] std::system::setting::<Duration>(copy _1);
+        return;
+    }
+}
+
+const crate::SKIP_UNREAD() -> Setting<bool> {
+    let mut _0: Setting<bool>; // return
+    bb0 (entry): {
+        _0 = builtin[Setting] std::system::setting::<bool>(const false);
+        return;
+    }
+}
+
+const crate::MASTER() -> Setting<Volume> {
+    let mut _0: Setting<Volume>; // return
+    let _1: Volume; // temp
+    bb0 (entry): {
+        _1 = std::system::volume(const 100);
+        _0 = builtin[Setting] std::system::setting::<Volume>(copy _1);
+        return;
+    }
+}
+
+const crate::MUSIC() -> Setting<Volume> {
+    let mut _0: Setting<Volume>; // return
+    let _1: Volume; // temp
+    bb0 (entry): {
+        _1 = std::system::volume(const 60);
+        _0 = builtin[Setting] std::system::setting::<Volume>(copy _1);
+        return;
+    }
+}
+
+const crate::SOUND() -> Setting<Volume> {
+    let mut _0: Setting<Volume>; // return
+    let _1: Volume; // temp
+    bb0 (entry): {
+        _1 = std::system::volume(const 100);
+        _0 = builtin[Setting] std::system::setting::<Volume>(copy _1);
+        return;
+    }
+}
+
+const crate::VOICE() -> Setting<Volume> {
+    let mut _0: Setting<Volume>; // return
+    let _1: Volume; // temp
+    bb0 (entry): {
+        _1 = std::system::volume(const 100);
+        _0 = builtin[Setting] std::system::setting::<Volume>(copy _1);
+        return;
+    }
+}
+
+const crate::VOICE_SUSTAIN() -> Setting<bool> {
+    let mut _0: Setting<bool>; // return
+    bb0 (entry): {
+        _0 = builtin[Setting] std::system::setting::<bool>(const false);
+        return;
+    }
+}
+
+const crate::WAIT_FOR_VOICE() -> Setting<bool> {
+    let mut _0: Setting<bool>; // return
+    bb0 (entry): {
+        _0 = builtin[Setting] std::system::setting::<bool>(const true);
+        return;
+    }
+}
+
+const crate::WINDOW_OPACITY() -> Setting<Int<0, 100>> {
+    let mut _0: Setting<Int<0, 100>>; // return
+    bb0 (entry): {
+        _0 = builtin[Setting] std::system::setting::<Int<0, 100>>(const 80);
+        return;
+    }
+}
+
+const crate::FULLSCREEN() -> Setting<bool> {
+    let mut _0: Setting<bool>; // return
+    bb0 (entry): {
+        _0 = builtin[Setting] std::system::setting::<bool>(const false);
+        return;
+    }
+}
+
+const crate::ANIMATIONS() -> Setting<bool> {
+    let mut _0: Setting<bool>; // return
+    bb0 (entry): {
+        _0 = builtin[Setting] std::system::setting::<bool>(const true);
+        return;
+    }
+}
+
+fn crate::main() -> System {
+    let mut _0: System; // return
+    let _1: Option<u32>; // temp
+    let _2: Size; // temp
+    let _3: TextStyle; // temp
+    let _4: Settings; // temp
+    let _5: Vec<Binding>; // temp
+    bb0 (entry): {
+        _1 = crate::closures(const 1, const 2);
+        _2 = std::screen::size(const 1280, const 720);
+        _3 = std::narrative::text::text_style(const 26, const std::screen::WHITE);
+        _4 = std::system::Settings { handle crate::TEXT_SPEED, handle crate::AUTO_DELAY, handle crate::AUTO_DELAY_PER_CHAR, handle crate::SKIP_UNREAD, handle crate::MASTER, handle crate::MUSIC, handle crate::SOUND, handle crate::VOICE, handle crate::VOICE_SUSTAIN, handle crate::WAIT_FOR_VOICE, handle crate::WINDOW_OPACITY, handle crate::FULLSCREEN, handle crate::ANIMATIONS };
+        _5 = std::system::default_bindings();
+        _0 = std::system::System { const "Closures", copy _2, fn crate::Title, fn crate::GameView, const 20, const 3, const 200, copy _3, copy _4, copy _5 };
+        return;
+    }
+}
+
+fn crate::Title() -> RootPage {
+    let mut _0: RootPage; // return
+    let _1: Element; // temp
+    let _2: [Fn() -> Element; 1]; // temp
+    let _3: Fn() -> Element; // temp
+    bb0 (entry): {
+        _3 = {closure#3}();
+        _2 = [copy _3];
+        _1 = builtin[Runtime] std::ui::column::<1>(copy _2);
+        _0 = std::system::RootPage(copy _1);
+        return;
+    }
+}
+
+fn crate::Title::{closure#0}() -> Element {
+    let mut _0: Element; // return
+    bb0 (entry): {
+        _0 = builtin[Runtime] std::ui::label(const "Start");
+        return;
+    }
+}
+
+fn crate::Title::{closure#1}(_1: ()) -> () {
+    let mut _0: (); // return
+    let _1: (); // _end
+    bb0 (entry): {
+        _0 = ();
+        return;
+    }
+}
+
+fn crate::Title::{closure#2}() -> () {
+    let mut _0: (); // return
+    let _1: (); // temp
+    let _2: Fn(()); // temp
+    bb0 (entry): {
+        _1 = ();
+        _2 = {closure#1}();
+        _0 = builtin[Runtime] std::system::nav::start::<scene fn(), (), ()>(fn crate::Show, copy _1, copy _2);
+        return;
+    }
+}
+
+fn crate::Title::{closure#3}() -> Element {
+    let mut _0: Element; // return
+    let _1: ButtonProps<1>; // temp
+    let _2: Option<Fn()>; // temp
+    let _3: Fn(); // temp
+    let _4: Option<Fn() -> bool>; // temp
+    let _5: Option<Fn() -> ButtonStyle>; // temp
+    let _6: [Fn() -> Element; 1]; // temp
+    let _7: Fn() -> Element; // temp
+    bb0 (entry): {
+        _3 = {closure#2}();
+        _2 = std::Option::Some::<Fn()>(copy _3);
+        _4 = std::Option::None::<Fn() -> bool>;
+        _5 = std::Option::None::<Fn() -> ButtonStyle>;
+        _7 = {closure#0}();
+        _6 = [copy _7];
+        _1 = std::ui::ButtonProps::<1> { copy _2, copy _4, copy _5, copy _6 };
+        _0 = builtin[Runtime] std::ui::button::<1>(copy _1);
+        return;
+    }
+}
+
+fn crate::GameView(_1: Narrative) -> Element {
+    let mut _0: Element; // return
+    let _1: Narrative; // game
+    let _2: GameScreenProps; // temp
+    let _3: Fn() -> Narrative; // temp
+    bb0 (entry): {
+        _3 = {closure#0}(copy _1);
+        _2 = std::ui::GameScreenProps { copy _3 };
+        _0 = builtin[Runtime] std::ui::game_screen(copy _2);
+        return;
+    }
+}
+
+fn crate::GameView::{closure#0}(_1: Narrative) -> Narrative {
+    let mut _0: Narrative; // return
+    let _1: Narrative; // game
+    bb0 (entry): {
+        _0 = copy _1;
+        return;
+    }
+}

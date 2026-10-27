@@ -30,3 +30,36 @@ fn a_program_without_main_has_no_bytecode() {
     assert_eq!(errors, vec![DiagnosticCode::EmitMissingMain]);
     assert!(result.module.is_none() && result.bytes.is_none());
 }
+
+/// Only functions reachable from `main` or an entry scene are emitted; a function used only
+/// as the value of a constant is reachable.
+#[test]
+fn unreachable_functions_are_not_emitted() {
+    let source = include_str!("../../tests/bytecode/005__story/main.kix").replace(
+        "fn main() -> System {",
+        "fn unused() -> u32 { 1 }\n\
+         fn kept() -> u32 { 2 }\n\
+         const PICK: fn() -> u32 = kept;\n\
+         fn main() -> System {\n    let _ = PICK();",
+    );
+    let mut files = FxHashMap::default();
+    files.insert(PathBuf::from("/game/main.kix"), source);
+    let db = RootDatabase::new(Arc::new(MemoryFileSystem(files)));
+    let program = db.program(FilePath::disk("/game/main.kix"));
+    let result = build(&db, program);
+    let module = result.module.as_ref().unwrap_or_else(|| {
+        panic!(
+            "{}",
+            crate::render_diagnostics(&db, &result.diagnostics, None)
+        )
+    });
+    let listing = kagari_bytecode::disassemble(module, &|path: &str| path.starts_with("crate::"));
+    let emitted: Vec<&str> = listing
+        .lines()
+        .filter_map(|line| line.strip_prefix("fn "))
+        .filter_map(|line| line.split(' ').next())
+        .collect();
+    assert!(emitted.contains(&"crate::kept"), "{emitted:?}");
+    assert!(emitted.contains(&"crate::Visit"), "{emitted:?}");
+    assert!(!emitted.contains(&"crate::unused"), "{emitted:?}");
+}

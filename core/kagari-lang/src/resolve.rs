@@ -11,11 +11,11 @@ use crate::def_map::{
     Def, DefMaps, ModuleId, Namespace, PathResolution, def_maps, resolve_first_segment,
     resolve_module_path, resolve_rest,
 };
-use crate::diagnostic::{Diagnostic, DiagnosticCode};
+use crate::diagnostic::{Anchor, Diag, DiagnosticCode, NodeId, Owner};
 use crate::hir::{
-    ArrayExpr, Condition, Expr, ExprId, ExprStore, FileHir, GenericArg, GenericArgs,
-    GenericParamKind, LangItem, Literal, Name, Pat, PatBound, PatId, Path, PathKind, Signature,
-    SignatureKind, Stmt, TypeRef, TypeRefId, file_hir,
+    ArrayExpr, Condition, Expr, ExprId, ExprStore, GenericArg, GenericArgs, GenericParamKind,
+    LangItem, Literal, Name, Pat, PatBound, PatId, Path, PathKind, Signature, SignatureKind, Stmt,
+    TypeRef, TypeRefId, body_of, signature_of,
 };
 use crate::input::{FilePath, Program, SourceFile};
 use crate::item_tree::{ItemId, ItemKind, ItemParent, Shape, item_tree};
@@ -31,16 +31,15 @@ pub struct Local {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct FileResolution {
-    /// Indexed like `ItemTree::items`; `None` for files outside the program.
-    pub items: Vec<Option<ItemResolution>>,
-    pub diagnostics: Vec<Diagnostic>,
+pub struct SignatureResolution {
+    pub store: StoreResolution,
+    pub diagnostics: Vec<Diag>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ItemResolution {
-    pub signature: StoreResolution,
+pub struct BodyResolutionOut {
     pub body: Option<BodyResolution>,
+    pub diagnostics: Vec<Diag>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -63,108 +62,35 @@ pub struct BodyResolution {
     pub loop_targets: FxHashMap<ExprId, ExprId>,
 }
 
+/// Resolution of an item's signature; empty for files outside the program.
 #[salsa::tracked(returns(ref))]
-pub fn file_resolution(db: &dyn Db, program: Program, file: SourceFile) -> FileResolution {
-    let maps = def_maps(db, program);
-    let mut out = FileResolution::default();
-    if !maps.file_modules.contains_key(&file) {
+pub fn signature_resolution(db: &dyn Db, program: Program, item: ItemId) -> SignatureResolution {
+    let mut out = SignatureResolution::default();
+    let Some(cx) = ItemCx::new(db, program, item) else {
         return out;
-    }
-    let tree = item_tree(db, file);
-    let hir = file_hir(db, file);
-    let asset_fn = match resolve_module_path(
-        maps,
-        db,
-        maps.std_root(),
-        &Path::lang(LangItem::Asset),
-        Namespace::Values,
-    )
-    .resolved
-    {
-        Some(Resolution::Def(def)) => Some(def),
-        _ => None,
     };
-    for (index, _) in tree.items.iter().enumerate() {
-        let item = ItemId {
-            file,
-            index: u32::try_from(index).unwrap_or(u32::MAX),
-        };
-        let resolution = resolve_item(db, maps, hir, item, asset_fn, &mut out.diagnostics);
-        out.items.push(Some(resolution));
+    if let Some(signature) = signature_of(db, item) {
+        let mut resolver = cx.resolver(
+            db,
+            Owner::Signature(item),
+            &signature.store,
+            &mut out.diagnostics,
+        );
+        resolver.resolve_signature(signature);
+        out.store = resolver.out;
     }
     out
 }
 
-/// Generic parameters in scope: `(name, owner, index, is_const)`.
-type GenericScope = Vec<(Name, ItemId, u32, bool)>;
-
-fn resolve_item(
-    db: &dyn Db,
-    maps: &DefMaps,
-    hir: &FileHir,
-    item: ItemId,
-    asset_fn: Option<Def>,
-    diagnostics: &mut Vec<Diagnostic>,
-) -> ItemResolution {
-    let tree = item_tree(db, item.file);
-    let module = maps.module_of_item(db, item);
-
-    // Generic parameters and `Self`: the item's own, plus its impl's or trait's.
-    let mut generics: GenericScope = Vec::new();
-    let mut self_owner = None;
-    let data = tree.item(item.index);
-    if matches!(
-        data.map(|data| &data.kind),
-        Some(ItemKind::Impl { .. } | ItemKind::Trait { .. })
-    ) {
-        self_owner = Some(item);
-    }
-    if let Some(ItemParent::Item(parent)) = data.map(|data| data.parent)
-        && matches!(
-            tree.item(parent).map(|data| &data.kind),
-            Some(ItemKind::Impl { .. } | ItemKind::Trait { .. })
-        )
-    {
-        let parent = ItemId {
-            file: item.file,
-            index: parent,
-        };
-        self_owner = Some(parent);
-        push_generics(&mut generics, hir, parent);
-    }
-    push_generics(&mut generics, hir, item);
-
-    let file_path = item.file.path(db).clone();
-    let mut resolution = ItemResolution::default();
-    if let Some(Some(signature)) = hir.signatures.get(item.index as usize) {
-        let mut resolver = Resolver::new(
-            db,
-            maps,
-            item.file,
-            file_path.clone(),
-            module,
-            &signature.store,
-            &generics,
-            self_owner,
-            asset_fn,
-            diagnostics,
-        );
-        resolver.resolve_signature(signature);
-        resolution.signature = resolver.out;
-    }
-    if let Some(Some(body)) = hir.bodies.get(item.index as usize) {
-        let mut resolver = Resolver::new(
-            db,
-            maps,
-            item.file,
-            file_path,
-            module,
-            &body.store,
-            &generics,
-            self_owner,
-            asset_fn,
-            diagnostics,
-        );
+/// Resolution of an item's body; empty for files outside the program.
+#[salsa::tracked(returns(ref))]
+pub fn body_resolution(db: &dyn Db, program: Program, item: ItemId) -> BodyResolutionOut {
+    let mut out = BodyResolutionOut::default();
+    let Some(cx) = ItemCx::new(db, program, item) else {
+        return out;
+    };
+    if let Some(body) = body_of(db, item) {
+        let mut resolver = cx.resolver(db, Owner::Body(item), &body.store, &mut out.diagnostics);
         if body.has_self {
             let local = resolver.locals.alloc(Local {
                 name: Name::new_static("self"),
@@ -183,18 +109,114 @@ fn resolve_item(
         }
         resolver.push_binds(binds);
         resolver.resolve_expr(body.value);
-        resolution.body = Some(BodyResolution {
+        out.body = Some(BodyResolution {
             store: resolver.out,
             locals: resolver.locals,
             bindings: resolver.bindings,
             loop_targets: resolver.loop_targets,
         });
     }
-    resolution
+    out
 }
 
-fn push_generics(scope: &mut GenericScope, hir: &FileHir, owner: ItemId) {
-    let Some(Some(signature)) = hir.signatures.get(owner.index as usize) else {
+/// Generic parameters in scope: `(name, owner, index, is_const)`.
+type GenericScope = Vec<(Name, ItemId, u32, bool)>;
+
+/// The scope shared by an item's signature and body.
+struct ItemCx<'db> {
+    maps: &'db DefMaps,
+    item: ItemId,
+    file_path: FilePath,
+    module: ModuleId,
+    generics: GenericScope,
+    self_owner: Option<ItemId>,
+    asset_fn: Option<Def>,
+}
+
+impl<'db> ItemCx<'db> {
+    /// `None` for items in files outside the program.
+    fn new(db: &'db dyn Db, program: Program, item: ItemId) -> Option<Self> {
+        let maps = def_maps(db, program);
+        if !maps.file_modules.contains_key(&item.file) {
+            return None;
+        }
+        let asset_fn = match resolve_module_path(
+            maps,
+            db,
+            maps.std_root(),
+            &Path::lang(LangItem::Asset),
+            Namespace::Values,
+            // Not written in source; the diagnostics are dropped.
+            &|_| Anchor::Text(item.file, TextRange::default()),
+        )
+        .resolved
+        {
+            Some(Resolution::Def(def)) => Some(def),
+            _ => None,
+        };
+        let tree = item_tree(db, item.file);
+        let module = maps.module_of_item(db, item);
+
+        // Generic parameters and `Self`: the item's own, plus its impl's or trait's.
+        let mut generics: GenericScope = Vec::new();
+        let mut self_owner = None;
+        let data = tree.item(item.index);
+        if matches!(
+            data.map(|data| &data.kind),
+            Some(ItemKind::Impl { .. } | ItemKind::Trait { .. })
+        ) {
+            self_owner = Some(item);
+        }
+        if let Some(ItemParent::Item(parent)) = data.map(|data| data.parent)
+            && matches!(
+                tree.item(parent).map(|data| &data.kind),
+                Some(ItemKind::Impl { .. } | ItemKind::Trait { .. })
+            )
+        {
+            let parent = ItemId {
+                file: item.file,
+                index: parent,
+            };
+            self_owner = Some(parent);
+            push_generics(&mut generics, db, parent);
+        }
+        push_generics(&mut generics, db, item);
+        Some(Self {
+            maps,
+            item,
+            file_path: item.file.path(db).clone(),
+            module,
+            generics,
+            self_owner,
+            asset_fn,
+        })
+    }
+
+    fn resolver<'a>(
+        &'a self,
+        db: &'a dyn Db,
+        owner: Owner,
+        store: &'a ExprStore,
+        diagnostics: &'a mut Vec<Diag>,
+    ) -> Resolver<'a> {
+        Resolver::new(
+            db,
+            self.maps,
+            self.item.file,
+            self.file_path.clone(),
+            self.module,
+            owner,
+            store,
+            &self.generics,
+            self.self_owner,
+            self.asset_fn,
+            diagnostics,
+        )
+    }
+}
+
+fn push_generics(scope: &mut GenericScope, db: &dyn Db, owner: ItemId) {
+    let Some(signature) = signature_of(db, owner) else {
         return;
     };
     for (index, param) in signature.generics.iter().enumerate() {
@@ -223,11 +245,12 @@ struct Resolver<'a> {
     file: SourceFile,
     file_path: FilePath,
     module: ModuleId,
+    src: Owner,
     store: &'a ExprStore,
     generics: &'a GenericScope,
     self_owner: Option<ItemId>,
     asset_fn: Option<Def>,
-    diagnostics: &'a mut Vec<Diagnostic>,
+    diagnostics: &'a mut Vec<Diag>,
     out: StoreResolution,
     locals: Arena<Local>,
     bindings: FxHashMap<PatId, LocalId>,
@@ -244,11 +267,12 @@ impl<'a> Resolver<'a> {
         file: SourceFile,
         file_path: FilePath,
         module: ModuleId,
+        src: Owner,
         store: &'a ExprStore,
         generics: &'a GenericScope,
         self_owner: Option<ItemId>,
         asset_fn: Option<Def>,
-        diagnostics: &'a mut Vec<Diagnostic>,
+        diagnostics: &'a mut Vec<Diag>,
     ) -> Self {
         Resolver {
             db,
@@ -256,6 +280,7 @@ impl<'a> Resolver<'a> {
             file,
             file_path,
             module,
+            src,
             store,
             generics,
             self_owner,
@@ -270,13 +295,9 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn diag(&mut self, range: TextRange, code: DiagnosticCode, message: String) {
-        self.diagnostics.push(Diagnostic::new(
-            self.file_path.clone(),
-            range,
-            code,
-            message,
-        ));
+    fn diag(&mut self, node: NodeId, code: DiagnosticCode, message: String) {
+        self.diagnostics
+            .push(Diag::new(Anchor::Node(self.src, node), code, message));
     }
 
     // ---- paths ----
@@ -290,10 +311,13 @@ impl<'a> Resolver<'a> {
             .map(|(_, id)| *id)
     }
 
-    /// Resolves `path` with the full lexical chain; diagnostics are returned, not reported.
-    fn resolve_path(&mut self, path: &Path, ns: Namespace) -> PathResolution {
+    /// Resolves `path`, owned by `node`, with the full lexical chain; diagnostics are
+    /// returned, not reported.
+    fn resolve_path(&mut self, path: &Path, ns: Namespace, node: NodeId) -> PathResolution {
+        let src = self.src;
+        let at = move |segment| Anchor::Segment(src, node, segment);
         if path.kind != PathKind::Plain {
-            return resolve_module_path(self.maps, self.db, self.module, path, ns);
+            return resolve_module_path(self.maps, self.db, self.module, path, ns, &at);
         }
         let Some(first) = path.segments.first() else {
             return PathResolution::default();
@@ -319,9 +343,8 @@ impl<'a> Resolver<'a> {
                 Some(owner) => Some(Resolution::SelfType(owner)),
                 None => {
                     let mut result = PathResolution::default();
-                    result.diagnostics.push(Diagnostic::new(
-                        self.file_path.clone(),
-                        first.range,
+                    result.diagnostics.push(Diag::new(
+                        at(0),
                         DiagnosticCode::ResolveSelfOutsideImpl,
                         "`Self` is only available in impls and traits",
                     ));
@@ -331,9 +354,8 @@ impl<'a> Resolver<'a> {
             }
         } else if name == "self" && first_ns == Namespace::Values {
             let mut result = PathResolution::default();
-            result.diagnostics.push(Diagnostic::new(
-                self.file_path.clone(),
-                first.range,
+            result.diagnostics.push(Diag::new(
+                at(0),
                 DiagnosticCode::ResolveUnresolvedName,
                 "`self` is only available in methods with a `self` parameter",
             ));
@@ -343,14 +365,15 @@ impl<'a> Resolver<'a> {
             None
         };
         match base {
-            Some(base) => resolve_rest(self.maps, self.db, self.module, base, path, 1, ns),
-            None => resolve_module_path(self.maps, self.db, self.module, path, ns),
+            Some(base) => resolve_rest(self.maps, self.db, self.module, base, path, 1, ns, &at),
+            None => resolve_module_path(self.maps, self.db, self.module, path, ns, &at),
         }
     }
 
-    /// Resolves a path, reports its diagnostics and resolves its generic arguments.
-    fn resolve_path_reported(&mut self, path: &Path, ns: Namespace) -> Resolution {
-        let result = self.resolve_path(path, ns);
+    /// Resolves a path owned by `node`, reports its diagnostics and resolves its generic
+    /// arguments.
+    fn resolve_path_reported(&mut self, path: &Path, ns: Namespace, node: NodeId) -> Resolution {
+        let result = self.resolve_path(path, ns, node);
         self.diagnostics.extend(result.diagnostics);
         self.resolve_path_args(path);
         result.resolved.unwrap_or(Resolution::Error)
@@ -380,9 +403,9 @@ impl<'a> Resolver<'a> {
             && path.kind == PathKind::Plain
             && path.segments.len() == 1
         {
-            let as_type = self.resolve_path(path, Namespace::Types);
+            let as_type = self.resolve_path(path, Namespace::Types, NodeId::Type(ty));
             if as_type.resolved.is_none() {
-                let as_value = self.resolve_path(path, Namespace::Values);
+                let as_value = self.resolve_path(path, Namespace::Values, NodeId::Type(ty));
                 if let Some(resolved) = as_value.resolved {
                     self.diagnostics.extend(as_value.diagnostics);
                     self.out.const_args.insert(ty, resolved);
@@ -401,7 +424,7 @@ impl<'a> Resolver<'a> {
         match type_ref {
             TypeRef::Missing | TypeRef::Infer => {}
             TypeRef::Path(path) => {
-                let resolved = self.resolve_path_reported(path, Namespace::Types);
+                let resolved = self.resolve_path_reported(path, Namespace::Types, NodeId::Type(ty));
                 self.out.types.insert(ty, resolved);
             }
             TypeRef::Tuple(fields) => {
@@ -511,7 +534,7 @@ impl<'a> Resolver<'a> {
                     .item(enum_item.index)
                     .map(|data| &data.kind),
                 Some(ItemKind::Enum { variants })
-                    if matches!(variants.get(index as usize), Some((_, _, Shape::Unit)))
+                    if matches!(variants.get(index as usize), Some((_, Shape::Unit)))
             ),
             Def::Module(_) => false,
         };
@@ -521,7 +544,6 @@ impl<'a> Resolver<'a> {
     fn walk_pat(&mut self, pat: PatId, mode: &mut BindMode<'_>) {
         let store = self.store;
         let data = store.pat(pat);
-        let range = store.pat_range(pat);
         match data {
             Pat::Missing | Pat::Wild | Pat::Lit { .. } | Pat::Rest => {}
             Pat::Bind { name, mutable } => {
@@ -529,16 +551,21 @@ impl<'a> Resolver<'a> {
                     self.out.pats.insert(pat, resolution);
                     return;
                 }
-                self.bind(pat, name, *mutable, range, mode);
+                self.bind(pat, name, *mutable, mode);
             }
             Pat::Path(path) => {
-                let resolved = self.resolve_path_reported(path, Namespace::Values);
+                let resolved =
+                    self.resolve_path_reported(path, Namespace::Values, NodeId::Pat(pat));
                 self.out.pats.insert(pat, resolved);
             }
             Pat::Range { start, end, .. } => {
                 for (slot, bound) in [(0u8, start), (1u8, end)] {
                     if let Some(PatBound::Path(path)) = bound {
-                        let resolved = self.resolve_path_reported(path, Namespace::Values);
+                        let resolved = self.resolve_path_reported(
+                            path,
+                            Namespace::Values,
+                            NodeId::PatBound(pat, slot),
+                        );
                         self.out.range_bounds.insert((pat, slot), resolved);
                     }
                 }
@@ -549,14 +576,15 @@ impl<'a> Resolver<'a> {
                 }
             }
             Pat::TupleStruct { path, pats } => {
-                let resolved = self.resolve_path_reported(path, Namespace::Values);
+                let resolved =
+                    self.resolve_path_reported(path, Namespace::Values, NodeId::Pat(pat));
                 self.out.pats.insert(pat, resolved);
                 for &sub in pats {
                     self.walk_pat(sub, mode);
                 }
             }
             Pat::Record { path, fields } => {
-                let resolved = self.resolve_path_reported(path, Namespace::Types);
+                let resolved = self.resolve_path_reported(path, Namespace::Types, NodeId::Pat(pat));
                 self.out.pats.insert(pat, resolved);
                 for &(_, sub) in fields {
                     self.walk_pat(sub, mode);
@@ -584,7 +612,7 @@ impl<'a> Resolver<'a> {
                             for (name, _) in &bound {
                                 if !seen.contains(name) {
                                     self.diag(
-                                        store.pat_range(alternative),
+                                        NodeId::Pat(alternative),
                                         DiagnosticCode::ResolveInconsistentBinding,
                                         format!("variable `{name}` is not bound in all patterns"),
                                     );
@@ -602,19 +630,12 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn bind(
-        &mut self,
-        pat: PatId,
-        name: &Name,
-        mutable: bool,
-        range: TextRange,
-        mode: &mut BindMode<'_>,
-    ) {
+    fn bind(&mut self, pat: PatId, name: &Name, mutable: bool, mode: &mut BindMode<'_>) {
         match mode {
             BindMode::New(binds) => {
                 if binds.iter().any(|(bound, _)| bound == name) {
                     self.diag(
-                        range,
+                        NodeId::Pat(pat),
                         DiagnosticCode::ResolveDuplicateBinding,
                         format!("identifier `{name}` is bound more than once in the same pattern"),
                     );
@@ -630,7 +651,7 @@ impl<'a> Resolver<'a> {
             BindMode::Alt { existing, seen } => {
                 if seen.contains(name) {
                     self.diag(
-                        range,
+                        NodeId::Pat(pat),
                         DiagnosticCode::ResolveDuplicateBinding,
                         format!("identifier `{name}` is bound more than once in the same pattern"),
                     );
@@ -642,7 +663,7 @@ impl<'a> Resolver<'a> {
                     }
                     None => {
                         self.diag(
-                            range,
+                            NodeId::Pat(pat),
                             DiagnosticCode::ResolveInconsistentBinding,
                             format!("variable `{name}` is not bound in all patterns"),
                         );
@@ -694,7 +715,7 @@ impl<'a> Resolver<'a> {
     }
 
     fn loop_target(&mut self, id: ExprId, label: Option<&Name>, what: &str) {
-        let range = self.store.expr_range(id);
+        let range = NodeId::Expr(id);
         let target = match label {
             Some(label) => {
                 let found = self
@@ -741,7 +762,8 @@ impl<'a> Resolver<'a> {
         match expr {
             Expr::Missing | Expr::Literal(_) => {}
             Expr::Path(path) => {
-                let resolved = self.resolve_path_reported(path, Namespace::Values);
+                let resolved =
+                    self.resolve_path_reported(path, Namespace::Values, NodeId::Expr(id));
                 self.out.exprs.insert(id, resolved);
             }
             Expr::Block { stmts, tail, scope } => {
@@ -883,7 +905,7 @@ impl<'a> Resolver<'a> {
                 self.resolve_expr(*count);
             }
             Expr::Record { path, fields } => {
-                let resolved = self.resolve_path_reported(path, Namespace::Types);
+                let resolved = self.resolve_path_reported(path, Namespace::Types, NodeId::Expr(id));
                 self.out.exprs.insert(id, resolved);
                 for &(_, value) in fields {
                     self.resolve_expr(value);
@@ -925,7 +947,7 @@ impl<'a> Resolver<'a> {
         let Expr::Literal(Literal::String(path)) = self.store.expr(arg) else {
             return;
         };
-        let range = self.store.expr_range(arg);
+        let range = NodeId::Expr(arg);
         if path.is_empty() {
             self.diag(
                 range,

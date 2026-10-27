@@ -9,14 +9,14 @@ use super::{
 };
 use crate::db::Db;
 use crate::def_map::{Def, DefMaps, Namespace, Resolution, def_maps, resolve_module_path};
-use crate::diagnostic::DiagnosticCode;
+use crate::diagnostic::{Anchor, Diag, DiagnosticCode, NodeId, Owner};
 use crate::hir::{
     GenericParamKind, Name, Path, PathKind, PathSegment, SelfParamKind, Signature, SignatureKind,
-    file_hir,
 };
 use crate::input::Program;
+use crate::item_tree::ItemIndex;
 use crate::item_tree::{Item, ItemId, ItemKind, ItemParent, item_tree};
-use crate::ty::Ty;
+use crate::ty::{Ty, TyKind};
 
 pub(super) fn collect(db: &dyn Db, program: Program) -> ProgramSignatures {
     let maps = def_maps(db, program);
@@ -25,15 +25,18 @@ pub(super) fn collect(db: &dyn Db, program: Program) -> ProgramSignatures {
     for &(file, _) in &maps.files {
         let tree = item_tree(db, file);
         for (index, data) in tree.items.iter().enumerate() {
+            let Some(item_index) = ItemIndex::from_usize(index) else {
+                continue;
+            };
             let item = ItemId {
                 file,
-                index: u32::try_from(index).unwrap_or(u32::MAX),
+                index: item_index,
             };
             let Some((signature, res)) = item_signature(db, program, item) else {
                 continue;
             };
             let scope = Scope {
-                owner: item,
+                src: Owner::Signature(item),
                 store: &signature.store,
                 res,
             };
@@ -93,21 +96,17 @@ fn item_sig(
                         .item(parent.index)
                         .map(|data| &data.kind)
                     {
-                        Some(ItemKind::Trait { .. }) => Ty::TraitSelf { trait_item: parent },
+                        Some(ItemKind::Trait { .. }) => {
+                            Ty::new(TyKind::TraitSelf { trait_item: parent })
+                        }
                         _ => lowerer.impl_self_ty(parent),
                     },
-                    None => Ty::Error,
+                    None => Ty::error(),
                 };
                 tys.push(match self_param {
                     SelfParamKind::Value => self_ty,
-                    SelfParamKind::Ref => Ty::Ref {
-                        mutable: false,
-                        inner: Box::new(self_ty),
-                    },
-                    SelfParamKind::RefMut => Ty::Ref {
-                        mutable: true,
-                        inner: Box::new(self_ty),
-                    },
+                    SelfParamKind::Ref => Ty::reference(false, self_ty),
+                    SelfParamKind::RefMut => Ty::reference(true, self_ty),
                 });
             }
             tys.extend(
@@ -119,11 +118,7 @@ fn item_sig(
                 Some(ret) => lowerer.lower(scope, *ret, sink),
                 None => Ty::unit(),
             };
-            let self_mutable = file_hir(db, item.file)
-                .bodies
-                .get(item.index as usize)
-                .and_then(Option::as_ref)
-                .is_some_and(|body| body.self_mutable);
+            let self_mutable = signature.self_mutable;
             ItemSig::Fn(FnSig {
                 generics,
                 kind: *kind,
@@ -162,7 +157,7 @@ fn item_sig(
             let variants = variants
                 .iter()
                 .zip(fields)
-                .map(|((name, _, shape), fields)| VariantDef {
+                .map(|((name, shape), fields)| VariantDef {
                     name: name.clone(),
                     shape: shape.clone(),
                     fields: fields
@@ -231,8 +226,8 @@ fn generics(
                     bounds: bounds
                         .iter()
                         .filter_map(|&bound| {
-                            let range = scope.store.type_range(bound);
-                            trait_bound(lowerer, scope, scope.res.types.get(&bound), range, sink)
+                            let range = scope.node(NodeId::Type(bound));
+                            trait_bound(lowerer, scope.res.types.get(&bound), range, sink)
                         })
                         .collect(),
                 },
@@ -251,9 +246,8 @@ fn generics(
 
 fn trait_bound(
     lowerer: &TyLowerer<'_>,
-    scope: Scope<'_>,
     resolution: Option<&Resolution>,
-    range: TextRange,
+    range: Anchor,
     sink: &mut Sink<'_>,
 ) -> Option<ItemId> {
     let db = lowerer.db;
@@ -270,8 +264,7 @@ fn trait_bound(
         }
         Resolution::Error => None,
         _ => {
-            sink.diags.push(crate::diagnostic::Diagnostic::new(
-                scope.owner.file.path(db).clone(),
+            sink.diags.push(Diag::new(
                 range,
                 DiagnosticCode::TypeExpectedTrait,
                 "expected a trait",
@@ -288,12 +281,14 @@ fn std_path(db: &dyn Db, maps: &DefMaps, path: &[&str], ns: Namespace) -> Option
             .iter()
             .map(|name| PathSegment {
                 name: Name::new(name),
-                range: TextRange::default(),
                 args: None,
             })
             .collect(),
     };
-    match resolve_module_path(maps, db, maps.std_root(), &path, ns).resolved {
+    // The path is not written in source; its diagnostics are dropped.
+    let file = maps.module_file(maps.std_root());
+    let at = |_| Anchor::Text(file, TextRange::default());
+    match resolve_module_path(maps, db, maps.std_root(), &path, ns, &at).resolved {
         Some(Resolution::Def(Def::Item(item))) => Some(item),
         _ => None,
     }

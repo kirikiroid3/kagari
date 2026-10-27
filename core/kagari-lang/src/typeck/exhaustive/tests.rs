@@ -1,15 +1,17 @@
 //! The algorithm on synthetic types, patterns and inference results.
 
+#![allow(clippy::unwrap_used)]
+
 use std::sync::Arc;
 
-use kagari_syntax::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
 use super::*;
 use crate::db::{MemoryFileSystem, RootDatabase};
 use crate::hir::{ExprStore, Path, PathKind};
+use crate::input::FilePath;
 use crate::signatures::{FieldDef, Generics, VariantDef};
-use crate::ty::{CtorRef, IntTy};
+use crate::ty::{CtorRef, GenericArgs, IntTy, TyKind};
 
 struct TestEnv {
     adts: FxHashMap<ItemId, AdtDef>,
@@ -116,8 +118,11 @@ struct World {
 impl World {
     fn new() -> World {
         let db = RootDatabase::new(Arc::new(MemoryFileSystem::default()));
-        let file = db.source_file(FilePath::Std("synthetic.kis".to_owned()));
-        let id = |index: u32| ItemId { file, index };
+        let file = db.source_file(FilePath::Std("synthetic.kis".into()));
+        let id = |index: u32| ItemId {
+            file,
+            index: crate::item_tree::ItemIndex::from_usize(index as usize).unwrap(),
+        };
         let (route, option, result, point, empty, big, shape, text, unit) = (
             id(0),
             id(1),
@@ -131,7 +136,7 @@ impl World {
         );
         let (const_x, low, neg, opaque, wrapped, some_fn) =
             (id(9), id(10), id(11), id(12), id(13), id(14));
-        let param = |owner: ItemId, index: u32| Ty::Param { owner, index };
+        let param = |owner: ItemId, index: u32| Ty::new(TyKind::Param { owner, index });
         let mut adts = FxHashMap::default();
         adts.insert(
             route,
@@ -176,8 +181,8 @@ impl World {
                     "Point",
                     record(&["x", "y"]),
                     vec![
-                        (Some("x"), Ty::Int(IntTy::U64)),
-                        (Some("y"), Ty::Int(IntTy::U64)),
+                        (Some("x"), Ty::int(IntTy::U64)),
+                        (Some("y"), Ty::int(IntTy::U64)),
                     ],
                 )],
             ),
@@ -203,12 +208,12 @@ impl World {
                     (
                         "Circle",
                         record(&["r"]),
-                        vec![(Some("r"), Ty::Int(IntTy::U8))],
+                        vec![(Some("r"), Ty::int(IntTy::U8))],
                     ),
                     (
                         "Rect",
                         record(&["w", "h"]),
-                        vec![(Some("w"), Ty::Bool), (Some("h"), Ty::Bool)],
+                        vec![(Some("w"), Ty::bool()), (Some("h"), Ty::bool())],
                     ),
                     ("Dot", Shape::Unit, vec![]),
                 ],
@@ -262,13 +267,10 @@ impl World {
             neg,
             const_body(|store, _| {
                 let three = int_expr(store, 3);
-                store.alloc_expr(
-                    Expr::Unary {
-                        op: UnaryOp::Neg,
-                        expr: three,
-                    },
-                    TextRange::default(),
-                )
+                store.exprs.alloc(Expr::Unary {
+                    op: UnaryOp::Neg,
+                    expr: three,
+                })
             }),
         );
         // const OPAQUE: Route = some_fn();
@@ -276,13 +278,10 @@ impl World {
             opaque,
             const_body(|store, res| {
                 let callee = path_expr(store, res, Resolution::Def(Def::Item(some_fn)));
-                store.alloc_expr(
-                    Expr::Call {
-                        callee,
-                        args: vec![],
-                    },
-                    TextRange::default(),
-                )
+                store.exprs.alloc(Expr::Call {
+                    callee,
+                    args: vec![],
+                })
             }),
         );
         // const WRAPPED: Option<Route> = Some(Route::A);
@@ -305,13 +304,10 @@ impl World {
                         index: 0,
                     }),
                 );
-                store.alloc_expr(
-                    Expr::Call {
-                        callee,
-                        args: vec![arg],
-                    },
-                    TextRange::default(),
-                )
+                store.exprs.alloc(Expr::Call {
+                    callee,
+                    args: vec![arg],
+                })
             }),
         );
 
@@ -345,24 +341,18 @@ impl World {
     }
 
     fn adt(&self, item: ItemId) -> Ty {
-        Ty::Adt {
-            item,
-            args: Vec::new(),
-        }
+        Ty::adt(item, GenericArgs::empty())
     }
 
     fn option_of(&self, ty: Ty) -> Ty {
-        Ty::Adt {
-            item: self.option,
-            args: vec![GenericArg::Type(ty)],
-        }
+        Ty::adt(self.option, GenericArgs::new(vec![GenericArg::Type(ty)]))
     }
 
     fn result_of(&self, ok: Ty, err: Ty) -> Ty {
-        Ty::Adt {
-            item: self.result,
-            args: vec![GenericArg::Type(ok), GenericArg::Type(err)],
-        }
+        Ty::adt(
+            self.result,
+            GenericArgs::new(vec![GenericArg::Type(ok), GenericArg::Type(err)]),
+        )
     }
 }
 
@@ -385,19 +375,16 @@ fn const_body(
 }
 
 fn path_expr(store: &mut ExprStore, res: &mut BodyResolution, resolution: Resolution) -> ExprId {
-    let expr = store.alloc_expr(Expr::Path(dummy_path()), TextRange::default());
+    let expr = store.exprs.alloc(Expr::Path(dummy_path()));
     res.store.exprs.insert(expr, resolution);
     expr
 }
 
 fn int_expr(store: &mut ExprStore, value: u128) -> ExprId {
-    store.alloc_expr(
-        Expr::Literal(Literal::Int {
-            value,
-            suffix: None,
-        }),
-        TextRange::default(),
-    )
+    store.exprs.alloc(Expr::Literal(Literal::Int {
+        value,
+        suffix: None,
+    }))
 }
 
 /// A body under construction, with its resolution and inference result.
@@ -407,24 +394,15 @@ struct B {
     res: BodyResolution,
     inf: InferenceResult,
     params: Vec<PatId>,
-    next: u32,
 }
 
 impl B {
-    fn range(&mut self) -> TextRange {
-        let start = TextSize::from(self.next);
-        self.next = self.next.saturating_add(1);
-        TextRange::new(start, start)
-    }
-
     fn pat(&mut self, pat: Pat) -> PatId {
-        let range = self.range();
-        self.store.alloc_pat(pat, range)
+        self.store.pats.alloc(pat)
     }
 
     fn expr(&mut self, expr: Expr) -> ExprId {
-        let range = self.range();
-        self.store.alloc_expr(expr, range)
+        self.store.exprs.alloc(expr)
     }
 
     fn wild(&mut self) -> PatId {
@@ -457,7 +435,7 @@ impl B {
 
     fn text(&mut self, value: &str) -> PatId {
         self.pat(Pat::Lit {
-            lit: Literal::String(value.to_owned()),
+            lit: Literal::String(value.into()),
             negated: false,
         })
     }
@@ -524,9 +502,14 @@ impl B {
             }),
             None => self.pat(Pat::Path(dummy_path())),
         };
-        self.inf
-            .pat_ctors
-            .insert(pat, CtorRef { adt, variant, args });
+        self.inf.pat_ctors.insert(
+            pat,
+            CtorRef {
+                adt,
+                variant,
+                args: GenericArgs::new(args),
+            },
+        );
         pat
     }
 
@@ -565,7 +548,7 @@ impl B {
             CtorRef {
                 adt,
                 variant,
-                args: Vec::new(),
+                args: GenericArgs::empty(),
             },
         );
         pat
@@ -608,7 +591,7 @@ impl B {
         })
     }
 
-    fn check(&self, w: &World, value: ExprId) -> Vec<Diagnostic> {
+    fn check(&self, w: &World, value: ExprId) -> Vec<Diag> {
         let body = Body {
             store: self.store.clone(),
             params: self.params.clone(),
@@ -616,23 +599,19 @@ impl B {
             self_mutable: false,
             value,
         };
-        check_body_in(
-            &w.env,
-            FilePath::Std("test.kis".to_owned()),
-            &body,
-            &self.res,
-            &self.inf,
-        )
+        check_body_in(&w.env, Owner::Body(w.route), &body, &self.res, &self.inf)
     }
 
     /// `code: message` lines; unreachable patterns name the arm by index in `arms`.
-    fn render(&self, diags: &[Diagnostic], arms: &[PatId]) -> Vec<String> {
+    fn render(&self, diags: &[Diag], arms: &[PatId]) -> Vec<String> {
         diags
             .iter()
             .map(|diag| {
                 let at = arms
                     .iter()
-                    .position(|&pat| self.store.pat_range(pat) == diag.range)
+                    .position(
+                        |&pat| matches!(diag.anchor, Anchor::Node(_, NodeId::Pat(p)) if p == pat),
+                    )
                     .map(|index| format!(" (arm {index})"))
                     .unwrap_or_default();
                 format!("{}: {}{at}", diag.code.as_str(), diag.message)
@@ -670,24 +649,24 @@ fn bool_matches() {
     let mut b = B::default();
     let arms = vec![b.boolean(true)];
     assert_eq!(
-        check_match(&w, &mut b, Ty::Bool, unguarded(arms)),
+        check_match(&w, &mut b, Ty::bool(), unguarded(arms)),
         vec![missing("`false`")]
     );
 
     let mut b = B::default();
     let arms = vec![b.boolean(true), b.boolean(false)];
-    assert!(check_match(&w, &mut b, Ty::Bool, unguarded(arms)).is_empty());
+    assert!(check_match(&w, &mut b, Ty::bool(), unguarded(arms)).is_empty());
 
     let mut b = B::default();
     let arms = vec![b.boolean(true), b.boolean(false), b.wild()];
     assert_eq!(
-        check_match(&w, &mut b, Ty::Bool, unguarded(arms)),
+        check_match(&w, &mut b, Ty::bool(), unguarded(arms)),
         vec![unreachable(2)]
     );
 
     let mut b = B::default();
     assert_eq!(
-        check_match(&w, &mut b, Ty::Bool, Vec::new()),
+        check_match(&w, &mut b, Ty::bool(), Vec::new()),
         vec![missing("`false` and `true`")]
     );
 }
@@ -728,7 +707,7 @@ fn enum_with_payloads() {
 #[test]
 fn nested_tuples() {
     let w = World::new();
-    let ty = Ty::Tuple(vec![Ty::Tuple(vec![Ty::Bool, Ty::Bool]), Ty::Bool]);
+    let ty = Ty::tuple(vec![Ty::tuple(vec![Ty::bool(), Ty::bool()]), Ty::bool()]);
     let mut b = B::default();
     let (t1, w1) = (b.boolean(true), b.wild());
     let inner1 = b.tuple(vec![t1, w1]);
@@ -746,7 +725,7 @@ fn nested_tuples() {
     );
 
     // `..` in tuples.
-    let ty = Ty::Tuple(vec![Ty::Bool, Ty::Bool, Ty::Bool]);
+    let ty = Ty::tuple(vec![Ty::bool(), Ty::bool(), Ty::bool()]);
     let mut b = B::default();
     let (t, r) = (b.boolean(true), b.rest());
     let arm1 = b.tuple(vec![t, r]);
@@ -762,7 +741,12 @@ fn nested_tuples() {
     let t = b.boolean(true);
     let arm = b.tuple(vec![t]);
     assert_eq!(
-        check_match(&w, &mut b, Ty::Tuple(vec![Ty::Bool]), unguarded(vec![arm])),
+        check_match(
+            &w,
+            &mut b,
+            Ty::tuple(vec![Ty::bool()]),
+            unguarded(vec![arm])
+        ),
         vec![missing("`(false,)`")]
     );
 }
@@ -806,7 +790,7 @@ fn bounded_int_ranges() {
 #[test]
 fn rust_int_ranges_with_gaps() {
     let w = World::new();
-    let i32_ty = Ty::Int(IntTy::I32);
+    let i32_ty = Ty::int(IntTy::I32);
     let mut b = B::default();
     let arms = vec![
         b.range_pat(None, Some(-1), true),
@@ -837,7 +821,7 @@ fn rust_int_ranges_with_gaps() {
         b.range_pat(Some(200), Some(255), true),
     ];
     assert_eq!(
-        check_match(&w, &mut b, Ty::Int(IntTy::U8), unguarded(arms)),
+        check_match(&w, &mut b, Ty::int(IntTy::U8), unguarded(arms)),
         vec![missing("`101..=199`")]
     );
 
@@ -846,7 +830,7 @@ fn rust_int_ranges_with_gaps() {
         b.range_pat(Some(0), Some(10), false),
         b.range_pat(Some(10), None, true),
     ];
-    assert!(check_match(&w, &mut b, Ty::Int(IntTy::U8), unguarded(arms)).is_empty());
+    assert!(check_match(&w, &mut b, Ty::int(IntTy::U8), unguarded(arms)).is_empty());
 
     let mut b = B::default();
     let arms = vec![
@@ -854,15 +838,12 @@ fn rust_int_ranges_with_gaps() {
         b.int(0),
         b.range_pat(Some(1), None, true),
     ];
-    assert!(check_match(&w, &mut b, Ty::Int(IntTy::I8), unguarded(arms)).is_empty());
+    assert!(check_match(&w, &mut b, Ty::int(IntTy::I8), unguarded(arms)).is_empty());
 
     // Through a reference.
     let mut b = B::default();
     let arms = vec![b.boolean(true)];
-    let ty = Ty::Ref {
-        mutable: false,
-        inner: Box::new(Ty::Bool),
-    };
+    let ty = Ty::reference(false, Ty::bool());
     assert_eq!(
         check_match(&w, &mut b, ty, unguarded(arms)),
         vec![missing("`false`")]
@@ -875,14 +856,14 @@ fn guards() {
     let mut b = B::default();
     let arms = vec![(b.boolean(true), true), (b.boolean(false), false)];
     assert_eq!(
-        check_match(&w, &mut b, Ty::Bool, arms),
+        check_match(&w, &mut b, Ty::bool(), arms),
         vec![missing("`true`")]
     );
 
     let mut b = B::default();
     let arms = vec![(b.wild(), false), (b.boolean(true), true)];
     assert_eq!(
-        check_match(&w, &mut b, Ty::Bool, arms),
+        check_match(&w, &mut b, Ty::bool(), arms),
         vec![unreachable(1)]
     );
 
@@ -892,7 +873,7 @@ fn guards() {
         (b.boolean(true), false),
         (b.boolean(false), false),
     ];
-    assert!(check_match(&w, &mut b, Ty::Bool, arms).is_empty());
+    assert!(check_match(&w, &mut b, Ty::bool(), arms).is_empty());
 }
 
 #[test]
@@ -932,7 +913,7 @@ fn or_patterns() {
         check_match(
             &w,
             &mut b,
-            Ty::Tuple(vec![Ty::Bool, Ty::Bool]),
+            Ty::tuple(vec![Ty::bool(), Ty::bool()]),
             unguarded(vec![arm])
         ),
         vec![missing("`(false, false)` and `(true, false)`")]
@@ -952,7 +933,7 @@ fn unreachable_arms() {
     let mut b = B::default();
     let arms = vec![b.bind("x"), b.bind("y")];
     assert_eq!(
-        check_match(&w, &mut b, Ty::Bool, unguarded(arms)),
+        check_match(&w, &mut b, Ty::bool(), unguarded(arms)),
         vec![unreachable(1)]
     );
 }
@@ -973,7 +954,7 @@ fn refutable_bindings() {
     let mut b = B::default();
     let (x, y) = (b.bind("x"), b.bind("y"));
     let pat = b.tuple(vec![x, y]);
-    let value = b.let_stmt(pat, Ty::Tuple(vec![Ty::Bool, Ty::Bool]));
+    let value = b.let_stmt(pat, Ty::tuple(vec![Ty::bool(), Ty::bool()]));
     assert!(b.check(&w, value).is_empty());
 
     let mut b = B::default();
@@ -997,7 +978,7 @@ fn refutable_bindings() {
 
     let mut b = B::default();
     let pat = b.int(3);
-    b.inf.pat_types.insert(pat, Ty::Int(IntTy::U8));
+    b.inf.pat_types.insert(pat, Ty::int(IntTy::U8));
     let iterable = b.expr(Expr::Missing);
     let body = b.expr(Expr::Tuple(Vec::new()));
     let value = b.expr(Expr::For {
@@ -1022,7 +1003,7 @@ fn empty_types() {
     assert!(check_match(&w, &mut b, w.adt(w.empty), Vec::new()).is_empty());
 
     let mut b = B::default();
-    assert!(check_match(&w, &mut b, Ty::Never, Vec::new()).is_empty());
+    assert!(check_match(&w, &mut b, Ty::never(), Vec::new()).is_empty());
 
     let route = w.adt(w.route);
     let mut b = B::default();
@@ -1167,14 +1148,14 @@ fn constant_patterns() {
     let mut b = B::default();
     let arms = vec![b.const_range(w.low, 9)];
     assert_eq!(
-        check_match(&w, &mut b, Ty::Int(IntTy::U64), unguarded(arms)),
+        check_match(&w, &mut b, Ty::int(IntTy::U64), unguarded(arms)),
         vec![missing("`0` and `10..=u64::MAX`")]
     );
 
     let mut b = B::default();
     let arms = vec![b.const_pat(w.neg)];
     assert_eq!(
-        check_match(&w, &mut b, Ty::Int(IntTy::I32), unguarded(arms)),
+        check_match(&w, &mut b, Ty::int(IntTy::I32), unguarded(arms)),
         vec![missing("`i32::MIN..=-4` and `-2..=i32::MAX`")]
     );
 
@@ -1216,12 +1197,12 @@ fn errors_skip_silently() {
     let route = w.adt(w.route);
     let mut b = B::default();
     let arm = b.unit_variant(w.route, 0);
-    b.inf.pat_types.insert(arm, Ty::Error);
+    b.inf.pat_types.insert(arm, Ty::error());
     assert!(check_match(&w, &mut b, route, unguarded(vec![arm])).is_empty());
 
     let mut b = B::default();
     let arms = vec![b.boolean(true)];
-    assert!(check_match(&w, &mut b, Ty::Error, unguarded(arms)).is_empty());
+    assert!(check_match(&w, &mut b, Ty::error(), unguarded(arms)).is_empty());
 
     let mut b = B::default();
     let arms = vec![b.int(7)];
@@ -1230,7 +1211,7 @@ fn errors_skip_silently() {
     let mut b = B::default();
     let missing_pat = b.pat(Pat::Missing);
     let arms = vec![b.boolean(true), missing_pat];
-    assert!(check_match(&w, &mut b, Ty::Bool, unguarded(arms)).is_empty());
+    assert!(check_match(&w, &mut b, Ty::bool(), unguarded(arms)).is_empty());
 }
 
 /// The checks on real inference, plus a constant folded by the shared folder.
@@ -1253,8 +1234,10 @@ fn end_to_end() {
     );
     let db = RootDatabase::new(Arc::new(fs));
     let program = db.program(FilePath::disk("/game/main.kix"));
-    let messages: Vec<&str> = file_pattern_checks(&db, program, *program.root(&db))
-        .iter()
+    let file = *program.root(&db);
+    let messages: Vec<&str> = item_tree(&db, file)
+        .indices()
+        .flat_map(|index| pattern_checks(&db, program, ItemId { file, index }))
         .map(|diag| diag.message.as_str())
         .collect();
     assert_eq!(

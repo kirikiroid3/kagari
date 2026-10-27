@@ -1,32 +1,30 @@
 //! The stage 3 type-level constant folder: array lengths, `Int` bounds and const generic
 //! arguments.
 
-use kagari_syntax::TextRange;
-
 use crate::db::Db;
 use crate::def_map::{Def, Resolution};
-use crate::diagnostic::{Diagnostic, DiagnosticCode};
-use crate::hir::{BinaryOp, Expr, ExprId, ExprStore, Literal, UnaryOp, file_hir};
+use crate::diagnostic::{Anchor, Diag, DiagnosticCode, NodeId, Owner};
+use crate::hir::{BinaryOp, Expr, ExprId, ExprStore, Literal, UnaryOp, body_of};
 use crate::input::Program;
 use crate::item_tree::{ItemId, ItemKind, item_tree};
-use crate::resolve::{StoreResolution, file_resolution};
+use crate::resolve::{StoreResolution, body_resolution};
 use crate::ty::Const;
 
 const UNSUPPORTED: &str =
     "only literals, arithmetic, constants and const parameters are allowed here";
 
-/// Folds `expr`, an expression of `store` (a signature or body of `owner`, resolved by
+/// Folds `expr`, an expression of `store` (the signature or body `owner`, resolved by
 /// `res`), to a type-level constant: integer literals, unary `-`, `+ - * / %`, blocks with only
 /// a tail, const generic parameters and `const` items. Anything else is reported as
 /// `E2002` and folds to `Const::Error`.
 pub fn fold_const_expr(
     db: &dyn Db,
     program: Program,
-    owner: ItemId,
+    owner: Owner,
     store: &ExprStore,
     res: &StoreResolution,
     expr: ExprId,
-    diags: &mut Vec<Diagnostic>,
+    diags: &mut Vec<Diag>,
 ) -> Const {
     let mut folder = Folder {
         db,
@@ -36,22 +34,21 @@ pub fn fold_const_expr(
     folder.fold(owner, store, res, expr, diags)
 }
 
-/// Folds the initializer of the `const` item `item`, reporting at `range` of `owner`'s file
-/// when it is not a type-level constant.
+/// Folds the initializer of the `const` item `item`, reporting at `anchor` when it is not a
+/// type-level constant.
 pub(crate) fn fold_const_item(
     db: &dyn Db,
     program: Program,
-    owner: ItemId,
     item: ItemId,
-    range: TextRange,
-    diags: &mut Vec<Diagnostic>,
+    anchor: Anchor,
+    diags: &mut Vec<Diag>,
 ) -> Const {
     let mut folder = Folder {
         db,
         program,
         stack: Vec::new(),
     };
-    folder.fold_item(owner, item, range, diags)
+    folder.fold_item(item, anchor, diags)
 }
 
 struct Folder<'a> {
@@ -61,28 +58,21 @@ struct Folder<'a> {
 }
 
 impl Folder<'_> {
-    fn diag(
-        &self,
-        owner: ItemId,
-        range: TextRange,
-        code: DiagnosticCode,
-        message: String,
-    ) -> Diagnostic {
-        Diagnostic::new(owner.file.path(self.db).clone(), range, code, message)
+    fn diag(&self, anchor: Anchor, code: DiagnosticCode, message: String) -> Diag {
+        Diag::new(anchor, code, message)
     }
 
     fn fold(
         &mut self,
-        owner: ItemId,
+        owner: Owner,
         store: &ExprStore,
         res: &StoreResolution,
         expr: ExprId,
-        diags: &mut Vec<Diagnostic>,
+        diags: &mut Vec<Diag>,
     ) -> Const {
-        let range = store.expr_range(expr);
-        let unsupported = |this: &Self, diags: &mut Vec<Diagnostic>| {
+        let range = Anchor::Node(owner, NodeId::Expr(expr));
+        let unsupported = |this: &Self, diags: &mut Vec<Diag>| {
             diags.push(this.diag(
-                owner,
                 range,
                 DiagnosticCode::TypeUnsupportedConst,
                 UNSUPPORTED.to_owned(),
@@ -95,7 +85,6 @@ impl Folder<'_> {
                 Ok(value) => Const::Value(value),
                 Err(_) => {
                     diags.push(self.diag(
-                        owner,
                         range,
                         DiagnosticCode::TypeConstOverflow,
                         "integer constant is too large".to_owned(),
@@ -109,7 +98,7 @@ impl Folder<'_> {
             } => match self.fold(owner, store, res, *inner, diags) {
                 Const::Value(value) => match value.checked_neg() {
                     Some(value) => Const::Value(value),
-                    None => self.overflow(owner, range, diags),
+                    None => self.overflow(range, diags),
                 },
                 Const::Error => Const::Error,
                 Const::Param { .. } | Const::Infer(_) => unsupported(self, diags),
@@ -126,7 +115,6 @@ impl Folder<'_> {
                     (Const::Value(a), Const::Value(b)) => {
                         if matches!(op, BinaryOp::Div | BinaryOp::Rem) && b == 0 {
                             diags.push(self.diag(
-                                owner,
                                 range,
                                 DiagnosticCode::TypeConstOverflow,
                                 "division by zero in a constant".to_owned(),
@@ -142,7 +130,7 @@ impl Folder<'_> {
                         };
                         match value {
                             Some(value) => Const::Value(value),
-                            None => self.overflow(owner, range, diags),
+                            None => self.overflow(range, diags),
                         }
                     }
                     (Const::Error, _) | (_, Const::Error) => Const::Error,
@@ -162,7 +150,7 @@ impl Folder<'_> {
                 Some(Resolution::Def(Def::Item(item)) | Resolution::Assoc(item))
                     if self.is_const(*item) =>
                 {
-                    self.fold_item(owner, *item, range, diags)
+                    self.fold_item(*item, range, diags)
                 }
                 Some(Resolution::Error) | None => Const::Error,
                 Some(_) => unsupported(self, diags),
@@ -171,9 +159,8 @@ impl Folder<'_> {
         }
     }
 
-    fn overflow(&self, owner: ItemId, range: TextRange, diags: &mut Vec<Diagnostic>) -> Const {
+    fn overflow(&self, range: Anchor, diags: &mut Vec<Diag>) -> Const {
         diags.push(self.diag(
-            owner,
             range,
             DiagnosticCode::TypeConstOverflow,
             "arithmetic overflow in a constant".to_owned(),
@@ -190,51 +177,45 @@ impl Folder<'_> {
         )
     }
 
-    fn fold_item(
-        &mut self,
-        owner: ItemId,
-        item: ItemId,
-        range: TextRange,
-        diags: &mut Vec<Diagnostic>,
-    ) -> Const {
+    fn fold_item(&mut self, item: ItemId, range: Anchor, diags: &mut Vec<Diag>) -> Const {
         let name = item_tree(self.db, item.file)
             .item(item.index)
             .and_then(|data| data.name.clone())
             .unwrap_or_default();
         if self.stack.contains(&item) {
             diags.push(self.diag(
-                owner,
                 range,
                 DiagnosticCode::TypeUnsupportedConst,
                 format!("cycle detected when evaluating constant `{name}`"),
             ));
             return Const::Error;
         }
-        let Some(Some(body)) = file_hir(self.db, item.file).bodies.get(item.index as usize) else {
+        let Some(body) = body_of(self.db, item) else {
             return Const::Error;
         };
-        let resolution = file_resolution(self.db, self.program, item.file);
-        let Some(Some(item_res)) = resolution.items.get(item.index as usize) else {
-            return Const::Error;
-        };
-        let Some(body_res) = &item_res.body else {
+        let Some(body_res) = &body_resolution(self.db, self.program, item).body else {
             return Const::Error;
         };
         self.stack.push(item);
         let mut inner = Vec::new();
-        let value = self.fold(item, &body.store, &body_res.store, body.value, &mut inner);
+        let value = self.fold(
+            Owner::Body(item),
+            &body.store,
+            &body_res.store,
+            body.value,
+            &mut inner,
+        );
         self.stack.pop();
         if let Some(cycle) = inner
             .iter()
             .find(|diag| diag.message.starts_with("cycle detected"))
         {
             let message = cycle.message.clone();
-            diags.push(self.diag(owner, range, DiagnosticCode::TypeUnsupportedConst, message));
+            diags.push(self.diag(range, DiagnosticCode::TypeUnsupportedConst, message));
             return Const::Error;
         }
         if !inner.is_empty() {
             diags.push(self.diag(
-                owner,
                 range,
                 DiagnosticCode::TypeUnsupportedConst,
                 format!(
@@ -247,7 +228,6 @@ impl Folder<'_> {
         match value {
             Const::Param { .. } => {
                 diags.push(self.diag(
-                    owner,
                     range,
                     DiagnosticCode::TypeUnsupportedConst,
                     format!("constant `{name}` depends on generic parameters"),

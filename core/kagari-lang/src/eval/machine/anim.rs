@@ -6,10 +6,10 @@ use std::cmp::Ordering;
 
 use crate::diagnostic::DiagnosticCode;
 
-use super::Fault;
-use super::num::Decimal;
-use super::std_items::{AdtInfo, StdTable};
-use super::value::ConstValue;
+use super::super::Fault;
+use super::super::num::Decimal;
+use super::super::std_items::{AdtInfo, StdTable};
+use super::super::value::ConstValue;
 
 fn fraction_fault(what: &str, value: Decimal, range: &str) -> Fault {
     Fault::new(
@@ -66,7 +66,7 @@ pub fn check_easing(value: &ConstValue, std: &StdTable) -> Result<(), Fault> {
             }
         }
     } else if Some(*variant) == std.easing.variant("Steps")
-        && fields.first().and_then(ConstValue::as_int) == Some(0)
+        && fields.front().and_then(ConstValue::as_int) == Some(0)
     {
         return Err(invalid_easing(
             "`Steps(0)`: the number of steps must not be 0".to_owned(),
@@ -99,9 +99,10 @@ fn invalid_motion(message: impl Into<String>) -> Fault {
 /// increasing, a last key at identity (offset (0, 0), scale 1.0, rotation 0°), `repeat > 0`;
 /// plus the easing of every key.
 pub fn check_motion(value: &ConstValue, std: &StdTable) -> Result<(), Fault> {
-    let keys: &[ConstValue] = match field(value, &std.motion, "keys") {
+    let empty = imbl::Vector::new();
+    let keys: &imbl::Vector<ConstValue> = match field(value, &std.motion, "keys") {
         Some(ConstValue::Vec(keys) | ConstValue::Array(keys)) => keys,
-        _ => &[],
+        _ => &empty,
     };
     if keys.is_empty() {
         return Err(invalid_motion("a motion needs at least one key"));

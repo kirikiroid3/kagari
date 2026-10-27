@@ -16,6 +16,9 @@ smol_str = { workspace = true }
 la-arena = { workspace = true }
 stacker = { workspace = true }
 unicode-ident = { workspace = true }
+imbl = { workspace = true }
+triomphe = { workspace = true }
+smallvec = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

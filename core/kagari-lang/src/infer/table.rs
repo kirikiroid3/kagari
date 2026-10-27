@@ -1,7 +1,7 @@
 //! Inference variables and unification.
 
 use crate::hir::ExprId;
-use crate::ty::{Const, FnRef, GenericArg, InferVar, Ty, TyNode};
+use crate::ty::{Const, FnRef, GenericArg, GenericArgs, InferVar, Ty, TyKind, TyNode};
 
 /// An integer literal whose type is not known yet: the hull of the values it must hold.
 #[derive(Clone, Copy, Debug)]
@@ -53,14 +53,14 @@ impl Table {
     }
 
     pub(crate) fn new_var(&mut self) -> Ty {
-        Ty::Infer(self.push(VarData::Ty {
+        Ty::infer(self.push(VarData::Ty {
             value: None,
             literal: None,
         }))
     }
 
     pub(crate) fn new_literal(&mut self, lo: i128, hi: i128, origin: ExprId) -> Ty {
-        Ty::Infer(self.push(VarData::Ty {
+        Ty::infer(self.push(VarData::Ty {
             value: None,
             literal: Some(Literal { lo, hi, origin }),
         }))
@@ -116,8 +116,8 @@ impl Table {
 
     /// Whether `ty` is (after following bindings) an unresolved integer literal variable.
     pub(crate) fn literal(&self, ty: &Ty) -> Option<(InferVar, Literal)> {
-        match self.shallow(ty) {
-            Ty::Infer(var) => self.literal_of(var).map(|literal| (var, literal)),
+        match self.shallow(ty).kind() {
+            TyKind::Infer(var) => self.literal_of(*var).map(|literal| (*var, literal)),
             _ => None,
         }
     }
@@ -127,7 +127,7 @@ impl Table {
     }
 
     fn root(&self, mut var: InferVar) -> InferVar {
-        while let Some(Ty::Infer(next)) = self.ty_value(var) {
+        while let Some(TyKind::Infer(next)) = self.ty_value(var).map(Ty::kind) {
             var = *next;
         }
         var
@@ -136,7 +136,7 @@ impl Table {
     /// `ty` with the bindings of its head followed.
     pub(crate) fn shallow(&self, ty: &Ty) -> Ty {
         let mut current = ty;
-        while let Ty::Infer(var) = current {
+        while let TyKind::Infer(var) = current.kind() {
             match self.ty_value(*var) {
                 Some(next) => current = next,
                 None => break,
@@ -158,52 +158,57 @@ impl Table {
 
     /// `ty` with every bound variable replaced by its value.
     pub(crate) fn resolve(&self, ty: &Ty) -> Ty {
-        match self.shallow(ty) {
-            Ty::Infer(var) => Ty::Infer(var),
-            Ty::Bounded { lo, hi } => Ty::Bounded {
-                lo: self.shallow_const(&lo),
-                hi: self.shallow_const(&hi),
+        if !ty.has_infer() {
+            return ty.clone();
+        }
+        let ty = self.shallow(ty);
+        let kind = match ty.kind() {
+            TyKind::Infer(_) => return ty,
+            TyKind::Bounded { lo, hi } => TyKind::Bounded {
+                lo: self.shallow_const(lo),
+                hi: self.shallow_const(hi),
             },
-            Ty::Tuple(fields) => {
-                Ty::Tuple(fields.iter().map(|field| self.resolve(field)).collect())
+            TyKind::Tuple(fields) => {
+                TyKind::Tuple(fields.iter().map(|field| self.resolve(field)).collect())
             }
-            Ty::Array { elem, len } => Ty::Array {
-                elem: Box::new(self.resolve(&elem)),
-                len: self.shallow_const(&len),
+            TyKind::Array { elem, len } => TyKind::Array {
+                elem: self.resolve(elem),
+                len: self.shallow_const(len),
             },
-            Ty::Adt { item, args } => Ty::Adt {
-                item,
-                args: self.resolve_args(&args),
+            TyKind::Adt { item, args } => TyKind::Adt {
+                item: *item,
+                args: self.resolve_args(args),
             },
-            Ty::Ref { mutable, inner } => Ty::Ref {
-                mutable,
-                inner: Box::new(self.resolve(&inner)),
+            TyKind::Ref { mutable, inner } => TyKind::Ref {
+                mutable: *mutable,
+                inner: self.resolve(inner),
             },
-            Ty::FnPtr { kind, params, ret } => Ty::FnPtr {
-                kind,
+            TyKind::FnPtr { kind, params, ret } => TyKind::FnPtr {
+                kind: *kind,
                 params: params.iter().map(|param| self.resolve(param)).collect(),
-                ret: Box::new(self.resolve(&ret)),
+                ret: self.resolve(ret),
             },
-            Ty::Closure { kind, params, ret } => Ty::Closure {
-                kind,
+            TyKind::Closure { kind, params, ret } => TyKind::Closure {
+                kind: *kind,
                 params: params.iter().map(|param| self.resolve(param)).collect(),
-                ret: Box::new(self.resolve(&ret)),
+                ret: self.resolve(ret),
             },
-            Ty::FnDef(fn_ref) => Ty::FnDef(Box::new(self.resolve_fn_ref(&fn_ref))),
-            Ty::Projection {
+            TyKind::FnDef(fn_ref) => TyKind::FnDef(self.resolve_fn_ref(fn_ref)),
+            TyKind::Projection {
                 base,
                 trait_item,
                 name,
-            } => Ty::Projection {
-                base: Box::new(self.resolve(&base)),
-                trait_item,
-                name,
+            } => TyKind::Projection {
+                base: self.resolve(base),
+                trait_item: *trait_item,
+                name: name.clone(),
             },
-            other => other,
-        }
+            _ => return ty,
+        };
+        Ty::new(kind)
     }
 
-    pub(crate) fn resolve_args(&self, args: &[GenericArg]) -> Vec<GenericArg> {
+    pub(crate) fn resolve_args(&self, args: &[GenericArg]) -> GenericArgs {
         args.iter()
             .map(|arg| match arg {
                 GenericArg::Type(ty) => GenericArg::Type(self.resolve(ty)),
@@ -223,63 +228,64 @@ impl Table {
     pub(crate) fn unify(&mut self, a: &Ty, b: &Ty) -> bool {
         let a = self.shallow(a);
         let b = self.shallow(b);
-        match (&a, &b) {
-            (Ty::Error, _) | (_, Ty::Error) => true,
-            (Ty::Infer(x), Ty::Infer(y)) if x == y => true,
-            (Ty::Infer(x), Ty::Infer(y)) => {
+        match (a.kind(), b.kind()) {
+            (TyKind::Error, _) | (_, TyKind::Error) => true,
+            (TyKind::Infer(x), TyKind::Infer(y)) if x == y => true,
+            (TyKind::Infer(x), TyKind::Infer(y)) => {
                 self.union(*x, *y);
                 true
             }
-            (Ty::Infer(var), other) | (other, Ty::Infer(var)) => self.bind(*var, other),
-            (Ty::Never, Ty::Never) | (Ty::Bool, Ty::Bool) => true,
-            (Ty::Int(x), Ty::Int(y)) => x == y,
-            (Ty::Bounded { lo: l1, hi: h1 }, Ty::Bounded { lo: l2, hi: h2 }) => {
+            (TyKind::Infer(var), _) => self.bind(*var, &b),
+            (_, TyKind::Infer(var)) => self.bind(*var, &a),
+            (TyKind::Never, TyKind::Never) | (TyKind::Bool, TyKind::Bool) => true,
+            (TyKind::Int(x), TyKind::Int(y)) => x == y,
+            (TyKind::Bounded { lo: l1, hi: h1 }, TyKind::Bounded { lo: l2, hi: h2 }) => {
                 self.unify_const(l1, l2) && self.unify_const(h1, h2)
             }
-            (Ty::Tuple(xs), Ty::Tuple(ys)) => {
-                xs.len() == ys.len() && xs.iter().zip(ys).all(|(x, y)| self.unify(x, y))
+            (TyKind::Tuple(xs), TyKind::Tuple(ys)) => {
+                xs.len() == ys.len() && xs.iter().zip(ys.iter()).all(|(x, y)| self.unify(x, y))
             }
-            (Ty::Array { elem: e1, len: l1 }, Ty::Array { elem: e2, len: l2 }) => {
+            (TyKind::Array { elem: e1, len: l1 }, TyKind::Array { elem: e2, len: l2 }) => {
                 self.unify(e1, e2) && self.unify_const(l1, l2)
             }
-            (Ty::Adt { item: i1, args: a1 }, Ty::Adt { item: i2, args: a2 }) => {
+            (TyKind::Adt { item: i1, args: a1 }, TyKind::Adt { item: i2, args: a2 }) => {
                 i1 == i2 && self.unify_args(a1, a2)
             }
             (
-                Ty::Ref {
+                TyKind::Ref {
                     mutable: m1,
                     inner: i1,
                 },
-                Ty::Ref {
+                TyKind::Ref {
                     mutable: m2,
                     inner: i2,
                 },
             ) => m1 == m2 && self.unify(i1, i2),
             (
-                Ty::FnPtr {
+                TyKind::FnPtr {
                     kind: k1,
                     params: p1,
                     ret: r1,
                 },
-                Ty::FnPtr {
+                TyKind::FnPtr {
                     kind: k2,
                     params: p2,
                     ret: r2,
                 },
             ) => k1 == k2 && self.unify_sig(p1, r1, p2, r2),
             (
-                Ty::Closure {
+                TyKind::Closure {
                     kind: k1,
                     params: p1,
                     ret: r1,
                 },
-                Ty::Closure {
+                TyKind::Closure {
                     kind: k2,
                     params: p2,
                     ret: r2,
                 },
             ) => k1 == k2 && self.unify_sig(p1, r1, p2, r2),
-            (Ty::FnDef(f), Ty::FnDef(g)) => {
+            (TyKind::FnDef(f), TyKind::FnDef(g)) => {
                 f.def == g.def
                     && self.unify_args(&f.args, &g.args)
                     && match (&f.self_ty, &g.self_ty) {
@@ -289,12 +295,12 @@ impl Table {
                     }
             }
             (
-                Ty::Projection {
+                TyKind::Projection {
                     base: b1,
                     trait_item: t1,
                     name: n1,
                 },
-                Ty::Projection {
+                TyKind::Projection {
                     base: b2,
                     trait_item: t2,
                     name: n2,
@@ -351,7 +357,7 @@ impl Table {
                 self.set(
                     y,
                     VarData::Ty {
-                        value: Some(Ty::Infer(x)),
+                        value: Some(Ty::infer(x)),
                         literal: None,
                     },
                 );
@@ -359,14 +365,14 @@ impl Table {
             (Some(_), None) => self.set(
                 y,
                 VarData::Ty {
-                    value: Some(Ty::Infer(x)),
+                    value: Some(Ty::infer(x)),
                     literal: None,
                 },
             ),
             _ => self.set(
                 x,
                 VarData::Ty {
-                    value: Some(Ty::Infer(y)),
+                    value: Some(Ty::infer(y)),
                     literal: None,
                 },
             ),
@@ -378,7 +384,7 @@ impl Table {
             return false;
         }
         if let Some(literal) = self.literal_of(var) {
-            if !matches!(ty, Ty::Int(_) | Ty::Bounded { .. }) {
+            if !matches!(ty.kind(), TyKind::Int(_) | TyKind::Bounded { .. }) {
                 return false;
             }
             self.fits.push(Fit {
@@ -400,7 +406,7 @@ impl Table {
         let resolved = self.resolve(ty);
         let mut found = false;
         resolved.walk(&mut |node| {
-            found |= matches!(node, TyNode::Ty(Ty::Infer(other)) if *other == var);
+            found |= matches!(node, TyNode::Ty(ty) if matches!(ty.kind(), TyKind::Infer(other) if *other == var));
         });
         found
     }

@@ -9,15 +9,15 @@ use std::sync::Arc;
 pub enum FilePath {
     /// `std/<name>`, embedded in `kagari-std`. The string uses `/` separators and is relative
     /// to the std directory.
-    Std(String),
+    Std(Arc<str>),
     /// An absolute, lexically normalized path on disk.
-    Disk(PathBuf),
+    Disk(Arc<Path>),
 }
 
 impl FilePath {
     /// A disk path with `.` dropped and `..` folded lexically. Callers pass absolute paths.
     pub fn disk(path: impl Into<PathBuf>) -> FilePath {
-        FilePath::Disk(normalize(&path.into()))
+        FilePath::Disk(normalize(&path.into()).into())
     }
 
     /// Human-readable path: `std/<name>` for std files; disk paths relative to `base`
@@ -74,7 +74,7 @@ impl FilePath {
         match self {
             FilePath::Std(name) => {
                 let base: Vec<&str> = name.split('/').filter(|part| !part.is_empty()).collect();
-                FilePath::Std(normalize_std(&base, rel))
+                FilePath::Std(normalize_std(&base, rel).into())
             }
             FilePath::Disk(path) => FilePath::disk(path.join(rel)),
         }
@@ -86,7 +86,7 @@ impl FilePath {
             FilePath::Std(name) => {
                 let mut base: Vec<&str> = name.split('/').filter(|part| !part.is_empty()).collect();
                 base.pop();
-                FilePath::Std(normalize_std(&base, rel))
+                FilePath::Std(normalize_std(&base, rel).into())
             }
             FilePath::Disk(path) => {
                 let parent = path.parent().unwrap_or(path);
@@ -133,6 +133,13 @@ pub struct SourceFile {
     pub path: FilePath,
     #[returns(ref)]
     pub text: Option<Arc<str>>,
+}
+
+/// Whether `file` exists. Queries that only care about existence read this rather than the
+/// text, so that editing the file does not re-run them.
+#[salsa::tracked(returns(copy))]
+pub fn file_exists(db: &dyn crate::db::Db, file: SourceFile) -> bool {
+    file.text(db).is_some()
 }
 
 /// A file named by an asset path; only its existence matters to the front end.
@@ -185,7 +192,7 @@ mod tests {
         let main = FilePath::disk("/g/script/main.kix");
         assert_eq!(
             main.parent_dir_join("../ext/a.png"),
-            FilePath::Disk("/g/ext/a.png".into())
+            FilePath::disk("/g/ext/a.png")
         );
         assert_eq!(
             FilePath::Std("system.kis".into()).parent_dir_join("system/nav.kis"),

@@ -1,16 +1,15 @@
 //! The inference context of one body: expectations, coercions, joins, instantiation of
 //! generic items, projections and deferred checks.
 
-use kagari_syntax::TextRange;
 use rustc_hash::FxHashMap;
 
 use super::table::Table;
 use super::{Coercion, InferenceResult};
 use crate::db::Db;
 use crate::def_map::{DefMaps, ModuleId};
-use crate::diagnostic::{Diagnostic, DiagnosticCode, Severity};
+use crate::diagnostic::{Anchor, Diag, DiagnosticCode, NodeId, Owner, Severity};
 use crate::hir::{ClosureKind, Expr, ExprId, ExprStore, FnPtrKind, Name, PatId};
-use crate::input::{FilePath, Program};
+use crate::input::Program;
 use crate::item_tree::{FnKind, ItemId};
 use crate::resolve::{BodyResolution, LocalId};
 use crate::signatures::lower::{Scope, Sink, TyLowerer};
@@ -19,7 +18,7 @@ use crate::signatures::{
     BoundEnv, GenericParamDefKind, Generics, ItemSig, ProgramSignatures, display_ty_with,
     normalize_projection,
 };
-use crate::ty::{Const, FnDefId, FnRef, GenericArg, Ty};
+use crate::ty::{Const, FnDefId, FnRef, GenericArg, GenericArgs, IntTy, Ty, TyKind};
 
 /// What the context of an expression asks of its type.
 #[derive(Clone, Copy)]
@@ -63,21 +62,21 @@ pub(crate) enum ObligationKind {
 pub(crate) struct Obligation {
     pub ty: Ty,
     pub trait_item: ItemId,
-    pub range: TextRange,
+    pub anchor: Anchor,
     pub kind: ObligationKind,
 }
 
 pub(crate) struct IntoCheck {
     pub from: Ty,
     pub to: Ty,
-    pub range: TextRange,
+    pub anchor: Anchor,
 }
 
 /// An integer literal of a pattern (or a bound of a range pattern) and the matched type.
 pub(crate) struct PatFit {
     pub value: i128,
     pub ty: Ty,
-    pub range: TextRange,
+    pub anchor: Anchor,
 }
 
 /// The signature of a callable, instantiated.
@@ -93,14 +92,13 @@ pub(crate) struct InferCtx<'a> {
     pub sigs: &'a ProgramSignatures,
     pub maps: &'a DefMaps,
     pub item: ItemId,
-    pub file_path: FilePath,
     pub store: &'a ExprStore,
     pub res: &'a BodyResolution,
     pub env: BoundEnv,
     pub lowerer: TyLowerer<'a>,
     pub table: Table,
     pub result: InferenceResult,
-    pub diags: Vec<Diagnostic>,
+    pub diags: Vec<Diag>,
     /// The kind closures get without an expected type.
     pub fn_kind: ClosureKind,
     pub closure_kinds: Vec<ClosureKind>,
@@ -123,30 +121,25 @@ pub(crate) struct InferCtx<'a> {
 impl<'a> InferCtx<'a> {
     pub(crate) fn diag(
         &mut self,
-        range: TextRange,
+        anchor: Anchor,
         code: DiagnosticCode,
         message: impl Into<String>,
     ) {
-        self.diags.push(Diagnostic::new(
-            self.file_path.clone(),
-            range,
-            code,
-            message,
-        ));
+        self.diags.push(Diag::new(anchor, code, message));
     }
 
     pub(crate) fn has_errors(&self) -> bool {
         self.diags
             .iter()
-            .any(|diag| diag.severity == Severity::Error)
+            .any(|diag| diag.severity() == Severity::Error)
     }
 
-    pub(crate) fn expr_range(&self, expr: ExprId) -> TextRange {
-        self.store.expr_range(expr)
+    pub(crate) fn expr_anchor(&self, expr: ExprId) -> Anchor {
+        Anchor::Node(Owner::Body(self.item), NodeId::Expr(expr))
     }
 
-    pub(crate) fn pat_range(&self, pat: PatId) -> TextRange {
-        self.store.pat_range(pat)
+    pub(crate) fn pat_anchor(&self, pat: PatId) -> Anchor {
+        Anchor::Node(Owner::Body(self.item), NodeId::Pat(pat))
     }
 
     /// The diagnostic text of `ty` as currently inferred.
@@ -157,7 +150,7 @@ impl<'a> InferCtx<'a> {
         })
     }
 
-    pub(crate) fn mismatch(&mut self, range: TextRange, expected: &Ty, found: &Ty) {
+    pub(crate) fn mismatch(&mut self, range: Anchor, expected: &Ty, found: &Ty) {
         let expected_resolved = self.table.resolve(expected);
         let found_resolved = self.table.resolve(found);
         if expected_resolved.references_error() || found_resolved.references_error() {
@@ -197,7 +190,7 @@ impl<'a> InferCtx<'a> {
 
     pub(crate) fn scope(&self) -> Scope<'a> {
         Scope {
-            owner: self.item,
+            src: Owner::Body(self.item),
             store: self.store,
             res: &self.res.store,
         }
@@ -242,7 +235,7 @@ impl<'a> InferCtx<'a> {
                 self.infer_type_exprs(*elem);
                 self.infer_expr(
                     *len,
-                    super::ctx::Expect::Coerce(&Ty::Int(crate::ty::IntTy::Usize)),
+                    super::ctx::Expect::Coerce(&Ty::int(crate::ty::IntTy::Usize)),
                 );
             }
             crate::hir::TypeRef::Ref { inner, .. } => self.infer_type_exprs(*inner),
@@ -326,7 +319,7 @@ impl<'a> InferCtx<'a> {
     /// unresolved variable.
     pub(crate) fn structurally_resolve(&mut self, ty: &Ty) -> Ty {
         let shallow = self.table.shallow(ty);
-        if matches!(shallow, Ty::Infer(_)) && !self.projections.is_empty() {
+        if matches!(shallow.kind(), TyKind::Infer(_)) && !self.projections.is_empty() {
             self.process_projections();
             return self.table.shallow(ty);
         }
@@ -340,9 +333,11 @@ impl<'a> InferCtx<'a> {
     pub(crate) fn coerce(&mut self, expr: ExprId, actual: &Ty, target: &Ty) -> bool {
         let a = self.structurally_resolve(actual);
         let t = self.structurally_resolve(target);
-        match (&a, &t) {
-            (Ty::Error, _) | (_, Ty::Error) | (Ty::Never, Ty::Never) => return true,
-            (Ty::Never, _) => {
+        match (a.kind(), t.kind()) {
+            (TyKind::Error, _) | (_, TyKind::Error) | (TyKind::Never, TyKind::Never) => {
+                return true;
+            }
+            (TyKind::Never, _) => {
                 self.result
                     .coercions
                     .insert(expr, (Coercion::NeverToAny, t.clone()));
@@ -358,7 +353,7 @@ impl<'a> InferCtx<'a> {
                 true
             }
             None => {
-                let range = self.expr_range(expr);
+                let range = self.expr_anchor(expr);
                 self.mismatch(range, &t, &a);
                 false
             }
@@ -372,8 +367,8 @@ impl<'a> InferCtx<'a> {
             return Some(None);
         }
         self.table.rollback(snapshot);
-        match (a, t) {
-            (Ty::Bounded { lo: l1, hi: h1 }, Ty::Bounded { lo: l2, hi: h2 }) => {
+        match (a.kind(), t.kind()) {
+            (TyKind::Bounded { lo: l1, hi: h1 }, TyKind::Bounded { lo: l2, hi: h2 }) => {
                 let values = (
                     self.table.shallow_const(l1).value(),
                     self.table.shallow_const(h1).value(),
@@ -387,7 +382,7 @@ impl<'a> InferCtx<'a> {
                     _ => None,
                 }
             }
-            (Ty::FnDef(fn_ref), Ty::FnPtr { kind, params, ret }) => {
+            (TyKind::FnDef(fn_ref), TyKind::FnPtr { kind, params, ret }) => {
                 let shape = self.fn_shape(fn_ref)?;
                 if shape.kind != *kind {
                     return None;
@@ -395,7 +390,7 @@ impl<'a> InferCtx<'a> {
                 self.unify_sig_or_rollback(&shape.params, &shape.ret, params, ret)
                     .then_some(Some(Coercion::FnDefToPtr))
             }
-            (Ty::FnDef(fn_ref), Ty::Closure { kind, params, ret }) => {
+            (TyKind::FnDef(fn_ref), TyKind::Closure { kind, params, ret }) => {
                 let shape = self.fn_shape(fn_ref)?;
                 if ptr_to_closure_kind(shape.kind) != Some(*kind) {
                     return None;
@@ -404,12 +399,12 @@ impl<'a> InferCtx<'a> {
                     .then_some(Some(Coercion::ToClosure))
             }
             (
-                Ty::FnPtr {
+                TyKind::FnPtr {
                     kind: k1,
                     params: p1,
                     ret: r1,
                 },
-                Ty::Closure {
+                TyKind::Closure {
                     kind: k2,
                     params: p2,
                     ret: r2,
@@ -422,12 +417,12 @@ impl<'a> InferCtx<'a> {
                     .then_some(Some(Coercion::ToClosure))
             }
             (
-                Ty::Closure {
+                TyKind::Closure {
                     kind: k1,
                     params: p1,
                     ret: r1,
                 },
-                Ty::FnPtr {
+                TyKind::FnPtr {
                     kind: k2,
                     params: p2,
                     ret: r2,
@@ -454,7 +449,7 @@ impl<'a> InferCtx<'a> {
                             .iter()
                             .map(|local| format!("`{}`", self.res.locals[*local].name))
                             .collect();
-                        let range = self.expr_range(expr);
+                        let range = self.expr_anchor(expr);
                         self.diag(
                             range,
                             DiagnosticCode::TypeCapturingClosure,
@@ -469,11 +464,11 @@ impl<'a> InferCtx<'a> {
                 }
             }
             (
-                Ty::Ref {
+                TyKind::Ref {
                     mutable: true,
                     inner: i1,
                 },
-                Ty::Ref {
+                TyKind::Ref {
                     mutable: false,
                     inner: i2,
                 },
@@ -513,19 +508,19 @@ impl<'a> InferCtx<'a> {
 
     /// The concrete bounds of an `Int` type.
     pub(crate) fn int_range(&self, ty: &Ty) -> Option<(i128, i128)> {
-        match self.table.shallow(ty) {
-            Ty::Bounded { lo, hi } => Some((
-                self.table.shallow_const(&lo).value()?,
-                self.table.shallow_const(&hi).value()?,
+        match self.table.shallow(ty).kind() {
+            TyKind::Bounded { lo, hi } => Some((
+                self.table.shallow_const(lo).value()?,
+                self.table.shallow_const(hi).value()?,
             )),
-            Ty::Int(int) => Some((int.min(), int.max())),
+            TyKind::Int(int) => Some((IntTy::min(*int), IntTy::max(*int))),
             _ => None,
         }
     }
 
     pub(crate) fn bounded_range(&self, ty: &Ty) -> Option<(i128, i128)> {
-        match self.table.shallow(ty) {
-            Ty::Bounded { .. } => self.int_range(ty),
+        match self.table.shallow(ty).kind() {
+            TyKind::Bounded { .. } => self.int_range(ty),
             _ => None,
         }
     }
@@ -537,7 +532,7 @@ impl<'a> InferCtx<'a> {
         let mut joined: Option<Ty> = None;
         for (expr, ty) in arms {
             let shallow = self.structurally_resolve(ty);
-            if matches!(shallow, Ty::Never) {
+            if shallow.is_never() {
                 continue;
             }
             joined = Some(match joined {
@@ -546,12 +541,12 @@ impl<'a> InferCtx<'a> {
             });
         }
         let Some(joined) = joined else {
-            return Ty::Never;
+            return Ty::never();
         };
         for (expr, ty) in arms {
             let shallow = self.table.shallow(ty);
-            if matches!(shallow, Ty::Never) {
-                if !matches!(self.table.shallow(&joined), Ty::Never) {
+            if shallow.is_never() {
+                if !self.table.shallow(&joined).is_never() {
                     self.result
                         .coercions
                         .insert(*expr, (Coercion::NeverToAny, joined.clone()));
@@ -653,10 +648,7 @@ impl<'a> InferCtx<'a> {
                     .iter()
                     .map(|field| subst_ty(&field.ty, &subst))
                     .collect();
-                let ret = Ty::Adt {
-                    item: adt,
-                    args: fn_ref.args.clone(),
-                };
+                let ret = Ty::adt(adt, fn_ref.args.clone());
                 (params, ret)
             }
         };
@@ -667,7 +659,7 @@ impl<'a> InferCtx<'a> {
 
     /// Records the trait bounds of the generic arguments of `fn_ref` (and `Self: Trait` for a
     /// method declared in a trait), checked once the body is solved.
-    pub(crate) fn add_fn_obligations(&mut self, fn_ref: &FnRef, range: TextRange) {
+    pub(crate) fn add_fn_obligations(&mut self, fn_ref: &FnRef, range: Anchor) {
         let FnDefId::Item(item) = fn_ref.def else {
             return;
         };
@@ -688,7 +680,7 @@ impl<'a> InferCtx<'a> {
                     self.obligations.push(Obligation {
                         ty: arg.clone(),
                         trait_item: bound,
-                        range,
+                        anchor: range,
                         kind: ObligationKind::Bound,
                     });
                 }
@@ -704,7 +696,7 @@ impl<'a> InferCtx<'a> {
             self.obligations.push(Obligation {
                 ty: self_ty.clone(),
                 trait_item: parent,
-                range,
+                anchor: range,
                 kind: ObligationKind::Bound,
             });
         }
@@ -715,8 +707,8 @@ impl<'a> InferCtx<'a> {
     /// `ty` with its projections normalized, or replaced by variables until their base is
     /// known.
     pub(crate) fn normalize(&mut self, ty: &Ty) -> Ty {
-        match ty {
-            Ty::Projection {
+        match ty.kind() {
+            TyKind::Projection {
                 base,
                 trait_item,
                 name,
@@ -724,14 +716,14 @@ impl<'a> InferCtx<'a> {
                 let base = self.normalize(base);
                 self.normalize_projection(&base, *trait_item, name)
             }
-            Ty::Tuple(fields) => {
-                Ty::Tuple(fields.iter().map(|field| self.normalize(field)).collect())
-            }
-            Ty::Array { elem, len } => Ty::Array {
-                elem: Box::new(self.normalize(elem)),
+            TyKind::Tuple(fields) => Ty::new(TyKind::Tuple(
+                fields.iter().map(|field| self.normalize(field)).collect(),
+            )),
+            TyKind::Array { elem, len } => Ty::new(TyKind::Array {
+                elem: self.normalize(elem),
                 len: len.clone(),
-            },
-            Ty::Adt { item, args } => Ty::Adt {
+            }),
+            TyKind::Adt { item, args } => Ty::new(TyKind::Adt {
                 item: *item,
                 args: args
                     .iter()
@@ -739,29 +731,29 @@ impl<'a> InferCtx<'a> {
                         GenericArg::Type(ty) => GenericArg::Type(self.normalize(ty)),
                         GenericArg::Const(c) => GenericArg::Const(c.clone()),
                     })
-                    .collect(),
-            },
-            Ty::Ref { mutable, inner } => Ty::Ref {
+                    .collect::<GenericArgs>(),
+            }),
+            TyKind::Ref { mutable, inner } => Ty::new(TyKind::Ref {
                 mutable: *mutable,
-                inner: Box::new(self.normalize(inner)),
-            },
-            Ty::FnPtr { kind, params, ret } => Ty::FnPtr {
+                inner: self.normalize(inner),
+            }),
+            TyKind::FnPtr { kind, params, ret } => Ty::new(TyKind::FnPtr {
                 kind: *kind,
                 params: params.iter().map(|param| self.normalize(param)).collect(),
-                ret: Box::new(self.normalize(ret)),
-            },
-            Ty::Closure { kind, params, ret } => Ty::Closure {
+                ret: self.normalize(ret),
+            }),
+            TyKind::Closure { kind, params, ret } => Ty::new(TyKind::Closure {
                 kind: *kind,
                 params: params.iter().map(|param| self.normalize(param)).collect(),
-                ret: Box::new(self.normalize(ret)),
-            },
-            other => other.clone(),
+                ret: self.normalize(ret),
+            }),
+            _ => ty.clone(),
         }
     }
 
     fn normalize_projection(&mut self, base: &Ty, trait_item: ItemId, name: &Name) -> Ty {
-        match self.table.shallow(base) {
-            Ty::Infer(_) => {
+        match self.table.shallow(base).kind() {
+            TyKind::Infer(_) => {
                 let var = self.table.new_var();
                 self.projections.push(PendingProjection {
                     var: var.clone(),
@@ -771,16 +763,16 @@ impl<'a> InferCtx<'a> {
                 });
                 var
             }
-            Ty::Error => Ty::Error,
-            Ty::Param { .. } | Ty::TraitSelf { .. } => Ty::Projection {
-                base: Box::new(self.table.resolve(base)),
+            TyKind::Error => Ty::error(),
+            TyKind::Param { .. } | TyKind::TraitSelf { .. } => Ty::new(TyKind::Projection {
+                base: self.table.resolve(base),
                 trait_item,
                 name: name.clone(),
-            },
+            }),
             _ => {
                 let resolved = self.table.resolve(base);
                 normalize_projection(self.db, self.sigs, self.maps, &resolved, trait_item, name)
-                    .map_or(Ty::Error, |ty| self.normalize(&ty))
+                    .map_or(Ty::error(), |ty| self.normalize(&ty))
             }
         }
     }
@@ -791,7 +783,10 @@ impl<'a> InferCtx<'a> {
             let pending = std::mem::take(&mut self.projections);
             let before = pending.len();
             for projection in pending {
-                if matches!(self.table.shallow(&projection.base), Ty::Infer(_)) {
+                if matches!(
+                    self.table.shallow(&projection.base).kind(),
+                    TyKind::Infer(_)
+                ) {
                     self.projections.push(projection);
                     continue;
                 }
@@ -820,16 +815,17 @@ impl<'a> InferCtx<'a> {
             let mut changed = false;
             let links = std::mem::take(&mut self.links);
             for members in &links {
-                let rust_int = members
-                    .iter()
-                    .find_map(|member| match self.table.shallow(member) {
-                        Ty::Int(int) => Some(int),
-                        _ => None,
-                    });
+                let rust_int =
+                    members
+                        .iter()
+                        .find_map(|member| match self.table.shallow(member).kind() {
+                            TyKind::Int(int) => Some(*int),
+                            _ => None,
+                        });
                 if let Some(int) = rust_int {
                     for member in members {
                         if self.table.literal(member).is_some() {
-                            self.table.unify(member, &Ty::Int(int));
+                            self.table.unify(member, &Ty::int(int));
                             changed = true;
                         }
                     }

@@ -1,6 +1,7 @@
 //! Textual dumps of name resolution and const evaluation, for tests and the `check`
 //! example.
 
+use crate::diagnostic::{Anchor, resolve_anchor};
 use std::fmt::Write as _;
 use std::path::Path as FsPath;
 
@@ -10,11 +11,14 @@ use crate::db::Db;
 use crate::def_map::{CrateId, Def, DefMaps, Resolution, def_maps};
 use crate::diagnostic::line_col;
 use crate::eval::{RenderId, const_eval};
-use crate::hir::{Body, Expr, ExprStore, Name, Pat, PathKind, TypeRef, file_hir};
+use crate::hir::{
+    Body, Expr, ExprStore, Name, Pat, PathKind, StoreSourceMap, TypeRef, body_of,
+    body_source_map_of, signature_of, signature_source_map_of,
+};
 use crate::input::{FilePath, Program, SourceFile};
 use crate::item_tree::{ItemId, item_tree};
 use crate::paths;
-use crate::resolve::{BodyResolution, StoreResolution, file_resolution};
+use crate::resolve::{BodyResolution, StoreResolution, body_resolution, signature_resolution};
 
 /// For each game-crate file (sorted by path) and each resolved path, in source order:
 /// `{file}:{line}:{col} {path} -> {description}`, plus one line per `break`/`continue` naming
@@ -32,18 +36,22 @@ pub fn resolution_dump(db: &dyn Db, program: Program, base: Option<&FsPath>) -> 
     for file in files {
         let dumper = Dumper { db, maps, file };
         let mut lines: Vec<(TextSize, String)> = Vec::new();
-        let hir = file_hir(db, file);
-        let resolution = file_resolution(db, program, file);
-        for (index, item) in resolution.items.iter().enumerate() {
-            let Some(item) = item else {
-                continue;
-            };
-            if let Some(Some(signature)) = hir.signatures.get(index) {
-                dumper.store_lines(&signature.store, &item.signature, None, &mut lines);
+        for index in item_tree(db, file).indices() {
+            let item = ItemId { file, index };
+            if let (Some(signature), Some(map)) =
+                (signature_of(db, item), signature_source_map_of(db, item))
+            {
+                let sig_res = &signature_resolution(db, program, item).store;
+                dumper.store_lines(&signature.store, map, sig_res, None, &mut lines);
             }
-            if let (Some(Some(body)), Some(resolved)) = (hir.bodies.get(index), &item.body) {
+            if let (Some(body), Some(map), Some(resolved)) = (
+                body_of(db, item),
+                body_source_map_of(db, item),
+                &body_resolution(db, program, item).body,
+            ) {
                 dumper.store_lines(
                     &body.store,
+                    map,
                     &resolved.store,
                     Some((body, resolved)),
                     &mut lines,
@@ -53,8 +61,8 @@ pub fn resolution_dump(db: &dyn Db, program: Program, base: Option<&FsPath>) -> 
                         Expr::Continue { .. } => "continue",
                         _ => "break",
                     };
-                    let range = body.store.expr_range(jump);
-                    let target = dumper.position(body.store.expr_range(target).start());
+                    let range = map.expr(jump);
+                    let target = dumper.position(map.expr(target).start());
                     lines.push((range.start(), format!("{what} -> loop@{target}")));
                 }
             }
@@ -88,17 +96,14 @@ pub fn render_dump(db: &dyn Db, program: Program, base: Option<&FsPath>) -> Stri
     for (id, info) in &const_eval(db, program).renders {
         let (file, offset, shown) = match *id {
             RenderId::Fn(item) => {
-                let Some(data) = item_tree(db, item.file).item(item.index) else {
-                    continue;
-                };
-                (item.file, data.name_range.start(), name(item))
+                let (_, range) = resolve_anchor(db, &Anchor::ItemName(item));
+                (item.file, range.start(), name(item))
             }
             RenderId::Closure(owner, expr) => {
-                let Some(Some(body)) = file_hir(db, owner.file).bodies.get(owner.index as usize)
-                else {
+                let Some(map) = body_source_map_of(db, owner) else {
                     continue;
                 };
-                let offset = body.store.expr_range(expr).start();
+                let offset = map.expr(expr).start();
                 (owner.file, offset, format!("closure in {}", name(owner)))
             }
         };
@@ -139,6 +144,7 @@ impl Dumper<'_> {
     fn store_lines(
         &self,
         store: &ExprStore,
+        map: &StoreSourceMap,
         resolved: &StoreResolution,
         body: Option<(&Body, &BodyResolution)>,
         lines: &mut Vec<(TextSize, String)>,
@@ -146,7 +152,7 @@ impl Dumper<'_> {
         let mut push = |range: TextRange, text: String, resolution: &Resolution| {
             lines.push((
                 range.start(),
-                format!("{text} -> {}", self.describe(resolution, store, body)),
+                format!("{text} -> {}", self.describe(resolution, map, body)),
             ));
         };
         for (&id, resolution) in &resolved.exprs {
@@ -157,16 +163,16 @@ impl Dumper<'_> {
             if matches!(path.kind, PathKind::Lang(_)) {
                 continue;
             }
-            push(store.expr_range(id), path.display(), resolution);
+            push(map.expr(id), path.display(), resolution);
         }
         for (&id, resolution) in &resolved.types {
             if let TypeRef::Path(path) = store.type_ref(id) {
-                push(store.type_range(id), path.display(), resolution);
+                push(map.type_ref(id), path.display(), resolution);
             }
         }
         for (&id, resolution) in &resolved.const_args {
             if let TypeRef::Path(path) = store.type_ref(id) {
-                push(store.type_range(id), path.display(), resolution);
+                push(map.type_ref(id), path.display(), resolution);
             }
         }
         for (&id, resolution) in &resolved.pats {
@@ -177,16 +183,18 @@ impl Dumper<'_> {
                 Pat::Bind { name, .. } => name.to_string(),
                 _ => continue,
             };
-            push(store.pat_range(id), text, resolution);
+            push(map.pat(id), text, resolution);
         }
         for (&(id, slot), resolution) in &resolved.range_bounds {
             if let Pat::Range { start, end, .. } = store.pat(id) {
                 let bound = if slot == 0 { start } else { end };
                 if let Some(crate::hir::PatBound::Path(path)) = bound {
-                    let range = path
-                        .segments
-                        .first()
-                        .map_or_else(|| store.pat_range(id), |segment| segment.range);
+                    let range = if path.segments.is_empty() {
+                        map.pat(id)
+                    } else {
+                        map.segment(crate::diagnostic::NodeId::PatBound(id, slot), 0)
+                            .unwrap_or_default()
+                    };
                     push(range, path.display(), resolution);
                 }
             }
@@ -194,11 +202,7 @@ impl Dumper<'_> {
         if let Some((_, body_resolution)) = body {
             for (&pat, &local) in &body_resolution.bindings {
                 if let Pat::Bind { name, .. } = store.pat(pat) {
-                    push(
-                        store.pat_range(pat),
-                        name.to_string(),
-                        &Resolution::Local(local),
-                    );
+                    push(map.pat(pat), name.to_string(), &Resolution::Local(local));
                 }
             }
         }
@@ -207,7 +211,7 @@ impl Dumper<'_> {
     fn describe(
         &self,
         resolution: &Resolution,
-        store: &ExprStore,
+        map: &StoreSourceMap,
         body: Option<(&Body, &BodyResolution)>,
     ) -> String {
         match resolution {
@@ -220,7 +224,7 @@ impl Dumper<'_> {
                     Some(pat) => format!(
                         "local {}@{}",
                         local.name,
-                        self.position(store.pat_range(pat).start())
+                        self.position(map.pat(pat).start())
                     ),
                     None => format!("local {}", local.name),
                 }
@@ -265,10 +269,7 @@ impl Dumper<'_> {
     }
 
     fn generic_name(&self, owner: ItemId, index: u32) -> Name {
-        file_hir(self.db, owner.file)
-            .signatures
-            .get(owner.index as usize)
-            .and_then(Option::as_ref)
+        signature_of(self.db, owner)
             .and_then(|signature| signature.generics.get(index as usize))
             .map_or_else(|| Name::new_static("?"), |param| param.name.clone())
     }

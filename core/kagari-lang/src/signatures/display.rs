@@ -1,10 +1,10 @@
 //! The diagnostic text of types.
 
 use crate::db::Db;
-use crate::hir::{ClosureKind, FnPtrKind, file_hir};
+use crate::hir::{ClosureKind, FnPtrKind, signature_of};
 use crate::input::Program;
 use crate::item_tree::{FnKind, ItemId};
-use crate::ty::{Const, FnDefId, FnRef, GenericArg, InferVar, Ty};
+use crate::ty::{Const, FnDefId, FnRef, GenericArg, InferVar, Ty, TyKind};
 
 use super::lower::item_name;
 use super::subst::{Subst, subst_ty};
@@ -37,10 +37,7 @@ pub(crate) fn display_ty_with(
 }
 
 fn param_name(db: &dyn Db, owner: ItemId, index: u32) -> String {
-    file_hir(db, owner.file)
-        .signatures
-        .get(owner.index as usize)
-        .and_then(Option::as_ref)
+    signature_of(db, owner)
         .and_then(|signature| signature.generics.get(index as usize))
         .map_or_else(|| "_".to_owned(), |param| param.name.to_string())
 }
@@ -92,10 +89,7 @@ fn fn_def_signature(sigs: &ProgramSignatures, fn_ref: &FnRef) -> Option<(FnPtrKi
                     .iter()
                     .map(|field| subst_ty(&field.ty, &subst))
                     .collect(),
-                Ty::Adt {
-                    item: adt,
-                    args: fn_ref.args.clone(),
-                },
+                Ty::adt(adt, fn_ref.args.clone()),
             ))
         }
     }
@@ -109,19 +103,19 @@ struct Printer<'a> {
 
 impl Printer<'_> {
     fn ty(&self, ty: &Ty, out: &mut String) {
-        match ty {
-            Ty::Error => out.push_str("{unknown}"),
-            Ty::Never => out.push('!'),
-            Ty::Bool => out.push_str("bool"),
-            Ty::Int(int) => out.push_str(int.name()),
-            Ty::Bounded { lo, hi } => {
+        match ty.kind() {
+            TyKind::Error => out.push_str("{unknown}"),
+            TyKind::Never => out.push('!'),
+            TyKind::Bool => out.push_str("bool"),
+            TyKind::Int(int) => out.push_str(int.name()),
+            TyKind::Bounded { lo, hi } => {
                 out.push_str("Int<");
                 self.constant(lo, out);
                 out.push_str(", ");
                 self.constant(hi, out);
                 out.push('>');
             }
-            Ty::Tuple(fields) => {
+            TyKind::Tuple(fields) => {
                 out.push('(');
                 for (index, field) in fields.iter().enumerate() {
                     if index > 0 {
@@ -134,22 +128,22 @@ impl Printer<'_> {
                 }
                 out.push(')');
             }
-            Ty::Array { elem, len } => {
+            TyKind::Array { elem, len } => {
                 out.push('[');
                 self.ty(elem, out);
                 out.push_str("; ");
                 self.constant(len, out);
                 out.push(']');
             }
-            Ty::Adt { item, args } => {
+            TyKind::Adt { item, args } => {
                 out.push_str(&item_name(self.db, *item));
                 self.args(args, out);
             }
-            Ty::Ref { mutable, inner } => {
+            TyKind::Ref { mutable, inner } => {
                 out.push_str(if *mutable { "&mut " } else { "&" });
                 self.ty(inner, out);
             }
-            Ty::FnPtr { kind, params, ret } => {
+            TyKind::FnPtr { kind, params, ret } => {
                 out.push_str(match kind {
                     FnPtrKind::Plain => "fn",
                     FnPtrKind::Const => "const fn",
@@ -158,7 +152,7 @@ impl Printer<'_> {
                 });
                 self.signature(params, ret, out);
             }
-            Ty::Closure { kind, params, ret } => {
+            TyKind::Closure { kind, params, ret } => {
                 out.push_str(match kind {
                     ClosureKind::Plain => "Fn",
                     ClosureKind::Const => "const Fn",
@@ -166,7 +160,7 @@ impl Printer<'_> {
                 });
                 self.signature(params, ret, out);
             }
-            Ty::FnDef(fn_ref) => {
+            TyKind::FnDef(fn_ref) => {
                 let name = match fn_ref.def {
                     FnDefId::Item(item) | FnDefId::StructCtor(item) => {
                         item_name(self.db, item).to_string()
@@ -180,11 +174,11 @@ impl Printer<'_> {
                 match self.sigs.and_then(|sigs| fn_def_signature(sigs, fn_ref)) {
                     Some((kind, params, ret)) => {
                         self.ty(
-                            &Ty::FnPtr {
+                            &Ty::new(TyKind::FnPtr {
                                 kind,
-                                params,
-                                ret: Box::new(ret),
-                            },
+                                params: params.into_boxed_slice(),
+                                ret,
+                            }),
                             out,
                         );
                         out.push_str(" {");
@@ -197,14 +191,14 @@ impl Printer<'_> {
                     }
                 }
             }
-            Ty::Param { owner, index } => out.push_str(&param_name(self.db, *owner, *index)),
-            Ty::TraitSelf { .. } => out.push_str("Self"),
-            Ty::Projection { base, name, .. } => {
+            TyKind::Param { owner, index } => out.push_str(&param_name(self.db, *owner, *index)),
+            TyKind::TraitSelf { .. } => out.push_str("Self"),
+            TyKind::Projection { base, name, .. } => {
                 self.ty(base, out);
                 out.push_str("::");
                 out.push_str(name);
             }
-            Ty::Infer(var) => {
+            TyKind::Infer(var) => {
                 if (self.is_literal)(*var) {
                     out.push_str("{integer}");
                 } else {
@@ -263,7 +257,7 @@ fn variant_name(db: &dyn Db, item: ItemId, index: u32) -> String {
     {
         Some(crate::item_tree::ItemKind::Enum { variants }) => variants
             .get(index as usize)
-            .map_or_else(String::new, |(name, _, _)| name.to_string()),
+            .map_or_else(String::new, |(name, _)| name.to_string()),
         _ => String::new(),
     }
 }

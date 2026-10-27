@@ -5,7 +5,7 @@ use super::ctx::{Expect, InferCtx, LoopState, ptr_to_closure_kind};
 use crate::diagnostic::DiagnosticCode;
 use crate::hir::{ArrayExpr, Condition, Expr, ExprId, Literal, PatId, Stmt, UnaryOp};
 use crate::resolve::{LocalId, Resolution};
-use crate::ty::{Const, GenericArg, IntTy, Ty};
+use crate::ty::{Const, GenericArg, GenericArgs, IntTy, Ty, TyKind};
 
 impl InferCtx<'_> {
     /// Infers `expr`; with `Expect::Coerce` the result is the target type.
@@ -26,7 +26,7 @@ impl InferCtx<'_> {
     fn infer_expr_inner(&mut self, expr: ExprId, expect: Expect<'_>) -> (Ty, bool) {
         let store = self.store;
         let ty = match store.expr(expr) {
-            Expr::Missing => Ty::Error,
+            Expr::Missing => Ty::error(),
             Expr::Literal(literal) => self.infer_literal(expr, literal),
             Expr::Path(path) => self.infer_path(expr, path),
             Expr::Block {
@@ -57,7 +57,7 @@ impl InferCtx<'_> {
                 for arm in arms {
                     self.check_pat(arm.pat, &scrutinee_ty);
                     if let Some(guard) = arm.guard {
-                        self.infer_expr(guard, Expect::Coerce(&Ty::Bool));
+                        self.infer_expr(guard, Expect::Coerce(&Ty::bool()));
                     }
                     let ty = self.infer_expr(arm.body, expect);
                     arm_tys.push((arm.body, ty));
@@ -65,7 +65,7 @@ impl InferCtx<'_> {
                 if let Expect::Coerce(target) = expect {
                     return (
                         if arms.is_empty() {
-                            Ty::Never
+                            Ty::never()
                         } else {
                             target.clone()
                         },
@@ -86,7 +86,7 @@ impl InferCtx<'_> {
                 self.infer_expr(*body, Expect::Coerce(&Ty::unit()));
                 match self.loops.remove(&expr) {
                     Some(state) if state.has_break => ty,
-                    _ => Ty::Never,
+                    _ => Ty::never(),
                 }
             }
             Expr::While { cond, body, .. } => {
@@ -122,23 +122,23 @@ impl InferCtx<'_> {
             }
             Expr::Break { value, .. } => {
                 self.infer_break(expr, *value);
-                Ty::Never
+                Ty::never()
             }
-            Expr::Continue { .. } => Ty::Never,
+            Expr::Continue { .. } => Ty::never(),
             Expr::Return { value } => {
-                let ret = self.returns.last().cloned().unwrap_or(Ty::Error);
+                let ret = self.returns.last().cloned().unwrap_or(Ty::error());
                 match value {
                     Some(value) => {
                         self.infer_expr(*value, Expect::Coerce(&ret));
                     }
                     None => {
                         if !self.try_unify(&ret, &Ty::unit()) {
-                            let range = self.expr_range(expr);
+                            let range = self.expr_anchor(expr);
                             self.mismatch(range, &ret, &Ty::unit());
                         }
                     }
                 }
-                Ty::Never
+                Ty::never()
             }
             Expr::Call { callee, args } => self.infer_call(expr, *callee, args, expect),
             Expr::MethodCall {
@@ -153,7 +153,7 @@ impl InferCtx<'_> {
             Expr::Cast { expr: inner, ty } => {
                 self.infer_expr(*inner, Expect::None);
                 let target = self.lower_type(*ty);
-                let range = self.expr_range(expr);
+                let range = self.expr_anchor(expr);
                 self.diag(
                     range,
                     DiagnosticCode::TypeAsCast,
@@ -166,18 +166,20 @@ impl InferCtx<'_> {
                 mutable,
                 expr: inner,
             } => {
-                let hint = match expect.ty().map(|ty| self.table.shallow(ty)) {
-                    Some(Ty::Ref { inner, .. }) => Some(*inner),
+                let hint = match expect
+                    .ty()
+                    .map(|ty| self.table.shallow(ty))
+                    .as_ref()
+                    .map(Ty::kind)
+                {
+                    Some(TyKind::Ref { inner, .. }) => Some(inner.clone()),
                     _ => None,
                 };
                 let inner_ty = match &hint {
                     Some(hint) => self.infer_expr(*inner, Expect::Hint(hint)),
                     None => self.infer_expr(*inner, Expect::None),
                 };
-                Ty::Ref {
-                    mutable: *mutable,
-                    inner: Box::new(inner_ty),
-                }
+                Ty::reference(*mutable, inner_ty)
             }
             Expr::Binary { op, lhs, rhs } => self.infer_binary(expr, *op, *lhs, *rhs),
             Expr::Assign { op, target, value } => {
@@ -190,25 +192,30 @@ impl InferCtx<'_> {
                 inclusive: _,
             } => self.infer_range(expr, *start, *end, expect),
             Expr::Tuple(exprs) => {
-                let expected = match expect.ty().map(|ty| self.table.shallow(ty)) {
-                    Some(Ty::Tuple(tys)) if tys.len() == exprs.len() => Some(tys),
+                let expected = match expect
+                    .ty()
+                    .map(|ty| self.table.shallow(ty))
+                    .as_ref()
+                    .map(Ty::kind)
+                {
+                    Some(TyKind::Tuple(tys)) if tys.len() == exprs.len() => Some(tys.clone()),
                     _ => None,
                 };
                 match (expected, expect) {
                     (Some(tys), Expect::Coerce(target)) => {
-                        for (expr, ty) in exprs.iter().zip(&tys) {
+                        for (expr, ty) in exprs.iter().zip(tys.iter()) {
                             self.infer_expr(*expr, Expect::Coerce(ty));
                         }
                         return (target.clone(), true);
                     }
-                    (Some(tys), _) => Ty::Tuple(
+                    (Some(tys), _) => Ty::tuple(
                         exprs
                             .iter()
-                            .zip(&tys)
+                            .zip(tys.iter())
                             .map(|(expr, ty)| self.infer_expr(*expr, Expect::Hint(ty)))
                             .collect(),
                     ),
-                    (None, _) => Ty::Tuple(
+                    (None, _) => Ty::tuple(
                         exprs
                             .iter()
                             .map(|expr| self.infer_expr(*expr, Expect::None))
@@ -218,22 +225,24 @@ impl InferCtx<'_> {
             }
             Expr::Array(ArrayExpr::List(exprs)) => self.infer_array_list(exprs, expect),
             Expr::Array(ArrayExpr::Repeat { value, count }) => {
-                let elem = match expect.ty().map(|ty| self.table.shallow(ty)) {
-                    Some(Ty::Array { elem, .. }) => {
-                        self.infer_expr(*value, Expect::Coerce(&elem));
-                        *elem
+                let elem = match expect
+                    .ty()
+                    .map(|ty| self.table.shallow(ty))
+                    .as_ref()
+                    .map(Ty::kind)
+                {
+                    Some(TyKind::Array { elem, .. }) => {
+                        self.infer_expr(*value, Expect::Coerce(elem));
+                        elem.clone()
                     }
                     _ => self.infer_expr(*value, Expect::None),
                 };
-                self.infer_expr(*count, Expect::Coerce(&Ty::Int(IntTy::Usize)));
+                self.infer_expr(*count, Expect::Coerce(&Ty::int(IntTy::Usize)));
                 let scope = self.scope();
                 let mut sink = crate::signatures::lower::Sink::loud();
                 let len = self.lowerer.fold(scope, *count, &mut sink);
                 self.diags.extend(sink.diags);
-                Ty::Array {
-                    elem: Box::new(elem),
-                    len,
-                }
+                Ty::new(TyKind::Array { elem, len })
             }
             Expr::Record { path, fields } => self.infer_record(expr, path, fields, expect),
             Expr::Closure { params, ret, body } => {
@@ -250,17 +259,14 @@ impl InferCtx<'_> {
             }
             Literal::Decimal(_) => self.std_adt(self.sigs.std.decimal),
             Literal::String(_) => self.std_adt(self.sigs.std.text),
-            Literal::Bool(_) => Ty::Bool,
+            Literal::Bool(_) => Ty::bool(),
         }
     }
 
     pub(crate) fn std_adt(&self, item: Option<crate::item_tree::ItemId>) -> Ty {
         match item {
-            Some(item) => Ty::Adt {
-                item,
-                args: Vec::new(),
-            },
-            None => Ty::Error,
+            Some(item) => Ty::adt(item, GenericArgs::empty()),
+            None => Ty::error(),
         }
     }
 
@@ -272,7 +278,7 @@ impl InferCtx<'_> {
         suffix: Option<&str>,
         negated: bool,
     ) -> Ty {
-        let range = self.expr_range(expr);
+        let range = self.expr_anchor(expr);
         let value = i128::try_from(value).ok().and_then(|value| {
             if negated {
                 value.checked_neg()
@@ -286,7 +292,7 @@ impl InferCtx<'_> {
                 DiagnosticCode::TypeLiteralOutOfRange,
                 "integer literal is too large",
             );
-            return Ty::Error;
+            return Ty::error();
         };
         match suffix {
             None => self.table.new_literal(value, value, expr),
@@ -302,7 +308,7 @@ impl InferCtx<'_> {
                             ),
                         );
                     }
-                    Ty::Int(int)
+                    Ty::int(int)
                 }
                 None => {
                     self.diag(
@@ -310,7 +316,7 @@ impl InferCtx<'_> {
                         DiagnosticCode::TypeBadLiteral,
                         format!("invalid suffix `{suffix}` for an integer literal"),
                     );
-                    Ty::Error
+                    Ty::error()
                 }
             },
         }
@@ -320,7 +326,7 @@ impl InferCtx<'_> {
         &mut self,
         stmts: &[Stmt],
         tail: Option<ExprId>,
-        scope: Option<u32>,
+        scope: Option<crate::item_tree::BlockIndex>,
         expect: Expect<'_>,
     ) -> (Ty, bool) {
         let module = scope.and_then(|block| {
@@ -356,7 +362,7 @@ impl InferCtx<'_> {
                 }
                 Stmt::Expr { expr, has_semi } => {
                     let ty = self.infer_expr(expr, Expect::None);
-                    let never = matches!(self.structurally_resolve(&ty), Ty::Never);
+                    let never = self.structurally_resolve(&ty).is_never();
                     diverges |= never;
                     if !has_semi && !never {
                         self.coerce(expr, &ty, &Ty::unit());
@@ -370,7 +376,7 @@ impl InferCtx<'_> {
                 let ty = self.infer_expr(tail, expect);
                 (ty, matches!(expect, Expect::Coerce(_)))
             }
-            None if diverges => (Ty::Never, false),
+            None if diverges => (Ty::never(), false),
             None => (Ty::unit(), false),
         };
         if module.is_some() {
@@ -383,13 +389,13 @@ impl InferCtx<'_> {
         self.result
             .expr_types
             .get(expr)
-            .is_some_and(|ty| matches!(self.table.shallow(ty), Ty::Never))
+            .is_some_and(|ty| self.table.shallow(ty).is_never())
     }
 
     pub(crate) fn infer_condition(&mut self, cond: Condition) {
         match cond {
             Condition::Expr(expr) => {
-                self.infer_expr(expr, Expect::Coerce(&Ty::Bool));
+                self.infer_expr(expr, Expect::Coerce(&Ty::bool()));
             }
             Condition::Let { pat, expr } => {
                 let ty = self.infer_expr(expr, Expect::None);
@@ -411,12 +417,12 @@ impl InferCtx<'_> {
             }
             (Some(Some(ty)), None) => {
                 if !self.try_unify(&ty, &Ty::unit()) {
-                    let range = self.expr_range(expr);
+                    let range = self.expr_anchor(expr);
                     self.mismatch(range, &ty, &Ty::unit());
                 }
             }
             (Some(None), Some(value)) => {
-                let range = self.expr_range(value);
+                let range = self.expr_anchor(value);
                 self.diag(
                     range,
                     DiagnosticCode::TypeMismatch,
@@ -443,37 +449,37 @@ impl InferCtx<'_> {
             }
         );
         let std = &self.sigs.std;
-        let item = match &resolved {
-            Ty::Error => Ty::Error,
-            Ty::Array { elem, .. } => (**elem).clone(),
-            Ty::Adt { item, args } if Some(*item) == std.vec => match args.first() {
+        let item = match resolved.kind() {
+            TyKind::Error => Ty::error(),
+            TyKind::Array { elem, .. } => elem.clone(),
+            TyKind::Adt { item, args } if Some(*item) == std.vec => match args.first() {
                 Some(GenericArg::Type(elem)) => elem.clone(),
-                _ => Ty::Error,
+                _ => Ty::error(),
             },
-            Ty::Adt { item, args } if Some(*item) == std.range => {
+            TyKind::Adt { item, args } if Some(*item) == std.range => {
                 let elem = match args.first() {
                     Some(GenericArg::Type(elem)) => elem.clone(),
-                    _ => Ty::Error,
+                    _ => Ty::error(),
                 };
                 self.range_item(iterable, &ty, &elem, literal_range, inclusive)
             }
-            Ty::Infer(_) => {
-                let range = self.expr_range(iterable);
+            TyKind::Infer(_) => {
+                let range = self.expr_anchor(iterable);
                 self.diag(
                     range,
                     DiagnosticCode::TypeAnnotationsNeeded,
                     "type annotations needed: the type of the iterated value is unknown",
                 );
-                Ty::Error
+                Ty::error()
             }
-            other => {
-                let range = self.expr_range(iterable);
+            _ => {
+                let range = self.expr_anchor(iterable);
                 let message = format!(
                     "`{}` is not iterable: `for` loops over arrays, `Vec` and integer ranges",
-                    self.show(other)
+                    self.show(&resolved)
                 );
                 self.diag(range, DiagnosticCode::TypeNotIterable, message);
-                Ty::Error
+                Ty::error()
             }
         };
         self.check_pat(pat, &item);
@@ -489,9 +495,9 @@ impl InferCtx<'_> {
         inclusive: bool,
     ) -> Ty {
         let shallow = self.structurally_resolve(elem);
-        match &shallow {
-            Ty::Error | Ty::Int(_) => shallow.clone(),
-            Ty::Bounded { lo, hi } => {
+        match shallow.kind() {
+            TyKind::Error | TyKind::Int(_) => shallow.clone(),
+            TyKind::Bounded { lo, hi } => {
                 let (Some(lo), Some(hi)) = (self.const_value(lo), self.const_value(hi)) else {
                     return elem.clone();
                 };
@@ -500,7 +506,7 @@ impl InferCtx<'_> {
                 }
                 Ty::bounded(lo, hi.saturating_sub(1).max(lo))
             }
-            Ty::Infer(_) => match self.table.literal(elem) {
+            TyKind::Infer(_) => match self.table.literal(elem) {
                 Some((_, literal)) if literal_range => {
                     let hi = if inclusive {
                         literal.hi
@@ -515,13 +521,13 @@ impl InferCtx<'_> {
                 None => elem.clone(),
             },
             _ => {
-                let range = self.expr_range(iterable);
+                let range = self.expr_anchor(iterable);
                 let message = format!(
                     "`{}` is not iterable: only ranges of integers are",
                     self.show(range_ty)
                 );
                 self.diag(range, DiagnosticCode::TypeNotIterable, message);
-                Ty::Error
+                Ty::error()
             }
         }
     }
@@ -531,27 +537,24 @@ impl InferCtx<'_> {
         let resolved = self.structurally_resolve(&ty);
         let std = &self.sigs.std;
         let (option, result) = (std.option, std.result);
-        let ret = self.returns.last().cloned().unwrap_or(Ty::Error);
+        let ret = self.returns.last().cloned().unwrap_or(Ty::error());
         let ret_resolved = self.structurally_resolve(&ret);
-        let range = self.expr_range(expr);
-        match &resolved {
-            Ty::Error => Ty::Error,
-            Ty::Adt { item, args } if Some(*item) == option => {
+        let range = self.expr_anchor(expr);
+        match resolved.kind() {
+            TyKind::Error => Ty::error(),
+            TyKind::Adt { item, args } if Some(*item) == option => {
                 let value = match args.first() {
                     Some(GenericArg::Type(value)) => value.clone(),
-                    _ => Ty::Error,
+                    _ => Ty::error(),
                 };
-                match &ret_resolved {
-                    Ty::Adt { item, .. } if Some(*item) == option => {}
-                    Ty::Error => {}
-                    Ty::Infer(_) => {
+                match ret_resolved.kind() {
+                    TyKind::Adt { item, .. } if Some(*item) == option => {}
+                    TyKind::Error => {}
+                    TyKind::Infer(_) => {
                         let fresh = self.table.new_var();
                         self.table.unify(
                             &ret,
-                            &Ty::Adt {
-                                item: *item,
-                                args: vec![GenericArg::Type(fresh)],
-                            },
+                            &Ty::adt(*item, GenericArgs::new(vec![GenericArg::Type(fresh)])),
                         );
                     }
                     _ => self.diag(
@@ -562,30 +565,33 @@ impl InferCtx<'_> {
                 }
                 value
             }
-            Ty::Adt { item, args } if Some(*item) == result => {
-                let (value, error) = match args.as_slice() {
+            TyKind::Adt { item, args } if Some(*item) == result => {
+                let (value, error) = match &args[..] {
                     [GenericArg::Type(value), GenericArg::Type(error)] => {
                         (value.clone(), error.clone())
                     }
-                    _ => (Ty::Error, Ty::Error),
+                    _ => (Ty::error(), Ty::error()),
                 };
-                match &ret_resolved {
-                    Ty::Adt { item, args } if Some(*item) == result => {
+                match ret_resolved.kind() {
+                    TyKind::Adt { item, args } if Some(*item) == result => {
                         if let Some(GenericArg::Type(ret_error)) = args.get(1)
                             && !self.try_unify(&error, ret_error)
                         {
                             self.mismatch(range, ret_error, &error);
                         }
                     }
-                    Ty::Error => {}
-                    Ty::Infer(_) => {
+                    TyKind::Error => {}
+                    TyKind::Infer(_) => {
                         let fresh = self.table.new_var();
                         self.table.unify(
                             &ret,
-                            &Ty::Adt {
-                                item: *item,
-                                args: vec![GenericArg::Type(fresh), GenericArg::Type(error)],
-                            },
+                            &Ty::adt(
+                                *item,
+                                GenericArgs::new(vec![
+                                    GenericArg::Type(fresh),
+                                    GenericArg::Type(error),
+                                ]),
+                            ),
                         );
                     }
                     _ => self.diag(
@@ -596,21 +602,26 @@ impl InferCtx<'_> {
                 }
                 value
             }
-            other => {
+            _ => {
                 let message = format!(
                     "the `?` operator applies to `Option` and `Result`, not `{}`",
-                    self.show(other)
+                    self.show(&resolved)
                 );
                 self.diag(range, DiagnosticCode::TypeBadTry, message);
-                Ty::Error
+                Ty::error()
             }
         }
     }
 
     fn infer_array_list(&mut self, exprs: &[ExprId], expect: Expect<'_>) -> Ty {
         let len = Const::Value(i128::try_from(exprs.len()).unwrap_or(i128::MAX));
-        let expected_elem = match expect.ty().map(|ty| self.table.shallow(ty)) {
-            Some(Ty::Array { elem, .. }) => Some(*elem),
+        let expected_elem = match expect
+            .ty()
+            .map(|ty| self.table.shallow(ty))
+            .as_ref()
+            .map(Ty::kind)
+        {
+            Some(TyKind::Array { elem, .. }) => Some(elem.clone()),
             _ => None,
         };
         let elem = match expected_elem {
@@ -632,10 +643,7 @@ impl InferCtx<'_> {
                 }
             }
         };
-        Ty::Array {
-            elem: Box::new(elem),
-            len,
-        }
+        Ty::new(TyKind::Array { elem, len })
     }
 
     fn infer_range(
@@ -649,23 +657,28 @@ impl InferCtx<'_> {
             for bound in [start, end].into_iter().flatten() {
                 self.infer_expr(bound, Expect::None);
             }
-            let range = self.expr_range(expr);
+            let range = self.expr_anchor(expr);
             self.diag(
                 range,
                 DiagnosticCode::TypeOpenRange,
                 "a range expression needs both bounds; `a..`, `..b` and `..` exist only in patterns",
             );
-            return Ty::Error;
+            return Ty::error();
         };
         let Some(range_item) = self.sigs.std.range else {
             self.infer_expr(start, Expect::None);
             self.infer_expr(end, Expect::None);
-            return Ty::Error;
+            return Ty::error();
         };
-        let expected_elem = match expect.ty().map(|ty| self.table.shallow(ty)) {
-            Some(Ty::Adt { item, args }) if item == range_item => match args.first() {
+        let expected_elem = match expect
+            .ty()
+            .map(|ty| self.table.shallow(ty))
+            .as_ref()
+            .map(Ty::kind)
+        {
+            Some(TyKind::Adt { item, args }) if *item == range_item => match args.first() {
                 Some(GenericArg::Type(elem))
-                    if !matches!(self.table.shallow(elem), Ty::Infer(_)) =>
+                    if !matches!(self.table.shallow(elem).kind(), TyKind::Infer(_)) =>
                 {
                     Some(elem.clone())
                 }
@@ -685,10 +698,7 @@ impl InferCtx<'_> {
                 self.join_arms(&[(start, start_ty), (end, end_ty)])
             }
         };
-        Ty::Adt {
-            item: range_item,
-            args: vec![GenericArg::Type(elem)],
-        }
+        Ty::adt(range_item, GenericArgs::new(vec![GenericArg::Type(elem)]))
     }
 
     fn infer_closure(
@@ -700,11 +710,15 @@ impl InferCtx<'_> {
         expect: Expect<'_>,
     ) -> Ty {
         let expected = expect.ty().map(|ty| self.structurally_resolve(ty));
-        let (expected_kind, expected_params, expected_ret) = match expected {
-            Some(Ty::Closure { kind, params, ret }) => (Some(kind), Some(params), Some(*ret)),
-            Some(Ty::FnPtr { kind, params, ret }) => {
-                (ptr_to_closure_kind(kind), Some(params), Some(*ret))
+        let (expected_kind, expected_params, expected_ret) = match expected.as_ref().map(Ty::kind) {
+            Some(TyKind::Closure { kind, params, ret }) => {
+                (Some(*kind), Some(params.clone()), Some(ret.clone()))
             }
+            Some(TyKind::FnPtr { kind, params, ret }) => (
+                ptr_to_closure_kind(*kind),
+                Some(params.clone()),
+                Some(ret.clone()),
+            ),
             _ => (None, None, None),
         };
         let kind = expected_kind
@@ -714,7 +728,7 @@ impl InferCtx<'_> {
             if expected.len() == params.len() {
                 return true;
             }
-            let range = self.expr_range(expr);
+            let range = self.expr_anchor(expr);
             self.diag(
                 range,
                 DiagnosticCode::TypeWrongArity,
@@ -736,7 +750,7 @@ impl InferCtx<'_> {
             let ty = match (declared, expected) {
                 (Some(declared), Some(expected)) => {
                     if !self.try_unify(&declared, &expected) {
-                        let range = self.pat_range(pat);
+                        let range = self.pat_anchor(pat);
                         self.mismatch(range, &expected, &declared);
                     }
                     declared
@@ -754,7 +768,7 @@ impl InferCtx<'_> {
                 if let Some(expected) = &expected_ret
                     && !self.try_unify(&declared, expected)
                 {
-                    let range = self.expr_range(expr);
+                    let range = self.expr_anchor(expr);
                     self.mismatch(range, expected, &declared);
                 }
                 declared
@@ -770,11 +784,11 @@ impl InferCtx<'_> {
         self.infer_expr(body, Expect::Coerce(&ret_ty));
         self.closure_kinds.pop();
         self.returns.pop();
-        Ty::Closure {
+        Ty::new(TyKind::Closure {
             kind,
-            params: param_tys,
-            ret: Box::new(ret_ty),
-        }
+            params: param_tys.into_boxed_slice(),
+            ret: ret_ty,
+        })
     }
 
     /// Locals declared outside the closure that its body uses, in order of first use.
@@ -851,29 +865,31 @@ impl InferCtx<'_> {
             }
             UnaryOp::Not => {
                 let ty = self.infer_expr(inner, Expect::None);
-                match self.structurally_resolve(&ty) {
-                    Ty::Bool | Ty::Int(_) | Ty::Error | Ty::Infer(_) => ty,
-                    other => {
-                        let range = self.expr_range(expr);
-                        let message = format!("cannot apply `!` to `{}`", self.show(&other));
+                let resolved = self.structurally_resolve(&ty);
+                match resolved.kind() {
+                    TyKind::Bool | TyKind::Int(_) | TyKind::Error | TyKind::Infer(_) => ty,
+                    _ => {
+                        let range = self.expr_anchor(expr);
+                        let message = format!("cannot apply `!` to `{}`", self.show(&resolved));
                         self.diag(range, DiagnosticCode::TypeBadOperands, message);
-                        Ty::Error
+                        Ty::error()
                     }
                 }
             }
             UnaryOp::Deref => {
                 let ty = self.infer_expr(inner, Expect::None);
-                match self.structurally_resolve(&ty) {
-                    Ty::Ref { inner, .. } => *inner,
-                    Ty::Error => Ty::Error,
-                    other => {
-                        let range = self.expr_range(expr);
+                let resolved = self.structurally_resolve(&ty);
+                match resolved.kind() {
+                    TyKind::Ref { inner, .. } => inner.clone(),
+                    TyKind::Error => Ty::error(),
+                    _ => {
+                        let range = self.expr_anchor(expr);
                         let message = format!(
                             "`{}` cannot be dereferenced: it is not a reference",
-                            self.show(&other)
+                            self.show(&resolved)
                         );
                         self.diag(range, DiagnosticCode::TypeBadDeref, message);
-                        Ty::Error
+                        Ty::error()
                     }
                 }
             }

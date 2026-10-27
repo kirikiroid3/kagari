@@ -302,7 +302,7 @@ impl Lowerer<'_> {
             items.push(lowered);
         }
         match items.len() {
-            0 => self.alloc(Expr::Literal(Literal::String(String::new())), range),
+            0 => self.alloc(Expr::Literal(Literal::String("".into())), range),
             1 => items.pop().unwrap_or_else(|| self.missing(range)),
             _ => {
                 let array = self.alloc(Expr::Array(ArrayExpr::List(items)), range);
@@ -318,7 +318,7 @@ impl Lowerer<'_> {
         range: TextRange,
     ) -> ExprId {
         match token.and_then(string_token_value) {
-            Some(value) => self.alloc(Expr::Literal(Literal::String(value)), range),
+            Some(value) => self.alloc(Expr::Literal(Literal::String(value.into())), range),
             None => self.missing(range),
         }
     }

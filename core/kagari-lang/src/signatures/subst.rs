@@ -1,7 +1,7 @@
 //! Substitution of generic parameters and matching of generic types against concrete ones.
 
 use crate::item_tree::ItemId;
-use crate::ty::{Const, FnRef, GenericArg, Ty};
+use crate::ty::{Const, FnRef, GenericArg, GenericArgs, Ty, TyKind};
 
 /// Generic parameters to replace: the parameters of each owner start at its offset in `args`.
 pub(crate) struct Subst<'a> {
@@ -19,54 +19,61 @@ impl Subst<'_> {
 }
 
 pub(crate) fn subst_ty(ty: &Ty, subst: &Subst<'_>) -> Ty {
-    match ty {
-        Ty::Param { owner, index } => match subst.arg(*owner, *index) {
+    if !ty.has_param() {
+        return ty.clone();
+    }
+    match ty.kind() {
+        TyKind::Param { owner, index } => match subst.arg(*owner, *index) {
             Some(GenericArg::Type(arg)) => arg.clone(),
-            Some(GenericArg::Const(_)) => Ty::Error,
+            Some(GenericArg::Const(_)) => Ty::error(),
             None => ty.clone(),
         },
-        Ty::TraitSelf { .. } => match subst.self_ty {
+        TyKind::TraitSelf { .. } => match subst.self_ty {
             Some(self_ty) => self_ty.clone(),
             None => ty.clone(),
         },
-        Ty::Error | Ty::Never | Ty::Bool | Ty::Int(_) | Ty::Infer(_) => ty.clone(),
-        Ty::Bounded { lo, hi } => Ty::Bounded {
+        TyKind::Error | TyKind::Never | TyKind::Bool | TyKind::Int(_) | TyKind::Infer(_) => {
+            ty.clone()
+        }
+        TyKind::Bounded { lo, hi } => Ty::new(TyKind::Bounded {
             lo: subst_const(lo, subst),
             hi: subst_const(hi, subst),
-        },
-        Ty::Tuple(fields) => Ty::Tuple(fields.iter().map(|field| subst_ty(field, subst)).collect()),
-        Ty::Array { elem, len } => Ty::Array {
-            elem: Box::new(subst_ty(elem, subst)),
+        }),
+        TyKind::Tuple(fields) => Ty::new(TyKind::Tuple(
+            fields.iter().map(|field| subst_ty(field, subst)).collect(),
+        )),
+        TyKind::Array { elem, len } => Ty::new(TyKind::Array {
+            elem: subst_ty(elem, subst),
             len: subst_const(len, subst),
-        },
-        Ty::Adt { item, args } => Ty::Adt {
+        }),
+        TyKind::Adt { item, args } => Ty::new(TyKind::Adt {
             item: *item,
             args: subst_args(args, subst),
-        },
-        Ty::Ref { mutable, inner } => Ty::Ref {
+        }),
+        TyKind::Ref { mutable, inner } => Ty::new(TyKind::Ref {
             mutable: *mutable,
-            inner: Box::new(subst_ty(inner, subst)),
-        },
-        Ty::FnPtr { kind, params, ret } => Ty::FnPtr {
+            inner: subst_ty(inner, subst),
+        }),
+        TyKind::FnPtr { kind, params, ret } => Ty::new(TyKind::FnPtr {
             kind: *kind,
             params: params.iter().map(|param| subst_ty(param, subst)).collect(),
-            ret: Box::new(subst_ty(ret, subst)),
-        },
-        Ty::Closure { kind, params, ret } => Ty::Closure {
+            ret: subst_ty(ret, subst),
+        }),
+        TyKind::Closure { kind, params, ret } => Ty::new(TyKind::Closure {
             kind: *kind,
             params: params.iter().map(|param| subst_ty(param, subst)).collect(),
-            ret: Box::new(subst_ty(ret, subst)),
-        },
-        Ty::FnDef(fn_ref) => Ty::FnDef(Box::new(subst_fn_ref(fn_ref, subst))),
-        Ty::Projection {
+            ret: subst_ty(ret, subst),
+        }),
+        TyKind::FnDef(fn_ref) => Ty::new(TyKind::FnDef(subst_fn_ref(fn_ref, subst))),
+        TyKind::Projection {
             base,
             trait_item,
             name,
-        } => Ty::Projection {
-            base: Box::new(subst_ty(base, subst)),
+        } => Ty::new(TyKind::Projection {
+            base: subst_ty(base, subst),
             trait_item: *trait_item,
             name: name.clone(),
-        },
+        }),
     }
 }
 
@@ -81,7 +88,7 @@ pub(crate) fn subst_const(c: &Const, subst: &Subst<'_>) -> Const {
     }
 }
 
-pub(crate) fn subst_args(args: &[GenericArg], subst: &Subst<'_>) -> Vec<GenericArg> {
+pub(crate) fn subst_args(args: &[GenericArg], subst: &Subst<'_>) -> GenericArgs {
     args.iter()
         .map(|arg| match arg {
             GenericArg::Type(ty) => GenericArg::Type(subst_ty(ty, subst)),
@@ -106,53 +113,53 @@ pub(crate) fn match_ty(
     owner: ItemId,
     out: &mut [Option<GenericArg>],
 ) -> bool {
-    if let Ty::Param {
+    if let TyKind::Param {
         owner: param_owner,
         index,
-    } = pattern
+    } = pattern.kind()
         && *param_owner == owner
     {
         return bind(out, *index, GenericArg::Type(ty.clone()));
     }
-    if matches!(ty, Ty::Infer(_) | Ty::Error) {
+    if matches!(ty.kind(), TyKind::Infer(_) | TyKind::Error) {
         return true;
     }
-    match (pattern, ty) {
-        (Ty::Error, _) => true,
-        (Ty::Never, Ty::Never) | (Ty::Bool, Ty::Bool) => true,
-        (Ty::Int(a), Ty::Int(b)) => a == b,
-        (Ty::Bounded { lo: l1, hi: h1 }, Ty::Bounded { lo: l2, hi: h2 }) => {
+    match (pattern.kind(), ty.kind()) {
+        (TyKind::Error, _) => true,
+        (TyKind::Never, TyKind::Never) | (TyKind::Bool, TyKind::Bool) => true,
+        (TyKind::Int(a), TyKind::Int(b)) => a == b,
+        (TyKind::Bounded { lo: l1, hi: h1 }, TyKind::Bounded { lo: l2, hi: h2 }) => {
             match_const(l1, l2, owner, out) && match_const(h1, h2, owner, out)
         }
-        (Ty::Tuple(a), Ty::Tuple(b)) => {
+        (TyKind::Tuple(a), TyKind::Tuple(b)) => {
             a.len() == b.len()
                 && a.iter()
-                    .zip(b)
+                    .zip(b.iter())
                     .all(|(pattern, ty)| match_ty(pattern, ty, owner, out))
         }
-        (Ty::Array { elem: e1, len: l1 }, Ty::Array { elem: e2, len: l2 }) => {
+        (TyKind::Array { elem: e1, len: l1 }, TyKind::Array { elem: e2, len: l2 }) => {
             match_ty(e1, e2, owner, out) && match_const(l1, l2, owner, out)
         }
-        (Ty::Adt { item: i1, args: a1 }, Ty::Adt { item: i2, args: a2 }) => {
+        (TyKind::Adt { item: i1, args: a1 }, TyKind::Adt { item: i2, args: a2 }) => {
             i1 == i2 && match_args(a1, a2, owner, out)
         }
         (
-            Ty::Ref {
+            TyKind::Ref {
                 mutable: m1,
                 inner: i1,
             },
-            Ty::Ref {
+            TyKind::Ref {
                 mutable: m2,
                 inner: i2,
             },
         ) => m1 == m2 && match_ty(i1, i2, owner, out),
         (
-            Ty::FnPtr {
+            TyKind::FnPtr {
                 kind: k1,
                 params: p1,
                 ret: r1,
             },
-            Ty::FnPtr {
+            TyKind::FnPtr {
                 kind: k2,
                 params: p2,
                 ret: r2,
@@ -160,16 +167,19 @@ pub(crate) fn match_ty(
         ) => {
             k1 == k2
                 && p1.len() == p2.len()
-                && p1.iter().zip(p2).all(|(a, b)| match_ty(a, b, owner, out))
+                && p1
+                    .iter()
+                    .zip(p2.iter())
+                    .all(|(a, b)| match_ty(a, b, owner, out))
                 && match_ty(r1, r2, owner, out)
         }
         (
-            Ty::Closure {
+            TyKind::Closure {
                 kind: k1,
                 params: p1,
                 ret: r1,
             },
-            Ty::Closure {
+            TyKind::Closure {
                 kind: k2,
                 params: p2,
                 ret: r2,
@@ -177,7 +187,10 @@ pub(crate) fn match_ty(
         ) => {
             k1 == k2
                 && p1.len() == p2.len()
-                && p1.iter().zip(p2).all(|(a, b)| match_ty(a, b, owner, out))
+                && p1
+                    .iter()
+                    .zip(p2.iter())
+                    .all(|(a, b)| match_ty(a, b, owner, out))
                 && match_ty(r1, r2, owner, out)
         }
         _ => pattern == ty,
@@ -213,11 +226,10 @@ fn match_const(pattern: &Const, c: &Const, owner: ItemId, out: &mut [Option<Gene
 }
 
 fn is_wildcard(arg: &GenericArg) -> bool {
-    matches!(
-        arg,
-        GenericArg::Type(Ty::Error | Ty::Infer(_))
-            | GenericArg::Const(Const::Error | Const::Infer(_))
-    )
+    match arg {
+        GenericArg::Type(ty) => matches!(ty.kind(), TyKind::Error | TyKind::Infer(_)),
+        GenericArg::Const(c) => matches!(c, Const::Error | Const::Infer(_)),
+    }
 }
 
 fn bind(out: &mut [Option<GenericArg>], index: u32, arg: GenericArg) -> bool {

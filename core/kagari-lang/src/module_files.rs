@@ -2,7 +2,7 @@
 
 use crate::db::Db;
 use crate::hir::Name;
-use crate::input::{FilePath, SourceFile};
+use crate::input::{FilePath, SourceFile, file_exists};
 
 /// The outcome of looking up the file of `mod foo;`. Candidate names are shown relative to the
 /// declaring file's directory, with `/` separators.
@@ -52,7 +52,7 @@ pub(crate) fn lookup_mod_file(
     let mut found = Vec::new();
     for candidate in &candidates {
         let source = db.source_file(dir.join(candidate));
-        if source.text(db).is_some() {
+        if file_exists(db, source) {
             found.push((source, format!("{relative}{candidate}")));
         }
     }

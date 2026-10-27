@@ -3,20 +3,19 @@
 
 use rustc_hash::FxHashSet;
 
-use crate::diagnostic::DiagnosticCode;
-use crate::hir::ExprId;
-use crate::ty::{FnRef, GenericArg, Ty};
+use crate::diagnostic::{Anchor, DiagnosticCode, Owner};
+use crate::ty::{FnRef, GenericArg, Ty, TyKind};
 
-use super::num::Rat;
-
-use super::Fault;
+use super::super::Fault;
+use super::super::num::Rat;
+use super::super::std_items::{Builtin, StdTable};
+use super::super::value::{ConstValue, HandleKind, Text};
 use super::anim;
-use super::interp::{ErrorKind, Frame, Machine, Pending, Place, Value, int_range};
 use super::screen::{
     ChannelId, EntityProp, LayerTarget, PendingChange, PropTarget, Screen, ScreenObj, Target,
 };
-use super::std_items::{Builtin, StdTable};
-use super::value::{ConstValue, HandleKind, Text};
+use super::value::{Pending, Value, int_range};
+use super::{CallSite, ErrorKind, Machine, Place};
 
 fn fault(code: DiagnosticCode, message: impl Into<String>) -> ErrorKind {
     ErrorKind::Fault(Fault::new(code, message))
@@ -64,7 +63,7 @@ pub(crate) fn to_text(value: &ConstValue) -> Option<Text> {
     })
 }
 
-impl<'db> Machine<'_, 'db> {
+impl Machine<'_> {
     fn arg(args: &[Value], index: usize) -> Result<&Value, ErrorKind> {
         args.get(index).ok_or(ErrorKind::Abort)
     }
@@ -160,21 +159,20 @@ impl<'db> Machine<'_, 'db> {
             Some(value) => Value::Adt {
                 item: std.option.item,
                 variant: std.option.variant("Some").unwrap_or(1),
-                fields: vec![value],
+                fields: imbl::vector![value],
             },
             None => Value::Adt {
                 item: std.option.item,
                 variant: std.option.variant("None").unwrap_or(0),
-                fields: Vec::new(),
+                fields: imbl::Vector::new(),
             },
         }
     }
 
-    /// Runs `builtin`; `expr` is the call.
+    /// Runs `builtin` called at `site`.
     pub(crate) fn builtin(
         &mut self,
-        frame: &Frame<'db>,
-        expr: ExprId,
+        site: CallSite,
         builtin: Builtin,
         fn_ref: &FnRef,
         args: Vec<Value>,
@@ -190,34 +188,43 @@ impl<'db> Machine<'_, 'db> {
                 let Text::Plain(path) = self.text_arg(&args, 0)? else {
                     return Err(ErrorKind::Abort);
                 };
-                let asset_item = match fn_ref.args.last() {
-                    Some(GenericArg::Type(Ty::Adt { item, .. })) => Some(*item),
-                    _ => match frame.ty(expr) {
-                        Some(Ty::Adt { item, .. }) => Some(item),
+                let asset_item = match fn_ref.args.last().map(|arg| match arg {
+                    GenericArg::Type(ty) => ty.kind(),
+                    GenericArg::Const(_) => &TyKind::Error,
+                }) {
+                    Some(TyKind::Adt { item, .. }) => Some(*item),
+                    _ => match site.ty.as_ref().map(Ty::kind) {
+                        Some(TyKind::Adt { item, .. }) => Some(*item),
                         _ => None,
                     },
                 };
                 let kind = asset_item
                     .and_then(|item| std.asset_kind(item))
                     .ok_or(ErrorKind::Abort)?;
-                let file = frame.b.item.file.path(self.ctx.db).parent_dir_join(&path);
-                Ok(Value::Asset { kind, path: file })
-            }
-            Builtin::VecNew => Ok(Value::Vec(Vec::new())),
-            Builtin::VecLen | Builtin::VecIsEmpty | Builtin::VecGet => {
-                let place = self.ref_place(Self::arg(&args, 0)?)?;
-                let Value::Vec(items) = self.place_mut(&place)?.clone() else {
+                let Some(Anchor::Node(Owner::Body(owner), _)) = site.at else {
                     return Err(ErrorKind::Abort);
                 };
-                match builtin {
-                    Builtin::VecLen => Ok(Value::Int(
+                let file = owner.file.path(self.db).parent_dir_join(&path);
+                Ok(Value::Asset { kind, path: file })
+            }
+            Builtin::VecNew => Ok(Value::Vec(imbl::Vector::new())),
+            Builtin::VecLen | Builtin::VecIsEmpty | Builtin::VecGet => {
+                let index = match builtin {
+                    Builtin::VecGet => Some(self.int_arg(&args, 1)?),
+                    _ => None,
+                };
+                let place = self.ref_place(Self::arg(&args, 0)?)?;
+                let Value::Vec(items) = self.place_mut(&place)? else {
+                    return Err(ErrorKind::Abort);
+                };
+                match (builtin, index) {
+                    (Builtin::VecLen, _) => Ok(Value::Int(
                         i128::try_from(items.len()).map_err(|_| ErrorKind::Abort)?,
                     )),
-                    Builtin::VecIsEmpty => Ok(Value::Bool(items.is_empty())),
-                    _ => {
-                        let index = self.int_arg(&args, 1)?;
-                        let item = usize::try_from(index)
-                            .ok()
+                    (Builtin::VecIsEmpty, _) => Ok(Value::Bool(items.is_empty())),
+                    (_, index) => {
+                        let item = index
+                            .and_then(|index| usize::try_from(index).ok())
                             .and_then(|index| items.get(index))
                             .cloned();
                         Ok(self.option_value(item))
@@ -252,20 +259,18 @@ impl<'db> Machine<'_, 'db> {
                 let Value::Vec(items) = self.place_mut(&place)? else {
                     return Err(ErrorKind::Abort);
                 };
-                items.push(value);
+                items.push_back(value);
                 Ok(Value::unit())
             }
             Builtin::IntegerInto => Ok(Value::Int(self.int_arg(&args, 0)?)),
             Builtin::IntegerSaturate => {
                 let value = self.int_arg(&args, 0)?;
-                Ok(Value::Int(
-                    match frame.ty(expr).as_ref().and_then(int_range) {
-                        Some((lo, hi)) => value.clamp(lo, hi),
-                        None => value,
-                    },
-                ))
+                Ok(Value::Int(match site.ty.as_ref().and_then(int_range) {
+                    Some((lo, hi)) => value.clamp(lo, hi),
+                    None => value,
+                }))
             }
-            Builtin::ScreenEmpty => Ok(Value::Screen(Box::new(Screen::empty(std)))),
+            Builtin::ScreenEmpty => Ok(Value::Screen(std::sync::Arc::new(Screen::empty(std)))),
             Builtin::ScreenEntity => {
                 let id =
                     u32::try_from(self.newtype_arg(&args, 1)?).map_err(|_| ErrorKind::Abort)?;
@@ -585,7 +590,7 @@ impl<'db> Machine<'_, 'db> {
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Value::Text(Text::MonoRuby {
                     base: Box::new(base),
-                    readings,
+                    readings: readings.into(),
                 }))
             }
             Builtin::Effect => {
@@ -609,7 +614,7 @@ impl<'db> Machine<'_, 'db> {
                         _ => Err(ErrorKind::Abort),
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                let text = Text::Concat(items);
+                let text = Text::Concat(items.into());
                 check_marks(&text, std)?;
                 Ok(Value::Text(text))
             }

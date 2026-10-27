@@ -26,12 +26,12 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::db::Db;
-use crate::hir::{ArrayExpr, Body, Condition, Expr, ExprId, ExprStore, Pat, PatId, Stmt, file_hir};
-use crate::infer::{FileInference, InferenceResult, ValueRef, file_inference};
-use crate::input::{Program, SourceFile};
+use crate::hir::{ArrayExpr, Body, Condition, Expr, ExprId, ExprStore, Pat, PatId, Stmt, body_of};
+use crate::infer::{InferenceResult, ValueRef, inference};
+use crate::input::Program;
 use crate::item_tree::{FnKind, ItemId, ItemKind, item_tree};
-use crate::resolve::{BodyResolution, LocalId, file_resolution};
-use crate::ty::{FnDefId, Ty};
+use crate::resolve::{BodyResolution, LocalId, body_resolution};
+use crate::ty::FnDefId;
 
 /// The constant expressions of one body.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -55,30 +55,20 @@ pub struct ConstLocal {
     pub source: ExprId,
 }
 
-/// The constant expressions of every body of a file, indexed like `ItemTree::items`;
-/// `Some` where the item has a body with inference results.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct FileConstExprs {
-    pub items: Vec<Option<ConstExprs>>,
+/// The constant expressions of `item`'s body (see the module docs); `Some` where the
+/// item has a body with resolution and inference results.
+pub fn const_exprs(db: &dyn Db, program: Program, item: ItemId) -> Option<&ConstExprs> {
+    item_const_exprs(db, program, item)
 }
 
-#[salsa::tracked(returns(ref))]
-pub fn file_const_exprs(db: &dyn Db, program: Program, file: SourceFile) -> FileConstExprs {
-    let hir = file_hir(db, file);
-    let resolution = file_resolution(db, program, file);
-    let inference: &FileInference = file_inference(db, program, file);
-    let items = hir
-        .bodies
-        .iter()
-        .enumerate()
-        .map(|(index, body)| {
-            let body = body.as_ref()?;
-            let res = resolution.items.get(index)?.as_ref()?.body.as_ref()?;
-            let infer = inference.items.get(index)?.as_ref()?;
-            Some(analyze(db, body, res, infer))
-        })
-        .collect();
-    FileConstExprs { items }
+/// The query behind [`const_exprs`]; a tracked fn named `const_exprs` would clash
+/// with this module's name in `eval`.
+#[salsa::tracked(returns(as_ref))]
+fn item_const_exprs(db: &dyn Db, program: Program, item: ItemId) -> Option<ConstExprs> {
+    let body = body_of(db, item)?;
+    let res = body_resolution(db, program, item).body.as_ref()?;
+    let infer = inference(db, program, item)?;
+    Some(analyze(db, body, res, infer))
 }
 
 /// The constant expressions of one body.
@@ -97,14 +87,6 @@ pub(crate) fn analyze(
     };
     analyzer.expr(body.value);
     analyzer.out
-}
-
-/// The constant expressions of `item`'s body (see the module docs).
-pub fn const_exprs(db: &dyn Db, program: Program, item: ItemId) -> Option<&ConstExprs> {
-    file_const_exprs(db, program, item.file)
-        .items
-        .get(item.index as usize)?
-        .as_ref()
 }
 
 fn fn_kind(db: &dyn Db, item: ItemId) -> Option<FnKind> {
@@ -134,7 +116,11 @@ impl Analyzer<'_> {
     /// Visits `expr` and everything inside it; returns whether `expr` is constant.
     fn expr(&mut self, expr: ExprId) -> bool {
         let constant = self.expr_inner(expr)
-            && !matches!(self.infer.expr_types.get(expr), Some(Ty::Error) | None);
+            && self
+                .infer
+                .expr_types
+                .get(expr)
+                .is_some_and(|ty| !ty.is_error());
         if constant {
             self.out.exprs.insert(expr);
         }

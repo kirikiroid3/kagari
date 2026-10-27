@@ -77,8 +77,8 @@ Fix: use an index below the length, such as `a[1]`.
 ## E4006 `const-cycle`
 
 **Error.** The value of a `const` depends on itself, directly or through other constants, so
-it cannot be computed at compile time. Each cycle is reported once, at the constant whose
-evaluation closed it.
+it cannot be computed at compile time. Every constant in the cycle is reported, at its own
+name; a constant that only uses one of them is not.
 
 ```kis
 const A: u32 = B + 1;

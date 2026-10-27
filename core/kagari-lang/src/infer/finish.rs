@@ -9,16 +9,16 @@ use crate::diagnostic::DiagnosticCode;
 use crate::hir::ExprId;
 use crate::signatures::lower::item_name;
 use crate::signatures::{TraitSolver, display_ty};
-use crate::ty::{Const, CtorRef, FnRef, GenericArg, InferVar, Ty, TyNode};
+use crate::ty::{Const, CtorRef, FnRef, GenericArg, GenericArgs, InferVar, Ty, TyKind, TyNode};
 
 impl InferCtx<'_> {
-    pub(crate) fn finish(mut self) -> (InferenceResult, Vec<crate::diagnostic::Diagnostic>) {
+    pub(crate) fn finish(mut self) -> (InferenceResult, Vec<crate::diagnostic::Diag>) {
         self.process_projections();
         self.resolve_links();
         self.default_literal_bounds();
         for (var, literal) in self.table.unresolved_literals() {
             self.table
-                .unify(&Ty::Infer(var), &Ty::bounded(literal.lo, literal.hi));
+                .unify(&Ty::infer(var), &Ty::bounded(literal.lo, literal.hi));
         }
         self.process_projections();
         self.check_fits();
@@ -33,12 +33,12 @@ impl InferCtx<'_> {
     fn default_literal_bounds(&mut self) {
         let fits = self.table.fits.clone();
         for fit in fits {
-            if let Ty::Bounded { lo, hi } = self.table.shallow(&fit.ty) {
-                if matches!(self.table.shallow_const(&lo), Const::Infer(_)) {
-                    self.table.unify_const(&lo, &Const::Value(fit.literal.lo));
+            if let TyKind::Bounded { lo, hi } = self.table.shallow(&fit.ty).kind() {
+                if matches!(self.table.shallow_const(lo), Const::Infer(_)) {
+                    self.table.unify_const(lo, &Const::Value(fit.literal.lo));
                 }
-                if matches!(self.table.shallow_const(&hi), Const::Infer(_)) {
-                    self.table.unify_const(&hi, &Const::Value(fit.literal.hi));
+                if matches!(self.table.shallow_const(hi), Const::Infer(_)) {
+                    self.table.unify_const(hi, &Const::Value(fit.literal.hi));
                 }
             }
         }
@@ -57,7 +57,7 @@ impl InferCtx<'_> {
             if !reported.insert(fit.literal.origin) {
                 continue;
             }
-            let range = self.expr_range(fit.literal.origin);
+            let range = self.expr_anchor(fit.literal.origin);
             let value = if fit.literal.lo < lo {
                 fit.literal.lo
             } else {
@@ -83,16 +83,16 @@ impl InferCtx<'_> {
                         self.show(&resolved),
                         fit.value
                     );
-                    self.diag(fit.range, DiagnosticCode::TypeLiteralOutOfRange, message);
+                    self.diag(fit.anchor, DiagnosticCode::TypeLiteralOutOfRange, message);
                 }
-            } else if !matches!(resolved, Ty::Infer(_) | Ty::Bounded { .. })
+            } else if !matches!(resolved.kind(), TyKind::Infer(_) | TyKind::Bounded { .. })
                 && !resolved.references_error()
             {
                 let message = format!(
                     "mismatched types: expected `{}`, found an integer",
                     self.show(&resolved)
                 );
-                self.diag(fit.range, DiagnosticCode::TypeMismatch, message);
+                self.diag(fit.anchor, DiagnosticCode::TypeMismatch, message);
             }
         }
     }
@@ -112,14 +112,19 @@ impl InferCtx<'_> {
                 continue;
             }
             if !solver.implements(&ty, obligation.trait_item) {
-                failures.push((ty, obligation.trait_item, obligation.range, obligation.kind));
+                failures.push((
+                    ty,
+                    obligation.trait_item,
+                    obligation.anchor,
+                    obligation.kind,
+                ));
             }
         }
         for (ty, trait_item, range, kind) in failures {
             let shown = display_ty(self.db, self.program, &ty);
             match kind {
                 ObligationKind::Eq => {
-                    let message = if matches!(ty, Ty::Closure { .. }) {
+                    let message = if matches!(ty.kind(), TyKind::Closure { .. }) {
                         format!("`==` needs `Eq`, but closures such as `{shown}` are never `Eq`")
                     } else {
                         format!("`==` needs `Eq`, but `{shown}` does not implement it")
@@ -155,7 +160,7 @@ impl InferCtx<'_> {
                 self.show(&from),
                 self.show(&to)
             );
-            self.diag(check.range, DiagnosticCode::TypeLossyInto, message);
+            self.diag(check.anchor, DiagnosticCode::TypeLossyInto, message);
         }
     }
 
@@ -173,12 +178,14 @@ impl InferCtx<'_> {
             // of the function it comes from (`Vec<_>` rather than `fn() -> Vec<_> {new}`).
             for fn_items in [false, true] {
                 for (expr, resolved) in &expr_types {
-                    if matches!(resolved, Ty::FnDef(_)) != fn_items || resolved.references_error() {
+                    if matches!(resolved.kind(), TyKind::FnDef(_)) != fn_items
+                        || resolved.references_error()
+                    {
                         continue;
                     }
                     for var in unresolved_roots(resolved) {
                         if reported.insert(var) {
-                            let range = self.expr_range(*expr);
+                            let range = self.expr_anchor(*expr);
                             let message = format!(
                                 "type annotations needed: cannot infer the type `{}`",
                                 self.show(resolved)
@@ -194,7 +201,7 @@ impl InferCtx<'_> {
         }
         for (expr, _) in self.store.exprs.iter() {
             if result.expr_types.get(expr).is_none() {
-                result.expr_types.insert(expr, Ty::Error);
+                result.expr_types.insert(expr, Ty::error());
             }
         }
         let pats: Vec<_> = result
@@ -207,7 +214,7 @@ impl InferCtx<'_> {
         }
         for (pat, _) in self.store.pats.iter() {
             if result.pat_types.get(pat).is_none() {
-                result.pat_types.insert(pat, Ty::Error);
+                result.pat_types.insert(pat, Ty::error());
             }
         }
         let locals: Vec<_> = result
@@ -220,7 +227,7 @@ impl InferCtx<'_> {
         }
         for (local, _) in self.res.locals.iter() {
             if result.local_types.get(local).is_none() {
-                result.local_types.insert(local, Ty::Error);
+                result.local_types.insert(local, Ty::error());
             }
         }
         result.return_ty = self.finalize_ty(&result.return_ty.clone());
@@ -266,7 +273,7 @@ impl InferCtx<'_> {
         erase_infer(&resolved)
     }
 
-    fn finalize_args(&self, args: &[GenericArg]) -> Vec<GenericArg> {
+    fn finalize_args<C: FromIterator<GenericArg>>(&self, args: &[GenericArg]) -> C {
         args.iter()
             .map(|arg| match arg {
                 GenericArg::Type(ty) => GenericArg::Type(self.finalize_ty(ty)),
@@ -310,7 +317,12 @@ impl InferCtx<'_> {
 fn unresolved_roots(ty: &Ty) -> Vec<InferVar> {
     let mut vars = Vec::new();
     ty.walk(&mut |node| {
-        if let TyNode::Ty(Ty::Infer(var)) | TyNode::Const(Const::Infer(var)) = node
+        if let TyNode::Ty(ty) = node
+            && let TyKind::Infer(var) = ty.kind()
+            && !vars.contains(var)
+        {
+            vars.push(*var);
+        } else if let TyNode::Const(Const::Infer(var)) = node
             && !vars.contains(var)
         {
             vars.push(*var);
@@ -324,7 +336,7 @@ fn erase_infer(ty: &Ty) -> Ty {
         Const::Infer(_) => Const::Error,
         other => other.clone(),
     };
-    let erase_args = |args: &[GenericArg]| -> Vec<GenericArg> {
+    let erase_args = |args: &[GenericArg]| -> GenericArgs {
         args.iter()
             .map(|arg| match arg {
                 GenericArg::Type(ty) => GenericArg::Type(erase_infer(ty)),
@@ -332,49 +344,50 @@ fn erase_infer(ty: &Ty) -> Ty {
             })
             .collect()
     };
-    match ty {
-        Ty::Infer(_) => Ty::Error,
-        Ty::Bounded { lo, hi } => Ty::Bounded {
+    let kind = match ty.kind() {
+        TyKind::Infer(_) => return Ty::error(),
+        TyKind::Bounded { lo, hi } => TyKind::Bounded {
             lo: erase_const(lo),
             hi: erase_const(hi),
         },
-        Ty::Tuple(fields) => Ty::Tuple(fields.iter().map(erase_infer).collect()),
-        Ty::Array { elem, len } => Ty::Array {
-            elem: Box::new(erase_infer(elem)),
+        TyKind::Tuple(fields) => TyKind::Tuple(fields.iter().map(erase_infer).collect()),
+        TyKind::Array { elem, len } => TyKind::Array {
+            elem: erase_infer(elem),
             len: erase_const(len),
         },
-        Ty::Adt { item, args } => Ty::Adt {
+        TyKind::Adt { item, args } => TyKind::Adt {
             item: *item,
             args: erase_args(args),
         },
-        Ty::Ref { mutable, inner } => Ty::Ref {
+        TyKind::Ref { mutable, inner } => TyKind::Ref {
             mutable: *mutable,
-            inner: Box::new(erase_infer(inner)),
+            inner: erase_infer(inner),
         },
-        Ty::FnPtr { kind, params, ret } => Ty::FnPtr {
+        TyKind::FnPtr { kind, params, ret } => TyKind::FnPtr {
             kind: *kind,
             params: params.iter().map(erase_infer).collect(),
-            ret: Box::new(erase_infer(ret)),
+            ret: erase_infer(ret),
         },
-        Ty::Closure { kind, params, ret } => Ty::Closure {
+        TyKind::Closure { kind, params, ret } => TyKind::Closure {
             kind: *kind,
             params: params.iter().map(erase_infer).collect(),
-            ret: Box::new(erase_infer(ret)),
+            ret: erase_infer(ret),
         },
-        Ty::FnDef(fn_ref) => Ty::FnDef(Box::new(FnRef {
+        TyKind::FnDef(fn_ref) => TyKind::FnDef(FnRef {
             def: fn_ref.def,
             self_ty: fn_ref.self_ty.as_ref().map(erase_infer),
             args: erase_args(&fn_ref.args),
-        })),
-        Ty::Projection {
+        }),
+        TyKind::Projection {
             base,
             trait_item,
             name,
-        } => Ty::Projection {
-            base: Box::new(erase_infer(base)),
+        } => TyKind::Projection {
+            base: erase_infer(base),
             trait_item: *trait_item,
             name: name.clone(),
         },
-        other => other.clone(),
-    }
+        _ => return ty.clone(),
+    };
+    Ty::new(kind)
 }

@@ -11,7 +11,7 @@ use crate::item_tree::{ItemId, ItemKind, item_tree};
 use crate::signatures::lower::{plural, trait_assoc, were};
 use crate::signatures::subst::{Subst, subst_ty};
 use crate::signatures::{ItemSig, assoc_parent, type_key};
-use crate::ty::{FnDefId, FnRef, GenericArg, Ty};
+use crate::ty::{FnDefId, FnRef, GenericArg, Ty, TyKind};
 
 enum MethodCandidate {
     Inherent { item: ItemId, impl_item: ItemId },
@@ -39,18 +39,18 @@ impl InferCtx<'_> {
         }
         let callee_ty = self.infer_expr(callee, Expect::None);
         let callee_ty = self.structurally_resolve(&callee_ty);
-        let range = self.expr_range(expr);
-        let (params, ret, fn_ref) = match &callee_ty {
-            Ty::FnDef(fn_ref) => match self.fn_shape(fn_ref) {
-                Some(FnShape { params, ret, .. }) => (params, ret, Some((**fn_ref).clone())),
+        let range = self.expr_anchor(expr);
+        let (params, ret, fn_ref) = match callee_ty.kind() {
+            TyKind::FnDef(fn_ref) => match self.fn_shape(fn_ref) {
+                Some(FnShape { params, ret, .. }) => (params, ret, Some(fn_ref.clone())),
                 None => return self.infer_args_unchecked(args),
             },
-            Ty::FnPtr { params, ret, .. } | Ty::Closure { params, ret, .. } => {
-                (params.clone(), (**ret).clone(), None)
+            TyKind::FnPtr { params, ret, .. } | TyKind::Closure { params, ret, .. } => {
+                (params.to_vec(), ret.clone(), None)
             }
-            Ty::Error => return self.infer_args_unchecked(args),
-            Ty::Infer(_) => {
-                let callee_range = self.expr_range(callee);
+            TyKind::Error => return self.infer_args_unchecked(args),
+            TyKind::Infer(_) => {
+                let callee_range = self.expr_anchor(callee);
                 self.diag(
                     callee_range,
                     DiagnosticCode::TypeAnnotationsNeeded,
@@ -58,9 +58,9 @@ impl InferCtx<'_> {
                 );
                 return self.infer_args_unchecked(args);
             }
-            other => {
-                let callee_range = self.expr_range(callee);
-                let message = format!("expected a function, found `{}`", self.show(other));
+            _ => {
+                let callee_range = self.expr_anchor(callee);
+                let message = format!("expected a function, found `{}`", self.show(&callee_ty));
                 self.diag(callee_range, DiagnosticCode::TypeNotCallable, message);
                 return self.infer_args_unchecked(args);
             }
@@ -97,7 +97,7 @@ impl InferCtx<'_> {
             self.into_checks.push(IntoCheck {
                 from: from.clone(),
                 to: to.clone(),
-                range,
+                anchor: range,
             });
         }
         ret
@@ -107,7 +107,7 @@ impl InferCtx<'_> {
         for &arg in args {
             self.infer_expr(arg, Expect::None);
         }
-        Ty::Error
+        Ty::error()
     }
 
     /// `asset::<A>(…)`: the path must be a string literal.
@@ -118,7 +118,7 @@ impl InferCtx<'_> {
         match self.store.expr(arg) {
             Expr::Literal(Literal::String(_)) | Expr::Missing => {}
             _ => {
-                let range = self.expr_range(arg);
+                let range = self.expr_anchor(arg);
                 self.diag(
                     range,
                     DiagnosticCode::TypeAssetPathNotLiteral,
@@ -131,7 +131,7 @@ impl InferCtx<'_> {
     /// `nav::start(entry, args, on_exit)`: `entry` names an `#[entry]` scene
     /// `scene fn(P1, …, Pn) -> R`, `args` is `(P1, …, Pn)` and `on_exit` is `Fn(R)`.
     fn infer_nav_start(&mut self, expr: ExprId, callee: ExprId, args: &[ExprId]) -> Ty {
-        let range = self.expr_range(expr);
+        let range = self.expr_anchor(expr);
         let Some(nav_start) = self.sigs.std.nav_start else {
             return self.infer_args_unchecked(args);
         };
@@ -144,7 +144,7 @@ impl InferCtx<'_> {
                     were(args.len())
                 ),
             );
-            self.record_expr(callee, &Ty::Error);
+            self.record_expr(callee, &Ty::error());
             self.result.paths.insert(callee, ValueRef::Error);
             self.infer_args_unchecked(args);
             return Ty::unit();
@@ -160,7 +160,7 @@ impl InferCtx<'_> {
             }
             (_, Some(Resolution::Error)) => None,
             _ => {
-                let entry_range = self.expr_range(*entry);
+                let entry_range = self.expr_anchor(*entry);
                 self.diag(
                     entry_range,
                     DiagnosticCode::TypeBadNavStart,
@@ -171,44 +171,44 @@ impl InferCtx<'_> {
         };
         let entry_ty = self.infer_expr(*entry, Expect::None);
         let (entry_ptr, args_ty, ret) = match scene {
-            Some(_) => match self.structurally_resolve(&entry_ty) {
-                Ty::FnDef(fn_ref) => match self.fn_shape(&fn_ref) {
+            Some(_) => match self.structurally_resolve(&entry_ty).kind() {
+                TyKind::FnDef(fn_ref) => match self.fn_shape(fn_ref) {
                     Some(shape) => {
-                        let ptr = Ty::FnPtr {
+                        let ptr = Ty::new(TyKind::FnPtr {
                             kind: FnPtrKind::Scene,
-                            params: shape.params.clone(),
-                            ret: Box::new(shape.ret.clone()),
-                        };
-                        (ptr, Ty::Tuple(shape.params), shape.ret)
+                            params: shape.params.clone().into_boxed_slice(),
+                            ret: shape.ret.clone(),
+                        });
+                        (ptr, Ty::tuple(shape.params), shape.ret)
                     }
-                    None => (Ty::Error, Ty::Error, Ty::Error),
+                    None => (Ty::error(), Ty::error(), Ty::error()),
                 },
-                _ => (Ty::Error, Ty::Error, Ty::Error),
+                _ => (Ty::error(), Ty::error(), Ty::error()),
             },
-            None => (Ty::Error, Ty::Error, Ty::Error),
+            None => (Ty::error(), Ty::error(), Ty::error()),
         };
         self.coerce(*entry, &entry_ty, &entry_ptr);
         self.infer_expr(*entry_args, Expect::Coerce(&args_ty));
-        let on_exit_ty = if matches!(ret, Ty::Error) {
-            Ty::Error
+        let on_exit_ty = if ret.is_error() {
+            Ty::error()
         } else {
-            Ty::Closure {
+            Ty::new(TyKind::Closure {
                 kind: ClosureKind::Plain,
-                params: vec![ret.clone()],
-                ret: Box::new(Ty::unit()),
-            }
+                params: Box::new([ret.clone()]),
+                ret: Ty::unit(),
+            })
         };
         self.infer_expr(*on_exit, Expect::Coerce(&on_exit_ty));
         let fn_ref = FnRef {
             def: FnDefId::Item(nav_start),
             self_ty: None,
-            args: vec![
+            args: crate::ty::GenericArgs::new(vec![
                 GenericArg::Type(entry_ptr),
                 GenericArg::Type(args_ty),
                 GenericArg::Type(ret),
-            ],
+            ]),
         };
-        self.record_expr(callee, &Ty::FnDef(Box::new(fn_ref.clone())));
+        self.record_expr(callee, &Ty::new(TyKind::FnDef(fn_ref.clone())));
         self.result.paths.insert(callee, ValueRef::Fn(fn_ref));
         Ty::unit()
     }
@@ -217,8 +217,8 @@ impl InferCtx<'_> {
     fn autoderef(&mut self, ty: &Ty) -> (Ty, u32) {
         let mut base = self.structurally_resolve(ty);
         let mut derefs = 0u32;
-        while let Ty::Ref { inner, .. } = &base {
-            let inner = (**inner).clone();
+        while let TyKind::Ref { inner, .. } = base.kind() {
+            let inner = inner.clone();
             base = self.structurally_resolve(&inner);
             derefs = derefs.saturating_add(1);
         }
@@ -235,7 +235,7 @@ impl InferCtx<'_> {
         args: &[ExprId],
         expect: Expect<'_>,
     ) -> Ty {
-        let range = self.expr_range(expr);
+        let range = self.expr_anchor(expr);
         let receiver_ty = self.infer_expr(receiver, Expect::None);
         for arg in generic_args.map_or(&[][..], |args| args.0.as_slice()) {
             match *arg {
@@ -246,12 +246,12 @@ impl InferCtx<'_> {
             }
         }
         let (base, derefs) = self.autoderef(&receiver_ty);
-        if matches!(base, Ty::Error) {
+        if base.is_error() {
             return self.infer_args_unchecked(args);
         }
         let is_literal = self.table.literal(&base).is_some();
-        if matches!(base, Ty::Infer(_)) && !is_literal {
-            let receiver_range = self.expr_range(receiver);
+        if matches!(base.kind(), TyKind::Infer(_)) && !is_literal {
+            let receiver_range = self.expr_anchor(receiver);
             self.diag(
                 receiver_range,
                 DiagnosticCode::TypeAnnotationsNeeded,
@@ -276,7 +276,7 @@ impl InferCtx<'_> {
                             self_ty: None,
                         },
                     ),
-                    _ => Ty::Error,
+                    _ => Ty::error(),
                 };
                 if !self.try_unify(&self_ty, &base) {
                     let message =
@@ -362,7 +362,7 @@ impl InferCtx<'_> {
             self.into_checks.push(IntoCheck {
                 from: base,
                 to: to.clone(),
-                range,
+                anchor: range,
             });
         }
         shape.ret
@@ -388,9 +388,9 @@ impl InferCtx<'_> {
         {
             return Some(MethodCandidate::Inherent { item, impl_item });
         }
-        let traits: Vec<ItemId> = match base {
-            Ty::Param { owner, index } => self.env.bounds_of(*owner, *index).to_vec(),
-            Ty::TraitSelf { trait_item } => vec![*trait_item],
+        let traits: Vec<ItemId> = match base.kind() {
+            TyKind::Param { owner, index } => self.env.bounds_of(*owner, *index).to_vec(),
+            TyKind::TraitSelf { trait_item } => vec![*trait_item],
             _ if is_literal => self.sigs.std.integer.into_iter().collect(),
             _ => {
                 let mut traits = Vec::new();
@@ -413,23 +413,23 @@ impl InferCtx<'_> {
     }
 
     pub(crate) fn infer_field(&mut self, expr: ExprId, base: ExprId, name: &FieldName) -> Ty {
-        let range = self.expr_range(expr);
+        let range = self.expr_anchor(expr);
         let base_ty = self.infer_expr(base, Expect::None);
         let (resolved, derefs) = self.autoderef(&base_ty);
-        let found: Option<(u32, Ty)> = match (&resolved, name) {
-            (Ty::Error, _) => return Ty::Error,
-            (Ty::Infer(_), _) => {
+        let found: Option<(u32, Ty)> = match (resolved.kind(), name) {
+            (TyKind::Error, _) => return Ty::error(),
+            (TyKind::Infer(_), _) => {
                 self.diag(
                     range,
                     DiagnosticCode::TypeAnnotationsNeeded,
                     "type annotations needed: cannot access a field of a value of unknown type",
                 );
-                return Ty::Error;
+                return Ty::error();
             }
-            (Ty::Tuple(fields), FieldName::Index(index)) => fields
+            (TyKind::Tuple(fields), FieldName::Index(index)) => fields
                 .get(*index as usize)
                 .map(|field| (*index, field.clone())),
-            (Ty::Adt { item, args }, _) => self.sigs.adt(*item).and_then(|adt| {
+            (TyKind::Adt { item, args }, _) => self.sigs.adt(*item).and_then(|adt| {
                 if adt.is_enum {
                     return None;
                 }
@@ -469,7 +469,7 @@ impl InferCtx<'_> {
                 };
                 let message = format!("no field `{field}` on type `{}`", self.show(&resolved));
                 self.diag(range, DiagnosticCode::TypeUnknownField, message);
-                Ty::Error
+                Ty::error()
             }
         }
     }
@@ -479,12 +479,15 @@ impl InferCtx<'_> {
         let index_ty = self.infer_expr(index, Expect::None);
         if self.table.literal(&index_ty).is_some() {
             self.table
-                .unify(&index_ty, &Ty::Int(crate::ty::IntTy::Usize));
+                .unify(&index_ty, &Ty::int(crate::ty::IntTy::Usize));
         }
         let index_resolved = self.structurally_resolve(&index_ty);
-        let is_integer = matches!(index_resolved, Ty::Int(_) | Ty::Bounded { .. } | Ty::Error);
+        let is_integer = matches!(
+            index_resolved.kind(),
+            TyKind::Int(_) | TyKind::Bounded { .. } | TyKind::Error
+        );
         if !is_integer {
-            let range = self.expr_range(index);
+            let range = self.expr_anchor(index);
             let message = format!(
                 "expected an integer index, found `{}`",
                 self.show(&index_ty)
@@ -492,18 +495,21 @@ impl InferCtx<'_> {
             self.diag(range, DiagnosticCode::TypeMismatch, message);
         }
         let (resolved, _) = self.autoderef(&base_ty);
-        match &resolved {
-            Ty::Error => Ty::Error,
-            Ty::Array { elem, .. } => (**elem).clone(),
-            Ty::Adt { item, args } if Some(*item) == self.sigs.std.vec => match args.first() {
+        match resolved.kind() {
+            TyKind::Error => Ty::error(),
+            TyKind::Array { elem, .. } => elem.clone(),
+            TyKind::Adt { item, args } if Some(*item) == self.sigs.std.vec => match args.first() {
                 Some(GenericArg::Type(elem)) => elem.clone(),
-                _ => Ty::Error,
+                _ => Ty::error(),
             },
-            other => {
-                let range = self.expr_range(expr);
-                let message = format!("cannot index into a value of type `{}`", self.show(other));
+            _ => {
+                let range = self.expr_anchor(expr);
+                let message = format!(
+                    "cannot index into a value of type `{}`",
+                    self.show(&resolved)
+                );
                 self.diag(range, DiagnosticCode::TypeNotIndexable, message);
-                Ty::Error
+                Ty::error()
             }
         }
     }

@@ -17,59 +17,48 @@ use rustc_hash::FxHashMap;
 
 use crate::db::Db;
 use crate::def_map::def_maps;
-use crate::diagnostic::Diagnostic;
-use crate::hir::{Body, ClosureKind, ExprId, GenericParamKind, PatId, file_hir};
-use crate::input::{Program, SourceFile};
+use crate::diagnostic::Diag;
+use crate::hir::{Body, ClosureKind, ExprId, GenericParamKind, PatId, body_of, signature_of};
+use crate::input::Program;
 use crate::item_tree::{FnKind, ItemId, ItemKind, item_tree};
-use crate::resolve::{BodyResolution, LocalId, file_resolution};
+use crate::resolve::{BodyResolution, LocalId, body_resolution};
 use crate::signatures::lower::TyLowerer;
 use crate::signatures::{BoundEnv, ItemSig, ProgramSignatures, assoc_parent, program_signatures};
 use crate::ty::{CtorRef, FnRef, GenericArg, Ty};
 
 use ctx::{Expect, InferCtx};
 
-/// Inference results of every item of a file with a body.
+/// The inference result of one item's body, with the diagnostics it reported.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct FileInference {
-    /// Indexed like `ItemTree::items`; `Some` for each `fn` with a body, `const` and
-    /// `static` with an initializer.
-    pub items: Vec<Option<InferenceResult>>,
-    pub diagnostics: Vec<Diagnostic>,
+pub struct InferOutput {
+    pub result: InferenceResult,
+    pub diagnostics: Vec<Diag>,
 }
 
+/// Infers one item's body: `Some` for each `fn` with a body, `const` and `static` with
+/// an initializer, in a file of the program.
 #[salsa::tracked(returns(ref))]
-pub fn file_inference(db: &dyn Db, program: Program, file: SourceFile) -> FileInference {
-    let maps = def_maps(db, program);
-    let mut out = FileInference::default();
-    if !maps.file_modules.contains_key(&file) {
-        return out;
+pub fn infer(db: &dyn Db, program: Program, item: ItemId) -> Option<InferOutput> {
+    if !def_maps(db, program).file_modules.contains_key(&item.file) {
+        return None;
     }
-    let tree = item_tree(db, file);
-    let hir = file_hir(db, file);
-    let resolution = file_resolution(db, program, file);
+    let tree = item_tree(db, item.file);
+    let data = tree.item(item.index)?;
+    if !matches!(
+        data.kind,
+        ItemKind::Fn { .. } | ItemKind::Const { .. } | ItemKind::Static { .. }
+    ) {
+        return None;
+    }
+    let body = body_of(db, item)?;
+    let res = body_resolution(db, program, item).body.as_ref()?;
     let sigs = program_signatures(db, program);
-    for (index, data) in tree.items.iter().enumerate() {
-        let item = ItemId {
-            file,
-            index: u32::try_from(index).unwrap_or(u32::MAX),
-        };
-        let body = hir.bodies.get(index).and_then(Option::as_ref);
-        let res = resolution
-            .items
-            .get(index)
-            .and_then(Option::as_ref)
-            .and_then(|res| res.body.as_ref());
-        let inferred = match (&data.kind, body, res) {
-            (
-                ItemKind::Fn { .. } | ItemKind::Const { .. } | ItemKind::Static { .. },
-                Some(body),
-                Some(res),
-            ) => infer_body(db, program, sigs, item, body, res, &mut out.diagnostics),
-            _ => None,
-        };
-        out.items.push(inferred);
-    }
-    out
+    let mut diagnostics = Vec::new();
+    let result = infer_body(db, program, sigs, item, body, res, &mut diagnostics)?;
+    Some(InferOutput {
+        result,
+        diagnostics,
+    })
 }
 
 fn infer_body(
@@ -79,7 +68,7 @@ fn infer_body(
     item: ItemId,
     body: &Body,
     res: &BodyResolution,
-    diagnostics: &mut Vec<Diagnostic>,
+    diagnostics: &mut Vec<Diag>,
 ) -> Option<InferenceResult> {
     let maps = def_maps(db, program);
     let (fn_kind, declared) = match sigs.get(item)? {
@@ -96,9 +85,8 @@ fn infer_body(
     };
     let self_owner = assoc_parent(db, item);
     let mut generic_scope = Vec::new();
-    let hir = file_hir(db, item.file);
     for owner in self_owner.into_iter().chain(std::iter::once(item)) {
-        if let Some(Some(signature)) = hir.signatures.get(owner.index as usize) {
+        if let Some(signature) = signature_of(db, owner) {
             for (index, param) in signature.generics.iter().enumerate() {
                 generic_scope.push((
                     param.name.clone(),
@@ -115,7 +103,6 @@ fn infer_body(
         sigs,
         maps,
         item,
-        file_path: item.file.path(db).clone(),
         store: &body.store,
         res,
         env: BoundEnv::of_item(sigs, item),
@@ -140,13 +127,13 @@ fn infer_body(
     if let Some(ItemSig::Fn(sig)) = sigs.get(item) {
         let mut params = sig.params.iter();
         if body.has_self {
-            let self_ty = params.next().cloned().unwrap_or(Ty::Error);
+            let self_ty = params.next().cloned().unwrap_or(Ty::error());
             if let Some((local, _)) = res.locals.iter().find(|(_, local)| local.pat.is_none()) {
                 cx.result.local_types.insert(local, self_ty);
             }
         }
         for &pat in &body.params {
-            let ty = params.next().cloned().unwrap_or(Ty::Error);
+            let ty = params.next().cloned().unwrap_or(Ty::error());
             cx.check_pat(pat, &ty);
         }
     }
@@ -158,10 +145,7 @@ fn infer_body(
 
 /// The inference result of one item's body.
 pub fn inference(db: &dyn Db, program: Program, item: ItemId) -> Option<&InferenceResult> {
-    file_inference(db, program, item.file)
-        .items
-        .get(item.index as usize)?
-        .as_ref()
+    infer(db, program, item).as_ref().map(|out| &out.result)
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

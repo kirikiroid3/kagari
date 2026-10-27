@@ -7,7 +7,7 @@ use crate::hir::{Literal, Pat, PatId, Path};
 use crate::item_tree::{ItemKind, Shape, item_tree};
 use crate::signatures::ItemSig;
 use crate::signatures::subst::{Subst, subst_ty};
-use crate::ty::{CtorRef, Ty};
+use crate::ty::{CtorRef, Ty, TyKind};
 
 impl InferCtx<'_> {
     /// Checks `pat` against the type of the matched value.
@@ -27,10 +27,7 @@ impl InferCtx<'_> {
                 } else {
                     if let Some(&local) = self.res.bindings.get(&pat) {
                         let local_ty = match by_ref {
-                            Some(mutable) => Ty::Ref {
-                                mutable,
-                                inner: Box::new(expected.clone()),
-                            },
+                            Some(mutable) => Ty::reference(mutable, expected.clone()),
                             None => expected.clone(),
                         };
                         self.result.local_types.insert(local, local_ty);
@@ -42,7 +39,7 @@ impl InferCtx<'_> {
                 Some(resolution) => {
                     self.check_path_pat(pat, &resolution, Some(path), expected, by_ref)
                 }
-                None => Ty::Error,
+                None => Ty::error(),
             },
             Pat::Lit { lit, negated } => {
                 let (expected, _) = self.peel_refs(expected, by_ref);
@@ -62,11 +59,11 @@ impl InferCtx<'_> {
                 }
                 let resolved = self.structurally_resolve(&expected);
                 let is_integer = matches!(
-                    resolved,
-                    Ty::Int(_) | Ty::Bounded { .. } | Ty::Error | Ty::Infer(_)
+                    resolved.kind(),
+                    TyKind::Int(_) | TyKind::Bounded { .. } | TyKind::Error | TyKind::Infer(_)
                 );
                 if !is_integer {
-                    let range = self.pat_range(pat);
+                    let range = self.pat_anchor(pat);
                     let message = format!(
                         "range patterns match integers, but the value has type `{}`",
                         self.show(&expected)
@@ -79,17 +76,17 @@ impl InferCtx<'_> {
                 let (expected, by_ref) = self.peel_refs(expected, by_ref);
                 let resolved = self.structurally_resolve(&expected);
                 let has_rest = pats.iter().any(|&sub| matches!(store.pat(sub), Pat::Rest));
-                let fields = match resolved {
-                    Ty::Tuple(fields) => Some(fields),
-                    Ty::Infer(_) if !has_rest => {
+                let fields = match resolved.kind() {
+                    TyKind::Tuple(fields) => Some(fields.to_vec()),
+                    TyKind::Infer(_) if !has_rest => {
                         let fields: Vec<Ty> = pats.iter().map(|_| self.table.new_var()).collect();
-                        self.table.unify(&expected, &Ty::Tuple(fields.clone()));
+                        self.table.unify(&expected, &Ty::tuple(fields.clone()));
                         Some(fields)
                     }
-                    Ty::Error => None,
+                    TyKind::Error => None,
                     _ => {
-                        let range = self.pat_range(pat);
-                        let found = Ty::Tuple(pats.iter().map(|_| self.table.new_var()).collect());
+                        let range = self.pat_anchor(pat);
+                        let found = Ty::tuple(pats.iter().map(|_| self.table.new_var()).collect());
                         self.mismatch(range, &expected, &found);
                         None
                     }
@@ -98,7 +95,7 @@ impl InferCtx<'_> {
                     Some(fields) => self.check_sub_pats(pat, pats, &fields, by_ref, "tuple"),
                     None => {
                         for &sub in pats {
-                            self.check_pat_mode(sub, &Ty::Error, None);
+                            self.check_pat_mode(sub, &Ty::error(), None);
                         }
                     }
                 }
@@ -107,7 +104,7 @@ impl InferCtx<'_> {
             Pat::TupleStruct { path, pats } => {
                 let (expected, by_ref) = self.peel_refs(expected, by_ref);
                 let resolution = self.res.store.pats.get(&pat).cloned();
-                let range = self.pat_range(pat);
+                let range = self.pat_anchor(pat);
                 let ctor = match &resolution {
                     Some(Resolution::Def(Def::Variant { .. }))
                     | Some(Resolution::Def(Def::Item(_)))
@@ -132,7 +129,7 @@ impl InferCtx<'_> {
                     }
                     None => {
                         for &sub in pats {
-                            self.check_pat_mode(sub, &Ty::Error, None);
+                            self.check_pat_mode(sub, &Ty::error(), None);
                         }
                     }
                 }
@@ -141,7 +138,7 @@ impl InferCtx<'_> {
             Pat::Record { path, fields } => {
                 let (expected, by_ref) = self.peel_refs(expected, by_ref);
                 let resolution = self.res.store.pats.get(&pat).cloned();
-                let range = self.pat_range(pat);
+                let range = self.pat_anchor(pat);
                 let ctor = self.ctor_of(resolution.as_ref(), path, range);
                 let defs = ctor.and_then(|ctor| {
                     self.ctor_fields(pat, ctor, &expected, Shape::Record(Vec::new()))
@@ -152,17 +149,17 @@ impl InferCtx<'_> {
                             match defs.iter().find(|(field, _)| field.as_ref() == Some(name)) {
                                 Some((_, ty)) => ty.clone(),
                                 None => {
-                                    let sub_range = self.pat_range(*sub);
+                                    let sub_range = self.pat_anchor(*sub);
                                     self.diag(
                                         sub_range,
                                         DiagnosticCode::TypeUnknownField,
                                         format!("no field named `{name}` in this pattern's type"),
                                     );
-                                    Ty::Error
+                                    Ty::error()
                                 }
                             }
                         }
-                        None => Ty::Error,
+                        None => Ty::error(),
                     };
                     self.check_pat_mode(*sub, &field_ty, by_ref);
                 }
@@ -182,10 +179,10 @@ impl InferCtx<'_> {
     fn peel_refs(&mut self, expected: &Ty, mut by_ref: Option<bool>) -> (Ty, Option<bool>) {
         let mut current = expected.clone();
         loop {
-            match self.structurally_resolve(&current) {
-                Ty::Ref { mutable, inner } => {
-                    by_ref = Some(by_ref.map_or(mutable, |outer| outer && mutable));
-                    current = *inner;
+            match self.structurally_resolve(&current).kind() {
+                TyKind::Ref { mutable, inner } => {
+                    by_ref = Some(by_ref.map_or(*mutable, |outer| outer && *mutable));
+                    current = inner.clone();
                 }
                 _ => return (current, by_ref),
             }
@@ -213,7 +210,7 @@ impl InferCtx<'_> {
             None => pats.len() == fields.len(),
         };
         if !fits {
-            let range = self.pat_range(pat);
+            let range = self.pat_anchor(pat);
             self.diag(
                 range,
                 DiagnosticCode::TypeBadPattern,
@@ -227,7 +224,7 @@ impl InferCtx<'_> {
         for (index, &sub) in pats.iter().enumerate() {
             let field = match rest {
                 Some(rest) if index == rest => {
-                    self.check_pat_mode(sub, &Ty::Error, None);
+                    self.check_pat_mode(sub, &Ty::error(), None);
                     continue;
                 }
                 Some(rest) if index > rest => {
@@ -239,7 +236,7 @@ impl InferCtx<'_> {
                 }
                 _ => fields.get(index),
             };
-            let field = field.cloned().unwrap_or(Ty::Error);
+            let field = field.cloned().unwrap_or(Ty::error());
             self.check_pat_mode(sub, &field, by_ref);
         }
     }
@@ -253,11 +250,8 @@ impl InferCtx<'_> {
         expected: &Ty,
         shape: Shape,
     ) -> Option<Vec<(Option<crate::hir::Name>, Ty)>> {
-        let range = self.pat_range(pat);
-        let ty = Ty::Adt {
-            item: ctor.adt,
-            args: ctor.args.clone(),
-        };
+        let range = self.pat_anchor(pat);
+        let ty = Ty::adt(ctor.adt, ctor.args.clone());
         if !self.try_unify(&ty, expected) {
             self.mismatch(range, expected, &ty);
             return None;
@@ -314,7 +308,7 @@ impl InferCtx<'_> {
         expected: &Ty,
         by_ref: Option<bool>,
     ) -> Ty {
-        let range = self.pat_range(pat);
+        let range = self.pat_anchor(pat);
         let (expected, _) = self.peel_refs(expected, by_ref);
         match resolution {
             Resolution::Def(Def::Item(item)) => {
@@ -325,7 +319,7 @@ impl InferCtx<'_> {
                     Some(ItemKind::Const { .. }) => {
                         let ty = match self.sigs.get(*item) {
                             Some(ItemSig::Const { ty, .. }) => ty.clone(),
-                            _ => Ty::Error,
+                            _ => Ty::error(),
                         };
                         if !self.try_unify(&ty, &expected) {
                             self.mismatch(range, &expected, &ty);
@@ -349,7 +343,7 @@ impl InferCtx<'_> {
             Resolution::Assoc(item) => {
                 let ty = match self.sigs.get(*item) {
                     Some(ItemSig::Const { ty, .. }) => ty.clone(),
-                    _ => Ty::Error,
+                    _ => Ty::error(),
                 };
                 if !self.try_unify(&ty, &expected) {
                     self.mismatch(range, &expected, &ty);
@@ -375,7 +369,7 @@ impl InferCtx<'_> {
         path: Option<&Path>,
         expected: &Ty,
     ) -> Ty {
-        let range = self.pat_range(pat);
+        let range = self.pat_anchor(pat);
         let empty = Path {
             kind: crate::hir::PathKind::Plain,
             segments: Vec::new(),
@@ -384,10 +378,7 @@ impl InferCtx<'_> {
         let Some(ctor) = self.ctor_of(Some(resolution), path, range) else {
             return expected.clone();
         };
-        let ty = Ty::Adt {
-            item: ctor.adt,
-            args: ctor.args.clone(),
-        };
+        let ty = Ty::adt(ctor.adt, ctor.args.clone());
         if !self.try_unify(&ty, expected) {
             self.mismatch(range, expected, &ty);
             return expected.clone();
@@ -413,7 +404,7 @@ impl InferCtx<'_> {
     /// An integer literal of a pattern must fit in the matched type; checked once the type
     /// is known.
     fn pat_int_fit(&mut self, pat: PatId, value: u128, negated: bool, expected: &Ty) {
-        let range = self.pat_range(pat);
+        let range = self.pat_anchor(pat);
         let value = i128::try_from(value).ok().and_then(|value| {
             if negated {
                 value.checked_neg()
@@ -425,7 +416,7 @@ impl InferCtx<'_> {
             Some(value) => self.pat_fits.push(super::ctx::PatFit {
                 value,
                 ty: expected.clone(),
-                range,
+                anchor: range,
             }),
             None => self.diag(
                 range,
@@ -436,13 +427,13 @@ impl InferCtx<'_> {
     }
 
     fn check_lit_pat(&mut self, pat: PatId, lit: &Literal, negated: bool, expected: &Ty) {
-        let range = self.pat_range(pat);
+        let range = self.pat_anchor(pat);
         let found = match lit {
             Literal::Int { value, .. } => {
                 let resolved = self.structurally_resolve(expected);
-                match resolved {
-                    Ty::Error => {}
-                    Ty::Int(_) | Ty::Bounded { .. } | Ty::Infer(_) => {
+                match resolved.kind() {
+                    TyKind::Error => {}
+                    TyKind::Int(_) | TyKind::Bounded { .. } | TyKind::Infer(_) => {
                         self.pat_int_fit(pat, *value, negated, expected);
                     }
                     _ => {
@@ -455,7 +446,7 @@ impl InferCtx<'_> {
                 }
                 return;
             }
-            Literal::Bool(_) => Ty::Bool,
+            Literal::Bool(_) => Ty::bool(),
             Literal::String(_) => self.std_adt(self.sigs.std.text),
             Literal::Decimal(_) => self.std_adt(self.sigs.std.decimal),
         };

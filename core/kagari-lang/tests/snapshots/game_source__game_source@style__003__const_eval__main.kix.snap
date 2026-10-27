@@ -16,9 +16,9 @@ style/003__const_eval/main.kix:20:7: error[E4001]: arithmetic overflow: 300 does
 style/003__const_eval/main.kix:24:7: error[E4002]: attempt to divide by zero
   note: style/003__const_eval/main.kix:22:5: evaluation failed here
 style/003__const_eval/main.kix:32:7: error[E4003]: constant evaluation exceeded its budget of 1000000 steps
-  note: style/003__const_eval/main.kix:27:17: evaluation failed here
+  note: style/003__const_eval/main.kix:27:11: evaluation failed here
 style/003__const_eval/main.kix:40:7: error[E4003]: recursion too deep: more than 10000 nested calls during constant evaluation
-  note: style/003__const_eval/main.kix:37:33: evaluation failed here
+  note: style/003__const_eval/main.kix:38:5: evaluation failed here
 style/003__const_eval/main.kix:41:7: error[E4005]: index 2 is out of range for length 2
   note: style/003__const_eval/main.kix:43:5: evaluation failed here
 style/003__const_eval/main.kix:46:7: error[E4007]: a `Setting` or `Meta` handle can only be the initializer of a `static`

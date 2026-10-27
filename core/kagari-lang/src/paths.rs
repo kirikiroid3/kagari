@@ -35,7 +35,7 @@ pub fn def_path(db: &dyn Db, maps: &DefMaps, def: Def) -> String {
             let variant = match tree.item(enum_item.index).map(|data| &data.kind) {
                 Some(ItemKind::Enum { variants }) => variants
                     .get(index as usize)
-                    .map_or_else(|| "?".to_owned(), |(name, _, _)| name.to_string()),
+                    .map_or_else(|| "?".to_owned(), |(name, _)| name.to_string()),
                 _ => "?".to_owned(),
             };
             format!("{}::{variant}", item_path(db, maps, enum_item))

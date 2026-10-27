@@ -7,16 +7,16 @@
 //! Visible changes go through [`PendingChange`]s that only [`Screen::commit`] applies,
 //! which is what `apply_animation` does.
 
-use std::collections::BTreeMap;
+use imbl::OrdMap;
 use std::hash::{Hash, Hasher};
 
 use crate::diagnostic::DiagnosticCode;
 
-use super::Fault;
+use super::super::Fault;
+use super::super::num::Decimal;
+use super::super::std_items::StdTable;
+use super::super::value::ConstValue;
 use super::anim;
-use super::num::Decimal;
-use super::std_items::StdTable;
-use super::value::ConstValue;
 
 /// A screen. Equality and hashing compare the logical screen only: the step-only parts are
 /// ignored, as the language's `==` on `Screen`, snapshots and the consistency check do.
@@ -44,7 +44,7 @@ impl Hash for Screen {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LogicalScreen {
     /// Live entities by `EntityId`.
-    pub entities: BTreeMap<u32, Entity>,
+    pub entities: OrdMap<u32, Entity>,
     pub hud: Hud,
     pub camera: Camera,
     /// The screen filter, an `Option<ShaderAsset>`.
@@ -78,7 +78,7 @@ pub struct Entity {
     /// An `Option<Size>`.
     pub fill_size: ConstValue,
     /// Image layers by `Part`: `ImageAsset`s.
-    pub parts: BTreeMap<u8, ConstValue>,
+    pub parts: OrdMap<u8, ConstValue>,
     /// The label's `Text`.
     pub label: Option<ConstValue>,
     /// The label's `TextStyle`; `None` is the system's default style.
@@ -134,7 +134,7 @@ pub struct StepState {
     /// The choice menu's `VAlign`.
     pub menu_align: ConstValue,
     /// Entities removed from the logical screen and still drawn until their animations end.
-    pub despawning: BTreeMap<u32, Entity>,
+    pub despawning: OrdMap<u32, Entity>,
 }
 
 /// A point of the step's timeline.
@@ -290,7 +290,7 @@ impl Entity {
                 ConstValue::Int(0),
             ]),
             fill_size: std.none(),
-            parts: BTreeMap::new(),
+            parts: OrdMap::new(),
             label: None,
             label_style: None,
             label_width: std.none(),
@@ -330,7 +330,7 @@ impl Screen {
         let mut background = Entity::spawned(std);
         background.plane = std.plane.unit("Background");
         background.opacity = decimal(Decimal::ONE);
-        let mut entities = BTreeMap::new();
+        let mut entities = OrdMap::new();
         entities.insert(0, background);
         Screen {
             logical: LogicalScreen {
@@ -362,7 +362,7 @@ impl Screen {
                 scheduled: Vec::new(),
                 disabled_arms: Vec::new(),
                 menu_align: std.valign.unit("Middle"),
-                despawning: BTreeMap::new(),
+                despawning: OrdMap::new(),
             },
         }
     }
@@ -377,7 +377,7 @@ impl Screen {
             scheduled: Vec::new(),
             disabled_arms: Vec::new(),
             menu_align: std.valign.unit("Middle"),
-            despawning: BTreeMap::new(),
+            despawning: OrdMap::new(),
         };
     }
 

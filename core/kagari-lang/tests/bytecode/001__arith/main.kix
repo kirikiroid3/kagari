@@ -53,6 +53,8 @@ static FULLSCREEN: Setting<bool> = setting(false);
 static ANIMATIONS: Setting<bool> = setting(true);
 
 fn main() -> System {
+    // Only functions reachable from `main` or an entry scene are emitted.
+    let _ = (ints(3, 7), bounded(9), decimals(1.5), rats(), compare(1, 2, 0.5));
     System {
         title: "Arithmetic",
         resolution: size(1280, 720),

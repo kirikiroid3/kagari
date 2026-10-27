@@ -18,20 +18,21 @@
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::db::Db;
-use crate::diagnostic::{Diagnostic, DiagnosticCode, line_col};
+use crate::diagnostic::{Diag, DiagnosticCode};
 use crate::eval::ConstValue;
-use crate::eval::interp::{Ctx, ErrorKind, Frame, Machine, Value};
-use crate::eval::screen::{LogicalScreen, Screen, duration_overflow};
-use crate::hir::{Expr, ExprId};
-use crate::infer::ValueRef;
+use crate::eval::machine::screen::{LogicalScreen, Screen, duration_overflow};
+use crate::eval::machine::value::Value;
+use crate::eval::machine::{CallSite, ErrorKind, Machine};
+use crate::hir::{Expr, ExprId, body_of};
+use crate::infer::{ValueRef, inference};
 use crate::ty::{FnDefId, FnRef};
 
-use super::explore::{CtxId, Explored, Interner, NodeId, NodeKind, Target};
+use super::explore::{CtxId, Explored, Interner, NodeId, NodeKind, StoryCx, Target};
 use super::{SCREEN_CAP, Scenes};
 
 type ScreenId = u32;
-/// A step: its scene (index into `Scenes::list`) and its `push_step` call.
+/// A step: its scene (index into `Scenes::list`) and its `push_step` call (the source of
+/// its `Step` terminator).
 type StepRef = (usize, ExprId);
 type InstId = usize;
 /// The step whose render last changed a screen; `None` for the screen the story starts on.
@@ -51,9 +52,8 @@ struct Overflow {
     producer: Producer,
 }
 
-struct Screens<'a, 'c, 'db> {
-    db: &'db dyn Db,
-    ctx: &'c Ctx<'db>,
+struct Screens<'a, 'db> {
+    cx: StoryCx<'db>,
     scenes: &'a Scenes<'db>,
     explored: &'a Explored,
     screens: Interner<LogicalScreen>,
@@ -64,21 +64,19 @@ struct Screens<'a, 'c, 'db> {
     step_sets: FxHashMap<StepRef, FxHashSet<ScreenId>>,
     disabled: FxHashSet<StepRef>,
     work: Vec<(InstId, Target, ScreenId, Producer)>,
-    diagnostics: Vec<Diagnostic>,
+    diagnostics: Vec<Diag>,
 }
 
 pub(super) fn check(
-    db: &dyn Db,
-    ctx: &Ctx<'_>,
+    cx: StoryCx<'_>,
     scenes: &Scenes<'_>,
     explored: &Explored,
-    out: &mut Vec<Diagnostic>,
+    out: &mut Vec<Diag>,
 ) {
     let mut screens = Interner::new();
-    let start = screens.intern(Screen::empty(ctx.std).logical);
+    let start = screens.intern(Screen::empty(cx.std).logical);
     let mut state = Screens {
-        db,
-        ctx,
+        cx,
         scenes,
         explored,
         screens,
@@ -109,13 +107,13 @@ pub(super) fn check(
     out.append(&mut state.diagnostics);
 }
 
-impl Screens<'_, '_, '_> {
+impl Screens<'_, '_> {
     fn node_count(&self, ctx: CtxId) -> usize {
-        self.explored.contexts.get(ctx).map_or(0, |c| c.nodes.len())
+        self.explored.context(ctx).map_or(0, |c| c.nodes.len())
     }
 
     fn exit_count(&self, ctx: CtxId) -> usize {
-        self.explored.contexts.get(ctx).map_or(0, |c| c.exits.len())
+        self.explored.context(ctx).map_or(0, |c| c.exits.len())
     }
 
     /// The instance of `ctx` entered with `screen`, created (and its entry scheduled) once.
@@ -131,7 +129,7 @@ impl Screens<'_, '_, '_> {
             callers: Vec::new(),
         });
         self.inst_index.insert((ctx, screen), id);
-        if let Some(context) = self.explored.contexts.get(ctx) {
+        if let Some(context) = self.explored.context(ctx) {
             self.work.push((id, context.entry, screen, producer));
         }
         id
@@ -154,7 +152,7 @@ impl Screens<'_, '_, '_> {
                     let fresh = match self
                         .insts
                         .get_mut(inst)
-                        .and_then(|inst| inst.node_in.get_mut(node))
+                        .and_then(|inst| inst.node_in.get_mut(node.idx()))
                     {
                         Some(set) if !set.contains_key(&screen) => {
                             set.insert(screen, producer);
@@ -165,10 +163,10 @@ impl Screens<'_, '_, '_> {
                     if !fresh {
                         continue;
                     }
-                    let Some(context) = self.explored.contexts.get(ctx) else {
+                    let Some(context) = self.explored.context(ctx) else {
                         continue;
                     };
-                    let Some(data) = context.nodes.get(node) else {
+                    let Some(data) = context.node(node) else {
                         continue;
                     };
                     match &data.kind {
@@ -203,7 +201,7 @@ impl Screens<'_, '_, '_> {
                             if let Some(callee_data) = self.insts.get_mut(callee_inst) {
                                 callee_data.callers.push((inst, node));
                                 for (exit, target) in succ {
-                                    if let Some(screens) = callee_data.exit_out.get(*exit) {
+                                    if let Some(screens) = callee_data.exit_out.get(exit.idx()) {
                                         pending
                                             .extend(screens.iter().map(|(s, p)| (*target, *s, *p)));
                                     }
@@ -219,7 +217,7 @@ impl Screens<'_, '_, '_> {
                     let fresh = match self
                         .insts
                         .get_mut(inst)
-                        .and_then(|inst| inst.exit_out.get_mut(exit))
+                        .and_then(|inst| inst.exit_out.get_mut(exit.idx()))
                     {
                         Some(set) if !set.contains_key(&screen) => {
                             set.insert(screen, producer);
@@ -241,9 +239,8 @@ impl Screens<'_, '_, '_> {
                         };
                         let target = self
                             .explored
-                            .contexts
-                            .get(caller_ctx)
-                            .and_then(|context| context.nodes.get(node))
+                            .context(caller_ctx)
+                            .and_then(|context| context.node(node))
                             .and_then(|node| match &node.kind {
                                 NodeKind::Call { succ, .. } => succ
                                     .iter()
@@ -287,13 +284,24 @@ impl Screens<'_, '_, '_> {
         screen: ScreenId,
     ) -> Option<ScreenId> {
         let data = self.scenes.list.get(step.0)?;
-        let mut input = Screen::empty(self.ctx.std);
+        let std = self.cx.std;
+        let mut input = Screen::empty(std);
         input.logical = self.screens.get(screen)?.clone();
-        let site = Frame::new(data.b, self.ctx.env_for(data.item, Vec::new()));
-        let mut machine = Machine::new(self.ctx);
+        let mut machine = Machine::new(self.cx.db, self.cx.program, std);
         let callee = machine.thaw(render);
-        match machine.call_value(&site, step.1, &callee, vec![Value::Screen(Box::new(input))]) {
-            Ok(Value::Screen(output)) => Some(self.screens.intern(output.logical)),
+        let site = CallSite {
+            at: Some(data.anchor(step.1)),
+            ty: None,
+        };
+        match machine.call_value(
+            site,
+            &callee,
+            vec![Value::Screen(std::sync::Arc::new(input))],
+        ) {
+            Ok(Value::Screen(output)) => Some(
+                self.screens
+                    .intern(std::sync::Arc::unwrap_or_clone(output).logical),
+            ),
             Ok(_) => None,
             Err(error) => {
                 let ErrorKind::Fault(fault) = &error.kind else {
@@ -301,28 +309,16 @@ impl Screens<'_, '_, '_> {
                 };
                 let mut fault = fault.clone();
                 if fault.code == DiagnosticCode::EvalOverflow
-                    && error
-                        .span
-                        .is_some_and(|span| span.file == self.ctx.std.time_file)
+                    && error.at.is_some_and(|at| at.file() == std.time_file)
                 {
                     fault = duration_overflow();
                 }
-                let site = self.render_site(step);
-                let range = data.b.body.store.expr_range(site);
-                let mut diagnostic = Diagnostic::new(
-                    data.item.file.path(self.db).clone(),
-                    range,
-                    fault.code,
-                    fault.message,
-                );
-                if let Some(span) = error.span
-                    && (span.file != data.item.file || span.range != range)
+                let site = data.anchor(self.render_site(step));
+                let mut diagnostic = Diag::new(site, fault.code, fault.message);
+                if let Some(at) = error.at
+                    && at != site
                 {
-                    diagnostic = diagnostic.with_related(
-                        span.file.path(self.db).clone(),
-                        span.range,
-                        "evaluation failed here",
-                    );
+                    diagnostic = diagnostic.with_related(at, "evaluation failed here");
                 }
                 if !self.diagnostics.contains(&diagnostic) {
                     self.diagnostics.push(diagnostic);
@@ -337,7 +333,13 @@ impl Screens<'_, '_, '_> {
         let Some(data) = self.scenes.list.get(step.0) else {
             return step.1;
         };
-        let store = &data.b.body.store;
+        let (Some(body), Some(infer)) = (
+            body_of(self.cx.db, data.item),
+            inference(self.cx.db, self.cx.program, data.item),
+        ) else {
+            return step.1;
+        };
+        let store = &body.store;
         let Expr::Call { args, .. } = store.expr(step.1) else {
             return step.1;
         };
@@ -347,31 +349,20 @@ impl Screens<'_, '_, '_> {
         let Some((_, render)) = fields.iter().find(|(name, _)| name == "render") else {
             return step.1;
         };
-        let option = &self.ctx.std.option;
+        let option = &self.cx.std.option;
         match store.expr(*render) {
-            Expr::Call { callee, args } => {
-                match (data.b.infer.paths.get(callee), args.as_slice()) {
-                    (
-                        Some(ValueRef::Fn(FnRef {
-                            def: FnDefId::VariantCtor(adt, variant),
-                            ..
-                        })),
-                        [inner],
-                    ) if *adt == option.item && option.variant("Some") == Some(*variant) => *inner,
-                    _ => *render,
-                }
-            }
+            Expr::Call { callee, args } => match (infer.paths.get(callee), args.as_slice()) {
+                (
+                    Some(ValueRef::Fn(FnRef {
+                        def: FnDefId::VariantCtor(adt, variant),
+                        ..
+                    })),
+                    [inner],
+                ) if *adt == option.item && option.variant("Some") == Some(*variant) => *inner,
+                _ => *render,
+            },
             _ => *render,
         }
-    }
-
-    fn location(&self, step: StepRef) -> String {
-        let Some(data) = self.scenes.list.get(step.0) else {
-            return String::new();
-        };
-        let path = data.item.file.path(self.db);
-        let (line, col) = line_col(self.db, path, data.b.body.store.expr_range(step.1).start());
-        format!("{line}:{col}")
     }
 
     fn report_overflow(&mut self, culprit: StepRef, step: StepRef) {
@@ -379,6 +370,11 @@ impl Screens<'_, '_, '_> {
             return;
         };
         let site = self.render_site(culprit);
+        // The step whose screens grow, when it is another step than the culprit's.
+        let target = (culprit != step)
+            .then(|| self.scenes.list.get(step.0))
+            .flatten()
+            .map(|target| target.anchor(step.1));
         let message = if culprit == step {
             format!(
                 "this render keeps producing new screens for its own step: more than {SCREEN_CAP} \
@@ -388,23 +384,14 @@ impl Screens<'_, '_, '_> {
             format!(
                 "this render makes more than {SCREEN_CAP} different screens reach the step at {}: \
                  the screens at that step have no bound",
-                self.location(step)
+                if target.is_some() { "{@0}" } else { "" }
             )
         };
-        let mut diagnostic = data.diagnostic(
-            self.db,
-            site,
-            DiagnosticCode::AnalysisUnboundedScreens,
-            message,
-        );
-        if culprit != step
-            && let Some(target) = self.scenes.list.get(step.0)
-        {
-            diagnostic = diagnostic.with_related(
-                target.item.file.path(self.db).clone(),
-                target.b.body.store.expr_range(step.1),
-                "the step whose screens grow",
-            );
+        let mut diagnostic =
+            data.diagnostic(site, DiagnosticCode::AnalysisUnboundedScreens, message);
+        if let Some(target) = target {
+            diagnostic.message_anchors.push(target);
+            diagnostic = diagnostic.with_related(target, "the step whose screens grow");
         }
         self.diagnostics.push(diagnostic);
     }
@@ -427,10 +414,11 @@ impl Screens<'_, '_, '_> {
                 .iter()
                 .filter_map(|screen| self.inst_index.get(&(ctx, *screen)).copied())
                 .collect();
-            let Some(context) = self.explored.contexts.get(ctx) else {
+            let explored = self.explored;
+            let Some(context) = explored.context(ctx) else {
                 continue;
             };
-            for (node, data) in context.nodes.iter().enumerate() {
+            for (node, data) in context.node_ids() {
                 match &data.kind {
                     NodeKind::Step { expr, render, .. } => {
                         let step = (context.scene, *expr);
@@ -439,8 +427,10 @@ impl Screens<'_, '_, '_> {
                         }
                         let mut reaching: Vec<(ScreenId, Producer)> = Vec::new();
                         for inst in &insts {
-                            if let Some(set) =
-                                self.insts.get(*inst).and_then(|i| i.node_in.get(node))
+                            if let Some(set) = self
+                                .insts
+                                .get(*inst)
+                                .and_then(|i| i.node_in.get(node.idx()))
                             {
                                 reaching.extend(set.iter().map(|(s, p)| (*s, *p)));
                             }
@@ -467,8 +457,10 @@ impl Screens<'_, '_, '_> {
                     NodeKind::Call { callee, .. } => {
                         let mut entered: Vec<ScreenId> = Vec::new();
                         for inst in &insts {
-                            if let Some(set) =
-                                self.insts.get(*inst).and_then(|i| i.node_in.get(node))
+                            if let Some(set) = self
+                                .insts
+                                .get(*inst)
+                                .and_then(|i| i.node_in.get(node.idx()))
                             {
                                 entered.extend(set.keys().copied());
                             }
@@ -486,11 +478,11 @@ impl Screens<'_, '_, '_> {
         // One report per merge: steps whose screens differ through the same renders are
         // reported at the first in source order.
         order.sort_by_key(|step| {
-            let start = self
-                .scenes
-                .list
-                .get(step.0)
-                .map(|data| data.b.body.store.expr_range(step.1).start());
+            let start = self.scenes.list.get(step.0).map(|data| {
+                let order = body_of(self.cx.db, data.item)
+                    .map_or(0, |body| body.store.source_order(step.1));
+                (data.item.index, order)
+            });
             (step.0, start)
         });
         let mut merges: FxHashSet<Vec<Producer>> = FxHashSet::default();
@@ -520,7 +512,6 @@ impl Screens<'_, '_, '_> {
                 continue;
             }
             let mut diagnostic = data.diagnostic(
-                self.db,
                 step.1,
                 DiagnosticCode::AnalysisInconsistentScreen,
                 "the screen this step shows depends on the path that reached it: give this step \
@@ -537,11 +528,7 @@ impl Screens<'_, '_, '_> {
                     continue;
                 };
                 let site = self.render_site(*producer);
-                diagnostic = diagnostic.with_related(
-                    source.item.file.path(self.db).clone(),
-                    source.b.body.store.expr_range(site),
-                    note,
-                );
+                diagnostic = diagnostic.with_related(source.anchor(site), note);
             }
             self.diagnostics.push(diagnostic);
         }

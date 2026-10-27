@@ -9,8 +9,8 @@ use crate::input::FilePath;
 use crate::item_tree::{ItemId, ItemKind, Shape, item_tree};
 use crate::ty::{FnDefId, FnRef};
 
+use super::machine::screen::Screen;
 use super::num::{Decimal, Rat};
-use super::screen::Screen;
 
 /// A fully evaluated value. Plain data: no references, no captured environments.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -21,17 +21,17 @@ pub enum ConstValue {
     Decimal(Decimal),
     Rat(Rat),
     Text(Text),
-    String(String),
+    String(std::sync::Arc<str>),
     /// Tuples, `()` included.
-    Tuple(Vec<ConstValue>),
-    Array(Vec<ConstValue>),
-    Vec(Vec<ConstValue>),
+    Tuple(imbl::Vector<ConstValue>),
+    Array(imbl::Vector<ConstValue>),
+    Vec(imbl::Vector<ConstValue>),
     /// A struct (variant 0) or an enum variant, user-declared or from std; fields in
     /// declaration order.
     Adt {
         item: ItemId,
         variant: u32,
-        fields: Vec<ConstValue>,
+        fields: imbl::Vector<ConstValue>,
     },
     /// An asset constant: its kind and the file it names.
     Asset {
@@ -51,12 +51,12 @@ pub enum ConstValue {
         kind: HandleKind,
         item: ItemId,
     },
-    Screen(Box<Screen>),
+    Screen(std::sync::Arc<Screen>),
 }
 
 impl ConstValue {
     pub fn unit() -> ConstValue {
-        ConstValue::Tuple(Vec::new())
+        ConstValue::Tuple(imbl::Vector::new())
     }
 
     pub fn as_int(&self) -> Option<i128> {
@@ -149,7 +149,7 @@ pub enum HandleKind {
 /// A constant text: plain, or rich as built by `t![…]`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Text {
-    Plain(String),
+    Plain(std::sync::Arc<str>),
     /// `ruby(base, reading)`.
     Ruby {
         base: Box<Text>,
@@ -158,7 +158,7 @@ pub enum Text {
     /// `mono_ruby(base, readings)`.
     MonoRuby {
         base: Box<Text>,
-        readings: Vec<Text>,
+        readings: imbl::Vector<Text>,
     },
     /// `effect(base, effect)`; `effect` is the `TextEffect` value.
     Effect {
@@ -166,11 +166,11 @@ pub enum Text {
         effect: Box<ConstValue>,
     },
     /// `concat(items)`.
-    Concat(Vec<Text>),
+    Concat(imbl::Vector<Text>),
 }
 
 impl Text {
-    pub fn plain(text: impl Into<String>) -> Text {
+    pub fn plain(text: impl Into<std::sync::Arc<str>>) -> Text {
         Text::Plain(text.into())
     }
 
@@ -240,7 +240,7 @@ pub(crate) fn adt_variants(db: &dyn Db, item: ItemId) -> Vec<(String, Shape)> {
         ItemKind::Struct { shape } => vec![(item_name(db, item), shape.clone())],
         ItemKind::Enum { variants } => variants
             .iter()
-            .map(|(name, _, shape)| (name.to_string(), shape.clone()))
+            .map(|(name, shape)| (name.to_string(), shape.clone()))
             .collect(),
         _ => Vec::new(),
     }
@@ -254,7 +254,7 @@ pub fn display_value(db: &dyn Db, value: &ConstValue) -> String {
     out
 }
 
-fn write_list(db: &dyn Db, items: &[ConstValue], out: &mut String) {
+fn write_list(db: &dyn Db, items: &imbl::Vector<ConstValue>, out: &mut String) {
     for (index, item) in items.iter().enumerate() {
         if index > 0 {
             out.push_str(", ");

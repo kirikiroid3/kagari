@@ -1,17 +1,18 @@
 //! Bytecode emission (compilation stage 6): the checked program lowered to a
 //! [`kagari_bytecode::Module`]. See `docs/syntax/src/bytecode.md`.
 //!
-//! The emitter reuses what const evaluation computed: constants, statics, the folded
-//! constant parts of story bodies and the generic environments of instances. Generic
-//! functions are monomorphized per instantiation; every table is interned on first use, so
-//! the output is deterministic.
+//! Code comes from the MIR of each function (`codegen`); constants, statics and promoted
+//! constants come from const evaluation. Only the functions reachable from `main`, the
+//! entry scenes and the statics are emitted. Generic functions are monomorphized per
+//! instantiation; every table is interned on first use, so the output is deterministic.
 
-mod lower;
+mod codegen;
 #[cfg(test)]
 mod tests;
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use kagari_bytecode::{
     AdtType, Asset, AssetId, AssetKind as BcAssetKind, ConstId, Constant, Debug, FnDebug, FnFlags,
@@ -25,17 +26,21 @@ use rustc_hash::FxHashMap;
 use crate::analysis::system::code::main_fn;
 use crate::db::Db;
 use crate::def_map::{CrateId, Def, DefMaps, def_maps};
-use crate::diagnostic::{Diagnostic, DiagnosticCode, Severity};
-use crate::eval::interp::{Ctx, GenericEnv};
-use crate::eval::std_items::StdTable;
-use crate::eval::{AssetKind, ConstEval, ConstValue, HandleKind, Text, const_eval};
-use crate::hir::{ClosureKind, Expr, ExprId};
+use crate::diagnostic::{Anchor, Diagnostic, DiagnosticCode, Severity, resolve_anchor};
+use crate::eval::machine::value::GenericEnv;
+use crate::eval::queries::static_value;
+use crate::eval::std_items::{StdTable, std_table};
+use crate::eval::{AssetKind, ConstValue, HandleKind, Text};
+use crate::hir::{Expr, ExprId};
 use crate::input::{FilePath, Program};
+use crate::item_tree::ItemIndex;
 use crate::item_tree::{FnKind, ItemId, ItemKind, item_tree};
+use crate::mir::{BodyKind, item_mir};
 use crate::paths;
 use crate::pipeline::check;
 use crate::signatures::{ProgramSignatures, display_ty, program_signatures};
-use crate::ty::{Const, FnDefId, FnRef, GenericArg, IntTy, Ty};
+use crate::thir::PromotedId;
+use crate::ty::{Const, FnDefId, FnRef, GenericArg, GenericArgs, IntTy, Ty, TyKind};
 
 /// The result of [`build`].
 pub struct Build {
@@ -61,12 +66,15 @@ pub fn build(db: &dyn Db, program: Program) -> Build {
     {
         return failed(diagnostics);
     }
+    #[cfg(debug_assertions)]
+    validate_mir(db, program);
     let (module, has_main, mut errors) = emit(db, program);
     diagnostics.append(&mut errors);
     let Some(module) = module else {
         return failed(diagnostics);
     };
-    // Without `main` the code is still lowered and verified, so its faults are found.
+    // Without `main` the entry scenes and statics are still lowered and verified, so their
+    // faults are found.
     let verified = if has_main {
         verify(&module)
     } else {
@@ -99,6 +107,36 @@ pub fn build(db: &dyn Db, program: Program) -> Build {
     }
 }
 
+/// Validates the MIR of every item with a body; a violation is a compiler bug.
+#[cfg(debug_assertions)]
+#[allow(clippy::panic)]
+fn validate_mir(db: &dyn Db, program: Program) {
+    let maps = def_maps(db, program);
+    for (file, _) in maps.files.iter() {
+        let tree = item_tree(db, *file);
+        for position in 0..tree.items.len() {
+            let Some(index) = ItemIndex::from_usize(position) else {
+                continue;
+            };
+            let item = ItemId { file: *file, index };
+            let Some(mir) = crate::mir::item_mir(db, program, item).as_ref() else {
+                continue;
+            };
+            for body in mir.bodies() {
+                let errors = crate::mir::validate::validate(db, program, body);
+                if !errors.is_empty() {
+                    panic!(
+                        "invalid MIR for {} ({:?}):\n{}",
+                        paths::assoc_path(db, maps, item),
+                        body.source,
+                        errors.join("\n")
+                    );
+                }
+            }
+        }
+    }
+}
+
 fn root_diagnostic(
     db: &dyn Db,
     program: Program,
@@ -117,14 +155,13 @@ fn root_diagnostic(
 /// whether it has a `main`, and the emission errors.
 fn emit(db: &dyn Db, program: Program) -> (Option<Module>, bool, Vec<Diagnostic>) {
     // Std failed to load: `check` already reported it.
-    let Some(std) = StdTable::new(db, program) else {
+    let Some(std) = std_table(db, program).as_ref() else {
         return (None, false, Vec::new());
     };
     let sigs = program_signatures(db, program);
     let main = main_fn(db, program)
         .filter(|main| sigs.fn_sig(*main).is_some_and(|sig| sig.params.is_empty()));
-    let ctx = Ctx::new(db, program, &std, sigs);
-    let mut emitter = Emitter::new(db, program, &ctx, main);
+    let mut emitter = Emitter::new(db, program, std, sigs, main);
     emitter.statics();
     emitter.roots();
     emitter.run();
@@ -149,25 +186,26 @@ enum Instance {
     /// The initializer of a `const` or plain `static` whose value holds a `Screen`, which
     /// cannot be a constant.
     ConstInit(ItemId, Vec<GenericArg>),
+    /// A promoted constant of a body whose value holds a `Screen` (or faults): the instance
+    /// owning the body, and the constant.
+    Promoted(Box<Instance>, PromotedId),
 }
 
 /// A function's source file (index into the Debug files) and its
 /// `(instruction index, byte offset)` lines.
 type FnLines = (Option<u32>, Vec<(u32, u32)>);
 
-struct Emitter<'a, 'db> {
+struct Emitter<'db> {
     db: &'db dyn Db,
     program: Program,
-    ctx: &'a Ctx<'db>,
     std: &'db StdTable,
     sigs: &'db ProgramSignatures,
     maps: &'db DefMaps,
-    eval: &'db ConstEval,
     /// `fn main` of the root module, when it has one.
     main: Option<ItemId>,
     root_dir: Option<PathBuf>,
     module: Module,
-    strings: FxHashMap<String, StrId>,
+    strings: FxHashMap<Arc<str>, StrId>,
     types: FxHashMap<ItemId, TypeId>,
     int_types: FxHashMap<IntType, IntTypeId>,
     imports: FxHashMap<ItemId, ImportId>,
@@ -197,14 +235,14 @@ fn index(len: usize) -> u32 {
 
 /// The `(lo, hi, bits, signed)` of an integer type; `i128` when unknown.
 fn int_type_of(ty: &Ty) -> IntType {
-    match ty {
-        Ty::Int(int) => IntType {
+    match ty.kind() {
+        TyKind::Int(int) => IntType {
             lo: IntTy::min(*int),
             hi: IntTy::max(*int),
             bits: crate::eval::int_bits(*int),
             signed: crate::eval::is_signed(*int),
         },
-        Ty::Bounded {
+        TyKind::Bounded {
             lo: Const::Value(lo),
             hi: Const::Value(hi),
         } => IntType {
@@ -228,8 +266,14 @@ fn bc_asset_kind(kind: AssetKind) -> BcAssetKind {
     }
 }
 
-impl<'a, 'db> Emitter<'a, 'db> {
-    fn new(db: &'db dyn Db, program: Program, ctx: &'a Ctx<'db>, main: Option<ItemId>) -> Self {
+impl<'db> Emitter<'db> {
+    fn new(
+        db: &'db dyn Db,
+        program: Program,
+        std: &'db StdTable,
+        sigs: &'db ProgramSignatures,
+        main: Option<ItemId>,
+    ) -> Self {
         let root_dir = match program.root(db).path(db) {
             FilePath::Disk(path) => path.parent().map(PathBuf::from),
             FilePath::Std(_) => None,
@@ -237,11 +281,9 @@ impl<'a, 'db> Emitter<'a, 'db> {
         let mut emitter = Emitter {
             db,
             program,
-            ctx,
-            std: ctx.std,
-            sigs: ctx.sigs,
+            std,
+            sigs,
             maps: def_maps(db, program),
-            eval: const_eval(db, program),
             main,
             root_dir,
             module: Module {
@@ -277,7 +319,7 @@ impl<'a, 'db> Emitter<'a, 'db> {
         }
         let id = StrId(index(self.module.strings.len()));
         self.module.strings.push(text.to_owned());
-        self.strings.insert(text.to_owned(), id);
+        self.strings.insert(Arc::from(text), id);
         id
     }
 
@@ -431,7 +473,7 @@ impl<'a, 'db> Emitter<'a, 'db> {
         Some(self.intern(constant))
     }
 
-    fn constants(&mut self, values: &[ConstValue]) -> Option<Vec<ConstId>> {
+    fn constants(&mut self, values: &imbl::Vector<ConstValue>) -> Option<Vec<ConstId>> {
         values.iter().map(|value| self.constant(value)).collect()
     }
 
@@ -476,7 +518,7 @@ impl<'a, 'db> Emitter<'a, 'db> {
             _ => Instance::Fn(FnRef {
                 def: FnDefId::Item(owner),
                 self_ty: None,
-                args: Vec::new(),
+                args: GenericArgs::empty(),
             }),
         }
     }
@@ -489,7 +531,7 @@ impl<'a, 'db> Emitter<'a, 'db> {
                 self.request(Instance::Ctor(FnRef {
                     def: fn_ref.def,
                     self_ty: None,
-                    args: Vec::new(),
+                    args: GenericArgs::empty(),
                 }))
             }
             FnDefId::Item(item) if self.std.builtin(item).is_some() => {
@@ -524,9 +566,12 @@ impl<'a, 'db> Emitter<'a, 'db> {
                 let ItemKind::Static { mutable } = data.kind else {
                     continue;
                 };
+                let Some(item_index) = ItemIndex::from_usize(position) else {
+                    continue;
+                };
                 let item = ItemId {
                     file,
-                    index: index(position),
+                    index: item_index,
                 };
                 if mutable {
                     if krate == CrateId::Game {
@@ -534,7 +579,7 @@ impl<'a, 'db> Emitter<'a, 'db> {
                     }
                     continue;
                 }
-                if let Ok(value) = self.ctx.static_value(item)
+                if let Ok(value) = static_value(self.db, self.program, item)
                     && let Some(kind) = value.handle
                 {
                     let kind = match kind {
@@ -552,10 +597,10 @@ impl<'a, 'db> Emitter<'a, 'db> {
             self.statics.insert(*item, StaticId(index(position)));
         }
         for (item, kind) in story {
-            let value = match kind {
-                StaticKind::StoryVariable => self.eval.statics.get(&item).cloned(),
-                _ => self.ctx.static_value(item).ok().map(|value| value.value),
-            };
+            let value = static_value(self.db, self.program, item)
+                .as_ref()
+                .ok()
+                .map(|value| value.value.clone());
             let path = paths::item_path(self.db, self.maps, item);
             let path = self.string(&path);
             let init = value.as_ref().and_then(|value| self.constant(value));
@@ -567,7 +612,8 @@ impl<'a, 'db> Emitter<'a, 'db> {
         }
     }
 
-    /// Every non-generic game function with a body.
+    /// The roots of the module: `fn main` and every non-generic entry scene of the game, in
+    /// item order. Every other function is reached from them, or from a static.
     fn roots(&mut self) {
         let files: Vec<_> = self
             .maps
@@ -582,20 +628,26 @@ impl<'a, 'db> Emitter<'a, 'db> {
                 if !matches!(data.kind, ItemKind::Fn { has_body: true, .. }) {
                     continue;
                 }
+                let Some(item_index) = ItemIndex::from_usize(position) else {
+                    continue;
+                };
                 let item = ItemId {
                     file,
-                    index: index(position),
+                    index: item_index,
                 };
-                let generic = self.sigs.fn_sig(item).is_none_or(|sig| {
-                    !sig.generics.params.is_empty() || sig.generics.parent_count != 0
-                });
-                if generic {
+                let root = Some(item) == self.main
+                    || self.sigs.fn_sig(item).is_some_and(|sig| {
+                        sig.entry
+                            && sig.generics.params.is_empty()
+                            && sig.generics.parent_count == 0
+                    });
+                if !root {
                     continue;
                 }
                 self.request(Instance::Fn(FnRef {
                     def: FnDefId::Item(item),
                     self_ty: None,
-                    args: Vec::new(),
+                    args: GenericArgs::empty(),
                 }));
             }
         }
@@ -630,7 +682,10 @@ impl<'a, 'db> Emitter<'a, 'db> {
             closure: matches!(instance, Instance::Closure { .. }),
             synthetic: matches!(
                 instance,
-                Instance::Ctor(_) | Instance::Builtin(_) | Instance::ConstInit(..)
+                Instance::Ctor(_)
+                    | Instance::Builtin(_)
+                    | Instance::ConstInit(..)
+                    | Instance::Promoted(..)
             ),
         };
         self.module.functions.push(Function {
@@ -658,6 +713,7 @@ impl<'a, 'db> Emitter<'a, 'db> {
             Instance::Closure { owner, .. } => self.instance_item(owner),
             Instance::Ctor(_) => None,
             Instance::ConstInit(item, _) => Some(*item),
+            Instance::Promoted(owner, _) => self.instance_item(owner),
         }
     }
 
@@ -685,27 +741,20 @@ impl<'a, 'db> Emitter<'a, 'db> {
                 (self.fn_kind(item), count(params))
             }
             Instance::Closure { owner, expr } => {
-                let Some(b) = self
+                let body = self
                     .instance_item(owner)
-                    .and_then(|item| self.ctx.body(item))
-                else {
+                    .and_then(|item| item_mir(self.db, self.program, item).as_ref())
+                    .and_then(|mir| mir.closure(*expr));
+                let Some(body) = body else {
                     return (BcFnKind::Const, 0);
                 };
-                let kind = match b.infer.closures.get(expr).map(|info| info.kind) {
-                    Some(ClosureKind::Plain) => BcFnKind::Fn,
-                    Some(ClosureKind::Pushdown) => BcFnKind::Instant,
-                    Some(ClosureKind::Const) | None => BcFnKind::Const,
+                let kind = match body.kind {
+                    BodyKind::Fn => BcFnKind::Fn,
+                    BodyKind::Instant => BcFnKind::Instant,
+                    BodyKind::Scene => BcFnKind::Scene,
+                    BodyKind::ConstFn | BodyKind::Const => BcFnKind::Const,
                 };
-                let captures = b
-                    .infer
-                    .closures
-                    .get(expr)
-                    .map_or(0, |info| info.captures.len());
-                let params = match b.body.store.expr(*expr) {
-                    Expr::Closure { params, .. } => params.len(),
-                    _ => 0,
-                };
-                (kind, count(captures.saturating_add(params)))
+                (kind, count(body.arg_count as usize))
             }
             Instance::Ctor(fn_ref) => {
                 let fields = match fn_ref.def {
@@ -723,7 +772,7 @@ impl<'a, 'db> Emitter<'a, 'db> {
                 };
                 (BcFnKind::Const, count(fields))
             }
-            Instance::ConstInit(..) => (BcFnKind::Const, 0),
+            Instance::ConstInit(..) | Instance::Promoted(..) => (BcFnKind::Const, 0),
         }
     }
 
@@ -767,10 +816,9 @@ impl<'a, 'db> Emitter<'a, 'db> {
             Instance::Closure { owner, expr } => {
                 let number = self
                     .instance_item(owner)
-                    .and_then(|item| self.ctx.body(item))
-                    .and_then(|b| {
-                        b.body
-                            .store
+                    .and_then(|item| crate::hir::body_of(self.db, item))
+                    .and_then(|body| {
+                        body.store
                             .exprs
                             .iter()
                             .filter(|(_, data)| matches!(data, Expr::Closure { .. }))
@@ -779,6 +827,13 @@ impl<'a, 'db> Emitter<'a, 'db> {
                     .unwrap_or(0);
                 format!("{}::{{closure#{number}}}", self.instance_path(owner))
             }
+            Instance::Promoted(owner, index) => {
+                format!(
+                    "{}::{{promoted#{}}}",
+                    self.instance_path(owner),
+                    index.idx()
+                )
+            }
         }
     }
 
@@ -786,12 +841,15 @@ impl<'a, 'db> Emitter<'a, 'db> {
     fn instance_env(&self, instance: &Instance) -> GenericEnv {
         match instance {
             Instance::Fn(fn_ref) | Instance::Builtin(fn_ref) => match fn_ref.def {
-                FnDefId::Item(item) => self.ctx.env_for(item, fn_ref.args.clone()),
+                FnDefId::Item(item) => GenericEnv::for_item(self.sigs, item, fn_ref.args.clone()),
                 _ => GenericEnv::default(),
             },
             Instance::Closure { owner, .. } => self.instance_env(owner),
-            Instance::ConstInit(item, args) => self.ctx.env_for(*item, args.clone()),
+            Instance::ConstInit(item, args) => {
+                GenericEnv::for_item(self.sigs, *item, GenericArgs::new(args.clone()))
+            }
             Instance::Ctor(_) => GenericEnv::default(),
+            Instance::Promoted(owner, _) => self.instance_env(owner),
         }
     }
 
@@ -806,7 +864,7 @@ impl<'a, 'db> Emitter<'a, 'db> {
             let Some(instance) = self.instances.get(id.0 as usize).cloned() else {
                 continue;
             };
-            let lowered = lower::lower(self, &instance);
+            let lowered = codegen::lower_instance(self, &instance);
             let file = self
                 .instance_item(&instance)
                 .filter(|_| !matches!(instance, Instance::Ctor(_) | Instance::Builtin(_)))
@@ -835,10 +893,7 @@ impl<'a, 'db> Emitter<'a, 'db> {
                 let item = self.instance_item(&instance);
                 let diagnostic = match item {
                     Some(item) => {
-                        let range = item_tree(self.db, item.file)
-                            .item(item.index)
-                            .map(|data| data.name_range)
-                            .unwrap_or_default();
+                        let (_, range) = resolve_anchor(self.db, &Anchor::ItemName(item));
                         Diagnostic::new(
                             item.file.path(self.db).clone(),
                             range,
@@ -874,10 +929,7 @@ impl<'a, 'db> Emitter<'a, 'db> {
     fn internal_error(&mut self, item: ItemId, message: &str) {
         self.diagnostics.push(Diagnostic::new(
             item.file.path(self.db).clone(),
-            item_tree(self.db, item.file)
-                .item(item.index)
-                .map(|data| data.name_range)
-                .unwrap_or_default(),
+            resolve_anchor(self.db, &Anchor::ItemName(item)).1,
             DiagnosticCode::EmitInvalidBytecode,
             format!("internal compiler error: {message}"),
         ));

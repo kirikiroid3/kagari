@@ -6,7 +6,11 @@ use std::path::Path;
 use kagari_syntax::{TextRange, TextSize};
 
 use crate::db::Db;
+use crate::hir::{
+    ExprId, PatId, StoreSourceMap, TypeRefId, body_source_map_of, signature_source_map_of,
+};
 use crate::input::{FilePath, SourceFile};
+use crate::item_tree::{ItemId, ItemSrc, item_source_map};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Severity {
@@ -65,33 +69,203 @@ impl Diagnostic {
     }
 }
 
-/// A location inside a source file, cheap to copy into HIR and IR.
+/// The store a HIR node belongs to: an item's signature or its body.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Span {
-    pub file: SourceFile,
-    pub range: TextRange,
+pub enum Owner {
+    Signature(ItemId),
+    Body(ItemId),
 }
 
-impl Span {
-    pub fn new(file: SourceFile, range: TextRange) -> Span {
-        Span { file, range }
-    }
-
-    pub fn diagnostic(
-        self,
-        db: &dyn Db,
-        code: DiagnosticCode,
-        message: impl Into<String>,
-    ) -> Diagnostic {
-        Diagnostic::new(self.file.path(db).clone(), self.range, code, message)
-    }
-
-    pub fn related(self, db: &dyn Db, message: impl Into<String>) -> Related {
-        Related {
-            file: self.file.path(db).clone(),
-            range: self.range,
-            message: message.into(),
+impl Owner {
+    pub fn item(self) -> ItemId {
+        match self {
+            Owner::Signature(item) | Owner::Body(item) => item,
         }
+    }
+}
+
+/// A node of an [`ExprStore`]. `PatBound(pat, 0 | 1)` is the lower or upper bound of a
+/// range pattern, used for the path segments it contains.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum NodeId {
+    Expr(ExprId),
+    Pat(PatId),
+    Type(TypeRefId),
+    PatBound(PatId, u8),
+}
+
+/// A location that survives edits elsewhere in the file: it names what it points at and is
+/// resolved to a text range only when diagnostics are reported.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Anchor {
+    /// A raw range; only from parsing and item-tree-level checks.
+    Text(SourceFile, TextRange),
+    ItemName(ItemId),
+    ItemWhole(ItemId),
+    /// Attribute `i` of an item.
+    ItemAttr(ItemId, u32),
+    /// Variant `i` of an enum.
+    Variant(ItemId, u32),
+    /// Import `i` of a `use` item.
+    Import(ItemId, u32),
+    /// Segment `j` of the path of import `i` of a `use` item.
+    ImportSegment(ItemId, u32, u32),
+    /// Generic parameter `i` of an item.
+    GenericParam(ItemId, u32),
+    Node(Owner, NodeId),
+    /// Segment `j` of the path owned by a node.
+    Segment(Owner, NodeId, u32),
+}
+
+/// A diagnostic inside a query result: anchored, resolved to text by [`Diag::resolve`].
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Diag {
+    pub anchor: Anchor,
+    pub code: DiagnosticCode,
+    pub message: String,
+    pub related: Vec<(Anchor, String)>,
+    /// `{@N}` in `message` is replaced with the `line:col` of `message_anchors[N]`.
+    pub message_anchors: Vec<Anchor>,
+}
+
+impl Diag {
+    pub fn new(anchor: Anchor, code: DiagnosticCode, message: impl Into<String>) -> Diag {
+        Diag {
+            anchor,
+            code,
+            message: message.into(),
+            related: Vec::new(),
+            message_anchors: Vec::new(),
+        }
+    }
+
+    pub fn with_related(mut self, anchor: Anchor, message: impl Into<String>) -> Diag {
+        self.related.push((anchor, message.into()));
+        self
+    }
+
+    pub fn severity(&self) -> Severity {
+        self.code.default_severity()
+    }
+
+    /// The diagnostic with its anchors resolved to text ranges.
+    pub fn resolve(&self, db: &dyn Db) -> Diagnostic {
+        let (file, range) = resolve_anchor(db, &self.anchor);
+        let message = self.resolve_message(db);
+        let mut out = Diagnostic::new(file.path(db).clone(), range, self.code, message);
+        for (anchor, message) in &self.related {
+            let (file, range) = resolve_anchor(db, anchor);
+            out = out.with_related(file.path(db).clone(), range, message.clone());
+        }
+        out
+    }
+
+    /// The message with `{@N}` replaced by the `line:col` of `message_anchors[N]` and `{#N}`
+    /// by its source text.
+    fn resolve_message(&self, db: &dyn Db) -> String {
+        if self.message_anchors.is_empty() {
+            return self.message.clone();
+        }
+        let mut out = String::with_capacity(self.message.len());
+        let mut rest = self.message.as_str();
+        while let Some(start) = rest.find('{') {
+            let (before, after) = rest.split_at(start);
+            out.push_str(before);
+            let placeholder = after.find('}').and_then(|end| {
+                let inner = after.get(1..end)?;
+                let (kind, index) = (inner.get(..1)?, inner.get(1..)?.parse::<usize>().ok()?);
+                let anchor = self.message_anchors.get(index)?;
+                let (file, range) = resolve_anchor(db, anchor);
+                let text = match kind {
+                    "@" => {
+                        let (line, col) = line_col(db, file.path(db), range.start());
+                        format!("{line}:{col}")
+                    }
+                    "#" => file
+                        .text(db)
+                        .as_deref()
+                        .and_then(|text| {
+                            text.get(usize::from(range.start())..usize::from(range.end()))
+                        })
+                        .unwrap_or_default()
+                        .to_owned(),
+                    _ => return None,
+                };
+                Some((text, end))
+            });
+            match placeholder {
+                Some((text, end)) => {
+                    out.push_str(&text);
+                    rest = after.get(end.saturating_add(1)..).unwrap_or_default();
+                }
+                None => {
+                    out.push('{');
+                    rest = after.get(1..).unwrap_or_default();
+                }
+            }
+        }
+        out.push_str(rest);
+        out
+    }
+}
+
+/// The file and text range an anchor points at; an empty range when it no longer exists.
+pub(crate) fn resolve_anchor(db: &dyn Db, anchor: &Anchor) -> (SourceFile, TextRange) {
+    let range = match *anchor {
+        Anchor::Text(file, range) => return (file, range),
+        Anchor::ItemName(item) => item_src(db, item).map(|src| src.name),
+        Anchor::ItemWhole(item) => item_src(db, item).map(|src| src.ptr.text_range()),
+        Anchor::ItemAttr(item, index) => {
+            item_src(db, item).and_then(|src| src.attrs.get(index as usize).copied())
+        }
+        Anchor::Variant(item, index) => {
+            item_src(db, item).and_then(|src| src.variants.get(index as usize).copied())
+        }
+        Anchor::Import(item, index) => item_src(db, item)
+            .and_then(|src| src.imports.get(index as usize))
+            .map(|(range, _)| *range),
+        Anchor::ImportSegment(item, index, segment) => item_src(db, item)
+            .and_then(|src| src.imports.get(index as usize))
+            .and_then(|(_, segments)| segments.get(segment as usize).copied()),
+        Anchor::GenericParam(item, index) => signature_source_map_of(db, item)
+            .and_then(|map| map.generic_params.get(index as usize).copied()),
+        Anchor::Node(owner, node) => store_map(db, owner).map(|map| match node {
+            NodeId::Expr(expr) => map.expr(expr),
+            NodeId::Pat(pat) | NodeId::PatBound(pat, _) => map.pat(pat),
+            NodeId::Type(ty) => map.type_ref(ty),
+        }),
+        Anchor::Segment(owner, node, segment) => {
+            store_map(db, owner).and_then(|map| map.segment(node, segment as usize))
+        }
+    };
+    (anchor.file(), range.unwrap_or_default())
+}
+
+impl Anchor {
+    /// The file the anchor is in.
+    pub fn file(&self) -> SourceFile {
+        match *self {
+            Anchor::Text(file, _) => file,
+            Anchor::ItemName(item)
+            | Anchor::ItemWhole(item)
+            | Anchor::ItemAttr(item, _)
+            | Anchor::Variant(item, _)
+            | Anchor::Import(item, _)
+            | Anchor::ImportSegment(item, _, _)
+            | Anchor::GenericParam(item, _) => item.file,
+            Anchor::Node(owner, _) | Anchor::Segment(owner, _, _) => owner.item().file,
+        }
+    }
+}
+
+fn item_src(db: &dyn Db, item: ItemId) -> Option<&ItemSrc> {
+    item_source_map(db, item.file).items.get(item.index.idx())
+}
+
+fn store_map(db: &dyn Db, owner: Owner) -> Option<&StoreSourceMap> {
+    match owner {
+        Owner::Signature(item) => signature_source_map_of(db, item),
+        Owner::Body(item) => body_source_map_of(db, item),
     }
 }
 

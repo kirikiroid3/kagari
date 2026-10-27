@@ -1,25 +1,23 @@
 //! Value paths, struct expressions and the type named by a path prefix.
 
-use kagari_syntax::TextRange;
-
 use super::ValueRef;
 use super::ctx::{Expect, InferCtx};
 use crate::def_map::{Def, Namespace, Resolution, resolve_module_path};
-use crate::diagnostic::DiagnosticCode;
+use crate::diagnostic::{Anchor, DiagnosticCode, NodeId, Owner};
 use crate::hir::{ExprId, GenericArgs, Name, Path, PathKind};
 use crate::item_tree::{ItemId, ItemKind, Shape, item_tree};
 use crate::signatures::lower::{item_name, plural, trait_assoc, were};
 use crate::signatures::subst::{Subst, subst_ty};
 use crate::signatures::{GenericParamDefKind, ItemSig, assoc_parent};
-use crate::ty::{CtorRef, FnDefId, FnRef, GenericArg, Ty};
+use crate::ty::{CtorRef, FnDefId, FnRef, GenericArg, Ty, TyKind};
 
 impl InferCtx<'_> {
     pub(crate) fn infer_path(&mut self, expr: ExprId, path: &Path) -> Ty {
         self.infer_path_arg_exprs(path);
         let Some(resolution) = self.res.store.exprs.get(&expr).cloned() else {
-            return Ty::Error;
+            return Ty::error();
         };
-        let range = self.expr_range(expr);
+        let range = self.expr_anchor(expr);
         let (value, ty) = self.path_value(expr, path, &resolution, range);
         self.result.paths.insert(expr, value);
         ty
@@ -30,7 +28,7 @@ impl InferCtx<'_> {
         expr: ExprId,
         path: &Path,
         resolution: &Resolution,
-        range: TextRange,
+        range: Anchor,
     ) -> (ValueRef, Ty) {
         let _ = expr;
         let last_args = path
@@ -64,14 +62,14 @@ impl InferCtx<'_> {
                     _ => self.not_a_value(range, "a type parameter"),
                 }
             }
-            Resolution::Assoc(item) => self.assoc_value(path, *item, range),
+            Resolution::Assoc(item) => self.assoc_value(expr, path, *item, range),
             Resolution::SelfType(owner) => {
                 let self_ty = self.lowerer.impl_self_ty(*owner);
-                match self_ty {
-                    Ty::Adt { item, args }
-                        if self.sigs.adt(item).is_some_and(|adt| !adt.is_enum) =>
+                match self_ty.kind() {
+                    TyKind::Adt { item, args }
+                        if self.sigs.adt(*item).is_some_and(|adt| !adt.is_enum) =>
                     {
-                        self.variant_value(item, None, args, range)
+                        self.variant_value(*item, None, args.to_vec(), range)
                     }
                     _ => self.not_a_value(range, "`Self`"),
                 }
@@ -83,17 +81,17 @@ impl InferCtx<'_> {
                 self.not_a_value(range, &format!("the type `{}`", prim.name()))
             }
             Resolution::Def(Def::Module(_)) => self.not_a_value(range, "a module"),
-            Resolution::Error => (ValueRef::Error, Ty::Error),
+            Resolution::Error => (ValueRef::Error, Ty::error()),
         }
     }
 
-    fn not_a_value(&mut self, range: TextRange, what: &str) -> (ValueRef, Ty) {
+    fn not_a_value(&mut self, range: Anchor, what: &str) -> (ValueRef, Ty) {
         self.diag(
             range,
             DiagnosticCode::TypeExpectedValue,
             format!("expected a value, found {what}"),
         );
-        (ValueRef::Error, Ty::Error)
+        (ValueRef::Error, Ty::error())
     }
 
     /// A path to an item used as a value. `parent_args` are the generic arguments of the
@@ -103,17 +101,17 @@ impl InferCtx<'_> {
         item: ItemId,
         last_args: Option<&GenericArgs>,
         parent_args: Option<Vec<GenericArg>>,
-        range: TextRange,
+        range: Anchor,
     ) -> (ValueRef, Ty) {
         let tree = item_tree(self.db, item.file);
         let Some(data) = tree.item(item.index) else {
-            return (ValueRef::Error, Ty::Error);
+            return (ValueRef::Error, Ty::error());
         };
         match &data.kind {
             ItemKind::Fn { .. } => {
                 let fn_ref = self.fn_ref(item, None, parent_args, last_args, range);
                 self.add_fn_obligations(&fn_ref, range);
-                let ty = Ty::FnDef(Box::new(fn_ref.clone()));
+                let ty = Ty::new(TyKind::FnDef(fn_ref.clone()));
                 (ValueRef::Fn(fn_ref), ty)
             }
             ItemKind::Struct { .. } => {
@@ -135,14 +133,14 @@ impl InferCtx<'_> {
                         );
                         self.normalize(&ty)
                     }
-                    _ => Ty::Error,
+                    _ => Ty::error(),
                 };
                 (ValueRef::Const { item, args }, ty)
             }
             ItemKind::Static { .. } => {
                 let ty = match self.sigs.get(item) {
                     Some(ItemSig::Static { ty, .. }) => ty.clone(),
-                    _ => Ty::Error,
+                    _ => Ty::error(),
                 };
                 (ValueRef::Static(item), ty)
             }
@@ -166,13 +164,13 @@ impl InferCtx<'_> {
         adt: ItemId,
         variant: Option<u32>,
         args: Vec<GenericArg>,
-        range: TextRange,
+        range: Anchor,
     ) -> (ValueRef, Ty) {
         let Some(def) = self.sigs.adt(adt) else {
-            return (ValueRef::Error, Ty::Error);
+            return (ValueRef::Error, Ty::error());
         };
         let Some(variant_def) = def.variants.get(variant.unwrap_or(0) as usize) else {
-            return (ValueRef::Error, Ty::Error);
+            return (ValueRef::Error, Ty::error());
         };
         match &variant_def.shape {
             Shape::Tuple(_) => {
@@ -183,16 +181,14 @@ impl InferCtx<'_> {
                 let fn_ref = FnRef {
                     def: def_id,
                     self_ty: None,
-                    args,
+                    args: crate::ty::GenericArgs::new(args),
                 };
-                let ty = Ty::FnDef(Box::new(fn_ref.clone()));
+                let ty = Ty::new(TyKind::FnDef(fn_ref.clone()));
                 (ValueRef::Fn(fn_ref), ty)
             }
             Shape::Unit => {
-                let ty = Ty::Adt {
-                    item: adt,
-                    args: args.clone(),
-                };
+                let args = crate::ty::GenericArgs::new(args);
+                let ty = Ty::adt(adt, args.clone());
                 (ValueRef::Ctor(CtorRef { adt, variant, args }), ty)
             }
             Shape::Record(_) => {
@@ -207,7 +203,7 @@ impl InferCtx<'_> {
                     DiagnosticCode::TypeExpectedValue,
                     format!("expected a value, found {what} `{name}`; write `{name} {{ … }}`"),
                 );
-                (ValueRef::Error, Ty::Error)
+                (ValueRef::Error, Ty::error())
             }
         }
     }
@@ -220,7 +216,7 @@ impl InferCtx<'_> {
         self_ty: Option<Ty>,
         parent_args: Option<Vec<GenericArg>>,
         own_args: Option<&GenericArgs>,
-        range: TextRange,
+        range: Anchor,
     ) -> FnRef {
         let mut args = match parent_args {
             Some(args) => args,
@@ -237,7 +233,7 @@ impl InferCtx<'_> {
         FnRef {
             def: FnDefId::Item(item),
             self_ty,
-            args,
+            args: crate::ty::GenericArgs::new(args),
         }
     }
 
@@ -246,7 +242,7 @@ impl InferCtx<'_> {
         &mut self,
         item: ItemId,
         given: Option<&GenericArgs>,
-        range: TextRange,
+        range: Anchor,
     ) -> Vec<GenericArg> {
         let Some(generics) = self.sigs.generics(item) else {
             return Vec::new();
@@ -294,18 +290,13 @@ impl InferCtx<'_> {
         &mut self,
         adt: ItemId,
         given: Option<&GenericArgs>,
-        range: TextRange,
+        range: Anchor,
     ) -> Vec<GenericArg> {
         self.own_args(adt, given, range)
     }
 
     /// The arguments of the enum of a variant path: `Option::<u32>::None` or `None::<u32>`.
-    fn adt_args_from_path(
-        &mut self,
-        path: &Path,
-        adt: ItemId,
-        range: TextRange,
-    ) -> Vec<GenericArg> {
+    fn adt_args_from_path(&mut self, path: &Path, adt: ItemId, range: Anchor) -> Vec<GenericArg> {
         let len = path.segments.len();
         let given = len
             .checked_sub(2)
@@ -320,9 +311,15 @@ impl InferCtx<'_> {
     }
 
     /// An associated function or constant reached through a type or trait path.
-    fn assoc_value(&mut self, path: &Path, item: ItemId, range: TextRange) -> (ValueRef, Ty) {
+    fn assoc_value(
+        &mut self,
+        expr: ExprId,
+        path: &Path,
+        item: ItemId,
+        range: Anchor,
+    ) -> (ValueRef, Ty) {
         let Some(parent) = assoc_parent(self.db, item) else {
-            return (ValueRef::Error, Ty::Error);
+            return (ValueRef::Error, Ty::error());
         };
         let last_args = path
             .segments
@@ -343,14 +340,14 @@ impl InferCtx<'_> {
                 let parent_args = self.fresh_args_of(parent);
                 let fn_ref = self.fn_ref(item, Some(self_ty), Some(parent_args), last_args, range);
                 self.add_fn_obligations(&fn_ref, range);
-                let ty = Ty::FnDef(Box::new(fn_ref.clone()));
+                let ty = Ty::new(TyKind::FnDef(fn_ref.clone()));
                 (ValueRef::Fn(fn_ref), ty)
             }
             Some(ItemSig::Impl { .. }) => {
-                let impl_args = self.impl_args_from_prefix(path, parent);
+                let impl_args = self.impl_args_from_prefix(expr, path, parent);
                 self.item_value(item, last_args, Some(impl_args), range)
             }
-            _ => (ValueRef::Error, Ty::Error),
+            _ => (ValueRef::Error, Ty::error()),
         }
     }
 
@@ -358,11 +355,12 @@ impl InferCtx<'_> {
     /// its last segment (`Board::new` with `type Board = Square<8>`).
     pub(crate) fn impl_args_from_prefix(
         &mut self,
+        expr: ExprId,
         path: &Path,
         impl_item: ItemId,
     ) -> Vec<GenericArg> {
         let args = self.fresh_args_of(impl_item);
-        if let Some(prefix) = self.prefix_type(path) {
+        if let Some(prefix) = self.prefix_type(expr, path) {
             let self_ty = match self.sigs.get(impl_item) {
                 Some(ItemSig::Impl { self_ty, .. }) => subst_ty(
                     self_ty,
@@ -372,15 +370,16 @@ impl InferCtx<'_> {
                         self_ty: None,
                     },
                 ),
-                _ => Ty::Error,
+                _ => Ty::error(),
             };
             self.try_unify(&self_ty, &prefix);
         }
         args
     }
 
-    /// The type named by all segments of `path` but the last, if it names one.
-    fn prefix_type(&mut self, path: &Path) -> Option<Ty> {
+    /// The type named by all segments of `path` (the path of `expr`) but the last, if it
+    /// names one.
+    fn prefix_type(&mut self, expr: ExprId, path: &Path) -> Option<Ty> {
         let len = path.segments.len().checked_sub(1)?;
         if len == 0 {
             return None;
@@ -389,15 +388,16 @@ impl InferCtx<'_> {
             kind: path.kind,
             segments: path.segments.get(..len)?.to_vec(),
         };
-        let resolution = self.resolve_type_path(&prefix)?;
+        let resolution = self.resolve_type_path(expr, &prefix)?;
         let args = prefix
             .segments
             .last()
             .and_then(|segment| segment.args.clone());
-        let range = prefix
-            .segments
-            .last()
-            .map_or_else(TextRange::default, |segment| segment.range);
+        let range = Anchor::Segment(
+            Owner::Body(self.item),
+            NodeId::Expr(expr),
+            u32::try_from(len.checked_sub(1)?).ok()?,
+        );
         let ty = self.with_expr_sink(|lowerer, scope, sink| {
             sink.quiet = false;
             lowerer.lower_resolution(scope, &resolution, args.as_ref(), range, sink)
@@ -405,9 +405,9 @@ impl InferCtx<'_> {
         Some(ty)
     }
 
-    /// Resolves a type path with the body's lexical scope: `Self`, generic parameters, then
-    /// modules.
-    fn resolve_type_path(&self, path: &Path) -> Option<Resolution> {
+    /// Resolves a type path (a prefix of the path of `expr`) with the body's lexical scope:
+    /// `Self`, generic parameters, then modules.
+    fn resolve_type_path(&self, expr: ExprId, path: &Path) -> Option<Resolution> {
         if path.kind == PathKind::Plain
             && let [segment] = path.segments.as_slice()
         {
@@ -427,7 +427,10 @@ impl InferCtx<'_> {
             }
         }
         let module = self.current_module();
-        match resolve_module_path(self.maps, self.db, module, path, Namespace::Types).resolved {
+        let owner = Owner::Body(self.item);
+        let at = |segment| Anchor::Segment(owner, NodeId::Expr(expr), segment);
+        match resolve_module_path(self.maps, self.db, module, path, Namespace::Types, &at).resolved
+        {
             Some(Resolution::Def(Def::Item(item)))
                 if matches!(
                     item_tree(self.db, item.file)
@@ -448,18 +451,21 @@ impl InferCtx<'_> {
         base: &Resolution,
         rest: &[Name],
         last_args: Option<&GenericArgs>,
-        range: TextRange,
+        range: Anchor,
     ) -> (ValueRef, Ty) {
         let (base_ty, traits) = match base {
             Resolution::GenericParam { owner, index } => (
-                Ty::Param {
+                Ty::new(TyKind::Param {
                     owner: *owner,
                     index: *index,
-                },
+                }),
                 self.env.bounds_of(*owner, *index).to_vec(),
             ),
-            Resolution::SelfType(owner) => (Ty::TraitSelf { trait_item: *owner }, vec![*owner]),
-            Resolution::Error => return (ValueRef::Error, Ty::Error),
+            Resolution::SelfType(owner) => (
+                Ty::new(TyKind::TraitSelf { trait_item: *owner }),
+                vec![*owner],
+            ),
+            Resolution::Error => return (ValueRef::Error, Ty::error()),
             _ => return self.not_a_value(range, "an associated item of an unknown type"),
         };
         let [name] = rest else {
@@ -481,12 +487,12 @@ impl InferCtx<'_> {
                 self.show(&base_ty)
             );
             self.diag(range, DiagnosticCode::TypeUnknownMethod, message);
-            return (ValueRef::Error, Ty::Error);
+            return (ValueRef::Error, Ty::error());
         };
         let parent_args = self.fresh_args_of(trait_item);
         let fn_ref = self.fn_ref(assoc, Some(base_ty), Some(parent_args), last_args, range);
         self.add_fn_obligations(&fn_ref, range);
-        let ty = Ty::FnDef(Box::new(fn_ref.clone()));
+        let ty = Ty::new(TyKind::FnDef(fn_ref.clone()));
         (ValueRef::Fn(fn_ref), ty)
     }
 
@@ -495,7 +501,7 @@ impl InferCtx<'_> {
         &mut self,
         resolution: Option<&Resolution>,
         path: &Path,
-        range: TextRange,
+        range: Anchor,
     ) -> Option<CtorRef> {
         match resolution? {
             Resolution::Def(Def::Item(item)) => {
@@ -512,7 +518,7 @@ impl InferCtx<'_> {
                         Some(CtorRef {
                             adt: *item,
                             variant: None,
-                            args,
+                            args: crate::ty::GenericArgs::new(args),
                         })
                     }
                     Some(ItemKind::TypeAlias { .. }) => {
@@ -548,7 +554,7 @@ impl InferCtx<'_> {
                 Some(CtorRef {
                     adt: *enum_item,
                     variant: Some(*index),
-                    args,
+                    args: crate::ty::GenericArgs::new(args),
                 })
             }
             Resolution::SelfType(owner) => {
@@ -567,17 +573,18 @@ impl InferCtx<'_> {
         }
     }
 
-    fn struct_ctor_of_ty(&mut self, ty: Ty, range: TextRange) -> Option<CtorRef> {
-        match ty {
-            Ty::Adt { item, args } if self.sigs.adt(item).is_some_and(|adt| !adt.is_enum) => {
+    fn struct_ctor_of_ty(&mut self, ty: Ty, range: Anchor) -> Option<CtorRef> {
+        match ty.kind() {
+            TyKind::Adt { item, args } if self.sigs.adt(*item).is_some_and(|adt| !adt.is_enum) => {
                 Some(CtorRef {
-                    adt: item,
+                    adt: *item,
                     variant: None,
-                    args,
+                    args: args.clone(),
                 })
             }
-            Ty::Error => None,
-            other => {
+            TyKind::Error => None,
+            _ => {
+                let other = ty.clone();
                 let message = format!("expected a struct, found `{}`", self.show(&other));
                 self.diag(range, DiagnosticCode::TypeExpectedType, message);
                 None
@@ -592,23 +599,20 @@ impl InferCtx<'_> {
         fields: &[(Name, ExprId)],
         expect: Expect<'_>,
     ) -> Ty {
-        let range = self.expr_range(expr);
+        let range = self.expr_anchor(expr);
         let resolution = self.res.store.exprs.get(&expr).cloned();
         let Some(ctor) = self.ctor_of(resolution.as_ref(), path, range) else {
             for (_, value) in fields {
                 self.infer_expr(*value, Expect::None);
             }
-            return Ty::Error;
+            return Ty::error();
         };
-        let ty = Ty::Adt {
-            item: ctor.adt,
-            args: ctor.args.clone(),
-        };
+        let ty = Ty::adt(ctor.adt, ctor.args.clone());
         if let Some(expected) = expect.ty() {
             self.try_unify(&ty, expected);
         }
         let Some(def) = self.sigs.adt(ctor.adt) else {
-            return Ty::Error;
+            return Ty::error();
         };
         if def.is_enum && ctor.variant.is_none() {
             let name = item_name(self.db, ctor.adt);
@@ -620,10 +624,10 @@ impl InferCtx<'_> {
             for (_, value) in fields {
                 self.infer_expr(*value, Expect::None);
             }
-            return Ty::Error;
+            return Ty::error();
         }
         let Some(variant) = def.variants.get(ctor.variant.unwrap_or(0) as usize) else {
-            return Ty::Error;
+            return Ty::error();
         };
         let variant_name = variant.name.clone();
         let subst = Subst {
@@ -648,12 +652,7 @@ impl InferCtx<'_> {
                     seen.push(name.clone());
                 }
                 None => {
-                    let value_range = self.expr_range(*value);
-                    let target = if value_range == range {
-                        range
-                    } else {
-                        value_range
-                    };
+                    let target = self.expr_anchor(*value);
                     self.diag(
                         target,
                         DiagnosticCode::TypeUnknownField,

@@ -1,23 +1,21 @@
 //! The walk over one body: context kinds, call rules, scenes and instant procedures,
 //! story variables, finite values and second-class closures and references.
 
-use kagari_syntax::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::diagnostic::{Diagnostic, DiagnosticCode};
+use crate::diagnostic::{self, Anchor, Diag, DiagnosticCode, NodeId};
 use crate::eval::ConstExprs;
 use crate::hir::{
     ArrayExpr, Body, ClosureKind, Condition, Expr, ExprId, ExprStore, LangItem, Pat, PatId,
     PathKind, Stmt, TypeRefId,
 };
 use crate::infer::{Coercion, InferenceResult, ValueRef};
-use crate::input::FilePath;
 use crate::item_tree::{FnKind, Item, ItemId, ItemKind};
 use crate::resolve::{BodyResolution, LocalId};
 use crate::signatures::ItemSig;
-use crate::ty::{FnDefId, Ty};
+use crate::ty::{FnDefId, Ty, TyKind};
 
-use super::{EdgeKind, Env, FileKindChecks, InstantCall, fn_kind_word};
+use super::{Env, KindChecks, fn_kind_word};
 
 /// The code a body (or closure) belongs to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,11 +39,8 @@ pub(super) enum Owner {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Pos {
     Value,
-    /// A direct argument of a call (the receiver excluded) of a `const fn` or a constructor.
+    /// A direct argument of a call (the receiver excluded).
     Arg,
-    /// A direct argument of a call of a `pushdown fn` (or a pointer or closure of that
-    /// kind): the callee receives it as a parameter.
-    ProcArg,
     Callee,
     /// The initializer of a `let`: the local it binds is checked instead.
     LetInit,
@@ -64,25 +59,8 @@ pub(super) enum Binding {
     Param,
 }
 
-/// What a call calls, by kind.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum CalleeKind {
-    Plain,
-    Const,
-    Instant,
-    Scene,
-    /// `push_step`.
-    Step,
-    /// `rng_choose`.
-    Rng,
-}
-
-/// A called function: a named one or a value of pointer or closure type.
-#[derive(Clone, Debug)]
-pub(super) enum Callee {
-    Item(ItemId),
-    Value(Ty),
-}
+use crate::callee::classify;
+pub(super) use crate::callee::{Callee, CalleeKind};
 
 /// A local bound to a `#[must_use]` value: the binding, the type and whether it is ever
 /// the receiver of one of the type's own methods.
@@ -96,8 +74,6 @@ pub(super) struct MustUseLocal {
 
 pub(super) struct BodyChecker<'a, 'db> {
     pub env: &'a Env<'db>,
-    pub path: FilePath,
-    pub text: Option<&'a str>,
     pub item: ItemId,
     pub owner: Owner,
     pub store: &'a ExprStore,
@@ -112,12 +88,9 @@ pub(super) struct BodyChecker<'a, 'db> {
     /// Paths to `Meta` handles reported in `const` code (their method calls are not
     /// reported again).
     pub meta_paths: FxHashSet<ExprId>,
-    pub choice_ids: FxHashMap<String, TextRange>,
+    pub choice_ids: FxHashMap<std::sync::Arc<str>, Anchor>,
     pub must_use: Vec<MustUseLocal>,
-    /// The item is an instant procedure: its direct calls of instant procedures are
-    /// recorded for the recursion check.
-    pub instant: bool,
-    pub out: &'a mut FileKindChecks,
+    pub out: &'a mut KindChecks,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -129,7 +102,7 @@ pub(super) fn check_body(
     res: &BodyResolution,
     infer: &InferenceResult,
     consts: &ConstExprs,
-    out: &mut FileKindChecks,
+    out: &mut KindChecks,
 ) {
     let (ctx, owner) = match data.kind {
         ItemKind::Fn { .. } => {
@@ -167,8 +140,6 @@ pub(super) fn check_body(
     }
     let mut checker = BodyChecker {
         env,
-        path: item.file.path(env.db).clone(),
-        text: item.file.text(env.db).as_deref(),
         item,
         owner,
         store: &body.store,
@@ -181,7 +152,6 @@ pub(super) fn check_body(
         meta_paths: FxHashSet::default(),
         choice_ids: FxHashMap::default(),
         must_use: Vec::new(),
-        instant: ctx.kind == ClosureKind::Pushdown && !ctx.scene,
         out,
     };
     checker.check_initializer(body.value);
@@ -304,54 +274,81 @@ pub(super) fn children(expr: &Expr) -> Vec<ExprId> {
     out
 }
 
+/// What calling a value of type `ty` calls: the item of a function item type, or the
+/// value itself for a pointer or closure.
+pub(super) fn callee_of_ty(ty: &Ty) -> Option<Callee> {
+    match ty.kind() {
+        TyKind::FnDef(fn_ref) => match fn_ref.def {
+            FnDefId::Item(item) => Some(Callee::Item(item)),
+            FnDefId::StructCtor(_) | FnDefId::VariantCtor(..) => None,
+        },
+        TyKind::FnPtr { .. } | TyKind::Closure { .. } => Some(Callee::Value(ty.clone())),
+        _ => None,
+    }
+}
+
+/// The type of `expr` before coercion; `None` when unknown or erroneous.
+pub(super) fn expr_ty(infer: &InferenceResult, expr: ExprId) -> Option<&Ty> {
+    infer
+        .expr_types
+        .get(expr)
+        .filter(|ty| !ty.references_error())
+}
+
+/// The type of the value `expr` produces: after a coercion to a pointer or a closure.
+pub(super) fn value_ty(infer: &InferenceResult, expr: ExprId) -> Option<&Ty> {
+    match infer.coercions.get(&expr) {
+        Some((Coercion::FnDefToPtr | Coercion::ToClosure | Coercion::ClosureToPtr, ty))
+            if !ty.references_error() =>
+        {
+            Some(ty)
+        }
+        _ => expr_ty(infer, expr),
+    }
+}
+
 impl BodyChecker<'_, '_> {
     pub(super) fn ctx(&self) -> Ctx {
         self.stack.last().copied().unwrap_or_else(const_ctx)
     }
 
-    pub(super) fn range(&self, expr: ExprId) -> TextRange {
-        self.store.expr_range(expr)
+    pub(super) fn anchor(&self, expr: ExprId) -> Anchor {
+        Anchor::Node(diagnostic::Owner::Body(self.item), NodeId::Expr(expr))
     }
 
-    pub(super) fn report(&mut self, diag: Diagnostic) {
+    pub(super) fn pat_anchor(&self, pat: PatId) -> Anchor {
+        Anchor::Node(diagnostic::Owner::Body(self.item), NodeId::Pat(pat))
+    }
+
+    pub(super) fn report(&mut self, diag: Diag) {
         self.out.diagnostics.push(diag);
     }
 
     pub(super) fn diag(
         &self,
-        range: TextRange,
+        anchor: Anchor,
         code: DiagnosticCode,
         message: impl Into<String>,
-    ) -> Diagnostic {
-        Diagnostic::new(self.path.clone(), range, code, message)
+    ) -> Diag {
+        Diag::new(anchor, code, message)
     }
 
     /// The type of `expr` before coercion; `None` when unknown or erroneous.
     pub(super) fn ty(&self, expr: ExprId) -> Option<&Ty> {
-        self.infer
-            .expr_types
-            .get(expr)
-            .filter(|ty| !ty.references_error())
+        expr_ty(self.infer, expr)
     }
 
     /// The type of the value `expr` produces: after a coercion to a pointer or a closure.
     fn value_ty(&self, expr: ExprId) -> Option<&Ty> {
-        match self.infer.coercions.get(&expr) {
-            Some((Coercion::FnDefToPtr | Coercion::ToClosure | Coercion::ClosureToPtr, ty))
-                if !ty.references_error() =>
-            {
-                Some(ty)
-            }
-            _ => self.ty(expr),
-        }
+        value_ty(self.infer, expr)
     }
 
-    /// The source text of `expr`.
-    pub(super) fn src(&self, expr: ExprId) -> String {
-        let range = self.range(expr);
-        self.text
-            .and_then(|text| text.get(usize::from(range.start())..usize::from(range.end())))
-            .map_or_else(|| "this value".to_owned(), ToOwned::to_owned)
+    /// A `{#N}` placeholder for the source text of `expr`, resolved when the diagnostic
+    /// is: pushes the anchor to `anchors`, the diagnostic's `message_anchors`.
+    pub(super) fn src(&self, anchors: &mut Vec<Anchor>, expr: ExprId) -> String {
+        let index = anchors.len();
+        anchors.push(self.anchor(expr));
+        format!("{{#{index}}}")
     }
 
     pub(super) fn local_name(&self, local: LocalId) -> String {
@@ -394,18 +391,18 @@ impl BodyChecker<'_, '_> {
         if reported {
             self.finite_off = self.finite_off.saturating_add(1);
         }
-        self.expr_inner(expr, pos);
+        self.expr_inner(expr);
         if reported {
             self.finite_off = self.finite_off.saturating_sub(1);
         }
         reported
     }
 
-    fn expr_inner(&mut self, expr: ExprId, pos: Pos) {
+    fn expr_inner(&mut self, expr: ExprId) {
         let store = self.store;
         match store.expr(expr) {
             Expr::Missing | Expr::Literal(_) | Expr::Continue { .. } => {}
-            Expr::Path(_) => self.path_expr(expr, pos),
+            Expr::Path(_) => self.path_expr(expr),
             Expr::Block { stmts, tail, .. } => {
                 for stmt in stmts {
                     self.stmt(stmt);
@@ -491,7 +488,6 @@ impl BodyChecker<'_, '_> {
             }
             Expr::Assign { target, value, .. } => {
                 self.check_mut_place(*target, super::places::Access::Assign);
-                self.note_stored_pointer(*value);
                 self.expr(*target, Pos::Place);
                 self.expr(*value, Pos::Value);
             }
@@ -580,17 +576,17 @@ impl BodyChecker<'_, '_> {
         if ty.references_error() {
             return;
         }
-        let range = self.store.pat_range(pat);
+        let range = self.pat_anchor(pat);
         let name = self.local_name(local);
         let ctx = self.ctx_desc();
-        let diag = match ty {
-            Ty::Ref { inner, .. } if binding == Binding::Param => {
+        let diag = match ty.kind() {
+            TyKind::Ref { inner, .. } if binding == Binding::Param => {
                 if self.env.is_finite(inner, false) {
                     return;
                 }
                 self.not_finite_local(range, &name, ty)
             }
-            Ty::Ref { .. } => self.diag(
+            TyKind::Ref { .. } => self.diag(
                 range,
                 DiagnosticCode::KindSecondClassReference,
                 format!(
@@ -598,8 +594,8 @@ impl BodyChecker<'_, '_> {
                      second-class and can only be passed as arguments"
                 ),
             ),
-            Ty::Closure { .. } if binding == Binding::Param => return,
-            Ty::Closure { .. } => self.diag(
+            TyKind::Closure { .. } if binding == Binding::Param => return,
+            TyKind::Closure { .. } => self.diag(
                 range,
                 DiagnosticCode::KindSecondClassClosure,
                 format!(
@@ -613,7 +609,7 @@ impl BodyChecker<'_, '_> {
         self.report(diag);
     }
 
-    fn not_finite_local(&self, range: TextRange, name: &str, ty: &Ty) -> Diagnostic {
+    fn not_finite_local(&self, range: Anchor, name: &str, ty: &Ty) -> Diag {
         self.diag(
             range,
             DiagnosticCode::KindNotFinite,
@@ -653,12 +649,12 @@ impl BodyChecker<'_, '_> {
         let Some(ty) = self.value_ty(expr) else {
             return false;
         };
-        if let Ty::Closure { .. } = ty {
-            if matches!(pos, Pos::Arg | Pos::ProcArg | Pos::Callee | Pos::LetInit) {
+        if let TyKind::Closure { .. } = ty.kind() {
+            if matches!(pos, Pos::Arg | Pos::Callee | Pos::LetInit) {
                 return false;
             }
             let diag = self.diag(
-                self.range(expr),
+                self.anchor(expr),
                 DiagnosticCode::KindSecondClassClosure,
                 format!(
                     "closures in the story are second-class: in {} a closure can only be \
@@ -688,7 +684,7 @@ impl BodyChecker<'_, '_> {
                      second-class and can only be passed as arguments and called, never stored"
                 ),
             )
-        } else if self.env.contains_ref(ty) && !matches!(ty, Ty::Ref { .. }) {
+        } else if self.env.contains_ref(ty) && !matches!(ty.kind(), TyKind::Ref { .. }) {
             (
                 DiagnosticCode::KindSecondClassReference,
                 format!(
@@ -713,7 +709,7 @@ impl BodyChecker<'_, '_> {
                 ),
             )
         };
-        let diag = self.diag(self.range(expr), code, message);
+        let diag = self.diag(self.anchor(expr), code, message);
         self.report(diag);
         true
     }
@@ -721,7 +717,7 @@ impl BodyChecker<'_, '_> {
     /// The kind of the function a call or method call calls.
     fn call_kind(&self, expr: ExprId) -> Option<CalleeKind> {
         let callee = match self.store.expr(expr) {
-            Expr::Call { callee, .. } => self.ty(*callee).and_then(|ty| self.callee_of_ty(ty)),
+            Expr::Call { callee, .. } => self.ty(*callee).and_then(callee_of_ty),
             Expr::MethodCall { .. } => {
                 self.infer
                     .method_calls
@@ -736,17 +732,7 @@ impl BodyChecker<'_, '_> {
         self.callee_kind(&callee?)
     }
 
-    fn path_expr(&mut self, expr: ExprId, pos: Pos) {
-        if pos != Pos::Callee
-            && let Some(ValueRef::Fn(fn_ref)) = self.infer.paths.get(&expr)
-            && let FnDefId::Item(item) = fn_ref.def
-            && self.callee_kind(&Callee::Item(item)) == Some(CalleeKind::Instant)
-        {
-            // An instant procedure used as a value: whoever receives it may call it.
-            self.out.instant_values.push((item, pos != Pos::ProcArg));
-            self.record_instant_call(expr, item, EdgeKind::Value);
-            return;
-        }
+    fn path_expr(&mut self, expr: ExprId) {
         let Some(ValueRef::Static(item)) = self.infer.paths.get(&expr) else {
             return;
         };
@@ -758,7 +744,7 @@ impl BodyChecker<'_, '_> {
         let name = self.env.item_name(item);
         if *mutable && ctx.kind != ClosureKind::Pushdown {
             let diag = self.diag(
-                self.range(expr),
+                self.anchor(expr),
                 DiagnosticCode::KindStoryVariableOutsideStory,
                 format!(
                     "story variable `{name}` cannot be used in {}: only `pushdown fn` code may \
@@ -771,7 +757,7 @@ impl BodyChecker<'_, '_> {
         } else if !*mutable && ctx.kind == ClosureKind::Const && self.env.is_meta(ty) {
             self.meta_paths.insert(expr);
             let diag = self.diag(
-                self.range(expr),
+                self.anchor(expr),
                 DiagnosticCode::KindMetaInConst,
                 format!(
                     "meta field `{name}` cannot be used in {}: meta is read by `fn` code and \
@@ -789,12 +775,15 @@ impl BodyChecker<'_, '_> {
         if outer.kind == ClosureKind::Pushdown
             && let Some(info) = info
             && let Some(&captured) = info.captures.iter().find(|&&local| {
-                matches!(self.infer.local_types.get(local), Some(Ty::Closure { .. }))
+                matches!(
+                    self.infer.local_types.get(local).map(Ty::kind),
+                    Some(TyKind::Closure { .. })
+                )
             })
         {
             let name = self.local_name(captured);
             let diag = self.diag(
-                self.range(expr),
+                self.anchor(expr),
                 DiagnosticCode::KindSecondClassClosure,
                 format!(
                     "this closure captures the closure `{name}`: closures in the story are \
@@ -830,7 +819,7 @@ impl BodyChecker<'_, '_> {
             "an instant procedure has"
         };
         let diag = self.diag(
-            self.range(expr),
+            self.anchor(expr),
             DiagnosticCode::KindUnboundedLoop,
             format!(
                 "`{keyword}` is not allowed in {}: {why} only bounded loops (`for` over an \
@@ -849,7 +838,7 @@ impl BodyChecker<'_, '_> {
         let Some(mut ty) = self.ty(iterable) else {
             return;
         };
-        while let Ty::Ref { inner, .. } = ty {
+        while let TyKind::Ref { inner, .. } = ty.kind() {
             ty = inner;
         }
         let constant_range = matches!(
@@ -857,11 +846,14 @@ impl BodyChecker<'_, '_> {
             Expr::Range { start: Some(start), end: Some(end), .. }
                 if self.consts.contains(*start) && self.consts.contains(*end)
         );
-        if matches!(ty, Ty::Array { .. }) || constant_range || self.consts.contains(iterable) {
+        if matches!(ty.kind(), TyKind::Array { .. })
+            || constant_range
+            || self.consts.contains(iterable)
+        {
             return;
         }
         let diag = self.diag(
-            self.range(iterable),
+            self.anchor(iterable),
             DiagnosticCode::KindForNotConstant,
             format!(
                 "a `for` loop in {} must iterate over an array or over a range whose bounds \
@@ -893,16 +885,15 @@ impl BodyChecker<'_, '_> {
         }
         let target = match direct {
             Some(item) => Some(Callee::Item(item)),
-            None => self.ty(callee).and_then(|ty| self.callee_of_ty(ty)),
+            None => self.ty(callee).and_then(callee_of_ty),
         };
-        let arg_pos = self.arg_pos(target.as_ref());
         self.expr(callee, Pos::Callee);
         for &arg in args {
             let skip = bad_effect == Some(arg);
             if skip {
                 self.finite_off = self.finite_off.saturating_add(1);
             }
-            self.expr(arg, arg_pos);
+            self.expr(arg, Pos::Arg);
             if skip {
                 self.finite_off = self.finite_off.saturating_sub(1);
             }
@@ -913,18 +904,6 @@ impl BodyChecker<'_, '_> {
                 Expr::Path(path) if path.kind == PathKind::Lang(LangItem::PushStep)
             );
             self.check_call(expr, target, from_form);
-        }
-        match (direct, &target) {
-            (Some(item), _) => self.record_instant_call(expr, item, EdgeKind::Direct),
-            (None, Some(target)) => {
-                if self.instant
-                    && self.ctx().kind == ClosureKind::Pushdown
-                    && self.callee_kind(target) == Some(CalleeKind::Instant)
-                {
-                    self.out.indirect_calls.push((self.item, self.range(expr)));
-                }
-            }
-            (None, None) => {}
         }
         if self.ctx().kind == ClosureKind::Pushdown {
             let args: Vec<_> = args
@@ -937,13 +916,8 @@ impl BodyChecker<'_, '_> {
 
     fn method_call(&mut self, expr: ExprId, receiver: ExprId, args: &[ExprId]) {
         self.expr(receiver, Pos::Value);
-        let method = match self.infer.method_calls.get(&expr).map(|call| call.func.def) {
-            Some(FnDefId::Item(method)) => Some(Callee::Item(method)),
-            _ => None,
-        };
-        let arg_pos = self.arg_pos(method.as_ref());
         for &arg in args {
-            self.expr(arg, arg_pos);
+            self.expr(arg, Pos::Arg);
         }
         let Some(call) = self.infer.method_calls.get(&expr) else {
             return;
@@ -958,7 +932,6 @@ impl BodyChecker<'_, '_> {
             self.check_receiver_mut(receiver, call.receiver.derefs);
         }
         self.must_use_receiver(receiver, method);
-        self.record_instant_call(expr, method, EdgeKind::Direct);
         if self.ctx().kind == ClosureKind::Pushdown {
             let mut all = vec![super::places::CallArg::Receiver(receiver, call.receiver)];
             all.extend(args.iter().map(|&arg| super::places::CallArg::Value(arg)));
@@ -966,47 +939,8 @@ impl BodyChecker<'_, '_> {
         }
     }
 
-    pub(super) fn callee_of_ty(&self, ty: &Ty) -> Option<Callee> {
-        match ty {
-            Ty::FnDef(fn_ref) => match fn_ref.def {
-                FnDefId::Item(item) => Some(Callee::Item(item)),
-                FnDefId::StructCtor(_) | FnDefId::VariantCtor(..) => None,
-            },
-            Ty::FnPtr { .. } | Ty::Closure { .. } => Some(Callee::Value(ty.clone())),
-            _ => None,
-        }
-    }
-
     pub(super) fn callee_kind(&self, callee: &Callee) -> Option<CalleeKind> {
-        match callee {
-            Callee::Item(item) => {
-                let sig = self.env.sigs.fn_sig(*item)?;
-                Some(match sig.kind {
-                    FnKind::Plain => CalleeKind::Plain,
-                    FnKind::Const => CalleeKind::Const,
-                    FnKind::Pushdown if Some(*item) == self.env.sigs.std.push_step => {
-                        CalleeKind::Step
-                    }
-                    FnKind::Pushdown if Some(*item) == self.env.sigs.std.rng_choose => {
-                        CalleeKind::Rng
-                    }
-                    FnKind::Pushdown if sig.scene => CalleeKind::Scene,
-                    FnKind::Pushdown => CalleeKind::Instant,
-                })
-            }
-            Callee::Value(Ty::FnPtr { kind, .. }) => Some(match kind {
-                crate::hir::FnPtrKind::Plain => CalleeKind::Plain,
-                crate::hir::FnPtrKind::Const => CalleeKind::Const,
-                crate::hir::FnPtrKind::Pushdown => CalleeKind::Instant,
-                crate::hir::FnPtrKind::Scene => CalleeKind::Scene,
-            }),
-            Callee::Value(Ty::Closure { kind, .. }) => Some(match kind {
-                ClosureKind::Plain => CalleeKind::Plain,
-                ClosureKind::Const => CalleeKind::Const,
-                ClosureKind::Pushdown => CalleeKind::Instant,
-            }),
-            Callee::Value(_) => None,
-        }
+        classify(self.env.sigs, callee)
     }
 
     fn callee_desc(&self, callee: &Callee, kind: CalleeKind) -> String {
@@ -1032,7 +966,7 @@ impl BodyChecker<'_, '_> {
             return;
         };
         let ctx = self.ctx();
-        let range = self.range(expr);
+        let range = self.anchor(expr);
         let desc = self.callee_desc(callee, kind);
         let here = self.ctx_desc();
         let (code, message) = match (ctx.kind, kind) {
@@ -1112,49 +1046,9 @@ impl BodyChecker<'_, '_> {
         };
         matches!(
             self.env.sigs.get(parent),
-            Some(ItemSig::Impl { self_ty: Ty::Adt { item, .. }, .. })
-                if Some(*item) == self.env.sigs.std.setting
+            Some(ItemSig::Impl { self_ty, .. })
+                if matches!(self_ty.kind(), TyKind::Adt { item, .. } if Some(*item) == self.env.sigs.std.setting)
         )
-    }
-
-    /// Records an edge from this instant procedure to the instant procedure `callee`: a
-    /// direct call in `pushdown` code, or a use of `callee` as a value anywhere in the body.
-    fn record_instant_call(&mut self, expr: ExprId, callee: ItemId, kind: EdgeKind) {
-        if !self.instant || (kind == EdgeKind::Direct && self.ctx().kind != ClosureKind::Pushdown) {
-            return;
-        }
-        if self.callee_kind(&Callee::Item(callee)) != Some(CalleeKind::Instant) {
-            return;
-        }
-        self.out.instant_calls.push(InstantCall {
-            caller: self.item,
-            callee,
-            range: self.range(expr),
-            kind,
-        });
-    }
-
-    /// Where the arguments of a call of `target` go: to a parameter of story code, or to a
-    /// `const fn` or constructor that may fold them into a constant.
-    fn arg_pos(&self, target: Option<&Callee>) -> Pos {
-        match target.and_then(|target| self.callee_kind(target)) {
-            Some(CalleeKind::Instant | CalleeKind::Scene | CalleeKind::Step | CalleeKind::Rng) => {
-                Pos::ProcArg
-            }
-            _ => Pos::Arg,
-        }
-    }
-
-    /// An assignment that stores a runtime `pushdown fn` pointer: any instant procedure
-    /// passed around may then come back out of storage (see `instant_recursion`).
-    fn note_stored_pointer(&mut self, value: ExprId) {
-        if !self.consts.contains(value)
-            && self
-                .value_ty(value)
-                .is_some_and(|ty| self.env.contains_instant_pointer(ty))
-        {
-            self.out.stores_pointers = true;
-        }
     }
 
     // ---- constant initializers ----
@@ -1168,19 +1062,21 @@ impl BodyChecker<'_, '_> {
             Owner::Static { mutable: false } => "a `static`",
             Owner::Fn => return,
         };
-        let Some((expr, reason)) = self.non_const_root(value) else {
+        let Some((expr, reason, anchors)) = self.non_const_root(value) else {
             return;
         };
-        let diag = self.diag(
-            self.range(expr),
+        let mut diag = self.diag(
+            self.anchor(expr),
             DiagnosticCode::KindNotConstant,
             format!("the initializer of {what} must be a constant expression: {reason}"),
         );
+        diag.message_anchors = anchors;
         self.report(diag);
     }
 
-    /// The first innermost non-constant part of `expr` and why it is not constant.
-    fn non_const_root(&self, expr: ExprId) -> Option<(ExprId, String)> {
+    /// The first innermost non-constant part of `expr` and why it is not constant, with
+    /// the reason's `message_anchors`.
+    fn non_const_root(&self, expr: ExprId) -> Option<(ExprId, String, Vec<Anchor>)> {
         let store = self.store;
         let data = store.expr(expr);
         if self.consts.contains(expr) || matches!(data, Expr::Missing) || self.ty(expr).is_none() {
@@ -1204,7 +1100,7 @@ impl BodyChecker<'_, '_> {
             _ => None,
         };
         if let Some(reason) = reason {
-            return Some((expr, reason));
+            return Some((expr, reason, Vec::new()));
         }
         let non_const: Vec<ExprId> = children(data)
             .into_iter()
@@ -1219,13 +1115,17 @@ impl BodyChecker<'_, '_> {
                 .into_iter()
                 .find_map(|child| self.non_const_root(child));
         }
+        let mut anchors = Vec::new();
         let reason = match data {
             Expr::Call { callee, .. } => {
-                let target = self.ty(*callee).and_then(|ty| self.callee_of_ty(ty))?;
+                let target = self.ty(*callee).and_then(callee_of_ty)?;
                 if self.callee_kind(&target) != Some(CalleeKind::Const) {
                     return None;
                 }
-                format!("`{}` is not a constant expression", self.src(expr))
+                format!(
+                    "`{}` is not a constant expression",
+                    self.src(&mut anchors, expr)
+                )
             }
             Expr::MethodCall { receiver, .. } => {
                 let call = self.infer.method_calls.get(&expr)?;
@@ -1236,9 +1136,15 @@ impl BodyChecker<'_, '_> {
                     return None;
                 }
                 if call.receiver.autoref == Some(true) {
-                    format!("the call borrows `{}` mutably", self.src(*receiver))
+                    format!(
+                        "the call borrows `{}` mutably",
+                        self.src(&mut anchors, *receiver)
+                    )
                 } else {
-                    format!("`{}` is not a constant expression", self.src(expr))
+                    format!(
+                        "`{}` is not a constant expression",
+                        self.src(&mut anchors, expr)
+                    )
                 }
             }
             Expr::Path(_) => match self.infer.paths.get(&expr)? {
@@ -1251,8 +1157,11 @@ impl BodyChecker<'_, '_> {
                 ),
                 _ => return None,
             },
-            _ => format!("`{}` is not a constant expression", self.src(expr)),
+            _ => format!(
+                "`{}` is not a constant expression",
+                self.src(&mut anchors, expr)
+            ),
         };
-        Some((expr, reason))
+        Some((expr, reason, anchors))
     }
 }

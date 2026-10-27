@@ -5,32 +5,35 @@ use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use kagari_syntax::TextRange;
 use rustc_hash::FxHashMap;
 
-use super::anim;
-use super::builtins::{check_marks, to_text};
+use super::ctx::Ctx;
 use super::domain::DomainCtx;
-use super::interp::{Ctx, EvalError, Frame, Machine, Place, Value};
-use super::num::{self, Decimal, Rat};
-use super::screen::{
+use super::machine::anim;
+use super::machine::builtins::{check_marks, to_text};
+use super::machine::screen::{
     ChannelId, EntityProp, LayerTarget, PendingChange, PropTarget, Scheduled, ScheduledKind,
     Screen, Target,
 };
+use super::machine::value::Value;
+use super::machine::{CallSite, EvalError, Machine, Place};
+use super::num::{self, Decimal, Rat};
 use super::std_items::{Builtin, StdTable};
 use super::value::{AssetKind, ConstValue, Text};
 use super::*;
 use crate::db::{MemoryFileSystem, RootDatabase};
 use crate::def_map::{Def, Resolution};
-use crate::hir::{Expr, Literal, Pat, file_hir};
+use crate::hir::{Expr, Literal, Pat, body_of, body_source_map_of};
 use crate::infer::{InferenceResult, ValueRef};
 use crate::input::FilePath;
 use crate::item_tree::Shape;
 use crate::pipeline::check;
-use crate::resolve::file_resolution;
+use crate::resolve::body_resolution;
 use crate::signatures::{
     AdtDef, FieldDef, GenericParamDef, GenericParamDefKind, Generics, ProgramSignatures, VariantDef,
 };
-use crate::ty::{Const, CtorRef, GenericArg, IntTy};
+use crate::ty::{Const, CtorRef, FnDefId, GenericArg, GenericArgs, IntTy, Ty, TyKind};
 
 const MAIN: &str = "/game/main.kis";
 
@@ -49,7 +52,9 @@ fn setup_at(main: &str, source: &str) -> (RootDatabase, Program) {
 }
 
 fn std_table(db: &RootDatabase, program: Program) -> StdTable {
-    StdTable::new(db, program).expect("std loads")
+    super::std_items::std_table(db, program)
+        .clone()
+        .expect("std loads")
 }
 
 /// A top-level item of the game root by name.
@@ -69,15 +74,8 @@ fn item(db: &RootDatabase, program: Program, name: &str) -> ItemId {
 /// resolution, integer types from literal suffixes propagated through operators, records
 /// and constructor patterns from their resolved paths.
 fn mini_infer(db: &RootDatabase, program: Program, item: ItemId) -> InferenceResult {
-    let body = file_hir(db, item.file).bodies[item.index as usize]
-        .as_ref()
-        .unwrap();
-    let res = file_resolution(db, program, item.file).items[item.index as usize]
-        .as_ref()
-        .unwrap()
-        .body
-        .as_ref()
-        .unwrap();
+    let body = body_of(db, item).unwrap();
+    let res = body_resolution(db, program, item).body.as_ref().unwrap();
     let mut out = InferenceResult::default();
     let ctor_of = |resolution: &Resolution| -> Option<CtorRef> {
         match resolution {
@@ -92,13 +90,13 @@ fn mini_infer(db: &RootDatabase, program: Program, item: ItemId) -> InferenceRes
                 Some(CtorRef {
                     adt: *adt,
                     variant: None,
-                    args: Vec::new(),
+                    args: GenericArgs::empty(),
                 })
             }
             Resolution::Def(Def::Variant { enum_item, index }) => Some(CtorRef {
                 adt: *enum_item,
                 variant: Some(*index),
-                args: Vec::new(),
+                args: GenericArgs::empty(),
             }),
             _ => None,
         }
@@ -113,7 +111,7 @@ fn mini_infer(db: &RootDatabase, program: Program, item: ItemId) -> InferenceRes
                             ItemKind::Fn { .. } => ValueRef::Fn(FnRef {
                                 def: FnDefId::Item(*target),
                                 self_ty: None,
-                                args: Vec::new(),
+                                args: GenericArgs::empty(),
                             }),
                             ItemKind::Const { .. } => ValueRef::Const {
                                 item: *target,
@@ -125,12 +123,12 @@ fn mini_infer(db: &RootDatabase, program: Program, item: ItemId) -> InferenceRes
                             } => ValueRef::Fn(FnRef {
                                 def: FnDefId::StructCtor(*target),
                                 self_ty: None,
-                                args: Vec::new(),
+                                args: GenericArgs::empty(),
                             }),
                             _ => ValueRef::Ctor(CtorRef {
                                 adt: *target,
                                 variant: None,
-                                args: Vec::new(),
+                                args: GenericArgs::empty(),
                             }),
                         }
                     }
@@ -140,13 +138,13 @@ fn mini_infer(db: &RootDatabase, program: Program, item: ItemId) -> InferenceRes
                             ValueRef::Fn(FnRef {
                                 def: FnDefId::VariantCtor(*enum_item, *index),
                                 self_ty: None,
-                                args: Vec::new(),
+                                args: GenericArgs::empty(),
                             })
                         } else {
                             ValueRef::Ctor(CtorRef {
                                 adt: *enum_item,
                                 variant: Some(*index),
-                                args: Vec::new(),
+                                args: GenericArgs::empty(),
                             })
                         }
                     }
@@ -169,7 +167,7 @@ fn mini_infer(db: &RootDatabase, program: Program, item: ItemId) -> InferenceRes
                 Expr::Literal(Literal::Int {
                     suffix: Some(suffix),
                     ..
-                }) => IntTy::from_suffix(suffix).map(Ty::Int),
+                }) => IntTy::from_suffix(suffix).map(Ty::int),
                 Expr::Binary { op, lhs, .. } => match op {
                     crate::hir::BinaryOp::Eq
                     | crate::hir::BinaryOp::Ne
@@ -178,7 +176,7 @@ fn mini_infer(db: &RootDatabase, program: Program, item: ItemId) -> InferenceRes
                     | crate::hir::BinaryOp::Gt
                     | crate::hir::BinaryOp::Ge
                     | crate::hir::BinaryOp::And
-                    | crate::hir::BinaryOp::Or => Some(Ty::Bool),
+                    | crate::hir::BinaryOp::Or => Some(Ty::bool()),
                     _ => out.expr_types.get(*lhs).cloned(),
                 },
                 Expr::Unary { expr, .. } => out.expr_types.get(*expr).cloned(),
@@ -201,45 +199,11 @@ fn mini_infer(db: &RootDatabase, program: Program, item: ItemId) -> InferenceRes
     out
 }
 
-/// Evaluates the initializer of the game item `name` with [`mini_infer`].
+/// Evaluates the `const` item `name` of a game program through the `const_value` query.
 fn eval_item(source: &str, name: &str) -> Result<ConstValue, EvalError> {
-    eval_item_with(source, name, |_, _, _| {})
-}
-
-fn eval_item_with(
-    source: &str,
-    name: &str,
-    adjust: impl FnOnce(&RootDatabase, ItemId, &mut InferenceResult),
-) -> Result<ConstValue, EvalError> {
     let (db, program) = setup(source);
-    let std = std_table(&db, program);
-    let sigs = ProgramSignatures::default();
-    let ctx = Ctx::new(&db, program, &std, &sigs);
     let id = item(&db, program, name);
-    let mut infer = mini_infer(&db, program, id);
-    adjust(&db, id, &mut infer);
-    let body = file_hir(&db, id.file).bodies[id.index as usize]
-        .as_ref()
-        .unwrap();
-    let res = file_resolution(&db, program, id.file).items[id.index as usize]
-        .as_ref()
-        .unwrap()
-        .body
-        .as_ref()
-        .unwrap();
-    let body_ref = interp::BodyRef {
-        item: id,
-        body,
-        res,
-        infer: &infer,
-    };
-    let mut machine = Machine::new(&ctx);
-    let mut frame = Frame::new(body_ref, GenericEnv::default());
-    frame.initializer = true;
-    let value = machine.run(&mut frame, body.value)?;
-    machine
-        .freeze(&value)
-        .map_err(|kind| EvalError { kind, span: None })
+    const_value(&db, program, id, GenericArgs::empty()).clone()
 }
 
 fn fault_code(result: Result<ConstValue, EvalError>) -> DiagnosticCode {
@@ -450,7 +414,7 @@ fn pending_changes_need_an_animation() {
     );
 
     // The same track again is a no-op: nothing more is scheduled.
-    let track = ConstValue::Tuple(vec![ConstValue::Int(1)]);
+    let track = ConstValue::Tuple(imbl::vector![ConstValue::Int(1)]);
     let fade = ConstValue::unit();
     screen
         .commit(
@@ -481,7 +445,7 @@ fn replay_bgm_restarts_the_track() {
     assert!(silent.step.scheduled.is_empty());
 
     let mut screen = Screen::empty(&std);
-    let track = ConstValue::Tuple(vec![ConstValue::Int(1)]);
+    let track = ConstValue::Tuple(imbl::vector![ConstValue::Int(1)]);
     screen
         .commit(
             PendingChange::Channel(ChannelId::Music, Some(track)),
@@ -660,7 +624,7 @@ fn motion_identity_rule() {
     let steps0 = ConstValue::Adt {
         item: std.easing.item,
         variant: std.easing.variant("Steps").unwrap(),
-        fields: vec![ConstValue::Int(0)],
+        fields: imbl::vector![ConstValue::Int(0)],
     };
     assert_eq!(
         check(motion_with(&std, &[(150, 0, 0)], 1, steps0)),
@@ -684,7 +648,7 @@ fn easing_rules() {
     let bezier = |x1: &str, y1: &str, x2: &str| ConstValue::Adt {
         item: std.easing.item,
         variant: std.easing.variant("CubicBezier").unwrap(),
-        fields: vec![
+        fields: imbl::vector![
             ConstValue::Decimal(dec(x1)),
             ConstValue::Decimal(dec(y1)),
             ConstValue::Decimal(dec(x2)),
@@ -704,7 +668,7 @@ fn easing_rules() {
     let steps = |n: i128| ConstValue::Adt {
         item: std.easing.item,
         variant: std.easing.variant("Steps").unwrap(),
-        fields: vec![ConstValue::Int(n)],
+        fields: imbl::vector![ConstValue::Int(n)],
     };
     assert_eq!(check(steps(3)), Ok(()));
     assert_eq!(check(steps(0)), Err(DiagnosticCode::EvalInvalidEasing));
@@ -772,7 +736,7 @@ fn text_building_and_marks() {
         base: Box::new(Text::plain("")),
         effect: Box::new(mark_effect(&std, Some(n))),
     };
-    let ok = Text::Concat(vec![
+    let ok = Text::Concat(imbl::vector![
         Text::plain("Wait"),
         marked(1),
         Text::plain("—what"),
@@ -784,9 +748,9 @@ fn text_building_and_marks() {
     ]);
     check_marks(&ok, &std).unwrap();
     assert_eq!(ok.base_string(), "Wait—what!");
-    let duplicate = Text::Concat(vec![
+    let duplicate = Text::Concat(imbl::vector![
         marked(1),
-        Text::Concat(vec![Text::plain("a"), marked(1)]),
+        Text::Concat(imbl::vector![Text::plain("a"), marked(1)]),
     ]);
     assert_eq!(
         check_marks(&duplicate, &std).unwrap_err().code,
@@ -816,9 +780,9 @@ struct Harness {
     db: RootDatabase,
     program: Program,
     std: StdTable,
-    sigs: ProgramSignatures,
     item: ItemId,
-    infer: InferenceResult,
+    /// The result type of the calls.
+    ty: Option<Ty>,
 }
 
 impl Harness {
@@ -830,44 +794,32 @@ impl Harness {
             db,
             program,
             std,
-            sigs: ProgramSignatures::default(),
             item,
-            infer: InferenceResult::default(),
-        }
-    }
-
-    fn body(&self) -> interp::BodyRef<'_> {
-        let body = file_hir(&self.db, self.item.file).bodies[self.item.index as usize]
-            .as_ref()
-            .unwrap();
-        let res = file_resolution(&self.db, self.program, self.item.file).items
-            [self.item.index as usize]
-            .as_ref()
-            .unwrap()
-            .body
-            .as_ref()
-            .unwrap();
-        interp::BodyRef {
-            item: self.item,
-            body,
-            res,
-            infer: &self.infer,
+            ty: None,
         }
     }
 }
 
-fn call<'db>(
-    machine: &mut Machine<'_, 'db>,
-    frame: &Frame<'db>,
+fn call(
+    machine: &mut Machine<'_>,
+    harness: &Harness,
     builtin: Builtin,
     args: Vec<Value>,
 ) -> Result<Value, ErrorKind> {
     let fn_ref = FnRef {
-        def: FnDefId::Item(frame.b.item),
+        def: FnDefId::Item(harness.item),
         self_ty: None,
-        args: Vec::new(),
+        args: GenericArgs::empty(),
     };
-    machine.builtin(frame, frame.b.body.value, builtin, &fn_ref, args)
+    let value = body_of(&harness.db, harness.item).unwrap().value;
+    let site = CallSite {
+        at: Some(crate::diagnostic::Anchor::Node(
+            crate::diagnostic::Owner::Body(harness.item),
+            crate::diagnostic::NodeId::Expr(value),
+        )),
+        ty: harness.ty.clone(),
+    };
+    machine.builtin(site, builtin, &fn_ref, args)
 }
 
 fn reference(cell: usize) -> Value {
@@ -882,44 +834,48 @@ fn reference(cell: usize) -> Value {
 fn screen_builtins_through_references() {
     let harness = Harness::new();
     let std = &harness.std;
-    let ctx = Ctx::new(&harness.db, harness.program, std, &harness.sigs);
-    let frame = Frame::new(harness.body(), GenericEnv::default());
-    let mut m = Machine::new(&ctx);
-    let screen = call(&mut m, &frame, Builtin::ScreenEmpty, vec![]).unwrap();
+    let mut m = Machine::new(&harness.db, harness.program, std);
+    let screen = call(&mut m, &harness, Builtin::ScreenEmpty, vec![]).unwrap();
     let cell = m.alloc(screen);
     let id = m.thaw(&std.entity_id_value(4));
     let entity = call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::ScreenEntity,
         vec![reference(cell), id.clone()],
     )
     .unwrap();
-    let prop = call(&mut m, &frame, Builtin::EntityOpacity, vec![entity.clone()]).unwrap();
+    let prop = call(
+        &mut m,
+        &harness,
+        Builtin::EntityOpacity,
+        vec![entity.clone()],
+    )
+    .unwrap();
     let change = call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::PropChange,
         vec![prop.clone(), Value::Decimal(Decimal::ONE)],
     )
     .unwrap();
     // Not applied yet.
-    let current = call(&mut m, &frame, Builtin::PropGet, vec![prop.clone()]).unwrap();
+    let current = call(&mut m, &harness, Builtin::PropGet, vec![prop.clone()]).unwrap();
     assert!(matches!(current, Value::Decimal(value) if value == Decimal::ZERO));
     let instant = m.thaw(&tween(std, linear(std)));
     call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::ChangeApplyAnimation,
         vec![change, instant],
     )
     .unwrap();
-    let current = call(&mut m, &frame, Builtin::PropGet, vec![prop.clone()]).unwrap();
+    let current = call(&mut m, &harness, Builtin::PropGet, vec![prop.clone()]).unwrap();
     assert!(matches!(current, Value::Decimal(value) if value == Decimal::ONE));
     // An out-of-range opacity is rejected where the change is made.
     let bad = call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::PropChange,
         vec![prop, Value::Decimal(dec("1.5"))],
     );
@@ -928,7 +884,7 @@ fn screen_builtins_through_references() {
     );
     let contains = call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::ScreenContains,
         vec![reference(cell), id.clone()],
     )
@@ -936,14 +892,14 @@ fn screen_builtins_through_references() {
     assert!(matches!(contains, Value::Bool(true)));
     call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::ScreenDespawn,
         vec![reference(cell), id.clone()],
     )
     .unwrap();
     let contains = call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::ScreenContains,
         vec![reference(cell), id],
     )
@@ -953,14 +909,14 @@ fn screen_builtins_through_references() {
     let mark = m.thaw(&std.mark.make(vec![ConstValue::Int(1)]));
     call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::ScreenAtMark,
         vec![reference(cell), mark],
     )
     .unwrap();
     let begin = call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::ScreenBeginText,
         vec![reference(cell)],
     );
@@ -972,13 +928,13 @@ fn screen_builtins_through_references() {
     let one = m.thaw(&std.entity_id_value(1));
     let entity = call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::ScreenEntity,
         vec![reference(probe), one],
     );
     assert_eq!(entity.unwrap_err(), ErrorKind::Inspected);
     assert_eq!(
-        call(&mut m, &frame, Builtin::ScreenEmpty, vec![]).map(|_| ()),
+        call(&mut m, &harness, Builtin::ScreenEmpty, vec![]).map(|_| ()),
         Ok(())
     );
 }
@@ -987,30 +943,28 @@ fn screen_builtins_through_references() {
 fn vec_and_text_builtins() {
     let harness = Harness::new();
     let std = &harness.std;
-    let ctx = Ctx::new(&harness.db, harness.program, std, &harness.sigs);
-    let frame = Frame::new(harness.body(), GenericEnv::default());
-    let mut m = Machine::new(&ctx);
-    let vec = call(&mut m, &frame, Builtin::VecNew, vec![]).unwrap();
+    let mut m = Machine::new(&harness.db, harness.program, std);
+    let vec = call(&mut m, &harness, Builtin::VecNew, vec![]).unwrap();
     let cell = m.alloc(vec);
     call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::VecPush,
         vec![reference(cell), Value::Int(7)],
     )
     .unwrap();
-    let len = call(&mut m, &frame, Builtin::VecLen, vec![reference(cell)]).unwrap();
+    let len = call(&mut m, &harness, Builtin::VecLen, vec![reference(cell)]).unwrap();
     assert!(matches!(len, Value::Int(1)));
     call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::VecSet,
         vec![reference(cell), Value::Int(0), Value::Int(9)],
     )
     .unwrap();
     let got = call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::VecGet,
         vec![reference(cell), Value::Int(0)],
     )
@@ -1018,7 +972,7 @@ fn vec_and_text_builtins() {
     assert_eq!(m.freeze(&got).unwrap(), std.some(ConstValue::Int(9)));
     let missing = call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::VecGet,
         vec![reference(cell), Value::Int(5)],
     )
@@ -1026,7 +980,7 @@ fn vec_and_text_builtins() {
     assert_eq!(m.freeze(&missing).unwrap(), std.none());
     let set = call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::VecSet,
         vec![reference(cell), Value::Int(1), Value::Int(9)],
     );
@@ -1037,16 +991,16 @@ fn vec_and_text_builtins() {
     let effect = m.thaw(&mark_effect(std, Some(3)));
     let marked = call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::Effect,
         vec![Value::Text(Text::plain("x")), effect],
     )
     .unwrap();
     let concat = call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::Concat,
-        vec![Value::Array(vec![
+        vec![Value::Array(imbl::vector![
             marked.clone(),
             Value::Text(Text::plain("y")),
             marked,
@@ -1055,9 +1009,9 @@ fn vec_and_text_builtins() {
     assert!(
         matches!(concat, Err(ErrorKind::Fault(fault)) if fault.code == DiagnosticCode::EvalDuplicateMark)
     );
-    let text = call(&mut m, &frame, Builtin::ToText, vec![Value::Int(12)]).unwrap();
-    assert!(matches!(text, Value::Text(Text::Plain(text)) if text == "12"));
-    let handle = call(&mut m, &frame, Builtin::Setting, vec![Value::Bool(true)]).unwrap();
+    let text = call(&mut m, &harness, Builtin::ToText, vec![Value::Int(12)]).unwrap();
+    assert!(matches!(text, Value::Text(Text::Plain(text)) if &*text == "12"));
+    let handle = call(&mut m, &harness, Builtin::Setting, vec![Value::Bool(true)]).unwrap();
     assert!(matches!(
         handle,
         Value::NewHandle {
@@ -1069,22 +1023,19 @@ fn vec_and_text_builtins() {
         m.freeze(&handle),
         Err(ErrorKind::Fault(fault)) if fault.code == DiagnosticCode::EvalHandleOutsideStatic
     ));
-    let runtime = call(&mut m, &frame, Builtin::Runtime, vec![]);
+    let runtime = call(&mut m, &harness, Builtin::Runtime, vec![]);
     assert!(matches!(runtime, Err(ErrorKind::Abort)));
 }
 
 #[test]
 fn integer_conversion_builtins() {
     let mut harness = Harness::new();
-    let value = harness.body().body.value;
-    harness.infer.expr_types.insert(value, Ty::Int(IntTy::U8));
+    harness.ty = Some(Ty::int(IntTy::U8));
     let std = &harness.std;
-    let ctx = Ctx::new(&harness.db, harness.program, std, &harness.sigs);
-    let frame = Frame::new(harness.body(), GenericEnv::default());
-    let mut m = Machine::new(&ctx);
+    let mut m = Machine::new(&harness.db, harness.program, std);
     let saturated = call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::IntegerSaturate,
         vec![Value::Int(300)],
     )
@@ -1092,13 +1043,13 @@ fn integer_conversion_builtins() {
     assert!(matches!(saturated, Value::Int(255)));
     let saturated = call(
         &mut m,
-        &frame,
+        &harness,
         Builtin::IntegerSaturate,
         vec![Value::Int(-3)],
     )
     .unwrap();
     assert!(matches!(saturated, Value::Int(0)));
-    let into = call(&mut m, &frame, Builtin::IntegerInto, vec![Value::Int(42)]).unwrap();
+    let into = call(&mut m, &harness, Builtin::IntegerInto, vec![Value::Int(42)]).unwrap();
     assert!(matches!(into, Value::Int(42)));
 }
 
@@ -1184,9 +1135,7 @@ fn patterns() {
     assert_eq!(eval_item(source, "M"), Ok(ConstValue::Bool(true)));
     let source = "const LIMIT: i32 = 4i32;
         const L: i32 = match 4i32 { LIMIT => 1i32, _ => 0i32 };";
-    // Consts are evaluated through the (stub) inference of their own body: the pattern
-    // cannot see `LIMIT`'s value, so evaluation stops without a diagnostic.
-    assert_eq!(eval_item(source, "L"), Err(EvalError::abort()));
+    assert_eq!(eval_item(source, "L"), Ok(ConstValue::Int(1)));
     // Stage 3 reports the non-exhaustive match; evaluation stops silently.
     assert_eq!(
         eval_item("const F: i32 = match 9i32 { 0..=5 => 1i32 };", "F"),
@@ -1205,7 +1154,7 @@ fn records_and_references() {
         Ok(ConstValue::Adt {
             item: p,
             variant: 0,
-            fields: vec![ConstValue::Int(2), ConstValue::Int(5)],
+            fields: imbl::vector![ConstValue::Int(2), ConstValue::Int(5)],
         })
     );
 }
@@ -1220,13 +1169,17 @@ fn vec_set_out_of_range_and_try() {
     let source = "const G: Vec<u32> = { let mut v = Vec::new(); Vec::push(&mut v, 1u32); Vec::set(&mut v, 0usize, 2u32); v };";
     assert_eq!(
         eval_item(source, "G"),
-        Ok(ConstValue::Vec(vec![ConstValue::Int(2)]))
+        Ok(ConstValue::Vec(imbl::vector![ConstValue::Int(2)]))
     );
     // Stage 3 rejects `?` in a constant; evaluation stops without a second diagnostic.
     let source = "const I: u8 = { let x: Option<u8> = None; x? };";
     assert_eq!(eval_item(source, "I"), Err(EvalError::abort()));
-    let source = "const I: u8 = { let x: Option<u8> = Some(3u8); x? };";
+    let source = "const fn get(x: Option<u8>) -> Option<u8> { Some(x?) }
+        const I: u8 = match get(Some(3u8)) { Some(v) => v, None => 0u8 };";
     assert_eq!(eval_item(source, "I"), Ok(ConstValue::Int(3)));
+    let source = "const fn get(x: Option<u8>) -> Option<u8> { Some(x?) }
+        const I: u8 = match get(None) { Some(v) => v, None => 0u8 };";
+    assert_eq!(eval_item(source, "I"), Ok(ConstValue::Int(0)));
     let source =
         "const A: [i32; 2] = [1i32, 2i32]; const B: i32 = { let a = [1i32, 2i32]; a[2usize] };";
     assert_eq!(
@@ -1241,35 +1194,18 @@ fn text_and_asset_values() {
         const H: Text = concat([\"a\", \"b\"]);";
     assert_eq!(
         eval_item(source, "H"),
-        Ok(ConstValue::Text(Text::Concat(vec![
+        Ok(ConstValue::Text(Text::Concat(imbl::vector![
             Text::plain("a"),
             Text::plain("b")
         ])))
     );
     let source = "const IMG: ImageAsset = asset(\"a.png\");";
-    let result = eval_item_with(source, "IMG", |db, id, infer| {
-        let body = file_hir(db, id.file).bodies[id.index as usize]
-            .as_ref()
-            .unwrap();
-        let std = &std_table_for(db);
-        infer.expr_types.insert(
-            body.value,
-            Ty::Adt {
-                item: std.assets[0].0,
-                args: Vec::new(),
-            },
-        );
-    });
-    assert_eq!(result, Ok(image("/game/a.png")));
+    assert_eq!(eval_item(source, "IMG"), Ok(image("/game/a.png")));
     let source = "const S: Setting<bool> = setting(true);";
     assert_eq!(
         fault_code(eval_item(source, "S")),
         DiagnosticCode::EvalHandleOutsideStatic
     );
-}
-
-fn std_table_for(db: &RootDatabase) -> StdTable {
-    std_table(db, db.program(FilePath::disk(MAIN)))
 }
 
 // ----- Constant expressions -----------------------------------------------------------
@@ -1292,20 +1228,13 @@ fn constant_expressions() {
     let (db, program) = setup(source);
     let p = item(&db, program, "p");
     let infer = mini_infer(&db, program, p);
-    let body = file_hir(&db, p.file).bodies[p.index as usize]
-        .as_ref()
-        .unwrap();
-    let res = file_resolution(&db, program, p.file).items[p.index as usize]
-        .as_ref()
-        .unwrap()
-        .body
-        .as_ref()
-        .unwrap();
+    let body = body_of(&db, p).unwrap();
+    let res = body_resolution(&db, program, p).body.as_ref().unwrap();
     // Every expression needs a type to be constant; give the untyped ones `bool`.
     let mut infer = infer;
     for (id, _) in body.store.exprs.iter() {
         if infer.expr_types.get(id).is_none() {
-            infer.expr_types.insert(id, Ty::Bool);
+            infer.expr_types.insert(id, Ty::bool());
         }
     }
     for (id, expr) in body.store.exprs.iter() {
@@ -1321,7 +1250,7 @@ fn constant_expressions() {
     }
     let consts = const_exprs::analyze(&db, body, res, &infer);
     let text = |id: ExprId| {
-        let range = body.store.expr_range(id);
+        let range = body_source_map_of(&db, p).unwrap().expr(id);
         source[usize::from(range.start())..usize::from(range.end())].to_owned()
     };
     let mut constant: Vec<String> = consts.exprs.iter().map(|id| text(*id)).collect();
@@ -1368,10 +1297,7 @@ fn finite_domain_sizes_and_values() {
     let pair = item(&db, program, "Pair");
     let e = item(&db, program, "E");
     let opt = item(&db, program, "Opt");
-    let adt = |item: ItemId| Ty::Adt {
-        item,
-        args: Vec::new(),
-    };
+    let adt = |item: ItemId| Ty::adt(item, GenericArgs::empty());
     let variant = |name: &str, fields: Vec<Ty>| VariantDef {
         name: name.into(),
         shape: Shape::Tuple(u32::try_from(fields.len()).unwrap()),
@@ -1406,7 +1332,7 @@ fn finite_domain_sizes_and_values() {
         pair,
         def(
             false,
-            vec![variant("Pair", vec![Ty::Bool, adt(mood)])],
+            vec![variant("Pair", vec![Ty::bool(), adt(mood)])],
             Generics::default(),
         ),
     );
@@ -1414,7 +1340,7 @@ fn finite_domain_sizes_and_values() {
         e,
         def(
             true,
-            vec![variant("A", vec![Ty::Bool]), variant("B", vec![])],
+            vec![variant("A", vec![Ty::bool()]), variant("B", vec![])],
             Generics::default(),
         ),
     );
@@ -1426,10 +1352,10 @@ fn finite_domain_sizes_and_values() {
                 variant("None", vec![]),
                 variant(
                     "Some",
-                    vec![Ty::Param {
+                    vec![Ty::new(TyKind::Param {
                         owner: opt,
                         index: 0,
-                    }],
+                    })],
                 ),
             ],
             Generics {
@@ -1442,10 +1368,7 @@ fn finite_domain_sizes_and_values() {
             },
         ),
     );
-    let screen = Ty::Adt {
-        item: std.screen,
-        args: Vec::new(),
-    };
+    let screen = Ty::adt(std.screen, GenericArgs::empty());
     let render_sig = FnSig {
         generics: Generics::default(),
         kind: FnKind::Const,
@@ -1470,94 +1393,76 @@ fn finite_domain_sizes_and_values() {
         assets: &assets,
         functions: &functions,
     };
-    let opt_of = |ty: Ty| Ty::Adt {
-        item: opt,
-        args: vec![GenericArg::Type(ty)],
-    };
-    assert_eq!(domain.size(&Ty::Bool), Some(2));
+    let opt_of = |ty: Ty| Ty::adt(opt, GenericArgs::new(vec![GenericArg::Type(ty)]));
+    assert_eq!(domain.size(&Ty::bool()), Some(2));
     assert_eq!(domain.size(&Ty::unit()), Some(1));
     assert_eq!(domain.size(&bounded(0, 5)), Some(6));
     assert_eq!(domain.size(&bounded(-3, 3)), Some(7));
     assert_eq!(
-        domain.size(&Ty::Tuple(vec![Ty::Bool, bounded(0, 5)])),
+        domain.size(&Ty::tuple(vec![Ty::bool(), bounded(0, 5)])),
         Some(12)
     );
     assert_eq!(
-        domain.size(&Ty::Array {
-            elem: Box::new(Ty::Bool),
+        domain.size(&Ty::new(TyKind::Array {
+            elem: Ty::bool(),
             len: Const::Value(3)
-        }),
+        })),
         Some(8)
     );
     assert_eq!(domain.size(&adt(mood)), Some(3));
     assert_eq!(domain.size(&adt(pair)), Some(6));
     assert_eq!(domain.size(&adt(e)), Some(3));
     assert_eq!(domain.size(&opt_of(adt(mood))), Some(4));
-    assert_eq!(domain.size(&opt_of(opt_of(Ty::Bool))), Some(4));
+    assert_eq!(domain.size(&opt_of(opt_of(Ty::bool()))), Some(4));
+    assert_eq!(domain.size(&Ty::reference(true, adt(mood))), Some(3));
     assert_eq!(
-        domain.size(&Ty::Ref {
-            mutable: true,
-            inner: Box::new(adt(mood))
-        }),
-        Some(3)
-    );
-    assert_eq!(
-        domain.size(&Ty::Adt {
-            item: std.text,
-            args: Vec::new()
-        }),
+        domain.size(&Ty::adt(std.text, GenericArgs::empty())),
         Some(2)
     );
     assert_eq!(
-        domain.size(&Ty::Adt {
-            item: std.assets[0].0,
-            args: Vec::new()
-        }),
+        domain.size(&Ty::adt(std.assets[0].0, GenericArgs::empty())),
         Some(1)
     );
     assert_eq!(
-        domain.size(&Ty::Adt {
-            item: std.assets[1].0,
-            args: Vec::new()
-        }),
+        domain.size(&Ty::adt(std.assets[1].0, GenericArgs::empty())),
         Some(0)
     );
-    let render_ptr = Ty::FnPtr {
+    let render_ptr = Ty::new(TyKind::FnPtr {
         kind: crate::hir::FnPtrKind::Const,
-        params: vec![screen.clone()],
-        ret: Box::new(screen.clone()),
-    };
+        params: vec![screen.clone()].into(),
+        ret: screen.clone(),
+    });
     assert_eq!(domain.size(&render_ptr), Some(2));
-    let scene_ptr = Ty::FnPtr {
+    let scene_ptr = Ty::new(TyKind::FnPtr {
         kind: crate::hir::FnPtrKind::Scene,
-        params: vec![screen.clone()],
-        ret: Box::new(screen),
-    };
+        params: vec![screen.clone()].into(),
+        ret: screen,
+    });
     assert_eq!(domain.size(&scene_ptr), Some(0));
     // Not finite.
-    assert_eq!(domain.size(&Ty::Int(IntTy::U8)), None);
+    assert_eq!(domain.size(&Ty::int(IntTy::U8)), None);
     assert_eq!(
-        domain.size(&Ty::Adt {
-            item: std.screen,
-            args: Vec::new()
-        }),
+        domain.size(&Ty::adt(std.screen, GenericArgs::empty())),
         None
     );
     assert_eq!(
-        domain.size(&Ty::FnPtr {
+        domain.size(&Ty::new(TyKind::FnPtr {
             kind: crate::hir::FnPtrKind::Plain,
-            params: vec![],
-            ret: Box::new(Ty::unit())
-        }),
+            params: Box::default(),
+            ret: Ty::unit()
+        })),
         None
     );
 
     let values = domain
-        .values(&Ty::Tuple(vec![Ty::Bool, bounded(0, 1)]), TABLE_DOMAIN_CAP)
+        .values(
+            &Ty::tuple(vec![Ty::bool(), bounded(0, 1)]),
+            TABLE_DOMAIN_CAP,
+        )
         .unwrap();
     let pairs: Vec<ConstValue> = [(false, 0), (false, 1), (true, 0), (true, 1)]
         .iter()
-        .map(|(b, n)| ConstValue::Tuple(vec![ConstValue::Bool(*b), ConstValue::Int(*n)]))
+        .map(|(b, n)| ConstValue::Tuple(imbl::vector![ConstValue::Bool(*b), ConstValue::Int(*n)]))
         .collect();
     assert_eq!(values, pairs);
     let values = domain.values(&adt(e), TABLE_DOMAIN_CAP).unwrap();
@@ -1567,17 +1472,17 @@ fn finite_domain_sizes_and_values() {
             ConstValue::Adt {
                 item: e,
                 variant: 0,
-                fields: vec![ConstValue::Bool(false)]
+                fields: imbl::vector![ConstValue::Bool(false)]
             },
             ConstValue::Adt {
                 item: e,
                 variant: 0,
-                fields: vec![ConstValue::Bool(true)]
+                fields: imbl::vector![ConstValue::Bool(true)]
             },
             ConstValue::Adt {
                 item: e,
                 variant: 1,
-                fields: vec![]
+                fields: imbl::vector![]
             },
         ]
     );
@@ -1600,7 +1505,7 @@ fn tabulation_cap() {
         assets: &assets,
         functions: &[],
     };
-    let byte_pair = Ty::Tuple(vec![bounded(0, 255), bounded(0, 255)]);
+    let byte_pair = Ty::tuple(vec![bounded(0, 255), bounded(0, 255)]);
     assert_eq!(domain.size(&byte_pair), Some(TABLE_DOMAIN_CAP));
     assert_eq!(
         domain
@@ -1608,16 +1513,16 @@ fn tabulation_cap() {
             .map(|values| values.len()),
         Some(65_536)
     );
-    let too_many = Ty::Array {
-        elem: Box::new(Ty::Bool),
+    let too_many = Ty::new(TyKind::Array {
+        elem: Ty::bool(),
         len: Const::Value(17),
-    };
+    });
     assert_eq!(domain.size(&too_many), Some(131_072));
     assert_eq!(domain.values(&too_many, TABLE_DOMAIN_CAP), None);
-    let huge = Ty::Array {
-        elem: Box::new(bounded(0, 1000)),
+    let huge = Ty::new(TyKind::Array {
+        elem: bounded(0, 1000),
         len: Const::Value(100),
-    };
+    });
     assert_eq!(domain.size(&huge), Some(u64::MAX));
     assert_eq!(domain.size(&bounded(i128::MIN, i128::MAX)), None);
 }
@@ -1636,61 +1541,30 @@ fn folds_and_tabulates_story_bodies() {
         }";
     let (db, program) = setup(source);
     let std = std_table(&db, program);
-    let sigs = ProgramSignatures::default();
-    let ctx = Ctx::new(&db, program, &std, &sigs);
+    let sigs = program_signatures(&db, program);
     let p = item(&db, program, "p");
-    let day = item(&db, program, "DAY");
-    let big = item(&db, program, "BIG");
-    let mut infer = mini_infer(&db, program, p);
-    let body = file_hir(&db, p.file).bodies[p.index as usize]
-        .as_ref()
-        .unwrap();
-    let res = file_resolution(&db, program, p.file).items[p.index as usize]
-        .as_ref()
-        .unwrap()
-        .body
-        .as_ref()
-        .unwrap();
-    let text = Ty::Adt {
-        item: std.text,
-        args: Vec::new(),
-    };
-    for (id, expr) in body.store.exprs.iter() {
-        let ty = match (expr, infer.paths.get(&id)) {
-            (_, Some(ValueRef::Static(item))) if *item == day => bounded(1, 3),
-            (_, Some(ValueRef::Static(item))) if *item == big => bounded(0, 70_000),
-            (Expr::Array(crate::hir::ArrayExpr::List(items)), _) => Ty::Array {
-                elem: Box::new(text.clone()),
-                len: Const::Value(i128::try_from(items.len()).unwrap()),
-            },
-            (Expr::Block { .. }, _) => Ty::unit(),
-            _ => text.clone(),
-        };
-        infer.expr_types.insert(id, ty);
-    }
-    let consts = const_exprs::analyze(&db, body, res, &infer);
-    let body_ref = interp::BodyRef {
-        item: p,
-        body,
-        res,
-        infer: &infer,
-    };
     let mut driver = Driver {
         db: &db,
         program,
-        ctx: &ctx,
+        ctx: Ctx::new(&db, program, &std, sigs),
         out: ConstEval::default(),
         texts: Vec::new(),
         text_set: Default::default(),
     };
-    driver.fold_body(true, body_ref, &consts);
-    let ab = ConstValue::Text(Text::Concat(vec![Text::plain("a"), Text::plain("b")]));
-    assert_eq!(
-        driver.out.folded.values().cloned().collect::<Vec<_>>(),
-        vec![ab]
-    );
+    driver.run();
+    let ab = ConstValue::Text(Text::Concat(imbl::vector![
+        Text::plain("a"),
+        Text::plain("b")
+    ]));
+    let mir = crate::mir::item_mir(&db, program, p).as_ref().unwrap();
+    let promoted: Vec<ConstValue> = (0..mir.promoted.len())
+        .map(|index| {
+            let index = crate::thir::PromotedId::from_usize(index).unwrap();
+            promoted_value(&db, program, p, index).clone().unwrap()
+        })
+        .collect();
+    assert_eq!(promoted, vec![ab]);
 
-    driver.tabulate_body(true, body_ref, &consts, &FxHashMap::default(), &[]);
     let by_len = |len: usize| {
         driver
             .out
@@ -1711,11 +1585,14 @@ fn folds_and_tabulates_story_bodies() {
     assert_eq!(
         concat.rows[1],
         (
-            vec![ConstValue::Array(vec![
+            vec![ConstValue::Array(imbl::vector![
                 ConstValue::Text(Text::plain("Day ")),
                 ConstValue::Text(Text::plain("2")),
             ])],
-            ConstValue::Text(Text::Concat(vec![Text::plain("Day "), Text::plain("2")])),
+            ConstValue::Text(Text::Concat(imbl::vector![
+                Text::plain("Day "),
+                Text::plain("2")
+            ])),
         )
     );
     // `to_text(BIG)` has more inputs than the cap.
@@ -1735,11 +1612,10 @@ fn overflow_in_duration_code_is_a_duration_overflow() {
     let (db, program) = setup("const D: u32 = 1u32;");
     let std = std_table(&db, program);
     let sigs = ProgramSignatures::default();
-    let ctx = Ctx::new(&db, program, &std, &sigs);
     let mut driver = Driver {
         db: &db,
         program,
-        ctx: &ctx,
+        ctx: Ctx::new(&db, program, &std, &sigs),
         out: ConstEval::default(),
         texts: Vec::new(),
         text_set: Default::default(),
@@ -1749,19 +1625,13 @@ fn overflow_in_duration_code_is_a_duration_overflow() {
             DiagnosticCode::EvalOverflow,
             "arithmetic overflow",
         )),
-        span: Some(crate::diagnostic::Span::new(file, TextRange::default())),
+        at: Some(crate::diagnostic::Anchor::Text(file, TextRange::default())),
     };
     let root = *program.root(&db);
-    let range = TextRange::new(1.into(), 2.into());
-    driver.report(true, root, range, &error(std.time_file), None);
-    driver.report(
-        true,
-        root,
-        range,
-        &error(root),
-        Some(" (with arguments `(1)`)"),
-    );
-    driver.report(false, root, range, &error(root), None);
+    let anchor = crate::diagnostic::Anchor::Text(root, TextRange::new(1.into(), 2.into()));
+    driver.report(true, anchor, &error(std.time_file), None);
+    driver.report(true, anchor, &error(root), Some(" (with arguments `(1)`)"));
+    driver.report(false, anchor, &error(root), None);
     let diags = &driver.out.diagnostics;
     assert_eq!(diags.len(), 2);
     assert_eq!(diags[0].code, DiagnosticCode::EvalDurationOverflow);
@@ -1903,8 +1773,8 @@ fn constant_cycles_are_errors() {
         .iter()
         .map(|diag| (diag.code, diag.message.as_str()))
         .collect();
-    // One error per cycle, at the constant whose evaluation closed it; a constant that
-    // only uses a failed one (`D`) adds nothing.
+    // One error per constant in a cycle, named after it; a constant that only uses a
+    // failed one (`D`) adds nothing.
     assert_eq!(
         reported,
         vec![
@@ -1915,6 +1785,10 @@ fn constant_cycles_are_errors() {
             (
                 DiagnosticCode::EvalConstCycle,
                 "the value of `B` depends on itself, so it cannot be computed at compile time"
+            ),
+            (
+                DiagnosticCode::EvalConstCycle,
+                "the value of `C` depends on itself, so it cannot be computed at compile time"
             ),
         ]
     );
@@ -1996,10 +1870,7 @@ fn evaluates_a_game_end_to_end() {
             let name = match id {
                 RenderId::Fn(item) => super::value::item_name(&db, *item),
                 RenderId::Closure(owner, expr) => {
-                    let body = file_hir(&db, owner.file).bodies[owner.index as usize]
-                        .as_ref()
-                        .unwrap();
-                    let range = body.store.expr_range(*expr);
+                    let range = body_source_map_of(&db, *owner).unwrap().expr(*expr);
                     GAME[usize::from(range.start())..usize::from(range.end())].to_owned()
                 }
             };
@@ -2038,7 +1909,7 @@ fn evaluates_a_game_end_to_end() {
         Some(ConstValue::Adt {
             item: mood_item,
             variant: 0,
-            fields: vec![]
+            fields: imbl::vector![]
         })
     );
     assert_eq!(
@@ -2046,7 +1917,7 @@ fn evaluates_a_game_end_to_end() {
         Some(ConstValue::Adt {
             item: mood_item,
             variant: 2,
-            fields: vec![]
+            fields: imbl::vector![]
         })
     );
 }

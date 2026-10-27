@@ -1,0 +1,357 @@
+---
+source: core/kagari-lang/tests/mir.rs
+expression: out
+input_file: core/kagari-lang/tests/bytecode/001__arith/main.kix
+---
+fn crate::ints(_1: u8, _2: i32) -> i32 {
+    let mut _0: i32; // return
+    let _1: u8; // a
+    let _2: i32; // b
+    let _3: u8; // c
+    let _4: u8; // temp
+    let _5: i32; // d
+    let _6: i32; // temp
+    let _7: i32; // temp
+    let _8: i32; // temp
+    let _9: i32; // e
+    let _10: i32; // temp
+    let _11: u8; // f
+    let _12: u8; // temp
+    let _13: u8; // temp
+    let _14: i32; // g
+    let _15: i32; // h
+    let _16: i32; // temp
+    let _17: i32; // temp
+    let _18: i32; // temp
+    bb0 (entry): {
+        _4 = IntBin::<u8>(Mul, copy _1, const 2);
+        _3 = IntBin::<u8>(Add, copy _4, const 1);
+        _8 = IntBin::<i32>(Mul, const 3, copy _2);
+        _7 = IntBin::<i32>(Div, copy _8, const 2);
+        _6 = IntBin::<i32>(Rem, copy _7, const 7);
+        _5 = IntBin::<i32>(Sub, copy _2, copy _6);
+        _10 = IntBin::<i32>(Shl, copy _2, const 2);
+        _9 = IntBin::<i32>(Shr, copy _10, const 1);
+        _12 = IntBin::<u8>(BitAnd, copy _1, const 15);
+        _13 = IntBin::<u8>(BitXor, copy _1, const 3);
+        _11 = IntBin::<u8>(BitOr, copy _12, copy _13);
+        _14 = builtin[IntegerInto] <u8 as std::Integer::into>::<i32>(copy _3);
+        _15 = builtin[IntegerInto] <u8 as std::Integer::into>::<i32>(copy _11);
+        _18 = IntBin::<i32>(Add, copy _5, copy _9);
+        _17 = IntBin::<i32>(Add, copy _18, copy _14);
+        _16 = IntBin::<i32>(Add, copy _17, copy _15);
+        _0 = IntNeg::<i32>(copy _16);
+        return;
+    }
+}
+
+fn crate::bounded(_1: u32) -> Int<0, 255> {
+    let mut _0: Int<0, 255>; // return
+    let _1: u32; // wide
+    let mut _2: Int<0, 5>; // n
+    let _3: i128; // temp
+    let _4: u8; // small
+    let _5: Int<0, 255>; // back
+    bb0 (entry): {
+        _2 = const 4;
+        _3 = IntBin::<i128>(Add, copy _2, const 3);
+        _2 = IntClamp::<Int<0, 5>>(copy _3);
+        _4 = builtin[IntegerSaturate] <u32 as std::Integer::saturate>::<u8>(copy _1);
+        _5 = builtin[IntegerInto] <u8 as std::Integer::into>::<Int<0, 255>>(copy _4);
+        _0 = copy _5;
+        return;
+    }
+}
+
+fn crate::decimals(_1: Decimal) -> Decimal {
+    let mut _0: Decimal; // return
+    let _1: Decimal; // x
+    let _2: Decimal; // third
+    let _3: Decimal; // r
+    let _4: Rat; // temp
+    let _5: Decimal; // temp
+    let _6: Decimal; // temp
+    bb0 (entry): {
+        _2 = DecBin(Div, const 1.0, const 3.0);
+        _4 = builtin[RatNew] std::Rat::new(const 1, const 3);
+        _3 = builtin[RatToDecimal] std::Rat::to_decimal(copy _4);
+        _6 = DecBin(Mul, copy _1, const 0.5);
+        _5 = DecBin(Add, copy _6, copy _2);
+        _0 = DecBin(Sub, copy _5, copy _3);
+        return;
+    }
+}
+
+fn crate::rats() -> Rat {
+    let mut _0: Rat; // return
+    let _1: Rat; // a
+    let _2: Rat; // temp
+    let _3: Rat; // temp
+    let _4: Rat; // temp
+    let _5: Rat; // temp
+    bb0 (entry): {
+        _1 = builtin[RatNew] std::Rat::new(const 1, const 3);
+        _2 = RatBin(Mul, copy _1, copy _1);
+        _4 = copy _1;
+        _5 = builtin[RatNew] std::Rat::new(const 2, const 1);
+        _3 = RatBin(Div, copy _4, copy _5);
+        _0 = RatBin(Sub, copy _2, copy _3);
+        return;
+    }
+}
+
+fn crate::compare(_1: i32, _2: i32, _3: Decimal) -> bool {
+    let mut _0: bool; // return
+    let _1: i32; // a
+    let _2: i32; // b
+    let _3: Decimal; // x
+    let _4: bool; // temp
+    let _5: bool; // temp
+    let _6: bool; // temp
+    let _7: bool; // temp
+    let _8: bool; // temp
+    let _9: bool; // temp
+    let _10: bool; // temp
+    bb0 (entry): {
+        _6 = Cmp(Lt, copy _1, copy _2);
+        switch_bool(copy _6) -> [true: bb1, false: bb3] (short-circuit _5);
+    }
+    bb1: {
+        _7 = Cmp(Ge, copy _3, const 0.5);
+        switch_bool(copy _7) -> [true: bb2, false: bb3] (short-circuit _5);
+    }
+    bb2: {
+        _5 = const true;
+        goto -> bb4;
+    }
+    bb3: {
+        _5 = const false;
+        goto -> bb4;
+    }
+    bb4: {
+        switch_bool(copy _5) -> [true: bb6, false: bb5] (short-circuit _4);
+    }
+    bb5: {
+        _9 = Cmp(Eq, copy _1, copy _2);
+        _8 = BoolNot(copy _9);
+        switch_bool(copy _8) -> [true: bb6, false: bb7] (short-circuit _4);
+    }
+    bb6: {
+        _4 = const true;
+        goto -> bb8;
+    }
+    bb7: {
+        _4 = const false;
+        goto -> bb8;
+    }
+    bb8: {
+        switch_bool(copy _4) -> [true: bb10, false: bb9] (short-circuit _0);
+    }
+    bb9: {
+        _10 = Cmp(Ne, copy _1, const 3);
+        switch_bool(copy _10) -> [true: bb10, false: bb11] (short-circuit _0);
+    }
+    bb10: {
+        _0 = const true;
+        goto -> bb12;
+    }
+    bb11: {
+        _0 = const false;
+        goto -> bb12;
+    }
+    bb12: {
+        return;
+    }
+}
+
+const crate::TEXT_SPEED() -> Setting<Duration> {
+    let mut _0: Setting<Duration>; // return
+    let _1: Duration; // temp
+    bb0 (entry): {
+        _1 = std::time::ms(const 30);
+        _0 = builtin[Setting] std::system::setting::<Duration>(copy _1);
+        return;
+    }
+}
+
+const crate::AUTO_DELAY() -> Setting<Duration> {
+    let mut _0: Setting<Duration>; // return
+    let _1: Duration; // temp
+    bb0 (entry): {
+        _1 = std::time::ms(const 1300);
+        _0 = builtin[Setting] std::system::setting::<Duration>(copy _1);
+        return;
+    }
+}
+
+const crate::AUTO_DELAY_PER_CHAR() -> Setting<Duration> {
+    let mut _0: Setting<Duration>; // return
+    let _1: Duration; // temp
+    bb0 (entry): {
+        _1 = std::time::ms(const 60);
+        _0 = builtin[Setting] std::system::setting::<Duration>(copy _1);
+        return;
+    }
+}
+
+const crate::SKIP_UNREAD() -> Setting<bool> {
+    let mut _0: Setting<bool>; // return
+    bb0 (entry): {
+        _0 = builtin[Setting] std::system::setting::<bool>(const false);
+        return;
+    }
+}
+
+const crate::MASTER() -> Setting<Volume> {
+    let mut _0: Setting<Volume>; // return
+    let _1: Volume; // temp
+    bb0 (entry): {
+        _1 = std::system::volume(const 100);
+        _0 = builtin[Setting] std::system::setting::<Volume>(copy _1);
+        return;
+    }
+}
+
+const crate::MUSIC() -> Setting<Volume> {
+    let mut _0: Setting<Volume>; // return
+    let _1: Volume; // temp
+    bb0 (entry): {
+        _1 = std::system::volume(const 60);
+        _0 = builtin[Setting] std::system::setting::<Volume>(copy _1);
+        return;
+    }
+}
+
+const crate::SOUND() -> Setting<Volume> {
+    let mut _0: Setting<Volume>; // return
+    let _1: Volume; // temp
+    bb0 (entry): {
+        _1 = std::system::volume(const 100);
+        _0 = builtin[Setting] std::system::setting::<Volume>(copy _1);
+        return;
+    }
+}
+
+const crate::VOICE() -> Setting<Volume> {
+    let mut _0: Setting<Volume>; // return
+    let _1: Volume; // temp
+    bb0 (entry): {
+        _1 = std::system::volume(const 100);
+        _0 = builtin[Setting] std::system::setting::<Volume>(copy _1);
+        return;
+    }
+}
+
+const crate::VOICE_SUSTAIN() -> Setting<bool> {
+    let mut _0: Setting<bool>; // return
+    bb0 (entry): {
+        _0 = builtin[Setting] std::system::setting::<bool>(const false);
+        return;
+    }
+}
+
+const crate::WAIT_FOR_VOICE() -> Setting<bool> {
+    let mut _0: Setting<bool>; // return
+    bb0 (entry): {
+        _0 = builtin[Setting] std::system::setting::<bool>(const true);
+        return;
+    }
+}
+
+const crate::WINDOW_OPACITY() -> Setting<Int<0, 100>> {
+    let mut _0: Setting<Int<0, 100>>; // return
+    bb0 (entry): {
+        _0 = builtin[Setting] std::system::setting::<Int<0, 100>>(const 80);
+        return;
+    }
+}
+
+const crate::FULLSCREEN() -> Setting<bool> {
+    let mut _0: Setting<bool>; // return
+    bb0 (entry): {
+        _0 = builtin[Setting] std::system::setting::<bool>(const false);
+        return;
+    }
+}
+
+const crate::ANIMATIONS() -> Setting<bool> {
+    let mut _0: Setting<bool>; // return
+    bb0 (entry): {
+        _0 = builtin[Setting] std::system::setting::<bool>(const true);
+        return;
+    }
+}
+
+fn crate::main() -> System {
+    let mut _0: System; // return
+    let _1: (i32, Int<0, 255>, Decimal, Rat, bool); // temp
+    let _2: i32; // temp
+    let _3: Int<0, 255>; // temp
+    let _4: Decimal; // temp
+    let _5: Rat; // temp
+    let _6: bool; // temp
+    let _7: Size; // temp
+    let _8: TextStyle; // temp
+    let _9: Settings; // temp
+    let _10: Vec<Binding>; // temp
+    bb0 (entry): {
+        _2 = crate::ints(const 3, const 7);
+        _3 = crate::bounded(const 9);
+        _4 = crate::decimals(const 1.5);
+        _5 = crate::rats();
+        _6 = crate::compare(const 1, const 2, const 0.5);
+        _1 = (copy _2, copy _3, copy _4, copy _5, copy _6);
+        _7 = std::screen::size(const 1280, const 720);
+        _8 = std::narrative::text::text_style(const 26, const std::screen::WHITE);
+        _9 = std::system::Settings { handle crate::TEXT_SPEED, handle crate::AUTO_DELAY, handle crate::AUTO_DELAY_PER_CHAR, handle crate::SKIP_UNREAD, handle crate::MASTER, handle crate::MUSIC, handle crate::SOUND, handle crate::VOICE, handle crate::VOICE_SUSTAIN, handle crate::WAIT_FOR_VOICE, handle crate::WINDOW_OPACITY, handle crate::FULLSCREEN, handle crate::ANIMATIONS };
+        _10 = std::system::default_bindings();
+        _0 = std::system::System { const "Arithmetic", copy _7, fn crate::Title, fn crate::GameView, const 20, const 3, const 200, copy _8, copy _9, copy _10 };
+        return;
+    }
+}
+
+fn crate::Title() -> RootPage {
+    let mut _0: RootPage; // return
+    let _1: Element; // temp
+    let _2: TextProps; // temp
+    let _3: Option<Fn() -> TextStyle>; // temp
+    let _4: Fn() -> Text; // temp
+    bb0 (entry): {
+        _3 = std::Option::None::<Fn() -> TextStyle>;
+        _4 = {closure#0}();
+        _2 = std::ui::TextProps { copy _3, copy _4 };
+        _1 = builtin[Runtime] std::ui::text(copy _2);
+        _0 = std::system::RootPage(copy _1);
+        return;
+    }
+}
+
+fn crate::Title::{closure#0}() -> Text {
+    let mut _0: Text; // return
+    bb0 (entry): {
+        _0 = const "Title";
+        return;
+    }
+}
+
+fn crate::GameView(_1: Narrative) -> Element {
+    let mut _0: Element; // return
+    let _1: Narrative; // game
+    let _2: GameScreenProps; // temp
+    let _3: Fn() -> Narrative; // temp
+    bb0 (entry): {
+        _3 = {closure#0}(copy _1);
+        _2 = std::ui::GameScreenProps { copy _3 };
+        _0 = builtin[Runtime] std::ui::game_screen(copy _2);
+        return;
+    }
+}
+
+fn crate::GameView::{closure#0}(_1: Narrative) -> Narrative {
+    let mut _0: Narrative; // return
+    let _1: Narrative; // game
+    bb0 (entry): {
+        _0 = copy _1;
+        return;
+    }
+}
