@@ -1,0 +1,127 @@
+================================================================================
+Line comments
+================================================================================
+
+// A comment.
+fn f() {} // Trailing.
+//
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (line_comment)
+  (function_item
+    (identifier)
+    (parameters)
+    (block))
+  (line_comment)
+  (line_comment))
+
+================================================================================
+Doc comments
+================================================================================
+
+//! Module doc.
+
+/// Item doc.
+///
+fn f() {}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (doc_comment)
+  (doc_comment)
+  (doc_comment)
+  (function_item
+    (identifier)
+    (parameters)
+    (block)))
+
+================================================================================
+Four slashes are not a doc comment
+================================================================================
+
+//// Not a doc.
+fn f() {}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (line_comment)
+  (function_item
+    (identifier)
+    (parameters)
+    (block)))
+
+================================================================================
+Block comments
+================================================================================
+
+/* before */ fn f(/* empty */) {
+    /*
+     * Several lines.
+     */
+    let x = 1 /* inline */ + 2;
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block_comment)
+  (function_item
+    (identifier)
+    (parameters
+      (block_comment))
+    (block
+      (block_comment)
+      (let_declaration
+        (identifier)
+        (binary_expression
+          (integer_literal)
+          (block_comment)
+          (integer_literal))))))
+
+================================================================================
+Comments inside lists
+================================================================================
+
+fn f() {
+    call(
+        a, // First.
+        // Second.
+        b,
+    );
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_item
+    (identifier)
+    (parameters)
+    (block
+      (expression_statement
+        (call_expression
+          (identifier)
+          (arguments
+            (identifier)
+            (line_comment)
+            (line_comment)
+            (identifier)))))))
+
+================================================================================
+Comment markers inside strings
+================================================================================
+
+const S: String = "// not /* a comment */ \" \u{1F600}";
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (const_item
+    (identifier)
+    (type_identifier)
+    (string_literal
+      (escape_sequence)
+      (escape_sequence))))

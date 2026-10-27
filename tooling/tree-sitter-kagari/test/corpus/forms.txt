@@ -1,0 +1,260 @@
+================================================================================
+Parenthesized form with attributes
+================================================================================
+
+fn f() {
+    s!(who = "Azusa", voice = AZUSA_0072, render = enter, t!["ぬっ"]);
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_item
+    (identifier)
+    (parameters)
+    (block
+      (expression_statement
+        (form_expression
+          (identifier)
+          (form_attribute
+            (identifier)
+            (string_literal))
+          (form_attribute
+            (identifier)
+            (identifier))
+          (form_attribute
+            (identifier)
+            (identifier))
+          (form_expression
+            (identifier)
+            (string_literal)))))))
+
+================================================================================
+Text with ruby, effects and interpolation
+================================================================================
+
+fn f() {
+    s!(t!["これは" ["数多"]("あまた") !["赤い"](emphasis()) {x}]);
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_item
+    (identifier)
+    (parameters)
+    (block
+      (expression_statement
+        (form_expression
+          (identifier)
+          (form_expression
+            (identifier)
+            (call_expression
+              (index_expression
+                (string_literal)
+                (string_literal))
+              (arguments
+                (string_literal)))
+            (unary_expression
+              (call_expression
+                (array_expression
+                  (string_literal))
+                (arguments
+                  (call_expression
+                    (identifier)
+                    (arguments)))))
+            (block
+              (identifier))))))))
+
+================================================================================
+Brace form with arms
+================================================================================
+
+fn f() {
+    let answer = choice!{
+        id = "confess",
+        t!["Tell her the truth"] => Confess::Yes,
+        t!["Say nothing"] if MET_MIO => Confess::No,
+    };
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_item
+    (identifier)
+    (parameters)
+    (block
+      (let_declaration
+        (identifier)
+        (form_expression
+          (identifier)
+          (form_attribute
+            (identifier)
+            (string_literal))
+          (form_arm
+            (form_expression
+              (identifier)
+              (string_literal))
+            (scoped_identifier
+              (identifier)
+              (identifier)))
+          (form_arm
+            (form_expression
+              (identifier)
+              (string_literal))
+            (identifier)
+            (scoped_identifier
+              (identifier)
+              (identifier))))))))
+
+================================================================================
+Nested bracket and brace forms
+================================================================================
+
+fn Config() -> Overlay {
+    Overlay(column![
+        text!(t!["Text speed: " {speed()}]),
+        button!{on_click = || nav::back(), t!["Back"]},
+    ])
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_item
+    (identifier)
+    (parameters)
+    (type_identifier)
+    (block
+      (call_expression
+        (identifier)
+        (arguments
+          (form_expression
+            (identifier)
+            (form_expression
+              (identifier)
+              (form_expression
+                (identifier)
+                (string_literal)
+                (block
+                  (call_expression
+                    (identifier)
+                    (arguments)))))
+            (form_expression
+              (identifier)
+              (form_attribute
+                (identifier)
+                (closure_expression
+                  (closure_parameters)
+                  (call_expression
+                    (scoped_identifier
+                      (identifier)
+                      (identifier))
+                    (arguments))))
+              (form_expression
+                (identifier)
+                (string_literal)))))))))
+
+================================================================================
+Brace form ends a statement
+================================================================================
+
+fn f() {
+    button!{on_click = || nav::back()}
+    a != b;
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_item
+    (identifier)
+    (parameters)
+    (block
+      (expression_statement
+        (form_expression
+          (identifier)
+          (form_attribute
+            (identifier)
+            (closure_expression
+              (closure_parameters)
+              (call_expression
+                (scoped_identifier
+                  (identifier)
+                  (identifier))
+                (arguments))))))
+      (expression_statement
+        (binary_expression
+          (identifier)
+          (identifier))))))
+
+================================================================================
+Form as a match scrutinee
+================================================================================
+
+fn f() {
+    match choice!{ id = "again", t!["Yes"] => Confess::Yes } {
+        Confess::Yes => s!(t!["Yes."]),
+    }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_item
+    (identifier)
+    (parameters)
+    (block
+      (expression_statement
+        (match_expression
+          (form_expression
+            (identifier)
+            (form_attribute
+              (identifier)
+              (string_literal))
+            (form_arm
+              (form_expression
+                (identifier)
+                (string_literal))
+              (scoped_identifier
+                (identifier)
+                (identifier))))
+          (match_block
+            (match_arm
+              (match_pattern
+                (scoped_identifier
+                  (identifier)
+                  (identifier)))
+              (form_expression
+                (identifier)
+                (form_expression
+                  (identifier)
+                  (string_literal))))))))))
+
+================================================================================
+Assignment outside a form
+================================================================================
+
+fn f() {
+    who = "Azusa";
+    s!(who = "Azusa");
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_item
+    (identifier)
+    (parameters)
+    (block
+      (expression_statement
+        (assignment_expression
+          (identifier)
+          (string_literal)))
+      (expression_statement
+        (form_expression
+          (identifier)
+          (form_attribute
+            (identifier)
+            (string_literal)))))))

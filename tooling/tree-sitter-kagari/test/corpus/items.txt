@@ -1,0 +1,417 @@
+================================================================================
+Functions with modifiers and attributes
+================================================================================
+
+#[scene]
+#[entry]
+pub pushdown fn Main(day: u8, (a, b): (u8, u8)) -> Ending {
+    Ending::Normal
+}
+
+const fn pure(x: u8) -> u8 { x }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (attribute_item
+    (attribute
+      (identifier)))
+  (attribute_item
+    (attribute
+      (identifier)))
+  (function_item
+    (visibility_modifier)
+    (function_modifiers)
+    (identifier)
+    (parameters
+      (parameter
+        (identifier)
+        (primitive_type))
+      (parameter
+        (tuple_pattern
+          (identifier)
+          (identifier))
+        (tuple_type
+          (primitive_type)
+          (primitive_type))))
+    (type_identifier)
+    (block
+      (scoped_identifier
+        (identifier)
+        (identifier))))
+  (function_item
+    (function_modifiers)
+    (identifier)
+    (parameters
+      (parameter
+        (identifier)
+        (primitive_type)))
+    (primitive_type)
+    (block
+      (identifier))))
+
+================================================================================
+Function without a body
+================================================================================
+
+#[builtin]
+pub pushdown fn push_step<S: Step>(s: S) -> S::Output;
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (attribute_item
+    (attribute
+      (identifier)))
+  (function_item
+    (visibility_modifier)
+    (function_modifiers)
+    (identifier)
+    (type_parameters
+      (type_parameter
+        (type_identifier)
+        (trait_bounds
+          (type_identifier))))
+    (parameters
+      (parameter
+        (identifier)
+        (type_identifier)))
+    (scoped_type_identifier
+      (identifier)
+      (type_identifier))))
+
+================================================================================
+Self parameters
+================================================================================
+
+impl Unit {
+    fn a(self) {}
+    fn b(mut self) {}
+    fn c(&self) -> u32 { 0 }
+    fn d(&mut self, x: u8) {}
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (impl_item
+    (type_identifier)
+    (declaration_list
+      (function_item
+        (identifier)
+        (parameters
+          (self_parameter
+            (self)))
+        (block))
+      (function_item
+        (identifier)
+        (parameters
+          (self_parameter
+            (self)))
+        (block))
+      (function_item
+        (identifier)
+        (parameters
+          (self_parameter
+            (self)))
+        (primitive_type)
+        (block
+          (integer_literal)))
+      (function_item
+        (identifier)
+        (parameters
+          (self_parameter
+            (self))
+          (parameter
+            (identifier)
+            (primitive_type)))
+        (block)))))
+
+================================================================================
+Structs
+================================================================================
+
+pub struct Unit;
+pub struct Pair(pub u8, Int<0, 10>);
+pub struct Record<T: Clone + Eq, const N: usize> {
+    pub items: [T; N],
+    count: usize,
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (struct_item
+    (visibility_modifier)
+    (type_identifier))
+  (struct_item
+    (visibility_modifier)
+    (type_identifier)
+    (ordered_field_declaration_list
+      (visibility_modifier)
+      (primitive_type)
+      (generic_type
+        (type_identifier)
+        (type_arguments
+          (integer_literal)
+          (integer_literal)))))
+  (struct_item
+    (visibility_modifier)
+    (type_identifier)
+    (type_parameters
+      (type_parameter
+        (type_identifier)
+        (trait_bounds
+          (type_identifier)
+          (type_identifier)))
+      (const_parameter
+        (identifier)
+        (primitive_type)))
+    (field_declaration_list
+      (field_declaration
+        (visibility_modifier)
+        (field_identifier)
+        (array_type
+          (type_identifier)
+          (identifier)))
+      (field_declaration
+        (field_identifier)
+        (primitive_type)))))
+
+================================================================================
+Enums
+================================================================================
+
+enum Shape {
+    Empty,
+    Circle(u32),
+    #[default]
+    Rect { w: u32, h: u32 },
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (enum_item
+    (type_identifier)
+    (enum_variant_list
+      (enum_variant
+        (identifier))
+      (enum_variant
+        (identifier)
+        (ordered_field_declaration_list
+          (primitive_type)))
+      (attribute_item
+        (attribute
+          (identifier)))
+      (enum_variant
+        (identifier)
+        (field_declaration_list
+          (field_declaration
+            (field_identifier)
+            (primitive_type))
+          (field_declaration
+            (field_identifier)
+            (primitive_type)))))))
+
+================================================================================
+Type aliases
+================================================================================
+
+type Alias = Vec<u8>;
+type Bounded<T>: Eq = T;
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (type_item
+    (type_identifier)
+    (generic_type
+      (type_identifier)
+      (type_arguments
+        (primitive_type))))
+  (type_item
+    (type_identifier)
+    (type_parameters
+      (type_parameter
+        (type_identifier)))
+    (trait_bounds
+      (type_identifier))
+    (type_identifier)))
+
+================================================================================
+Constants and statics
+================================================================================
+
+static mut COUNTER: u64 = 0;
+static NAME: &String = "x";
+pub const NEG: i32 = -1;
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (static_item
+    (identifier)
+    (primitive_type)
+    (integer_literal))
+  (static_item
+    (identifier)
+    (reference_type
+      (type_identifier))
+    (string_literal))
+  (const_item
+    (visibility_modifier)
+    (identifier)
+    (primitive_type)
+    (unary_expression
+      (integer_literal))))
+
+================================================================================
+Modules
+================================================================================
+
+mod outer;
+pub mod inline {
+    pub fn f() {}
+    mod deeper {
+        const X: u8 = 1;
+    }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (mod_item
+    (identifier))
+  (mod_item
+    (visibility_modifier)
+    (identifier)
+    (declaration_list
+      (function_item
+        (visibility_modifier)
+        (identifier)
+        (parameters)
+        (block))
+      (mod_item
+        (identifier)
+        (declaration_list
+          (const_item
+            (identifier)
+            (primitive_type)
+            (integer_literal)))))))
+
+================================================================================
+Use declarations
+================================================================================
+
+use a::{b as c, d::*, self};
+pub use crate::screen::Screen;
+use super::x as _;
+use std::*;
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (use_declaration
+    (scoped_use_list
+      (identifier)
+      (use_list
+        (use_as_clause
+          (identifier)
+          (identifier))
+        (use_wildcard
+          (identifier))
+        (self))))
+  (use_declaration
+    (visibility_modifier)
+    (scoped_identifier
+      (scoped_identifier
+        (identifier))
+      (identifier)))
+  (use_declaration
+    (use_as_clause
+      (scoped_identifier
+        (identifier))))
+  (use_declaration
+    (use_wildcard
+      (identifier))))
+
+================================================================================
+Traits and impls
+================================================================================
+
+pub trait Step: Eq {
+    type Output;
+    const ID: u32;
+    fn show(&self) -> Self::Output;
+}
+
+impl<A, const N: usize> Step for Choice<A, N> {
+    type Output = A;
+    const ID: u32 = 1;
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (trait_item
+    (visibility_modifier)
+    (type_identifier)
+    (trait_bounds
+      (type_identifier))
+    (declaration_list
+      (type_item
+        (type_identifier))
+      (const_item
+        (identifier)
+        (primitive_type))
+      (function_item
+        (identifier)
+        (parameters
+          (self_parameter
+            (self)))
+        (scoped_type_identifier
+          (self_type)
+          (type_identifier)))))
+  (impl_item
+    (type_parameters
+      (type_parameter
+        (type_identifier))
+      (const_parameter
+        (identifier)
+        (primitive_type)))
+    (type_identifier)
+    (generic_type
+      (type_identifier)
+      (type_arguments
+        (type_identifier)
+        (type_identifier)))
+    (declaration_list
+      (type_item
+        (type_identifier)
+        (type_identifier))
+      (const_item
+        (identifier)
+        (primitive_type)
+        (integer_literal)))))
+
+================================================================================
+Contextual keywords as names
+================================================================================
+
+fn scene(pushdown: u8) -> u8 {
+    pushdown
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_item
+    (identifier)
+    (parameters
+      (parameter
+        (identifier)
+        (primitive_type)))
+    (primitive_type)
+    (block
+      (identifier))))

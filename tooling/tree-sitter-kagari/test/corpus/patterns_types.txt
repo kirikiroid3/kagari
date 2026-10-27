@@ -1,0 +1,399 @@
+================================================================================
+Literal and range patterns
+================================================================================
+
+fn f() {
+    match r {
+        -1 => 2,
+        "s" => 3,
+        true | false => 4,
+        1..=5 => 5,
+        ..=-1 => 6,
+        10.. => 7,
+        LOW..HIGH => 8,
+    }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_item
+    (identifier)
+    (parameters)
+    (block
+      (expression_statement
+        (match_expression
+          (identifier)
+          (match_block
+            (match_arm
+              (match_pattern
+                (negative_literal
+                  (integer_literal)))
+              (integer_literal))
+            (match_arm
+              (match_pattern
+                (string_literal))
+              (integer_literal))
+            (match_arm
+              (match_pattern
+                (or_pattern
+                  (boolean_literal)
+                  (boolean_literal)))
+              (integer_literal))
+            (match_arm
+              (match_pattern
+                (range_pattern
+                  (integer_literal)
+                  (integer_literal)))
+              (integer_literal))
+            (match_arm
+              (match_pattern
+                (range_pattern
+                  (negative_literal
+                    (integer_literal))))
+              (integer_literal))
+            (match_arm
+              (match_pattern
+                (range_pattern
+                  (integer_literal)))
+              (integer_literal))
+            (match_arm
+              (match_pattern
+                (range_pattern
+                  (identifier)
+                  (identifier)))
+              (integer_literal))))))))
+
+================================================================================
+Tuple, struct and path patterns
+================================================================================
+
+fn f() {
+    match r {
+        (a, .., b) => 9,
+        Point { x: 0, y, .. } => 11,
+        Point { mut x, y: _ } => 12,
+        crate::X => 16,
+        Shape::Circle(r) => 17,
+    }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_item
+    (identifier)
+    (parameters)
+    (block
+      (expression_statement
+        (match_expression
+          (identifier)
+          (match_block
+            (match_arm
+              (match_pattern
+                (tuple_pattern
+                  (identifier)
+                  (remaining_field_pattern)
+                  (identifier)))
+              (integer_literal))
+            (match_arm
+              (match_pattern
+                (struct_pattern
+                  (type_identifier)
+                  (field_pattern
+                    (field_identifier)
+                    (integer_literal))
+                  (field_pattern
+                    (shorthand_field_identifier))
+                  (remaining_field_pattern)))
+              (integer_literal))
+            (match_arm
+              (match_pattern
+                (struct_pattern
+                  (type_identifier)
+                  (field_pattern
+                    (shorthand_field_identifier))
+                  (field_pattern
+                    (field_identifier))))
+              (integer_literal))
+            (match_arm
+              (match_pattern
+                (scoped_identifier
+                  (identifier)))
+              (integer_literal))
+            (match_arm
+              (match_pattern
+                (tuple_struct_pattern
+                  (scoped_identifier
+                    (identifier)
+                    (identifier))
+                  (identifier)))
+              (integer_literal))))))))
+
+================================================================================
+Or patterns with a leading pipe
+================================================================================
+
+fn f() {
+    match r {
+        | Route::C => 14,
+        A | B | C => 15,
+    }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_item
+    (identifier)
+    (parameters)
+    (block
+      (expression_statement
+        (match_expression
+          (identifier)
+          (match_block
+            (match_arm
+              (match_pattern
+                (or_pattern
+                  (scoped_identifier
+                    (identifier)
+                    (identifier))))
+              (integer_literal))
+            (match_arm
+              (match_pattern
+                (or_pattern
+                  (or_pattern
+                    (identifier)
+                    (identifier))
+                  (identifier)))
+              (integer_literal))))))))
+
+================================================================================
+Bindings
+================================================================================
+
+fn f(mut v: Vec<u8>, (a, b): (u8, u8)) {
+    let mut x = 0;
+    let (speed, set_speed) = signal(1);
+    let _ = x;
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_item
+    (identifier)
+    (parameters
+      (parameter
+        (mut_pattern
+          (identifier))
+        (generic_type
+          (type_identifier)
+          (type_arguments
+            (primitive_type))))
+      (parameter
+        (tuple_pattern
+          (identifier)
+          (identifier))
+        (tuple_type
+          (primitive_type)
+          (primitive_type))))
+    (block
+      (let_declaration
+        (mut_pattern
+          (identifier))
+        (integer_literal))
+      (let_declaration
+        (tuple_pattern
+          (identifier)
+          (identifier))
+        (call_expression
+          (identifier)
+          (arguments
+            (integer_literal))))
+      (let_declaration
+        (identifier)))))
+
+================================================================================
+Reference, array and tuple types
+================================================================================
+
+type Array = [T; 4];
+type Ref = &mut T;
+type Shared = &T;
+type Pair = (A, B);
+type Single = (A,);
+type Unit = ();
+type Infer = Vec<_>;
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (type_item
+    (type_identifier)
+    (array_type
+      (type_identifier)
+      (integer_literal)))
+  (type_item
+    (type_identifier)
+    (reference_type
+      (type_identifier)))
+  (type_item
+    (type_identifier)
+    (reference_type
+      (type_identifier)))
+  (type_item
+    (type_identifier)
+    (tuple_type
+      (type_identifier)
+      (type_identifier)))
+  (type_item
+    (type_identifier)
+    (tuple_type
+      (type_identifier)))
+  (type_item
+    (type_identifier)
+    (unit_type))
+  (type_item
+    (type_identifier)
+    (generic_type
+      (type_identifier)
+      (type_arguments
+        (infer_type)))))
+
+================================================================================
+Function and closure types
+================================================================================
+
+type F1 = fn(u8) -> u8;
+type F2 = const fn(Screen) -> Screen;
+type F3 = pushdown fn();
+type F4 = scene fn(u8, bool) -> Ending;
+type C1 = Fn() -> u8;
+type C2 = const Fn(u8);
+type C3 = pushdown Fn(u8, u8) -> (u8, u8);
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (type_item
+    (type_identifier)
+    (function_type
+      (parameters
+        (primitive_type))
+      (primitive_type)))
+  (type_item
+    (type_identifier)
+    (function_type
+      (function_modifiers)
+      (parameters
+        (type_identifier))
+      (type_identifier)))
+  (type_item
+    (type_identifier)
+    (function_type
+      (function_modifiers)
+      (parameters)))
+  (type_item
+    (type_identifier)
+    (function_type
+      (function_modifiers)
+      (parameters
+        (primitive_type)
+        (primitive_type))
+      (type_identifier)))
+  (type_item
+    (type_identifier)
+    (closure_type
+      (type_identifier)
+      (parameters)
+      (primitive_type)))
+  (type_item
+    (type_identifier)
+    (closure_type
+      (function_modifiers)
+      (type_identifier)
+      (parameters
+        (primitive_type))))
+  (type_item
+    (type_identifier)
+    (closure_type
+      (function_modifiers)
+      (type_identifier)
+      (parameters
+        (primitive_type)
+        (primitive_type))
+      (tuple_type
+        (primitive_type)
+        (primitive_type)))))
+
+================================================================================
+Generic arguments
+================================================================================
+
+static SPEED: Setting<Int<0, 10>> = setting(5);
+const SIGNED: Int<-3, {N}> = 0;
+type Nested = Vec<Vec<Vec<u8>>>;
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (static_item
+    (identifier)
+    (generic_type
+      (type_identifier)
+      (type_arguments
+        (generic_type
+          (type_identifier)
+          (type_arguments
+            (integer_literal)
+            (integer_literal)))))
+    (call_expression
+      (identifier)
+      (arguments
+        (integer_literal))))
+  (const_item
+    (identifier)
+    (generic_type
+      (type_identifier)
+      (type_arguments
+        (negative_literal
+          (integer_literal))
+        (block
+          (identifier))))
+    (integer_literal))
+  (type_item
+    (type_identifier)
+    (generic_type
+      (type_identifier)
+      (type_arguments
+        (generic_type
+          (type_identifier)
+          (type_arguments
+            (generic_type
+              (type_identifier)
+              (type_arguments
+                (primitive_type)))))))))
+
+================================================================================
+Path types
+================================================================================
+
+type Qualified = std::screen::Screen;
+type Assoc = Self::Output;
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (type_item
+    (type_identifier)
+    (scoped_type_identifier
+      (scoped_identifier
+        (identifier)
+        (identifier))
+      (type_identifier)))
+  (type_item
+    (type_identifier)
+    (scoped_type_identifier
+      (self_type)
+      (type_identifier))))
