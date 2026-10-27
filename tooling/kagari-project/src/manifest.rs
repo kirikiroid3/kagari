@@ -51,6 +51,7 @@ struct RawToolchain {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 struct RawAssets {
     dir: Option<String>,
+    system_fonts: Option<bool>,
 }
 
 #[derive(Default, Deserialize)]
@@ -115,6 +116,7 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
             state_cap: raw.build.state_cap.unwrap_or(DEFAULT_STATE_CAP),
             recursion_depth: raw.build.recursion_depth.unwrap_or(DEFAULT_RECURSION_DEPTH),
             keyframe_check: raw.build.keyframe_check.unwrap_or(false),
+            system_fonts: raw.assets.system_fonts.unwrap_or(true),
         },
     })
 }

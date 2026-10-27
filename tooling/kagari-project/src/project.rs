@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use kagari_lang::{FilePath, Program, RootDatabase};
 
 use crate::error::ProjectError;
+use crate::fonts::system_font_dirs;
 use crate::manifest::{Manifest, parse_manifest};
 use crate::target::Target;
 use crate::{MANIFEST_FILE, TOOLCHAIN_VERSION};
@@ -89,11 +90,18 @@ impl Project {
         self.root.join(&self.manifest.out_dir).join(target.as_str())
     }
 
-    /// The project's program in `db`.
+    /// The project's program in `db`. `system_font("…")` searches this machine's system font
+    /// directories unless the manifest forbids system fonts.
     pub fn program(&self, db: &RootDatabase) -> Program {
+        let font_dirs = if self.manifest.options.system_fonts {
+            system_font_dirs().into_iter().map(FilePath::disk).collect()
+        } else {
+            Vec::new()
+        };
         db.program_with_assets(
             FilePath::disk(self.entry_path()),
             FilePath::disk(self.asset_dir()),
+            font_dirs,
             self.manifest.options,
         )
     }

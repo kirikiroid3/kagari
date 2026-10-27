@@ -9,6 +9,9 @@ use std::narrative::text::text_style;
 use std::screen::size;
 use std::system::default_bindings;
 
+/// The default font of every text.
+const FONT: FontAsset = {{font}};
+
 fn main() -> System {
     System {
         title: "{{name}}",
@@ -18,6 +21,7 @@ fn main() -> System {
         save_slots: 20,
         auto_slots: 3,
         backlog: 200,
+        font: FONT,
         text: text_style(26, WHITE),
         settings: system::settings(),
         bindings: default_bindings(),

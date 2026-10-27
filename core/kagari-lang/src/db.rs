@@ -87,20 +87,28 @@ impl RootDatabase {
     }
 
     /// The program rooted at `root`, compiled with `options`. Asset paths are relative to the
-    /// root file's directory.
+    /// root file's directory; no system font directory is searched.
     pub fn program_with(&self, root: FilePath, options: CompileOptions) -> Program {
         let asset_root = root.parent_dir_join(".");
-        self.program_with_assets(root, asset_root, options)
+        self.program_with_assets(root, asset_root, Vec::new(), options)
     }
 
-    /// The program rooted at `root`, with `asset("…")` paths relative to `asset_root`.
+    /// The program rooted at `root`, with `asset("…")` paths relative to `asset_root` and
+    /// `system_font("…")` searching `font_dirs` in order.
     pub fn program_with_assets(
         &self,
         root: FilePath,
         asset_root: FilePath,
+        font_dirs: Vec<FilePath>,
         options: CompileOptions,
     ) -> Program {
-        Program::new(self, self.source_file(root), asset_root, options)
+        Program::new(
+            self,
+            self.source_file(root),
+            asset_root,
+            font_dirs.into(),
+            options,
+        )
     }
 
     /// Replace a file's text (`None` = missing). Creates the input if needed.

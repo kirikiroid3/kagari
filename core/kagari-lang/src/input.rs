@@ -164,6 +164,9 @@ pub struct CompileOptions {
     pub recursion_depth: u32,
     /// Whether the keyframe-placement check (`W5011`) runs.
     pub keyframe_check: bool,
+    /// Whether `system_font("…")` may name fonts in the system font directories (`E1031`
+    /// when not).
+    pub system_fonts: bool,
 }
 
 impl Default for CompileOptions {
@@ -172,6 +175,7 @@ impl Default for CompileOptions {
             state_cap: DEFAULT_STATE_CAP,
             recursion_depth: DEFAULT_RECURSION_DEPTH,
             keyframe_check: false,
+            system_fonts: true,
         }
     }
 }
@@ -183,6 +187,9 @@ pub struct Program {
     /// The directory `asset("…")` paths are relative to; asset paths in the bytecode are relative to it too.
     #[returns(ref)]
     pub asset_root: FilePath,
+    /// The system font directories `system_font("…")` searches, in order.
+    #[returns(ref)]
+    pub font_dirs: Arc<[FilePath]>,
     pub options: CompileOptions,
 }
 

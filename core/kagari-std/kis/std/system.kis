@@ -76,6 +76,8 @@ pub struct System {
     pub auto_slots: u32,
     /// The maximum number of backlog entries.
     pub backlog: u32,
+    /// The default font: the font of text whose style and effects name none.
+    pub font: FontAsset,
     /// The default style of `ui::label` and `text!`.
     pub text: TextStyle,
     pub settings: Settings,

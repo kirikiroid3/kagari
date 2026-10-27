@@ -335,6 +335,7 @@ fn std_items(db: &dyn Db, maps: &DefMaps) -> StdItems {
         push_step: value(&["narrative", "push_step"]),
         rng_choose: value(&["narrative", "rng_choose"]),
         asset_fn: value(&["asset"]),
+        system_font_fn: value(&["system_font"]),
         to_text_fn: value(&["narrative", "text", "to_text"]),
         concat: value(&["narrative", "text", "concat"]),
         ruby: value(&["narrative", "text", "ruby"]),

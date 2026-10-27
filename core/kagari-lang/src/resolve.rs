@@ -5,6 +5,7 @@ use kagari_syntax::TextRange;
 use la_arena::{Arena, Idx};
 use rustc_hash::FxHashMap;
 
+use crate::assets;
 use crate::db::Db;
 pub use crate::def_map::Resolution;
 use crate::def_map::{
@@ -125,13 +126,20 @@ type GenericScope = Vec<(Name, ItemId, u32, bool)>;
 /// The scope shared by an item's signature and body.
 struct ItemCx<'db> {
     maps: &'db DefMaps,
+    program: Program,
     item: ItemId,
     file_path: FilePath,
-    asset_root: FilePath,
     module: ModuleId,
     generics: GenericScope,
     self_owner: Option<ItemId>,
-    asset_fn: Option<Def>,
+    asset_fns: AssetFns,
+}
+
+/// The std functions whose path argument names a file: `asset` and `system_font`.
+#[derive(Clone, Copy)]
+struct AssetFns {
+    asset: Option<Def>,
+    system_font: Option<Def>,
 }
 
 impl<'db> ItemCx<'db> {
@@ -141,11 +149,11 @@ impl<'db> ItemCx<'db> {
         if !maps.file_modules.contains_key(&item.file) {
             return None;
         }
-        let asset_fn = match resolve_module_path(
+        let lang_fn = |lang: LangItem| match resolve_module_path(
             maps,
             db,
             maps.std_root(),
-            &Path::lang(LangItem::Asset),
+            &Path::lang(lang),
             Namespace::Values,
             // Not written in source; the diagnostics are dropped.
             &|_| Anchor::Text(item.file, TextRange::default()),
@@ -154,6 +162,10 @@ impl<'db> ItemCx<'db> {
         {
             Some(Resolution::Def(def)) => Some(def),
             _ => None,
+        };
+        let asset_fns = AssetFns {
+            asset: lang_fn(LangItem::Asset),
+            system_font: lang_fn(LangItem::SystemFont),
         };
         let tree = item_tree(db, item.file);
         let module = maps.module_of_item(db, item);
@@ -184,13 +196,13 @@ impl<'db> ItemCx<'db> {
         push_generics(&mut generics, db, item);
         Some(Self {
             maps,
+            program,
             item,
             file_path: item.file.path(db).clone(),
-            asset_root: program.asset_root(db).clone(),
             module,
             generics,
             self_owner,
-            asset_fn,
+            asset_fns,
         })
     }
 
@@ -204,15 +216,15 @@ impl<'db> ItemCx<'db> {
         Resolver::new(
             db,
             self.maps,
+            self.program,
             self.item.file,
             self.file_path.clone(),
-            self.asset_root.clone(),
             self.module,
             owner,
             store,
             &self.generics,
             self.self_owner,
-            self.asset_fn,
+            self.asset_fns,
             diagnostics,
         )
     }
@@ -245,15 +257,15 @@ enum BindMode<'a> {
 struct Resolver<'a> {
     db: &'a dyn Db,
     maps: &'a DefMaps,
+    program: Program,
     file: SourceFile,
     file_path: FilePath,
-    asset_root: FilePath,
     module: ModuleId,
     src: Owner,
     store: &'a ExprStore,
     generics: &'a GenericScope,
     self_owner: Option<ItemId>,
-    asset_fn: Option<Def>,
+    asset_fns: AssetFns,
     diagnostics: &'a mut Vec<Diag>,
     out: StoreResolution,
     locals: Arena<Local>,
@@ -268,29 +280,29 @@ impl<'a> Resolver<'a> {
     fn new(
         db: &'a dyn Db,
         maps: &'a DefMaps,
+        program: Program,
         file: SourceFile,
         file_path: FilePath,
-        asset_root: FilePath,
         module: ModuleId,
         src: Owner,
         store: &'a ExprStore,
         generics: &'a GenericScope,
         self_owner: Option<ItemId>,
-        asset_fn: Option<Def>,
+        asset_fns: AssetFns,
         diagnostics: &'a mut Vec<Diag>,
     ) -> Self {
         Resolver {
             db,
             maps,
+            program,
             file,
             file_path,
-            asset_root,
             module,
             src,
             store,
             generics,
             self_owner,
-            asset_fn,
+            asset_fns,
             diagnostics,
             out: StoreResolution::default(),
             locals: Arena::new(),
@@ -936,15 +948,20 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// `asset("path")` in a disk file: the path must be non-empty and name an existing file
-    /// inside the program's asset directory.
+    /// `asset("path")` and `system_font("path")` in a disk file. An asset path must be
+    /// non-empty and name an existing file inside the program's asset directory, outside its
+    /// reserved `system-fonts` directory; a system font path must name an existing file in a
+    /// system font directory, and the program must allow system fonts.
     fn check_asset(&mut self, callee: ExprId, args: &[ExprId]) {
-        let Some(asset_fn) = self.asset_fn else {
+        let callee = self.out.exprs.get(&callee);
+        let is = |def: Option<Def>| def.is_some_and(|def| callee == Some(&Resolution::Def(def)));
+        let system_font = if is(self.asset_fns.asset) {
+            false
+        } else if is(self.asset_fns.system_font) {
+            true
+        } else {
             return;
         };
-        if self.out.exprs.get(&callee) != Some(&Resolution::Def(asset_fn)) {
-            return;
-        }
         if !matches!(self.file_path, FilePath::Disk(_)) {
             return;
         }
@@ -955,6 +972,10 @@ impl<'a> Resolver<'a> {
             return;
         };
         let range = NodeId::Expr(arg);
+        if system_font {
+            self.check_system_font(range, path);
+            return;
+        }
         if path.is_empty() {
             self.diag(
                 range,
@@ -963,17 +984,23 @@ impl<'a> Resolver<'a> {
             );
             return;
         }
-        let asset_path = self.asset_root.join(path);
-        let inside = matches!(
-            (&asset_path, &self.asset_root),
-            (FilePath::Disk(file), FilePath::Disk(root))
-                if file.as_ref() != root.as_ref() && file.starts_with(root)
-        );
-        if !inside {
+        let asset_root = self.program.asset_root(self.db);
+        let Some(asset_path) = assets::inside(asset_root, path) else {
             self.diag(
                 range,
                 DiagnosticCode::ResolveAssetOutsideRoot,
                 format!("asset path `{path}` leaves the asset directory"),
+            );
+            return;
+        };
+        if assets::is_reserved(&asset_path, asset_root) {
+            self.diag(
+                range,
+                DiagnosticCode::ResolveReservedAssetDir,
+                format!(
+                    "asset path `{path}` enters `{}`, which is reserved for system fonts",
+                    assets::SYSTEM_FONTS_DIR
+                ),
             );
             return;
         }
@@ -983,6 +1010,47 @@ impl<'a> Resolver<'a> {
                 range,
                 DiagnosticCode::ResolveAssetNotFound,
                 format!("asset file `{path}` not found"),
+            );
+        }
+    }
+
+    fn check_system_font(&mut self, range: NodeId, path: &str) {
+        if !self.program.options(self.db).system_fonts {
+            self.diag(
+                range,
+                DiagnosticCode::ResolveSystemFontsDisabled,
+                "system fonts are disabled by `system-fonts = false` in `kagari.toml`".to_owned(),
+            );
+            return;
+        }
+        if path.is_empty() {
+            self.diag(
+                range,
+                DiagnosticCode::ResolveEmptyAssetPath,
+                "system font path must not be empty".to_owned(),
+            );
+            return;
+        }
+        if !assets::stays_inside(path) {
+            self.diag(
+                range,
+                DiagnosticCode::ResolveAssetOutsideRoot,
+                format!("system font path `{path}` leaves the system font directories"),
+            );
+            return;
+        }
+        if assets::system_font_file(self.db, self.program, path).is_none() {
+            let dirs = self.program.font_dirs(self.db);
+            let searched = if dirs.is_empty() {
+                "no system font directory was found".to_owned()
+            } else {
+                let shown: Vec<String> = dirs.iter().map(|dir| dir.display(None)).collect();
+                format!("searched {}", shown.join(", "))
+            };
+            self.diag(
+                range,
+                DiagnosticCode::ResolveSystemFontNotFound,
+                format!("system font `{path}` not found; {searched}"),
             );
         }
     }

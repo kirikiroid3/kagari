@@ -25,6 +25,7 @@ static WAIT_FOR_VOICE: Setting<bool> = setting(true);
 static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
 static FULLSCREEN: Setting<bool> = setting(false);
 static ANIMATIONS: Setting<bool> = setting(true);
+const FONT: FontAsset = asset("fonts/default.otf");
 
 fn main() -> System {
     System {
@@ -35,6 +36,7 @@ fn main() -> System {
         save_slots: 20,
         auto_slots: 3,
         backlog: 200,
+        font: FONT,
         text: text_style(26, WHITE),
         settings: Settings {
             text_speed: TEXT_SPEED,
@@ -95,6 +97,7 @@ static WAIT_FOR_VOICE: Setting<bool> = setting(true);
 static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
 static FULLSCREEN: Setting<bool> = setting(false);
 static ANIMATIONS: Setting<bool> = setting(true);
+const FONT: FontAsset = asset("fonts/default.otf");
 
 fn main() -> System {
     System {
@@ -105,6 +108,7 @@ fn main() -> System {
         save_slots: 20,
         auto_slots: 3,
         backlog: 200,
+        font: FONT,
         text: text_style(26, WHITE),
         settings: Settings {
             text_speed: TEXT_SPEED,
@@ -164,6 +168,7 @@ static WAIT_FOR_VOICE: Setting<bool> = setting(true);
 static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
 static FULLSCREEN: Setting<bool> = setting(false);
 static ANIMATIONS: Setting<bool> = setting(true);
+const FONT: FontAsset = asset("fonts/default.otf");
 
 fn main() -> System {
     System {
@@ -174,6 +179,7 @@ fn main() -> System {
         save_slots: 20,
         auto_slots: 3,
         backlog: 200,
+        font: FONT,
         text: text_style(26, WHITE),
         settings: Settings {
             text_speed: TEXT_SPEED,
@@ -238,6 +244,7 @@ static WAIT_FOR_VOICE: Setting<bool> = setting(true);
 static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
 static FULLSCREEN: Setting<bool> = setting(false);
 static ANIMATIONS: Setting<bool> = setting(true);
+const FONT: FontAsset = asset("fonts/default.otf");
 
 fn main() -> System {
     System {
@@ -248,6 +255,7 @@ fn main() -> System {
         save_slots: 20,
         auto_slots: 3,
         backlog: 200,
+        font: FONT,
         text: text_style(26, WHITE),
         settings: Settings {
             text_speed: TEXT_SPEED,

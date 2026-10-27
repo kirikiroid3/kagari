@@ -20,6 +20,7 @@ pub struct System {
     pub save_slots: u32,
     pub auto_slots: u32,
     pub backlog: u32,
+    pub font: FontAsset,          // the font of text whose style and effects name none
     pub text: TextStyle,          // default style of `ui::label` and `text!`
     pub settings: Settings,
     pub bindings: Vec<Binding>,
@@ -37,6 +38,7 @@ pub struct System {
 |`save_slots`|the number of manual slots, `Manual(0)` … `Manual(save_slots − 1)`|
 |`auto_slots`|the number of autosave slots|
 |`backlog`|the maximum number of `Narrative::history` entries|
+|`font`|the default font: the font of text whose style and effects name none|
 |`text`|the default `TextStyle` of `ui::label` and `text!`|
 |`settings`|the setting handles the engine reads|
 |`bindings`|input bindings|
@@ -55,6 +57,7 @@ fn main() -> System {
         save_slots: 20,
         auto_slots: 3,
         backlog: 200,
+        font: FONT,
         text: text_style(26, WHITE),
         settings: Settings {
             text_speed: TEXT_SPEED,

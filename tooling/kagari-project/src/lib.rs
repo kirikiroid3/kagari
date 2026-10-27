@@ -3,6 +3,7 @@
 //! Kagari projects: the `kagari.toml` manifest and the program it describes.
 
 mod error;
+mod fonts;
 mod manifest;
 mod project;
 mod target;
@@ -11,6 +12,7 @@ mod target;
 mod tests;
 
 pub use error::ProjectError;
+pub use fonts::system_font_dirs;
 pub use manifest::{Manifest, parse_manifest};
 pub use project::Project;
 pub use target::Target;

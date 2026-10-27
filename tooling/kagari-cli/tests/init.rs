@@ -52,3 +52,32 @@ fn init_escapes_the_name() {
     let manifest = kagari_project::parse_manifest(&text).unwrap();
     assert_eq!(manifest.name, "a\"b");
 }
+
+#[cfg(not(any(windows, target_os = "macos")))]
+#[test]
+fn init_uses_an_installed_system_font() {
+    let tmp = init_project();
+    let main = std::fs::read_to_string(game(&tmp).join("src/main.kis")).unwrap();
+    assert!(
+        main.contains("const FONT: FontAsset = system_font(\"TestSans.ttf\");"),
+        "{main}"
+    );
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
+#[test]
+fn init_without_system_fonts_asks_for_a_font_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let output = common::kagari_in(&["init", "game"], tmp.path(), tmp.path());
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(
+        stderr(&output).contains("put the default font at `assets/fonts/default.ttf`"),
+        "{}",
+        stderr(&output)
+    );
+    let main = std::fs::read_to_string(tmp.path().join("game/src/main.kis")).unwrap();
+    assert!(
+        main.contains("const FONT: FontAsset = asset(\"fonts/default.ttf\");"),
+        "{main}"
+    );
+}

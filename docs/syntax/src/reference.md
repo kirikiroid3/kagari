@@ -50,6 +50,7 @@ System](./system.md#components-and-signals).
 | Setting | `static NAME: Setting<T> = setting(init);` |
 | Meta field | `static NAME: Meta<T> = meta(init);` |
 | Asset | `const NAME: ImageAsset = asset("path");`, likewise `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset`, `ShaderAsset` |
+| System font | `const NAME: FontAsset = system_font("path");` |
 | Entity id | `const NAME: EntityId = EntityId(n);`, with `n` ≥ 1 |
 | Render | `const fn name(mut screen: Screen) -> Screen { …; screen }` |
 

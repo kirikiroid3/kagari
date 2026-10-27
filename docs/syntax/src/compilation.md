@@ -100,9 +100,11 @@ never used at all.
 | `state_cap` (`[build] state-cap`) | 200 000 | Most story states the analysis explores (`W5006` past it) |
 | `recursion_depth` (`[build] recursion-depth`) | 2048 | Most nested calls at run time, counting every call frame (`fn`, closures, scenes, instant procedures); deeper is a [VM panic](./bytecode.md#panics). Written into the bytecode |
 | `keyframe_check` (`[build] keyframe-check`) | off | Runs the [keyframe-placement check](./presentation.md#keyframes) (`W5011`) |
+| `system_fonts` (`[assets] system-fonts`) | on | Lets `system_font("…")` name fonts in the system font directories (`E1031` when off) |
 
 In Rust these are the fields of `kagari_lang::CompileOptions`, passed to
-`RootDatabase::program_with` or `RootDatabase::program_with_assets`.
+`RootDatabase::program_with` or `RootDatabase::program_with_assets`; the latter also takes the
+system font directories, which `kagari_project::system_font_dirs` finds.
 
 ## Projects and the `kagari` tool
 
@@ -119,6 +121,7 @@ kagari = "0.1"            # required; the toolchain versions the project accepts
 
 [assets]
 dir = "assets"            # the asset directory; default "assets"
+system-fonts = true       # whether `system_font("…")` may name installed fonts; default true
 
 [build]
 targets = ["v0"]          # engine major versions to build for; default ["v0"]
@@ -143,9 +146,14 @@ kagari lsp                                  run the language server over stdio
 ```
 
 `kagari build` packs the assets the bytecode references into `.kiarchive` files next to the
-bytecode: one per top-level directory of the asset directory, and `data.kiarchive` for files
-directly in it. An archive entry's name is the asset path in the bytecode, e.g.
-`characters/character1/image/normal.png`. Usage, IO and manifest errors exit with 2.
+bytecode: one per top-level directory of the asset directory, `data.kiarchive` for files
+directly in it, and `system-fonts.kiarchive` for the system fonts. An archive entry's name is the
+asset path in the bytecode, e.g. `characters/character1/image/normal.png` or
+`system-fonts/msgothic.ttc`. Usage, IO and manifest errors exit with 2.
+
+`kagari init` names an installed system font as the new project's `FONT`, preferring Japanese
+gothic faces. With no font installed it names `assets/fonts/default.ttf` and warns that the file
+is missing.
 
 Diagnostics are numbered; see the Kagari Diagnostics book.
 

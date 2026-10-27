@@ -69,7 +69,9 @@ fn load_checks_the_toolchain() {
     let error = Project::load(&path).unwrap_err();
     assert!(matches!(error, ProjectError::Toolchain { .. }), "{error}");
     assert!(
-        error.to_string().contains("this project requires kagari >=99"),
+        error
+            .to_string()
+            .contains("this project requires kagari >=99"),
         "{error}"
     );
 }

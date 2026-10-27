@@ -103,3 +103,18 @@ const AZUSA_0072: VoiceAsset = asset("voice/azusa_0072.ogg");
 An asset type is a [finite type](./kinds.md#finite-types): its values are exactly the asset
 constants of the program. So the story may choose between assets at runtime, for example a voice
 line by route.
+
+A font installed on the building machine can be bound without copying it into the assets:
+
+```kis
+const GOTHIC: FontAsset = system_font("msgothic.ttc");
+```
+
+```kis
+#[builtin] pub const fn system_font(path: narrative::Text) -> FontAsset;
+```
+
+The path is a string literal relative to a system font directory (`C:\Windows\Fonts`,
+`/System/Library/Fonts`, `/usr/share/fonts`, …; the first directory that has the file wins) and
+is checked like an asset path. `[assets] system-fonts = false` in `kagari.toml` forbids system
+fonts. The standard library ships no fonts; `System::font`, the default font, is required.

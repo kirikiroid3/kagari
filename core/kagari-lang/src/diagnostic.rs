@@ -332,6 +332,9 @@ codes! {
     ResolveAssetNotFound = "E1027";
     ResolveEmptyAssetPath = "E1028";
     ResolveAssetOutsideRoot = "E1029";
+    ResolveSystemFontNotFound = "E1030";
+    ResolveSystemFontsDisabled = "E1031";
+    ResolveReservedAssetDir = "E1032";
 
     // E2: type inference, exhaustiveness and refutability.
     TypeMismatch = "E2001";

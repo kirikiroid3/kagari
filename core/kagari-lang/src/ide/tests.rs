@@ -66,6 +66,7 @@ static WAIT_FOR_VOICE: Setting<bool> = setting(true);
 static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
 static FULLSCREEN: Setting<bool> = setting(false);
 static ANIMATIONS: Setting<bool> = setting(true);
+const FONT: FontAsset = asset("font.ttf");
 
 fn main() -> System {
     System {
@@ -76,6 +77,7 @@ fn main() -> System {
         save_slots: 20,
         auto_slots: 3,
         backlog: 200,
+        font: FONT,
         text: text_style(26, WHITE),
         settings: Settings {
             text_speed: TEXT_SPEED,
@@ -119,6 +121,7 @@ fn fixture() -> Fixture {
     let mut fs = MemoryFileSystem::default();
     fs.0.insert(PathBuf::from(MAIN), MAIN_SOURCE.to_owned());
     fs.0.insert(PathBuf::from(OTHER), OTHER_SOURCE.to_owned());
+    fs.0.insert(PathBuf::from("/game/font.ttf"), String::new());
     let db = RootDatabase::new(Arc::new(fs));
     let program = db.program(FilePath::disk(MAIN));
     let main = db.source_file(FilePath::disk(MAIN));

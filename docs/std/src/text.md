@@ -250,7 +250,7 @@ A `TextStyle` is the style of a text box: the message window (`ui::message`), la
 
 |Field|Meaning|
 |---|---|
-|`font`|`None`: the engine's default font|
+|`font`|`None`: `System::font`|
 |`size`, `ruby_size`|pixels|
 |`line_height`|a multiple of `size`|
 |`letter_spacing`|pixels between characters|

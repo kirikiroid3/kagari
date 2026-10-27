@@ -1,5 +1,5 @@
-//! The `#[builtin]` const functions of std: `asset`, `Vec`, `Integer`, the screen API,
-//! text building, `setting` and `meta`.
+//! The `#[builtin]` const functions of std: `asset`, `system_font`, `Vec`, `Integer`, the
+//! screen API, text building, `setting` and `meta`.
 
 use rustc_hash::FxHashSet;
 
@@ -9,7 +9,7 @@ use crate::ty::{FnRef, GenericArg, Ty, TyKind};
 use super::super::Fault;
 use super::super::num::Rat;
 use super::super::std_items::{Builtin, StdTable};
-use super::super::value::{ConstValue, HandleKind, Text};
+use super::super::value::{AssetKind, ConstValue, HandleKind, Text};
 use super::anim;
 use super::screen::{
     ChannelId, EntityProp, LayerTarget, PendingChange, PropTarget, Screen, ScreenObj, Target,
@@ -206,6 +206,22 @@ impl Machine<'_> {
                 }
                 let file = self.program.asset_root(self.db).join(&path);
                 Ok(Value::Asset { kind, path: file })
+            }
+            Builtin::SystemFont => {
+                let Text::Plain(path) = self.text_arg(&args, 0)? else {
+                    return Err(ErrorKind::Abort);
+                };
+                if !matches!(site.at, Some(Anchor::Node(Owner::Body(_), _)))
+                    || !crate::assets::stays_inside(&path)
+                {
+                    return Err(ErrorKind::Abort);
+                }
+                let file = crate::assets::system_font_file(self.db, self.program, &path)
+                    .ok_or(ErrorKind::Abort)?;
+                Ok(Value::Asset {
+                    kind: AssetKind::Font,
+                    path: file,
+                })
             }
             Builtin::VecNew => Ok(Value::Vec(imbl::Vector::new())),
             Builtin::VecLen | Builtin::VecIsEmpty | Builtin::VecGet => {

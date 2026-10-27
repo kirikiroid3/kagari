@@ -97,7 +97,7 @@ Every module imports the prelude implicitly. A name declared in the module, or i
 takes precedence over a prelude name.
 
 ```kis
-pub use crate::{String, Vec, Rat, Decimal, Range, Option, Result, Eq, Integer, ImageAsset, AudioAsset, VoiceAsset, VideoAsset, FontAsset, asset};
+pub use crate::{String, Vec, Rat, Decimal, Range, Option, Result, Eq, Integer, RandChoose, ImageAsset, AudioAsset, VoiceAsset, VideoAsset, FontAsset, ShaderAsset, asset, system_font};
 pub use crate::Option::{None, Some};
 pub use crate::Result::{Err, Ok};
 pub use crate::time::{Duration, ms, secs};

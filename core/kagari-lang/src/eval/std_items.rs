@@ -15,6 +15,7 @@ use super::value::{AssetKind, ConstValue, adt_variants};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Builtin {
     Asset,
+    SystemFont,
     VecNew,
     VecLen,
     VecIsEmpty,
@@ -107,6 +108,7 @@ pub(crate) const BUILTINS_LEN: usize = BUILTINS.len();
 /// `(std file, owner type or trait, function name)` of every const builtin.
 const BUILTINS: &[(&str, &str, &str, Builtin)] = &[
     ("mod.kis", "", "asset", Builtin::Asset),
+    ("mod.kis", "", "system_font", Builtin::SystemFont),
     ("mod.kis", "Vec", "new", Builtin::VecNew),
     ("mod.kis", "Vec", "len", Builtin::VecLen),
     ("mod.kis", "Vec", "is_empty", Builtin::VecIsEmpty),

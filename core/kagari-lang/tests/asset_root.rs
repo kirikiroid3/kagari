@@ -1,5 +1,6 @@
 //! `asset("…")` paths are relative to the program's asset directory, which may lie outside the
-//! root file's directory, and may not leave it.
+//! root file's directory, and may not leave it. `system_font("…")` paths are relative to the
+//! system font directories, searched in order.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -34,6 +35,7 @@ static WAIT_FOR_VOICE: Setting<bool> = setting(true);
 static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
 static FULLSCREEN: Setting<bool> = setting(false);
 static ANIMATIONS: Setting<bool> = setting(true);
+const FONT: FontAsset = asset("font.ttf");
 
 fn main() -> System {
     System {
@@ -44,6 +46,7 @@ fn main() -> System {
         save_slots: 20,
         auto_slots: 3,
         backlog: 200,
+        font: FONT,
         text: text_style(26, WHITE),
         settings: Settings {
             text_speed: TEXT_SPEED,
@@ -75,16 +78,40 @@ fn GameView(game: Narrative) -> Element {
 }
 "#;
 
+/// The system font directories of [`database`], in search order.
+const FONT_DIRS: [&str; 2] = ["/home/user/.fonts", "/usr/share/fonts"];
+
 fn database(asset_line: &str) -> (RootDatabase, kagari_lang::Program) {
+    database_with(asset_line, CompileOptions::default())
+}
+
+fn database_with(
+    asset_line: &str,
+    options: CompileOptions,
+) -> (RootDatabase, kagari_lang::Program) {
+    database_of(format!("{SYSTEM}\n{asset_line}\n"), options)
+}
+
+fn database_of(source: String, options: CompileOptions) -> (RootDatabase, kagari_lang::Program) {
     let mut fs = MemoryFileSystem::default();
-    fs.0.insert(PathBuf::from(MAIN), format!("{SYSTEM}\n{asset_line}\n"));
-    fs.0.insert(PathBuf::from("/game/assets/bg/a.png"), String::new());
-    fs.0.insert(PathBuf::from("/game/src/x.png"), String::new());
+    fs.0.insert(PathBuf::from(MAIN), source);
+    for file in [
+        "/game/assets/bg/a.png",
+        "/game/assets/font.ttf",
+        "/game/assets/system-fonts/a.ttf",
+        "/game/src/x.png",
+        "/home/user/.fonts/Both.ttf",
+        "/usr/share/fonts/Both.ttf",
+        "/usr/share/fonts/truetype/Sans.ttf",
+    ] {
+        fs.0.insert(PathBuf::from(file), String::new());
+    }
     let db = RootDatabase::new(Arc::new(fs));
     let program = db.program_with_assets(
         FilePath::disk(MAIN),
         FilePath::disk("/game/assets"),
-        CompileOptions::default(),
+        FONT_DIRS.iter().map(FilePath::disk).collect(),
+        options,
     );
     (db, program)
 }
@@ -97,22 +124,134 @@ fn codes(asset_line: &str) -> Vec<&'static str> {
         .collect()
 }
 
-#[test]
-fn asset_paths_are_relative_to_the_asset_directory() {
-    let (db, program) = database(r#"const A: VoiceAsset = asset("bg/a.png");"#);
-    let result = build(&db, program);
+/// `line` after the voice `A` the scene of `SYSTEM` names.
+fn with_voice(line: &str) -> String {
+    format!("const A: VoiceAsset = asset(\"bg/a.png\");\n{line}")
+}
+
+/// `(bytecode path, file)` of every asset of the built program, sorted.
+fn built_assets(db: &RootDatabase, program: kagari_lang::Program) -> Vec<(String, FilePath)> {
+    let result = build(db, program);
     assert!(
         result.diagnostics.is_empty(),
         "{:?}",
-        result.diagnostics.iter().map(|d| d.code.as_str()).collect::<Vec<_>>()
+        result
+            .diagnostics
+            .iter()
+            .map(|d| d.code.as_str())
+            .collect::<Vec<_>>()
     );
     let module = result.module.expect("module");
-    let paths: Vec<&str> = module
+    let mut assets: Vec<(String, FilePath)> = module
         .assets
         .iter()
-        .map(|asset| module.strings[usize::try_from(asset.path.0).unwrap()].as_str())
+        .map(|asset| module.strings[usize::try_from(asset.path.0).unwrap()].clone())
+        .zip(result.asset_files)
         .collect();
-    assert_eq!(paths, ["bg/a.png"]);
+    assets.sort();
+    assets
+}
+
+#[test]
+fn asset_paths_are_relative_to_the_asset_directory() {
+    let (db, program) = database(r#"const A: VoiceAsset = asset("bg/a.png");"#);
+    assert_eq!(
+        built_assets(&db, program),
+        [
+            (
+                "bg/a.png".to_owned(),
+                FilePath::disk("/game/assets/bg/a.png")
+            ),
+            (
+                "font.ttf".to_owned(),
+                FilePath::disk("/game/assets/font.ttf")
+            ),
+        ]
+    );
+}
+
+#[test]
+fn system_fonts_are_found_in_the_first_directory_that_has_them() {
+    let source = SYSTEM.replace("font: FONT,", "font: F,").replace(
+        "text: text_style(26, WHITE),",
+        "text: text_style(26, WHITE).font(G),",
+    );
+    let fonts = with_voice(
+        r#"const F: FontAsset = system_font("truetype/Sans.ttf");
+const G: FontAsset = system_font("Both.ttf");"#,
+    );
+    let (db, program) = database_of(format!("{source}\n{fonts}\n"), CompileOptions::default());
+    let assets = built_assets(&db, program);
+    assert_eq!(
+        assets,
+        [
+            (
+                "bg/a.png".to_owned(),
+                FilePath::disk("/game/assets/bg/a.png")
+            ),
+            (
+                "system-fonts/Both.ttf".to_owned(),
+                FilePath::disk("/home/user/.fonts/Both.ttf")
+            ),
+            (
+                "system-fonts/truetype/Sans.ttf".to_owned(),
+                FilePath::disk("/usr/share/fonts/truetype/Sans.ttf")
+            ),
+        ]
+    );
+}
+
+#[test]
+fn system_font_errors() {
+    assert_eq!(
+        codes(&with_voice(
+            r#"const F: FontAsset = system_font("Missing.ttf");"#
+        )),
+        ["E1030"]
+    );
+    assert_eq!(
+        codes(&with_voice(
+            r#"const F: FontAsset = system_font("../share/fonts/Both.ttf");"#
+        )),
+        ["E1029"]
+    );
+    assert_eq!(
+        codes(&with_voice(
+            r#"const F: FontAsset = system_font("/usr/share/fonts/Both.ttf");"#
+        )),
+        ["E1029"]
+    );
+    assert_eq!(
+        codes(&with_voice(r#"const F: FontAsset = system_font("");"#)),
+        ["E1028"]
+    );
+}
+
+#[test]
+fn system_fonts_can_be_disabled() {
+    let options = CompileOptions {
+        system_fonts: false,
+        ..CompileOptions::default()
+    };
+    let (db, program) = database_with(
+        &with_voice(r#"const F: FontAsset = system_font("Both.ttf");"#),
+        options,
+    );
+    let codes: Vec<&str> = check(&db, program)
+        .iter()
+        .map(|diagnostic| diagnostic.code.as_str())
+        .collect();
+    assert_eq!(codes, ["E1031"]);
+}
+
+#[test]
+fn the_system_fonts_directory_of_the_assets_is_reserved() {
+    assert_eq!(
+        codes(&with_voice(
+            r#"const F: FontAsset = asset("system-fonts/a.ttf");"#
+        )),
+        ["E1032"]
+    );
 }
 
 #[test]

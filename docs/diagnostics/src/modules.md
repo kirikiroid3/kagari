@@ -333,7 +333,7 @@ Fix: add the file or correct the path, e.g. `asset("cg_001.png")`.
 
 ## E1028 `empty-asset-path`
 
-**Error.** An `asset("...")` call is given an empty path.
+**Error.** An `asset("...")` or `system_font("...")` call is given an empty path.
 
 ```kis
 const EMPTY: ImageAsset = asset("");
@@ -343,10 +343,46 @@ Fix: pass a non-empty asset path, e.g. `asset("cg_001.png")`.
 
 ## E1029 `asset-outside-asset-dir`
 
-**Error.** An `asset("...")` path leaves the asset directory (`[assets] dir` in `kagari.toml`, or the root file's directory without a manifest).
+**Error.** An `asset("...")` path leaves the asset directory (`[assets] dir` in `kagari.toml`, or the root file's directory without a manifest), or a `system_font("...")` path is absolute or leaves the system font directory it is joined to.
 
 ```kis
 const OUTSIDE: ImageAsset = asset("../secret.png");
 ```
 
 Fix: move the file into the asset directory and name it relative to that directory, e.g. `asset("bgimage/room.png")`.
+For a system font, name the file relative to a system font directory, e.g. `system_font("msgothic.ttc")` rather than `system_font("C:/Windows/Fonts/msgothic.ttc")`.
+
+## E1030 `system-font-not-found`
+
+**Error.** A `system_font("...")` call names a file that is in none of the system font directories. The message lists the directories searched, in order: on Windows `%LOCALAPPDATA%\Microsoft\Windows\Fonts` and `%WINDIR%\Fonts`; on macOS `~/Library/Fonts`, `/Library/Fonts` and `/System/Library/Fonts`; elsewhere `$XDG_DATA_HOME/fonts` (by default `~/.local/share/fonts`), `~/.fonts` and `fonts` in each of `$XDG_DATA_DIRS` (by default `/usr/local/share:/usr/share`). Directories that do not exist are skipped.
+
+```kis
+const MINCHO: FontAsset = system_font("missing-mincho.ttc");
+```
+
+Fix: install the font, correct the path relative to its font directory (e.g. `system_font("truetype/dejavu/DejaVuSans.ttf")` for `/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf`), or copy the file into the asset directory and use `asset("…")`.
+
+## E1031 `system-fonts-disabled`
+
+**Error.** A `system_font("...")` call in a project whose `kagari.toml` sets `system-fonts = false` under `[assets]`.
+
+```toml
+[assets]
+system-fonts = false
+```
+
+```kis
+const GOTHIC: FontAsset = system_font("msgothic.ttc");
+```
+
+Fix: copy the font into the asset directory and use `asset("fonts/msgothic.ttc")`, or allow system fonts by removing the setting.
+
+## E1032 `reserved-asset-dir`
+
+**Error.** An `asset("...")` path enters the top-level `system-fonts` directory of the asset directory. That name is where the bytecode and the archives keep system fonts, so assets may not use it.
+
+```kis
+const GOTHIC: FontAsset = asset("system-fonts/msgothic.ttc");
+```
+
+Fix: rename the directory, e.g. `asset("fonts/msgothic.ttc")`.

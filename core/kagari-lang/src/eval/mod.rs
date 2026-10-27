@@ -267,7 +267,7 @@ impl<'db> Driver<'db> {
         }
     }
 
-    /// The string literals of `item`'s body, except asset paths.
+    /// The string literals of `item`'s body, except asset and system font paths.
     fn collect_literal_texts(&mut self, item: ItemId) {
         let Some(body) = body_of(self.db, item) else {
             return;
@@ -277,7 +277,10 @@ impl<'db> Driver<'db> {
             matches!(
                 resolution.and_then(|res| res.store.exprs.get(&callee)),
                 Some(Resolution::Def(Def::Item(item)))
-                    if self.ctx.std.builtin(*item) == Some(Builtin::Asset)
+                    if matches!(
+                        self.ctx.std.builtin(*item),
+                        Some(Builtin::Asset | Builtin::SystemFont)
+                    )
             )
         };
         let mut asset_paths = FxHashSet::default();

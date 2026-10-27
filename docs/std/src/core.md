@@ -149,6 +149,7 @@ impl Asset for FontAsset {}
 impl Asset for ShaderAsset {}
 
 #[builtin] pub const fn asset<A: Asset>(path: narrative::Text) -> A;
+#[builtin] pub const fn system_font(path: narrative::Text) -> FontAsset;
 ```
 
 |Type|Used by|
@@ -157,7 +158,7 @@ impl Asset for ShaderAsset {}
 |`AudioAsset`|music and ambience loops, one-shot sounds|
 |`VoiceAsset`|`Say::voice`|
 |`VideoAsset`|movie layers|
-|`FontAsset`|`TextEffect::font`, `TextStyle::font`|
+|`FontAsset`|`System::font`, `TextEffect::font`, `TextStyle::font`|
 |`ShaderAsset`|`Screen::filter`, `Entity::filter`, `Entity::shader` (`.wgsl` files)|
 
 An asset is declared as a constant:
@@ -169,11 +170,35 @@ const THEME: AudioAsset = asset("bgm/theme.ogg");
 ```
 
 - The type parameter is inferred from the constant's type.
-- The argument must be a string literal. The path is relative to the file that declares the
-  constant.
+- The argument must be a string literal and must not be empty. The path is relative to the
+  asset directory (`[assets] dir` in `kagari.toml`, by default `assets`; without a manifest, the
+  root file's directory) and must not leave it.
 - A missing file is a compile error. Because faces, tracks and voices are constants, a misspelled
   name is a resolve error, not a runtime failure.
 - The values of an asset type are exactly its constants, so every asset type is finite.
+
+### System fonts
+
+The standard library ships no fonts, and `System::font` must name one. A font installed on the
+machine that builds the game can be named directly:
+
+```kis
+const GOTHIC: FontAsset = system_font("msgothic.ttc");
+const SANS: FontAsset = system_font("truetype/dejavu/DejaVuSans.ttf");
+```
+
+- The argument is a string literal relative to a system font directory. The directories are
+  searched in order and the first that has the file wins: on Windows
+  `%LOCALAPPDATA%\Microsoft\Windows\Fonts`, then `%WINDIR%\Fonts`; on macOS `~/Library/Fonts`,
+  `/Library/Fonts`, `/System/Library/Fonts`; elsewhere `$XDG_DATA_HOME/fonts`, `~/.fonts`, then
+  `fonts` in each of `$XDG_DATA_DIRS`.
+- A font found in none of them is a compile error (`E1030`), as is any `system_font` in a
+  project whose `kagari.toml` sets `system-fonts = false` under `[assets]` (`E1031`). System
+  fonts are allowed by default.
+- `kagari build` packs a system font like any other asset, into `system-fonts.kiarchive`; its
+  path in the bytecode is `system-fonts/` and the path written in the source. The top-level
+  `system-fonts` directory of the asset directory is therefore reserved (`E1032`).
+- A system font is a `FontAsset` constant like one from `asset("…")`.
 
 ## Time
 

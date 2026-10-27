@@ -3,7 +3,7 @@ source: core/kagari-lang/tests/bytecode.rs
 expression: out
 input_file: core/kagari-lang/tests/bytecode/002__control/main.kix
 ---
-002__control/main.kix:124:4: warning[W6001]: the game is never started: no reachable mode calls `nav::start` or `nav::load`
+002__control/main.kix:126:4: warning[W6001]: the game is never started: no reachable mode calls `nav::start` or `nav::load`
 --- bytecode ---
 fn crate::main [fn, main] params=0 regs=18
   0000 ADT r4, (), crate::Shape::Dot
@@ -43,7 +43,7 @@ fn crate::main [fn, main] params=0 regs=18
   0034 CONST r15, #25 crate::FULLSCREEN
   0035 CONST r16, #26 crate::ANIMATIONS
   0036 ADT r2, (r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16), std::system::Settings
-  0037 CALL r13, (), std::system::default_bindings
+  0037 CALL r14, (), std::system::default_bindings
   0038 CONST r4, #27 "Control"
   0039 MOVE r5, r0
   0040 FUNC r6, crate::Title
@@ -51,10 +51,11 @@ fn crate::main [fn, main] params=0 regs=18
   0042 INT r8, 20
   0043 INT r9, 3
   0044 INT r10, 200
-  0045 MOVE r11, r1
-  0046 MOVE r12, r2
-  0047 ADT r0, (r4, r5, r6, r7, r8, r9, r10, r11, r12, r13), std::system::System
-  0048 RET r0
+  0045 CONST r11, #28 font "font.ttf"
+  0046 MOVE r12, r1
+  0047 MOVE r13, r2
+  0048 ADT r0, (r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14), std::system::System
+  0049 RET r0
 
 fn crate::area [fn] params=1 regs=6
   0000 ISVAR r4, r0, crate::Shape::Line
@@ -247,7 +248,7 @@ fn crate::GameView [fn] params=1 regs=3
   0004 RET r1
 
 fn crate::Title::{closure#0} [fn, closure] params=0 regs=1
-  0000 CONST r0, #29 "Title"
+  0000 CONST r0, #30 "Title"
   0001 RET r0
 
 fn crate::GameView::{closure#0} [fn, closure] params=1 regs=2

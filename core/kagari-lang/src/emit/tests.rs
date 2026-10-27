@@ -44,6 +44,7 @@ fn unreachable_functions_are_not_emitted() {
     );
     let mut files = FxHashMap::default();
     files.insert(PathBuf::from("/game/main.kix"), source);
+    files.insert(PathBuf::from("/game/font.ttf"), String::new());
     let db = RootDatabase::new(Arc::new(MemoryFileSystem(files)));
     let program = db.program(FilePath::disk("/game/main.kix"));
     let result = build(&db, program);

@@ -50,6 +50,9 @@ pub struct Build {
     pub module: Option<kagari_bytecode::Module>,
     /// `module` encoded.
     pub bytes: Option<Vec<u8>>,
+    /// The file of each entry of `module.assets`, by index: in the asset directory or in a
+    /// system font directory.
+    pub asset_files: Vec<FilePath>,
 }
 
 /// Checks the program and, without errors, emits, verifies and encodes its bytecode.
@@ -59,6 +62,7 @@ pub fn build(db: &dyn Db, program: Program) -> Build {
         diagnostics,
         module: None,
         bytes: None,
+        asset_files: Vec::new(),
     };
     if diagnostics
         .iter()
@@ -68,9 +72,9 @@ pub fn build(db: &dyn Db, program: Program) -> Build {
     }
     #[cfg(debug_assertions)]
     validate_mir(db, program);
-    let (module, has_main, mut errors) = emit(db, program);
+    let (emitted, has_main, mut errors) = emit(db, program);
     diagnostics.append(&mut errors);
-    let Some(module) = module else {
+    let Some((module, asset_files)) = emitted else {
         return failed(diagnostics);
     };
     // Without `main` the entry scenes and statics are still lowered and verified, so their
@@ -104,6 +108,7 @@ pub fn build(db: &dyn Db, program: Program) -> Build {
         diagnostics,
         module: Some(module),
         bytes: Some(bytes),
+        asset_files,
     }
 }
 
@@ -151,9 +156,12 @@ fn root_diagnostic(
     )
 }
 
-/// Emits the module of a checked program: the module (`None` after an emission error),
-/// whether it has a `main`, and the emission errors.
-fn emit(db: &dyn Db, program: Program) -> (Option<Module>, bool, Vec<Diagnostic>) {
+/// A module and the file of each of its assets, by index.
+type Emitted = (Module, Vec<FilePath>);
+
+/// Emits the module of a checked program: the module and its asset files (`None` after an
+/// emission error), whether it has a `main`, and the emission errors.
+fn emit(db: &dyn Db, program: Program) -> (Option<Emitted>, bool, Vec<Diagnostic>) {
     // Std failed to load: `check` already reported it.
     let Some(std) = std_table(db, program).as_ref() else {
         return (None, false, Vec::new());
@@ -166,7 +174,7 @@ fn emit(db: &dyn Db, program: Program) -> (Option<Module>, bool, Vec<Diagnostic>
     emitter.roots();
     emitter.run();
     match emitter.finish() {
-        Ok(module) => (Some(module), main.is_some(), Vec::new()),
+        Ok(emitted) => (Some(emitted), main.is_some(), Vec::new()),
         Err(errors) => (None, main.is_some(), errors),
     }
 }
@@ -204,8 +212,8 @@ struct Emitter<'db> {
     /// `fn main` of the root module, when it has one.
     main: Option<ItemId>,
     root_dir: Option<PathBuf>,
-    /// The program's asset directory; bytecode asset paths are relative to it.
-    asset_root: Option<PathBuf>,
+    /// The file of each entry of `module.assets`, by index.
+    asset_files: Vec<FilePath>,
     module: Module,
     strings: FxHashMap<Arc<str>, StrId>,
     types: FxHashMap<ItemId, TypeId>,
@@ -280,10 +288,6 @@ impl<'db> Emitter<'db> {
             FilePath::Disk(path) => path.parent().map(PathBuf::from),
             FilePath::Std(_) => None,
         };
-        let asset_root = match program.asset_root(db) {
-            FilePath::Disk(path) => Some(path.to_path_buf()),
-            FilePath::Std(_) => None,
-        };
         let mut emitter = Emitter {
             db,
             program,
@@ -292,7 +296,7 @@ impl<'db> Emitter<'db> {
             maps: def_maps(db, program),
             main,
             root_dir,
-            asset_root,
+            asset_files: Vec::new(),
             module: Module {
                 options: Options {
                     max_call_depth: program.options(db).recursion_depth,
@@ -413,13 +417,14 @@ impl<'db> Emitter<'db> {
         if let Some(id) = self.assets.get(&key) {
             return *id;
         }
-        let shown = path.display(self.asset_root.as_deref());
+        let shown = crate::assets::bytecode_path(self.db, self.program, path);
         let shown = self.string(&shown);
         let id = AssetId(index(self.module.assets.len()));
         self.module.assets.push(Asset {
             kind: bc_asset_kind(kind),
             path: shown,
         });
+        self.asset_files.push(path.clone());
         self.assets.insert(key, id);
         id
     }
@@ -942,7 +947,7 @@ impl<'db> Emitter<'db> {
         ));
     }
 
-    fn finish(mut self) -> Result<Module, Vec<Diagnostic>> {
+    fn finish(mut self) -> Result<Emitted, Vec<Diagnostic>> {
         if !self.diagnostics.is_empty() {
             return Err(self.diagnostics);
         }
@@ -975,6 +980,6 @@ impl<'db> Emitter<'db> {
             })
             .collect();
         self.module.debug = Some(Debug { files, functions });
-        Ok(self.module)
+        Ok((self.module, self.asset_files))
     }
 }

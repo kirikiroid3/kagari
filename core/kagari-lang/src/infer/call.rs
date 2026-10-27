@@ -35,7 +35,10 @@ impl InferCtx<'_> {
             return self.infer_nav_start(expr, callee, args);
         }
         if callee_item.is_some() && callee_item == std.asset_fn {
-            self.check_asset_path(args);
+            self.check_asset_path("asset", args);
+        }
+        if callee_item.is_some() && callee_item == std.system_font_fn {
+            self.check_asset_path("system_font", args);
         }
         let callee_ty = self.infer_expr(callee, Expect::None);
         let callee_ty = self.structurally_resolve(&callee_ty);
@@ -110,8 +113,8 @@ impl InferCtx<'_> {
         Ty::error()
     }
 
-    /// `asset::<A>(…)`: the path must be a string literal.
-    fn check_asset_path(&mut self, args: &[ExprId]) {
+    /// `asset::<A>(…)` and `system_font(…)`: the path must be a string literal.
+    fn check_asset_path(&mut self, name: &str, args: &[ExprId]) {
         let Some(&arg) = args.first() else {
             return;
         };
@@ -122,7 +125,7 @@ impl InferCtx<'_> {
                 self.diag(
                     range,
                     DiagnosticCode::TypeAssetPathNotLiteral,
-                    "the path of `asset` must be a string literal",
+                    format!("the path of `{name}` must be a string literal"),
                 );
             }
         }

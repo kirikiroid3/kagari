@@ -337,7 +337,7 @@ Fix: start an `#[entry]` scene, e.g. mark `Side` with `#[entry]`.
 
 ## E2028 `asset-path-not-literal`
 
-**Error.** The path passed to `asset(…)` is not a string literal, so it cannot be checked at compile time.
+**Error.** The path passed to `asset(…)` or `system_font(…)` is not a string literal, so it cannot be checked at compile time.
 
 ```kis
 const PATH: Text = "missing.png";

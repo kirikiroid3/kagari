@@ -38,7 +38,7 @@ pub fn run(manifest_path: Option<&Path>, targets: &[String]) -> Result<ExitCode,
         let bytecode = dir.join(BYTECODE_FILE);
         std::fs::write(&bytecode, &bytes).map_err(|error| io(&bytecode, error))?;
         println!("wrote {}", shown(&bytecode, &project.root));
-        for (archive, files) in archives::write(&module, &project.asset_dir(), &dir)? {
+        for (archive, files) in archives::write(&module, &result.asset_files, &dir)? {
             println!("wrote {} ({files} files)", shown(&archive, &project.root));
         }
     }

@@ -282,6 +282,14 @@ const crate::ANIMATIONS() -> Setting<bool> {
     }
 }
 
+const crate::FONT() -> FontAsset {
+    let mut _0: FontAsset; // return
+    bb0 (entry): {
+        _0 = builtin[Asset] std::asset::<FontAsset>(const "font.ttf");
+        return;
+    }
+}
+
 fn crate::main() -> System {
     let mut _0: System; // return
     let _1: (i32, Int<0, 255>, Decimal, Rat, bool); // temp
@@ -305,7 +313,7 @@ fn crate::main() -> System {
         _8 = std::narrative::text::text_style(const 26, const std::screen::WHITE);
         _9 = std::system::Settings { handle crate::TEXT_SPEED, handle crate::AUTO_DELAY, handle crate::AUTO_DELAY_PER_CHAR, handle crate::SKIP_UNREAD, handle crate::MASTER, handle crate::MUSIC, handle crate::SOUND, handle crate::VOICE, handle crate::VOICE_SUSTAIN, handle crate::WAIT_FOR_VOICE, handle crate::WINDOW_OPACITY, handle crate::FULLSCREEN, handle crate::ANIMATIONS };
         _10 = std::system::default_bindings();
-        _0 = std::system::System { const "Arithmetic", copy _7, fn crate::Title, fn crate::GameView, const 20, const 3, const 200, copy _8, copy _9, copy _10 };
+        _0 = std::system::System { const "Arithmetic", copy _7, fn crate::Title, fn crate::GameView, const 20, const 3, const 200, const crate::FONT, copy _8, copy _9, copy _10 };
         return;
     }
 }

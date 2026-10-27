@@ -1,5 +1,6 @@
 //! `kagari init`: a new project from the embedded template.
 
+mod font;
 mod template;
 
 use std::path::Path;
@@ -34,14 +35,26 @@ pub fn run(path: &Path, name: Option<&str>) -> Result<ExitCode, Failure> {
             )));
         }
     }
+    let font = font::default_font();
     for (rel, contents) in template::FILES {
         let out = dir.join(rel);
         if let Some(parent) = out.parent() {
             std::fs::create_dir_all(parent).map_err(|error| io(parent, error))?;
         }
-        std::fs::write(&out, template::render(rel, contents, &name))
-            .map_err(|error| io(&out, error))?;
+        std::fs::write(
+            &out,
+            template::render(rel, contents, &name, font.as_deref()),
+        )
+        .map_err(|error| io(&out, error))?;
     }
     println!("created Kagari project `{name}` in {}", dir.display());
+    match &font {
+        Some(font) => println!("default font: system font `{font}`"),
+        None => eprintln!(
+            "warning: no system font is installed; put the default font at `assets/{}` or \
+             change `FONT` in `src/main.kis`",
+            template::FALLBACK_FONT
+        ),
+    }
     Ok(ExitCode::SUCCESS)
 }

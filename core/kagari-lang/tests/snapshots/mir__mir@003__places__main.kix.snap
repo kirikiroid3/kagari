@@ -190,6 +190,14 @@ const crate::ANIMATIONS() -> Setting<bool> {
     }
 }
 
+const crate::FONT() -> FontAsset {
+    let mut _0: FontAsset; // return
+    bb0 (entry): {
+        _0 = builtin[Asset] std::asset::<FontAsset>(const "font.ttf");
+        return;
+    }
+}
+
 fn crate::main() -> System {
     let mut _0: System; // return
     let _1: i32; // temp
@@ -203,7 +211,7 @@ fn crate::main() -> System {
         _3 = std::narrative::text::text_style(const 26, const std::screen::WHITE);
         _4 = std::system::Settings { handle crate::TEXT_SPEED, handle crate::AUTO_DELAY, handle crate::AUTO_DELAY_PER_CHAR, handle crate::SKIP_UNREAD, handle crate::MASTER, handle crate::MUSIC, handle crate::SOUND, handle crate::VOICE, handle crate::VOICE_SUSTAIN, handle crate::WAIT_FOR_VOICE, handle crate::WINDOW_OPACITY, handle crate::FULLSCREEN, handle crate::ANIMATIONS };
         _5 = std::system::default_bindings();
-        _0 = std::system::System { const "Places", copy _2, fn crate::Title, fn crate::GameView, const 20, const 3, const 200, copy _3, copy _4, copy _5 };
+        _0 = std::system::System { const "Places", copy _2, fn crate::Title, fn crate::GameView, const 20, const 3, const 200, const crate::FONT, copy _3, copy _4, copy _5 };
         return;
     }
 }

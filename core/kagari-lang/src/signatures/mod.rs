@@ -205,6 +205,7 @@ pub struct StdItems {
     pub push_step: Option<ItemId>,
     pub rng_choose: Option<ItemId>,
     pub asset_fn: Option<ItemId>,
+    pub system_font_fn: Option<ItemId>,
     pub to_text_fn: Option<ItemId>,
     pub concat: Option<ItemId>,
     pub ruby: Option<ItemId>,

@@ -18,6 +18,7 @@
 //! [`Anchor`]s, resolved to ranges through the source maps only in [`check`]. Editing text
 //! inside one item re-runs the queries of that item and of the code that uses it.
 
+mod assets;
 mod callee;
 mod db;
 mod diagnostic;
@@ -50,6 +51,7 @@ pub(crate) const STACK_RED_ZONE: usize = 100 * 1024;
 /// The size of each new stack segment.
 pub(crate) const STACK_GROWTH: usize = 1024 * 1024;
 
+pub use assets::SYSTEM_FONTS_DIR;
 pub use db::{Db, FileSystem, MemoryFileSystem, OsFileSystem, RootDatabase};
 pub use diagnostic::{
     Anchor, Diag, Diagnostic, DiagnosticCode, NodeId, Owner, Related, Severity, render_diagnostics,

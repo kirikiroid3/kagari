@@ -12,6 +12,16 @@ const ASSETS: [&str; 2] = [
     "characters/character1/voice/0001.wav",
 ];
 
+/// The bytecode path and file of the template's default font, `TestSans.ttf` of
+/// [`common::font_home`]. Only the XDG platforms read `font_home`.
+#[cfg(not(any(windows, target_os = "macos")))]
+fn system_font() -> (&'static str, std::path::PathBuf) {
+    (
+        "system-fonts/TestSans.ttf",
+        common::font_home().join("fonts/TestSans.ttf"),
+    )
+}
+
 #[test]
 fn build_writes_bytecode_and_archives() {
     let tmp = init_project();
@@ -23,25 +33,43 @@ fn build_writes_bytecode_and_archives() {
     let bytes = std::fs::read(out.join("game.kagari")).unwrap();
     let module = kagari_bytecode::decode(&bytes).unwrap();
     kagari_bytecode::verify(&module).unwrap();
-    let mut paths: Vec<&str> = module
+    let (fonts, mut paths): (Vec<&str>, Vec<&str>) = module
         .assets
         .iter()
         .map(|asset| module.strings[usize::try_from(asset.path.0).unwrap()].as_str())
-        .collect();
+        .partition(|path| path.starts_with("system-fonts/"));
     paths.sort_unstable();
     assert_eq!(paths, ASSETS);
+    assert_eq!(fonts.len(), 1, "{fonts:?}");
 
     let mut files: Vec<String> = std::fs::read_dir(&out)
         .unwrap()
         .map(|entry| entry.unwrap().file_name().into_string().unwrap())
         .collect();
     files.sort();
-    assert_eq!(files, ["characters.kiarchive", "game.kagari"]);
+    assert_eq!(
+        files,
+        [
+            "characters.kiarchive",
+            "game.kagari",
+            "system-fonts.kiarchive"
+        ]
+    );
 
     let mut archive = Archive::open(File::open(out.join("characters.kiarchive")).unwrap()).unwrap();
     for path in ASSETS {
         let expected = std::fs::read(dir.join("assets").join(path)).unwrap();
         assert_eq!(archive.read(path).unwrap(), Some(expected), "{path}");
+    }
+    let mut archive =
+        Archive::open(File::open(out.join("system-fonts.kiarchive")).unwrap()).unwrap();
+    let font = archive.read(fonts[0]).unwrap();
+    assert!(font.is_some(), "{}", fonts[0]);
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        let (path, file) = system_font();
+        assert_eq!(fonts[0], path);
+        assert_eq!(font, Some(std::fs::read(file).unwrap()));
     }
 
     let disasm = kagari(&["disasm", "target/v0/game.kagari"], &dir);

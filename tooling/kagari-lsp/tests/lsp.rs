@@ -68,6 +68,7 @@ static WAIT_FOR_VOICE: Setting<bool> = setting(true);
 static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
 static FULLSCREEN: Setting<bool> = setting(false);
 static ANIMATIONS: Setting<bool> = setting(true);
+const FONT: FontAsset = asset("font.ttf");
 
 fn main() -> System {{
     System {{
@@ -78,6 +79,7 @@ fn main() -> System {{
         save_slots: 20,
         auto_slots: helper(),
         backlog: 200,
+        font: FONT,
         text: text_style(26, WHITE),
         settings: Settings {{
             text_speed: TEXT_SPEED,
@@ -139,6 +141,7 @@ impl Client {
         std::fs::write(root.join("kagari.toml"), MANIFEST).unwrap();
         std::fs::create_dir_all(root.join("src")).unwrap();
         std::fs::create_dir_all(root.join("assets")).unwrap();
+        std::fs::write(root.join("assets/font.ttf"), "").unwrap();
         let main_path = root.join("src/main.kix");
         std::fs::write(&main_path, main_kix(HELPER)).unwrap();
 

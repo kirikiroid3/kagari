@@ -258,7 +258,7 @@ pub enum EmphasisStyle {
 
 /// The style of a text box.
 pub struct TextStyle {
-    /// `None`: the engine's default font.
+    /// `None`: `System::font`.
     pub font: Option<FontAsset>,
     /// Pixels.
     pub size: u32,

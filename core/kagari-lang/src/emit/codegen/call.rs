@@ -6,7 +6,7 @@ use smallvec::SmallVec;
 
 use crate::eval::machine::value::{GenericEnv, subst_fn_ref, subst_ty};
 use crate::eval::std_items::Builtin;
-use crate::eval::{ConstValue, Text};
+use crate::eval::{AssetKind, ConstValue, Text};
 use crate::hir::{ClosureKind, ExprId, FnPtrKind};
 use crate::item_tree::ItemId;
 use crate::mir::{Callee, ConstOperand, Operand, Place};
@@ -216,6 +216,24 @@ impl FnCodegen<'_, '_> {
                         return;
                     }
                     _ => self.import_call(item, args, dst),
+                }
+            }
+            Builtin::SystemFont => {
+                let file = asset
+                    .filter(|path| crate::assets::stays_inside(path))
+                    .and_then(|path| {
+                        crate::assets::system_font_file(self.em.db, self.em.program, path)
+                    });
+                match file {
+                    Some(file) => {
+                        let value = ConstValue::Asset {
+                            kind: AssetKind::Font,
+                            path: file,
+                        };
+                        self.load_value(dst, &value);
+                        return;
+                    }
+                    None => self.import_call(item, args, dst),
                 }
             }
             Builtin::VecNew => Instr::VecNew { dst: d },

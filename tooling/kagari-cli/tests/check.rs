@@ -31,6 +31,22 @@ fn assets_outside_the_asset_directory_are_errors() {
 }
 
 #[test]
+fn system_fonts_can_be_forbidden() {
+    let tmp = init_project();
+    let dir = game(&tmp);
+    let path = dir.join("kagari.toml");
+    let text = std::fs::read_to_string(&path)
+        .unwrap()
+        .replace("dir = \"assets\"", "dir = \"assets\"\nsystem-fonts = false");
+    std::fs::write(&path, text).unwrap();
+    let output = kagari(&["check"], &dir);
+    assert_eq!(output.status.code(), Some(1));
+    let out = stdout(&output);
+    assert!(out.contains("src/main.kis:"), "{out}");
+    assert!(out.contains("error[E1031]"), "{out}");
+}
+
+#[test]
 fn missing_manifest_is_a_failure() {
     let tmp = tempfile::tempdir().unwrap();
     let output = kagari(&["check"], tmp.path());

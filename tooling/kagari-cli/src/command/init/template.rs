@@ -52,16 +52,27 @@ pub const FILES: &[(&str, &[u8])] = &[
     ),
 ];
 
-/// The contents of `path` for a project named `name`.
-pub fn render(path: &str, contents: &[u8], name: &str) -> Vec<u8> {
+/// The default font when no system font is installed; `kagari init` warns that the file is
+/// missing.
+pub const FALLBACK_FONT: &str = "fonts/default.ttf";
+
+/// The contents of `path` for a project named `name`, whose default font is the system font
+/// `font` (relative to its font directory), or [`FALLBACK_FONT`] in the assets.
+pub fn render(path: &str, contents: &[u8], name: &str, font: Option<&str>) -> Vec<u8> {
     match path {
         "kagari.toml" => MANIFEST
             .replace("\"{{name}}\"", &toml_string(name))
             .replace("{{toolchain}}", &toolchain_req())
             .into_bytes(),
-        "src/main.kis" => MAIN
-            .replace("\"{{name}}\"", &kagari_string(name))
-            .into_bytes(),
+        "src/main.kis" => {
+            let font = match font {
+                Some(font) => format!("system_font({})", kagari_string(font)),
+                None => format!("asset({})", kagari_string(FALLBACK_FONT)),
+            };
+            MAIN.replace("\"{{name}}\"", &kagari_string(name))
+                .replace("{{font}}", &font)
+                .into_bytes()
+        }
         _ => contents.to_vec(),
     }
 }
