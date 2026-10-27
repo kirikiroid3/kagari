@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "core/kagari-archive",
     "core/kagari-bytecode",
     "core/kagari-lang",
     "core/kagari-std",
@@ -15,6 +16,7 @@ license = "Apache-2.0"
 edition = "2024"
 
 [workspace.dependencies]
+kagari-archive = { path = "core/kagari-archive" }
 kagari-bytecode = { path = "core/kagari-bytecode" }
 kagari-lang = { path = "core/kagari-lang" }
 kagari-syntax = { path = "core/kagari-syntax" }
@@ -31,3 +33,6 @@ insta = { version = "1.49", features = ["glob"] }
 triomphe = "0.1"
 smallvec = { version = "1.13", features = ["union", "const_generics"] }
 imbl = "7"
+lz4_flex = { version = "0.14", default-features = false, features = ["std", "safe-encode", "safe-decode"] }
+crc32fast = "1.5"
+tempfile = "3"
