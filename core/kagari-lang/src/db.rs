@@ -86,9 +86,21 @@ impl RootDatabase {
         self.program_with(root, CompileOptions::default())
     }
 
-    /// The program rooted at `root`, compiled with `options`.
+    /// The program rooted at `root`, compiled with `options`. Asset paths are relative to the
+    /// root file's directory.
     pub fn program_with(&self, root: FilePath, options: CompileOptions) -> Program {
-        Program::new(self, self.source_file(root), options)
+        let asset_root = root.parent_dir_join(".");
+        self.program_with_assets(root, asset_root, options)
+    }
+
+    /// The program rooted at `root`, with `asset("…")` paths relative to `asset_root`.
+    pub fn program_with_assets(
+        &self,
+        root: FilePath,
+        asset_root: FilePath,
+        options: CompileOptions,
+    ) -> Program {
+        Program::new(self, self.source_file(root), asset_root, options)
     }
 
     /// Replace a file's text (`None` = missing). Creates the input if needed.

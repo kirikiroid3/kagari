@@ -1,0 +1,26 @@
+---
+source: tooling/kagari-fmt/tests/format.rs
+expression: out
+input_file: tooling/kagari-fmt/tests/fixtures/008__blank_lines.kis
+---
+use a::b;
+
+use c::d;
+fn first() {
+    let a = 1;
+
+    let b = 2;
+
+    a + b
+}
+
+fn second() {}
+struct S {
+    a: u32,
+
+    b: u32,
+}
+
+// ---- section ----
+
+const X: u32 = 1;

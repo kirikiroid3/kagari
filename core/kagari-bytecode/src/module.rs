@@ -215,7 +215,7 @@ impl AssetKind {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Asset {
     pub kind: AssetKind,
-    /// `/`-separated, relative to the root file's directory.
+    /// `/`-separated, relative to the program's asset directory.
     pub path: StrId,
 }
 

@@ -1,0 +1,10 @@
+//! The characters: a `Character` constant and a module of assets for each one.
+
+use std::screen::BOTTOM_CENTER;
+
+pub const CHARACTER1: Character = character(EntityId(1)).anchor(BOTTOM_CENTER);
+
+pub mod CHARACTER1 {
+    pub const NORMAL: ImageAsset = asset("characters/character1/image/normal.png");
+    pub const VOICE_0001: VoiceAsset = asset("characters/character1/voice/0001.wav");
+}

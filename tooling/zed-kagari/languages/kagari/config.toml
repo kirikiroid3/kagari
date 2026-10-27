@@ -1,0 +1,11 @@
+name = "Kagari"
+grammar = "kagari"
+path_suffixes = ["kis", "kix"]
+line_comments = ["// ", "/// "]
+tab_size = 4
+brackets = [
+  { start = "{", end = "}", close = true, newline = true },
+  { start = "[", end = "]", close = true, newline = true },
+  { start = "(", end = ")", close = true, newline = true },
+  { start = "\"", end = "\"", close = true, newline = false, not_in = ["string", "comment"] },
+]

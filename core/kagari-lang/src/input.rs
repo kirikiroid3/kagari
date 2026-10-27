@@ -180,6 +180,9 @@ impl Default for CompileOptions {
 #[salsa::input(debug)]
 pub struct Program {
     pub root: SourceFile,
+    /// The directory `asset("…")` paths are relative to; asset paths in the bytecode are relative to it too.
+    #[returns(ref)]
+    pub asset_root: FilePath,
     pub options: CompileOptions,
 }
 

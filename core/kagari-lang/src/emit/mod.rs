@@ -204,6 +204,8 @@ struct Emitter<'db> {
     /// `fn main` of the root module, when it has one.
     main: Option<ItemId>,
     root_dir: Option<PathBuf>,
+    /// The program's asset directory; bytecode asset paths are relative to it.
+    asset_root: Option<PathBuf>,
     module: Module,
     strings: FxHashMap<Arc<str>, StrId>,
     types: FxHashMap<ItemId, TypeId>,
@@ -278,6 +280,10 @@ impl<'db> Emitter<'db> {
             FilePath::Disk(path) => path.parent().map(PathBuf::from),
             FilePath::Std(_) => None,
         };
+        let asset_root = match program.asset_root(db) {
+            FilePath::Disk(path) => Some(path.to_path_buf()),
+            FilePath::Std(_) => None,
+        };
         let mut emitter = Emitter {
             db,
             program,
@@ -286,6 +292,7 @@ impl<'db> Emitter<'db> {
             maps: def_maps(db, program),
             main,
             root_dir,
+            asset_root,
             module: Module {
                 options: Options {
                     max_call_depth: program.options(db).recursion_depth,
@@ -406,7 +413,7 @@ impl<'db> Emitter<'db> {
         if let Some(id) = self.assets.get(&key) {
             return *id;
         }
-        let shown = path.display(self.root_dir.as_deref());
+        let shown = path.display(self.asset_root.as_deref());
         let shown = self.string(&shown);
         let id = AssetId(index(self.module.assets.len()));
         self.module.assets.push(Asset {

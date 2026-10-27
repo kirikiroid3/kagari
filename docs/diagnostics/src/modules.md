@@ -4,10 +4,10 @@ These errors come from building the module tree, lowering item declarations, and
 
 ## E1001 `bad-root`
 
-**Error.** The crate root file passed to the compiler does not have a `.kis` or `.kix` extension.
+**Error.** The root file of the program does not have a `.kis` or `.kix` extension. `kagari.toml` already rejects such a `project.entry`, so this reaches only programs built through the library.
 
 ```text
-kagari check main.txt
+db.program(FilePath::disk("/game/main.txt"))
 ```
 
 Fix: point the compiler at a `.kis` or `.kix` root file, e.g. `main.kix`.
@@ -340,3 +340,13 @@ const EMPTY: ImageAsset = asset("");
 ```
 
 Fix: pass a non-empty asset path, e.g. `asset("cg_001.png")`.
+
+## E1029 `asset-outside-asset-dir`
+
+**Error.** An `asset("...")` path leaves the asset directory (`[assets] dir` in `kagari.toml`, or the root file's directory without a manifest).
+
+```kis
+const OUTSIDE: ImageAsset = asset("../secret.png");
+```
+
+Fix: move the file into the asset directory and name it relative to that directory, e.g. `asset("bgimage/room.png")`.

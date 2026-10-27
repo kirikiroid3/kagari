@@ -1,0 +1,57 @@
+---
+source: tooling/kagari-fmt/tests/format.rs
+expression: out
+input_file: tooling/kagari-fmt/tests/fixtures/006__forms.kix
+---
+enum Map {
+    A,
+    B,
+    Leave,
+}
+
+#[scene]
+pushdown fn Hub() {
+    s!(t!["The school festival starts today."]);
+    s!(who = "Hanako", render = hanako_jumps, t!["Welcome!"]);
+    s!(
+        render = |mut screen| {
+            screen.background().change(BG::ROOF).apply_animation(fade(30));
+            screen
+        },
+        t!["The wind on the roof is cold."],
+    );
+    loop {
+        match choice!{
+            id = "map",
+            t!["Go to stall A"] => Map::A,
+            t!["Go to stall B"] => Map::B,
+            t!["Leave"] if VISITED_A => Map::Leave,
+        } {
+            Map::A => StallA(),
+            Map::B => StallB(),
+            Map::Leave => break,
+        }
+    }
+}
+
+fn Title() -> RootPage {
+    RootPage(column![button!{
+        on_click = || nav::start(scenario::Start, (), |_end| ()),
+        t!["Start a new game from the beginning"],
+    }])
+}
+
+fn Config() -> Overlay {
+    let (speed, set_speed) = signal(TEXT_SPEED.get());
+    Overlay(column![
+        text!(t!["Text speed: " {speed()}]),
+        slider!{
+            value = speed(),
+            on_change = |v| {
+                set_speed(v);
+                TEXT_SPEED.set(v)
+            },
+        },
+        button!{on_click = || nav::back(), t!["Back"]},
+    ])
+}

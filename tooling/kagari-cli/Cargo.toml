@@ -1,6 +1,6 @@
 [package]
 name = "kagari-cli"
-version = "0.1.0"
+version.workspace = true
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -10,5 +10,17 @@ name = "kagari"
 path = "src/main.rs"
 
 [dependencies]
+kagari-archive = { workspace = true }
 kagari-bytecode = { workspace = true }
+kagari-fmt = { workspace = true }
 kagari-lang = { workspace = true }
+kagari-lsp = { workspace = true }
+kagari-project = { workspace = true }
+kagari-syntax = { workspace = true }
+clap = { workspace = true }
+
+[dev-dependencies]
+kagari-archive = { workspace = true }
+kagari-bytecode = { workspace = true }
+kagari-project = { workspace = true }
+tempfile = { workspace = true }

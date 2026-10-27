@@ -1,0 +1,3 @@
+//! Custom animation effects: tweens, transitions and motions shared by renders.
+
+pub const ENTER: Tween = tween(ms(300));

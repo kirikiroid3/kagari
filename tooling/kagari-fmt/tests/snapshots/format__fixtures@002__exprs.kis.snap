@@ -1,0 +1,54 @@
+---
+source: tooling/kagari-fmt/tests/format.rs
+expression: out
+input_file: tooling/kagari-fmt/tests/fixtures/002__exprs.kis
+---
+fn expressions(t: ((u8, u8), u8), mut v: Vec<u8>) -> u8 {
+    let a = 1 + 2 * 3 - 4 / 5 % 6;
+    let b = -a << 2 >> 1 & 3 | 4 ^ 5;
+    let mut x = 0;
+    x = 1;
+    x += 1;
+    x <<= 2;
+    let r1 = 0..10;
+    let r2 = 0..=10;
+    let r3 = ..5;
+    let r4 = 3..;
+    let r5 = ..;
+    let f1 = || 1;
+    let f2 = |mut s| { s };
+    let f3 = |x: u8| -> u8 { x };
+    let f4 = |a, b| a + b;
+    let y = a as u16 as u32;
+    let z = parse(x)?;
+    let first = v[0];
+    let nested = t.0.1;
+    let r = &mut v;
+    let rr = &&x;
+    let d = *r;
+    let w = Vec::<u8>::new();
+    let m = v.iter().map::<u8>(|e| e).count();
+    let arr = [1, 2, 3];
+    let rep = [0; 4];
+    let unit = ();
+    let one = (1,);
+    let tup = (1, "two", 3.5, true, false);
+    let rec = Point { x: 1, y };
+    let empty = Empty {};
+    let neg = !(a < b);
+    return x;
+}
+
+fn calls() {
+    foo();
+    foo(a, b);
+    let point = Point { x: compute_the_x_coordinate(value), y: compute_the_y_coordinate(value) };
+    nav::start(scenario::Start, (), |end| {
+        record(end);
+        finish()
+    });
+    call(|| {
+        first();
+        second();
+    });
+}

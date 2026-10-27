@@ -33,6 +33,7 @@ pub mod def_map;
 pub mod emit;
 pub mod eval;
 pub mod hir;
+pub mod ide;
 pub mod infer;
 pub mod item_tree;
 pub mod mir;

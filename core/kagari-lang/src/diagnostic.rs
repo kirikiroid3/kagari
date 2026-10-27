@@ -331,6 +331,7 @@ codes! {
     ResolveMissingStdItem = "E1026";
     ResolveAssetNotFound = "E1027";
     ResolveEmptyAssetPath = "E1028";
+    ResolveAssetOutsideRoot = "E1029";
 
     // E2: type inference, exhaustiveness and refutability.
     TypeMismatch = "E2001";

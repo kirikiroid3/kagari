@@ -1,0 +1,25 @@
+//! The root module: declares the other modules and describes the game system.
+
+mod effect;
+mod scenario;
+mod scripts;
+mod system;
+
+use std::narrative::text::text_style;
+use std::screen::size;
+use std::system::default_bindings;
+
+fn main() -> System {
+    System {
+        title: "{{name}}",
+        resolution: size(1280, 720),
+        start: system::Title,
+        game: system::GameView,
+        save_slots: 20,
+        auto_slots: 3,
+        backlog: 200,
+        text: text_style(26, WHITE),
+        settings: system::settings(),
+        bindings: default_bindings(),
+    }
+}

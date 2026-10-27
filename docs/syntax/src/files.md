@@ -94,8 +94,9 @@ const AZUSA_0072: VoiceAsset = asset("voice/azusa_0072.ogg");
 - There are six asset types, the only implementations of the trait `Asset`: `ImageAsset`,
   `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset` and `ShaderAsset` (a WGSL shader,
   `.wgsl`: a filter, or generated content such as weather or particles).
-- The constant's type chooses `A`. The argument must be a string literal, and the path, relative
-  to the declaring file, must not be empty.
+- The constant's type chooses `A`. The argument must be a string literal and must not be empty.
+  The path is relative to the asset directory (`[assets] dir` in `kagari.toml`, by default
+  `assets`; without a manifest, the root file's directory) and must not leave it.
 - The file is checked to exist at compile time, so a missing file is a compile error, not a
   runtime failure.
 

@@ -38,7 +38,7 @@ an unknown one is skipped. Every critical section below is required.
 | `0x03` | Types | `count: u64`; per ADT: `path: u32`, `flags: u32` (bit 0 = enum), `variants: u64`; per variant: `name: u32`, `fields: u32`, then `fields × u32` field names (`NONE` for positional), pad |
 | `0x04` | IntTypes | `count: u64`; per entry: `lo: i128`, `hi: i128`, `bits: u32`, `signed: u32` (0/1), pad to 40 bytes. Entry 0 is always `i128` (`i128::MIN..=i128::MAX`, 128, 1) |
 | `0x05` | Imports | `count: u64`; per import: `path: u32`, `kind: u16`, `params: u16` |
-| `0x06` | Assets | `count: u64`; per asset: `kind: u32` (0 image, 1 audio, 2 voice, 3 video, 4 font, 5 shader), `path: u32` (string: `/`-separated, relative to the root file's directory) |
+| `0x06` | Assets | `count: u64`; per asset: `kind: u32` (0 image, 1 audio, 2 voice, 3 video, 4 font, 5 shader), `path: u32` (string: `/`-separated, relative to the program's asset directory) |
 | `0x07` | Constants | `count: u64`; per constant: `tag: u32`, `aux: u32`, then the payload by tag (see [Constants](#constants)) |
 | `0x08` | Statics | `count: u64`; per static: `path: u32`, `kind: u32` (0 story variable, 1 setting, 2 meta), `init: u32` (constant), `reserved: u32` |
 | `0x09` | Functions | `count: u64`; per function: `path: u32`, `kind: u8`, `flags: u8`, `params: u16`, `regs: u16`, `reserved: u16`, `words: u32`, then `words × u64` code |

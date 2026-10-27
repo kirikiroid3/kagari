@@ -97,21 +97,55 @@ never used at all.
 
 | Option | Default | Meaning |
 | ------ | ------: | ------- |
-| `state_cap` (`--state-cap <n>`) | 200 000 | Most story states the analysis explores (`W5006` past it) |
-| `recursion_depth` (`--recursion-depth <n>`) | 2048 | Most nested calls at run time, counting every call frame (`fn`, closures, scenes, instant procedures); deeper is a [VM panic](./bytecode.md#panics). Written into the bytecode |
-| `keyframe_check` (`--keyframe-check`) | off | Runs the [keyframe-placement check](./presentation.md#keyframes) (`W5011`) |
+| `state_cap` (`[build] state-cap`) | 200 000 | Most story states the analysis explores (`W5006` past it) |
+| `recursion_depth` (`[build] recursion-depth`) | 2048 | Most nested calls at run time, counting every call frame (`fn`, closures, scenes, instant procedures); deeper is a [VM panic](./bytecode.md#panics). Written into the bytecode |
+| `keyframe_check` (`[build] keyframe-check`) | off | Runs the [keyframe-placement check](./presentation.md#keyframes) (`W5011`) |
 
 In Rust these are the fields of `kagari_lang::CompileOptions`, passed to
-`RootDatabase::program_with`.
+`RootDatabase::program_with` or `RootDatabase::program_with_assets`.
 
-The `kagari` command-line tool (`cargo run -p kagari-cli -- …`) runs the compiler:
+## Projects and the `kagari` tool
+
+A project is a directory with a `kagari.toml`:
+
+```toml
+[project]
+name = "my-game"          # required
+version = "0.1.0"         # required, semver
+entry = "src/main.kis"    # the root file; default "src/main.kis"
+
+[toolchain]
+kagari = "0.1"            # required; the toolchain versions the project accepts
+
+[assets]
+dir = "assets"            # the asset directory; default "assets"
+
+[build]
+targets = ["v0"]          # engine major versions to build for; default ["v0"]
+out-dir = "target"        # default "target"
+state-cap = 200000
+recursion-depth = 2048
+keyframe-check = false
+```
+
+Unknown keys are errors. Paths are relative to the directory of `kagari.toml`.
+
+The `kagari` command-line tool (`cargo run -p kagari-cli -- …`) works on the project found in
+the current directory or its nearest parent, or on `--manifest-path <path>`:
 
 ```text
-kagari check <root> [--resolutions] [opts]   print the diagnostics; exit 1 on an error
-kagari build <root> [-o <out>] [opts]        write the bytecode (default: <root> with extension .kagari)
-kagari disasm <file> [--all]                 decode, verify and disassemble a .kagari file
-opts: --state-cap <n> --recursion-depth <n> --keyframe-check
+kagari init [PATH] [--name <NAME>]          create a project from the template
+kagari check [--resolutions]                print the diagnostics; exit 1 on an error
+kagari build [--target <TARGET>]...         write <out-dir>/<target>/game.kagari and the asset archives
+kagari fmt [--check] [FILES]...             format the project's sources, or FILES
+kagari disasm <file> [--all]                decode, verify and disassemble a .kagari file
+kagari lsp                                  run the language server over stdio
 ```
+
+`kagari build` packs the assets the bytecode references into `.kiarchive` files next to the
+bytecode: one per top-level directory of the asset directory, and `data.kiarchive` for files
+directly in it. An archive entry's name is the asset path in the bytecode, e.g.
+`characters/character1/image/normal.png`. Usage, IO and manifest errors exit with 2.
 
 Diagnostics are numbered; see the Kagari Diagnostics book.
 

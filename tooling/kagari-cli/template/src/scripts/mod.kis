@@ -1,0 +1,3 @@
+//! Code shared by the story and the system: characters, constants and helpers.
+
+pub mod characters;

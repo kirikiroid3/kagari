@@ -201,10 +201,10 @@ impl Machine<'_> {
                 let kind = asset_item
                     .and_then(|item| std.asset_kind(item))
                     .ok_or(ErrorKind::Abort)?;
-                let Some(Anchor::Node(Owner::Body(owner), _)) = site.at else {
+                if !matches!(site.at, Some(Anchor::Node(Owner::Body(_), _))) {
                     return Err(ErrorKind::Abort);
-                };
-                let file = owner.file.path(self.db).parent_dir_join(&path);
+                }
+                let file = self.program.asset_root(self.db).join(&path);
                 Ok(Value::Asset { kind, path: file })
             }
             Builtin::VecNew => Ok(Value::Vec(imbl::Vector::new())),

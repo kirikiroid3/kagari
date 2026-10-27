@@ -1,0 +1,14 @@
+use a::{b as c,d::*,self};
+pub use crate::screen::Screen;
+use super::x as _;
+use crate::{String, Vec, Rat, Decimal, Range, Option, Result, Eq, Integer, RandChoose, ImageAsset, asset};
+use {first, second::{third, fourth}};
+
+#[builtin] pub struct Builtin;
+#[scene] #[entry]
+pub pushdown fn Main() {}
+#[must_use]
+pub struct Change<T>;
+#[derive( Clone,Eq )]
+#[path(a::b, "c")]
+struct Attributed { #[skip] field: u32 }

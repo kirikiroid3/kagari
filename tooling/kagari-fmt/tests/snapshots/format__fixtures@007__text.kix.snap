@@ -1,0 +1,24 @@
+---
+source: tooling/kagari-fmt/tests/format.rs
+expression: out
+input_file: tooling/kagari-fmt/tests/fixtures/007__text.kix
+---
+#[scene]
+pushdown fn Text(x: Text) {
+    s!(t!["これは" ["数多"]("あまた") "の" ["漢字"]("かん"|"じ") !["赤い"](emphasis()) "花。"]);
+    s!(t![![["数多"]("あまた")](emphasis()) {x}]);
+    s!(t!["spaced" {x}]);
+    s!(
+        who = "語り手",
+        t![
+            "吾輩は猫である。名前はまだ無い。どこで生れたかとんと見当がつかぬ。何でも薄暗いじめじめした所で"
+            "ニャーニャー泣いていた事だけは記憶している。"
+        ],
+    );
+    s!(
+        t![
+            "吾輩はここで始めて人間というものを見た。しかもあとで聞くとそれは書生という人間中で一番獰悪な種族であったそうだ。"
+        ],
+    );
+    s!(t![]);
+}

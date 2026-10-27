@@ -1,0 +1,35 @@
+---
+source: tooling/kagari-fmt/tests/format.rs
+expression: out
+input_file: tooling/kagari-fmt/tests/fixtures/004__long_lines.kis
+---
+fn long_lines() {
+    let total =
+        first_value_with_a_long_name + second_value_with_a_long_name + third_value_with_a_long_name;
+    let check =
+        some_condition_that_is_long && another_condition_that_is_long || a_third_condition_here;
+    let result = compute_something(
+        first_argument_value,
+        second_argument_value,
+        third_argument_value,
+    );
+    let chained = screen
+        .entity(HANAKO)
+        .cord
+        .apply_animation(jump(20))
+        .then(something_else(1, 2, 3))
+        .finish();
+    let short = a.b().c();
+    let nested = outer_function(
+        inner_function(first_argument, second_argument),
+        another_argument_value,
+    );
+    screen.background().change(BG::ROOF_AT_NIGHT_WITH_FIREWORKS).apply_animation(fade(30)).with(5);
+    some_variable_name = another_function_call(
+        with_arguments,
+        and_more_arguments,
+        and_even_more_args,
+    );
+    let value: SomeType =
+        a_function_returning_a_very_long_name_value_here_and_there_and_everywhere_x;
+}

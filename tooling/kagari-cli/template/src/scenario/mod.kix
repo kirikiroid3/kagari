@@ -1,0 +1,15 @@
+//! The story. A scene is a `#[scene] pushdown fn`; `#[entry]` marks where a new game starts.
+
+use crate::effect::ENTER;
+use crate::scripts::characters::CHARACTER1;
+
+#[scene]
+#[entry]
+pub pushdown fn Start() {
+    s!(who = "Character 1", voice = CHARACTER1::VOICE_0001, render = enter, t!["Hello, world."]);
+}
+
+const fn enter(mut screen: Screen) -> Screen {
+    CHARACTER1.show(&mut screen, CHARACTER1::NORMAL, point(640, 720), ENTER);
+    screen
+}

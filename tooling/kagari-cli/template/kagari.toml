@@ -1,0 +1,14 @@
+[project]
+name = "{{name}}"
+version = "0.1.0"
+entry = "src/main.kis"
+
+[toolchain]
+kagari = "{{toolchain}}"
+
+[assets]
+dir = "assets"
+
+[build]
+targets = ["v0"]
+out-dir = "target"

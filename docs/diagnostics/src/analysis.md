@@ -147,7 +147,7 @@ pushdown fn Main() {
 }
 ```
 
-Fix: narrow the types of story variables, entry scene parameters and random draws, or raise the state limit with `--state-cap`.
+Fix: narrow the types of story variables, entry scene parameters and random draws, or raise the state limit with `[build] state-cap` in `kagari.toml`.
 
 ## W5007 `incomplete`
 
@@ -225,7 +225,7 @@ Fix: read the variable where it should matter (a condition, a line, an ending) o
 
 ## W5011 `missing-keyframe`
 
-**Warning.** Turn this check on with `--keyframe-check`. A choice, or the first step of an entry scene, has no keyframe render. Loading or jumping there would have to replay renders from an earlier keyframe.
+**Warning.** Turn this check on with `[build] keyframe-check = true` in `kagari.toml`. A choice, or the first step of an entry scene, has no keyframe render. Loading or jumping there would have to replay renders from an earlier keyframe.
 
 ```kix
 const A: EntityId = EntityId(1);

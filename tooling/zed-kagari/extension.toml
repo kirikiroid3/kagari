@@ -1,0 +1,16 @@
+id = "kagari"
+name = "Kagari"
+version = "0.1.0"
+schema_version = 1
+authors = ["Nikaidou Haruki"]
+description = "Kagari (.kis/.kix) syntax highlighting and language server"
+repository = "https://github.com/kirikiroid3/kagari"
+
+[grammars.kagari]
+repository = "https://github.com/kirikiroid3/kagari"
+rev = "7656e2b9d7bba5327119b128d83e5d528d0698f8"
+path = "tooling/tree-sitter-kagari"
+
+[language_servers.kagari]
+name = "Kagari Language Server"
+languages = ["Kagari"]

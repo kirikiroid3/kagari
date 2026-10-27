@@ -127,6 +127,7 @@ struct ItemCx<'db> {
     maps: &'db DefMaps,
     item: ItemId,
     file_path: FilePath,
+    asset_root: FilePath,
     module: ModuleId,
     generics: GenericScope,
     self_owner: Option<ItemId>,
@@ -185,6 +186,7 @@ impl<'db> ItemCx<'db> {
             maps,
             item,
             file_path: item.file.path(db).clone(),
+            asset_root: program.asset_root(db).clone(),
             module,
             generics,
             self_owner,
@@ -204,6 +206,7 @@ impl<'db> ItemCx<'db> {
             self.maps,
             self.item.file,
             self.file_path.clone(),
+            self.asset_root.clone(),
             self.module,
             owner,
             store,
@@ -244,6 +247,7 @@ struct Resolver<'a> {
     maps: &'a DefMaps,
     file: SourceFile,
     file_path: FilePath,
+    asset_root: FilePath,
     module: ModuleId,
     src: Owner,
     store: &'a ExprStore,
@@ -266,6 +270,7 @@ impl<'a> Resolver<'a> {
         maps: &'a DefMaps,
         file: SourceFile,
         file_path: FilePath,
+        asset_root: FilePath,
         module: ModuleId,
         src: Owner,
         store: &'a ExprStore,
@@ -279,6 +284,7 @@ impl<'a> Resolver<'a> {
             maps,
             file,
             file_path,
+            asset_root,
             module,
             src,
             store,
@@ -930,7 +936,8 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// `asset("path")` in a disk file: the path must be non-empty and name an existing file.
+    /// `asset("path")` in a disk file: the path must be non-empty and name an existing file
+    /// inside the program's asset directory.
     fn check_asset(&mut self, callee: ExprId, args: &[ExprId]) {
         let Some(asset_fn) = self.asset_fn else {
             return;
@@ -956,7 +963,21 @@ impl<'a> Resolver<'a> {
             );
             return;
         }
-        let asset = self.db.asset_file(self.file_path.parent_dir_join(path));
+        let asset_path = self.asset_root.join(path);
+        let inside = matches!(
+            (&asset_path, &self.asset_root),
+            (FilePath::Disk(file), FilePath::Disk(root))
+                if file.as_ref() != root.as_ref() && file.starts_with(root)
+        );
+        if !inside {
+            self.diag(
+                range,
+                DiagnosticCode::ResolveAssetOutsideRoot,
+                format!("asset path `{path}` leaves the asset directory"),
+            );
+            return;
+        }
+        let asset = self.db.asset_file(asset_path);
         if !asset.exists(self.db) {
             self.diag(
                 range,

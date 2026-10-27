@@ -1,0 +1,46 @@
+//! The game system: the title page, the game view and the player settings.
+
+use crate::scenario;
+
+static TEXT_SPEED: Setting<Duration> = setting(ms(30));
+static AUTO_DELAY: Setting<Duration> = setting(ms(1300));
+static AUTO_DELAY_PER_CHAR: Setting<Duration> = setting(ms(60));
+static SKIP_UNREAD: Setting<bool> = setting(false);
+static MASTER: Setting<Volume> = setting(volume(100));
+static MUSIC: Setting<Volume> = setting(volume(60));
+static SOUND: Setting<Volume> = setting(volume(100));
+static VOICE: Setting<Volume> = setting(volume(100));
+static VOICE_SUSTAIN: Setting<bool> = setting(false);
+static WAIT_FOR_VOICE: Setting<bool> = setting(true);
+static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
+static FULLSCREEN: Setting<bool> = setting(false);
+static ANIMATIONS: Setting<bool> = setting(true);
+
+pub fn settings() -> Settings {
+    Settings {
+        text_speed: TEXT_SPEED,
+        auto_delay: AUTO_DELAY,
+        auto_delay_per_char: AUTO_DELAY_PER_CHAR,
+        skip_unread: SKIP_UNREAD,
+        master: MASTER,
+        music: MUSIC,
+        sound: SOUND,
+        voice: VOICE,
+        voice_sustain: VOICE_SUSTAIN,
+        wait_for_voice: WAIT_FOR_VOICE,
+        window_opacity: WINDOW_OPACITY,
+        fullscreen: FULLSCREEN,
+        animations: ANIMATIONS,
+    }
+}
+
+pub fn Title() -> RootPage {
+    RootPage(column![button!{
+        on_click = || nav::start(scenario::Start, (), |_end| ()),
+        t!["Start"],
+    }])
+}
+
+pub fn GameView(game: Narrative) -> Element {
+    game_screen!(game = game)
+}

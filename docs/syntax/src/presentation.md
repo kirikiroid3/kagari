@@ -205,7 +205,7 @@ renders only from the last keyframe on that path.
 {{#include diagrams/keyframes.svg}}
 
 Keyframes are recommended at choice points and chapter starts. The keyframe-placement check is
-opt-in, through `--keyframe-check` or `CompileOptions::keyframe_check`: when it is on, every
+opt-in, through `[build] keyframe-check` in `kagari.toml` or `CompileOptions::keyframe_check`: when it is on, every
 `choice!` and the first step of each entry scene need a keyframe render, and a step without one
 gets the warning `W5011`. A step with no render is not a keyframe. Interrupt scenes, such as a phone
 call that can happen anywhere, should *not* start with a keyframe: they are meant to overlay

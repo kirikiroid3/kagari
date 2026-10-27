@@ -1,0 +1,45 @@
+---
+source: tooling/kagari-fmt/tests/format.rs
+expression: out
+input_file: tooling/kagari-fmt/tests/fixtures/003__comments.kis
+---
+//! Module docs stay at the top.
+
+// A leading comment before an item.
+/// Doc comment.
+fn documented(
+    a: u32, // trailing after a comma
+    b: u32,
+) -> u32 { // trailing after the brace
+    // leading in a block
+
+    let x = a; // trailing after a statement
+    /* block comment */ let y = b;
+    let z = foo(a, /* inline */ b);
+    let w = foo(
+        a,
+        // dangling inside an argument list
+    );
+    x + y // trailing on the tail
+    // dangling before the closing brace
+}
+
+/* A block comment
+   spanning lines. */
+struct S {
+    a: u32, // field comment
+    // before b
+    b: u32,
+}
+
+fn empty_with_comment() {
+    // nothing here
+}
+
+fn args() {
+    call(
+        first, // first
+        second,
+    );
+}
+// Comment at the end of the file.

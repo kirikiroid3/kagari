@@ -208,10 +208,9 @@ impl FnCodegen<'_, '_> {
                     },
                 };
                 let kind = asset_item.and_then(|item| std.asset_kind(item));
-                let owner = self.body.map(|body| body.source.owner());
-                match (asset, kind, owner) {
-                    (Some(path), Some(kind), Some(owner)) => {
-                        let file = owner.file.path(self.em.db).parent_dir_join(path);
+                match (asset, kind) {
+                    (Some(path), Some(kind)) => {
+                        let file = self.em.program.asset_root(self.em.db).join(path);
                         let value = ConstValue::Asset { kind, path: file };
                         self.load_value(dst, &value);
                         return;

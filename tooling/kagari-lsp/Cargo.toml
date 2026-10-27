@@ -1,8 +1,24 @@
 [package]
 name = "kagari-lsp"
-version = "0.1.0"
+version.workspace = true
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
 
 [dependencies]
+kagari-lang = { workspace = true }
+kagari-syntax = { workspace = true }
+kagari-std = { workspace = true }
+kagari-fmt = { workspace = true }
+kagari-project = { workspace = true }
+lsp-server = { workspace = true }
+lsp-types = { workspace = true }
+serde_json = { workspace = true }
+crossbeam-channel = { workspace = true }
+serde = { workspace = true }
+url = { workspace = true }
+rustc-hash = { workspace = true }
+salsa = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

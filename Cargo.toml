@@ -7,10 +7,14 @@ members = [
     "core/kagari-std",
     "core/kagari-syntax",
     "tooling/kagari-cli",
-    "tooling/kagari-lsp"
+    "tooling/kagari-fmt",
+    "tooling/kagari-lsp",
+    "tooling/kagari-project"
 ]
+exclude = ["tooling/zed-kagari"]
 
 [workspace.package]
+version = "0.1.0"
 authors = ["Nikaidou Haruki"]
 license = "Apache-2.0"
 edition = "2024"
@@ -21,6 +25,9 @@ kagari-bytecode = { path = "core/kagari-bytecode" }
 kagari-lang = { path = "core/kagari-lang" }
 kagari-syntax = { path = "core/kagari-syntax" }
 kagari-std = { path = "core/kagari-std" }
+kagari-fmt = { path = "tooling/kagari-fmt" }
+kagari-project = { path = "tooling/kagari-project" }
+kagari-lsp = { path = "tooling/kagari-lsp" }
 rowan = "0.17"
 salsa = "0.28"
 logos = "0.16"
@@ -36,3 +43,13 @@ imbl = "7"
 lz4_flex = { version = "0.14", default-features = false, features = ["std", "safe-encode", "safe-decode"] }
 crc32fast = "1.5"
 tempfile = "3"
+clap = { version = "4.6", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "1"
+semver = "1"
+lsp-server = "0.10"
+lsp-types = "0.97"
+crossbeam-channel = "0.5"
+url = "2"
+unicode-width = "0.2"

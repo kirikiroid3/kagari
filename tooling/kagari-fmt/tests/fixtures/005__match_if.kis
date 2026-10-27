@@ -1,0 +1,24 @@
+fn control(r: u8, opt: Option<u8>) -> u8 {
+    if let Some(n)=opt {n} else if c {1} else {2};
+    if x == 5 { break_out(); }
+    let shift = if k % 2 == 1 { offset(horizontal, -vertical) } else { offset(-horizontal, vertical) };
+    'outer: loop { 'inner: while x<10 { if x==5 {break 'outer;} continue 'inner; } break 'outer 3; }
+    while let Some(n)=it.next() {}
+    for i in 0..n {}
+    for (k,v) in pairs { use_it(k, v); }
+    match r {
+        _=>0,
+        n=>n,
+        0=>{1}
+        -1 => { let y = 2; y },
+        "s"|"t"=>3,
+        1..=5=>5,
+        Some(x) if x>0 => 10,
+        Point{x:0,y,..}=>11,
+        | Route::C => 14,
+        Route::A => if a { 1 } else { 2 }
+        Route::B => match inner { _ => 0 },
+        VeryLongVariantNameNumberOne | VeryLongVariantNameNumberTwo | VeryLongVariantNameNumberThree => 0,
+    }
+    match S { _ => () }
+}

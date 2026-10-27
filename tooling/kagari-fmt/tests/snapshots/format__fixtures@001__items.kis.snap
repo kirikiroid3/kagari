@@ -1,0 +1,63 @@
+---
+source: tooling/kagari-fmt/tests/format.rs
+expression: out
+input_file: tooling/kagari-fmt/tests/fixtures/001__items.kis
+---
+//! Every item kind, badly spaced.
+mod outer;
+pub mod inline {
+    pub fn f() {}
+    mod deeper {
+        const X: u8 = 1;
+    }
+}
+
+static mut COUNTER: u64 = 0;
+static NAME: &String = "x";
+const LIMIT: usize = 4;
+pub const NEG: i32 = -1;
+pub struct Unit;
+pub struct Pair(pub u8, Int<0, 10>);
+pub struct Record<T: Clone + Eq, const N: usize> {
+    pub items: [T; N],
+    count: usize,
+}
+pub struct Empty {}
+enum Shape {
+    Empty,
+    Circle(u32),
+    Rect { w: u32, h: u32 },
+}
+enum Long {
+    VariantWithAVeryLongName(SomeLongTypeName, AnotherLongTypeName, YetAnotherLongTypeName, More),
+}
+type Alias = Vec<u8>;
+type Bounded<T>: Eq = T;
+pub trait Step: Eq {
+    type Output;
+    const ID: u32;
+    fn show(&self) -> Self::Output;
+    fn id(&mut self) -> u32 {
+        0
+    }
+}
+impl<A, const N: usize> Step for Choice<A, N> {
+    type Output = A;
+}
+impl Unit {
+    pub const fn new() -> Unit {
+        Unit
+    }
+    fn take(self) {}
+    fn take_mut(mut self) {}
+}
+pub pushdown fn push_step<S: Step>(s: S) -> S::Output;
+fn plain() {}
+const fn pure(x: u8) -> u8 {
+    x
+}
+pushdown fn story() {}
+pub fn many_parameters(first_parameter: u32, second_parameter: u32, third_parameter: u32) -> u32 {
+    first_parameter
+}
+fn pointer(f: const fn(Screen) -> Screen, g: pushdown Fn(u8) -> u8, h: scene fn()) {}
