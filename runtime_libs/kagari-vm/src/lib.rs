@@ -7,7 +7,7 @@
 
 //! The Kagari bytecode interpreter: decoded and verified programs, values, host objects, the
 //! instruction loop, story fibers with their PRNG, and traps. The format and the semantics of
-//! every instruction are specified in `docs/syntax/src/bytecode.md`.
+//! every instruction are specified in `docs/dev/src/formats/kagari.md`.
 
 mod exec;
 mod host;

@@ -1,8 +1,9 @@
 //! Const evaluation (compilation stage 4): constants and statics, the constant parts of
 //! story bodies, tabulated `const fn` calls from the story, and the renders steps use.
 //!
-//! See `docs/syntax/src/compilation.md` (stage 4), `docs/syntax/src/kinds.md`,
-//! `docs/syntax/src/presentation.md` and `docs/std/src/checks.md#const-evaluation-errors`.
+//! See `docs/dev/src/compiler/eval.md`, `docs/dev/src/std/contract.md#const-evaluation-errors`
+//! and, in The Kagari Reference, `docs/reference/en/src/concepts/kinds.md` and
+//! `concepts/presentation.md`.
 
 pub(crate) mod const_exprs;
 pub(crate) mod ctx;

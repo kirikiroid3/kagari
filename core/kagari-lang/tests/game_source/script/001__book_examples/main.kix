@@ -1,8 +1,8 @@
-// Examples of the syntax book and the engine proposal; all of them resolve.
+// Examples of The Kagari Reference and the engine proposal; all of them resolve.
 
 const HANAKO: EntityId = EntityId(216);
 
-// introduction.md, narrative/overview.md
+// Reference introduction.md, concepts/story.md
 
 static mut VISITED_A: bool = false;
 static mut VISITED_B: bool = false;
@@ -84,7 +84,7 @@ const fn hanako_jumps(mut screen: Screen) -> Screen {
     screen
 }
 
-// narrative/scenes.md
+// Reference concepts/scenes.md
 
 pushdown fn visit(stall: Map) {
     match stall {
@@ -168,7 +168,7 @@ mod chapter2 {
     }
 }
 
-// kinds.md
+// Reference concepts/kinds.md
 
 enum Mood { Warm, Polite, Stranger }
 

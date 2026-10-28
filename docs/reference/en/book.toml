@@ -1,0 +1,8 @@
+[book]
+title = "The Kagari Reference"
+authors = ["Nikaidou Haruki"]
+language = "en"
+
+[build]
+# Output mirrors the source tree so relative links between books work in the built site.
+build-dir = "../../_site/reference/en/src"

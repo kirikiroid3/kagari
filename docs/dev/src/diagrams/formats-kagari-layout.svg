@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 300" width="100%" style="max-width:880px" role="img" aria-label="Layout of a .kagari file: a 16-byte magic, then sections in ascending id order; each section is a 16-byte header, the payload and zero padding; a function record is a 16-byte head followed by its code words">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-dash{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2;stroke-dasharray:4 3}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1;stroke-dasharray:3 3;opacity:.7}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+</style>
+<text x="14" y="16" class="kg-s">file (offset 0)</text>
+<rect x="14" y="24" width="116" height="44" rx="4" class="kg-hl"/>
+<text x="72" y="43" class="kg-t kg-c">magic</text>
+<text x="72" y="59" class="kg-s kg-c">16 B, V000</text>
+<rect x="134" y="24" width="116" height="44" rx="4" class="kg-box"/>
+<text x="192" y="43" class="kg-t kg-c">Strings</text>
+<text x="192" y="59" class="kg-s kg-m kg-c">0x01</text>
+<rect x="254" y="24" width="116" height="44" rx="4" class="kg-box"/>
+<text x="312" y="43" class="kg-t kg-c">Features</text>
+<text x="312" y="59" class="kg-s kg-m kg-c">0x02</text>
+<rect x="374" y="24" width="116" height="44" rx="4" class="kg-box"/>
+<text x="432" y="43" class="kg-t kg-c">Types … Statics</text>
+<text x="432" y="59" class="kg-s kg-m kg-c">0x03–0x08</text>
+<rect x="494" y="24" width="116" height="44" rx="4" class="kg-hl"/>
+<text x="552" y="43" class="kg-t kg-c">Functions</text>
+<text x="552" y="59" class="kg-s kg-m kg-c">0x09</text>
+<rect x="614" y="24" width="116" height="44" rx="4" class="kg-box"/>
+<text x="672" y="43" class="kg-t kg-c">Options</text>
+<text x="672" y="59" class="kg-s kg-m kg-c">0x0A</text>
+<rect x="734" y="24" width="132" height="44" rx="4" class="kg-dash"/>
+<text x="800" y="43" class="kg-t kg-c">Debug (optional)</text>
+<text x="800" y="59" class="kg-s kg-m kg-c">0x80 ancillary</text>
+<path d="M494,68L14,118" class="kg-ln"/>
+<path d="M610,68L866,118" class="kg-ln"/>
+<text x="14" y="112" class="kg-s">one section (every section has this frame)</text>
+<rect x="14" y="120" width="90" height="44" rx="4" class="kg-box"/>
+<text x="59" y="139" class="kg-t kg-m kg-c">id: u16</text>
+<text x="59" y="155" class="kg-s kg-c">+0</text>
+<rect x="108" y="120" width="104" height="44" rx="4" class="kg-box"/>
+<text x="160" y="139" class="kg-t kg-m kg-c">flags: u16</text>
+<text x="160" y="155" class="kg-s kg-c">+2, = 0</text>
+<rect x="216" y="120" width="124" height="44" rx="4" class="kg-box"/>
+<text x="278" y="139" class="kg-t kg-m kg-c">reserved: u32</text>
+<text x="278" y="155" class="kg-s kg-c">+4, = 0</text>
+<rect x="344" y="120" width="104" height="44" rx="4" class="kg-box"/>
+<text x="396" y="139" class="kg-t kg-m kg-c">len: u64</text>
+<text x="396" y="155" class="kg-s kg-c">+8</text>
+<rect x="452" y="120" width="300" height="44" rx="4" class="kg-hl"/>
+<text x="602" y="139" class="kg-t kg-c">payload</text>
+<text x="602" y="155" class="kg-s kg-c">+16, exactly len bytes</text>
+<rect x="756" y="120" width="110" height="44" rx="4" class="kg-dash"/>
+<text x="811" y="139" class="kg-t kg-c">zero pad</text>
+<text x="811" y="155" class="kg-s kg-c">to 8-byte boundary</text>
+<path d="M452,164L14,214" class="kg-ln"/>
+<path d="M752,164L866,214" class="kg-ln"/>
+<text x="14" y="208" class="kg-s">Functions payload: count: u64, then per function a 16-byte head and its code</text>
+<rect x="14" y="216" width="90" height="44" rx="4" class="kg-box"/>
+<text x="59" y="235" class="kg-t kg-m kg-c">path: u32</text>
+<text x="59" y="251" class="kg-s kg-c">+0</text>
+<rect x="108" y="216" width="74" height="44" rx="4" class="kg-box"/>
+<text x="145" y="235" class="kg-t kg-m kg-c">kind: u8</text>
+<text x="145" y="251" class="kg-s kg-c">+4</text>
+<rect x="186" y="216" width="78" height="44" rx="4" class="kg-box"/>
+<text x="225" y="235" class="kg-t kg-m kg-c">flags: u8</text>
+<text x="225" y="251" class="kg-s kg-c">+5</text>
+<rect x="268" y="216" width="92" height="44" rx="4" class="kg-box"/>
+<text x="314" y="235" class="kg-t kg-m kg-c">params: u16</text>
+<text x="314" y="251" class="kg-s kg-c">+6</text>
+<rect x="364" y="216" width="84" height="44" rx="4" class="kg-box"/>
+<text x="406" y="235" class="kg-t kg-m kg-c">regs: u16</text>
+<text x="406" y="251" class="kg-s kg-c">+8</text>
+<rect x="452" y="216" width="84" height="44" rx="4" class="kg-box"/>
+<text x="494" y="235" class="kg-t kg-m kg-c">rsv: u16</text>
+<text x="494" y="251" class="kg-s kg-c">+10, = 0</text>
+<rect x="540" y="216" width="92" height="44" rx="4" class="kg-box"/>
+<text x="586" y="235" class="kg-t kg-m kg-c">words: u32</text>
+<text x="586" y="251" class="kg-s kg-c">+12</text>
+<rect x="636" y="216" width="230" height="44" rx="4" class="kg-hl"/>
+<text x="751" y="235" class="kg-t kg-m kg-c">words × u64 code</text>
+<text x="751" y="251" class="kg-s kg-c">+16, see the instruction word</text>
+<text x="14" y="286" class="kg-s">All integers little-endian. Every record is a multiple of 8 bytes, so every section starts 8-aligned.</text>
+</svg>

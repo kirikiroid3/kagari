@@ -1,5 +1,5 @@
 //! Which expressions of a body are constant expressions
-//! (`docs/syntax/src/language.md#constant-expressions`).
+//! (`docs/reference/en/src/syntax/constants.md`).
 //!
 //! An expression is constant when it is:
 //! - a literal;

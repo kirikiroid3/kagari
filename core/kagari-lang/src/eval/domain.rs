@@ -1,5 +1,5 @@
-//! The values of finite types (`docs/syntax/src/kinds.md#finite-types`), for tabulating
-//! `const fn` calls from the story.
+//! The values of finite types (`docs/reference/en/src/concepts/kinds.md#finite-types`), for
+//! tabulating `const fn` calls from the story.
 
 use rustc_hash::FxHashMap;
 

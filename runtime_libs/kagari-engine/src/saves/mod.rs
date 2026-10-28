@@ -1,5 +1,5 @@
-//! Save slots: naming, the slot index, saving, autosaving and loading (`docs/syntax/src/system.md`
-//! §A save is a witness).
+//! Save slots: naming, the slot index, saving, autosaving and loading
+//! (`docs/dev/src/runtime/saves.md`).
 
 pub(crate) mod replay;
 pub(crate) mod trace;

@@ -1,5 +1,5 @@
 //! Typed decoders and constructors of std values, and the validity checks of animation values
-//! and fractions (`docs/std/src/checks.md`).
+//! and fractions (`docs/dev/src/std/contract.md`).
 
 use std::cmp::Ordering;
 use std::rc::Rc;

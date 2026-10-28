@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 200" width="100%" style="max-width:880px" role="img" aria-label="Formatter pipeline: parse, refuse on syntax errors, compute comment ownership, layout rules build a Doc, propagate breaks and print, then verify by reparsing and comparing tokens and comments">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-dash{fill:none;stroke:var(--fg,#333);stroke-width:1.2;stroke-dasharray:4 3}
+.kg-head{fill:var(--fg,#333)}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+</style>
+<defs><marker id="kg-arrow-fmt-pipeline" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<rect x="10" y="20" width="96" height="56" rx="4" class="kg-box"/>
+<text x="58" y="44" class="kg-t kg-m kg-c">text</text>
+<text x="58" y="62" class="kg-s kg-c">.kis / .kix</text>
+<rect x="126" y="20" width="120" height="56" rx="4" class="kg-box"/>
+<text x="186" y="44" class="kg-t kg-c">parse</text>
+<text x="186" y="62" class="kg-s kg-m kg-c">kagari_syntax</text>
+<rect x="266" y="20" width="120" height="56" rx="4" class="kg-box"/>
+<text x="326" y="44" class="kg-t kg-c">Trivia::new</text>
+<text x="326" y="62" class="kg-s kg-c">comment ownership</text>
+<rect x="406" y="20" width="120" height="56" rx="4" class="kg-box"/>
+<text x="466" y="44" class="kg-t kg-c">rules</text>
+<text x="466" y="62" class="kg-s kg-c">CST node → Doc</text>
+<rect x="546" y="20" width="120" height="56" rx="4" class="kg-box"/>
+<text x="606" y="44" class="kg-t kg-c">print</text>
+<text x="606" y="62" class="kg-s kg-c">width 100, indent 4</text>
+<rect x="686" y="20" width="120" height="56" rx="4" class="kg-box"/>
+<text x="746" y="44" class="kg-t kg-c">verify</text>
+<text x="746" y="62" class="kg-s kg-c">reparse, compare</text>
+<path d="M106,48H124" class="kg-ln" marker-end="url(#kg-arrow-fmt-pipeline)"/>
+<path d="M246,48H264" class="kg-ln" marker-end="url(#kg-arrow-fmt-pipeline)"/>
+<path d="M386,48H404" class="kg-ln" marker-end="url(#kg-arrow-fmt-pipeline)"/>
+<path d="M526,48H544" class="kg-ln" marker-end="url(#kg-arrow-fmt-pipeline)"/>
+<path d="M666,48H684" class="kg-ln" marker-end="url(#kg-arrow-fmt-pipeline)"/>
+<rect x="126" y="126" width="180" height="40" rx="4" class="kg-box"/>
+<text x="216" y="151" class="kg-t kg-m kg-c">Err(Syntax(errors))</text>
+<path d="M186,76V124" class="kg-dash" marker-end="url(#kg-arrow-fmt-pipeline)"/>
+<text x="194" y="104" class="kg-s">parse errors</text>
+<rect x="560" y="126" width="160" height="40" rx="4" class="kg-box"/>
+<text x="640" y="151" class="kg-t kg-m kg-c">Err(Internal(…))</text>
+<path d="M746,76L680,124" class="kg-dash" marker-end="url(#kg-arrow-fmt-pipeline)"/>
+<text x="722" y="110" class="kg-s">mismatch</text>
+<rect x="740" y="126" width="130" height="40" rx="4" class="kg-hl"/>
+<text x="805" y="151" class="kg-t kg-m kg-c">Ok(String)</text>
+<path d="M790,76L805,124" class="kg-ln" marker-end="url(#kg-arrow-fmt-pipeline)"/>
+</svg>

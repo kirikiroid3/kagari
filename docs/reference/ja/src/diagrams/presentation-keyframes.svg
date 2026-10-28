@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 744 212" width="100%" style="max-width:744px" role="img" aria-label="経路上にキーフレームがあれば最も近いキーフレームから計算し、なければ最初からすべてのレンダーを再実行する">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-warn{fill:var(--quote-bg,#f6f7f6);stroke:#c98a2b;stroke-width:2.5}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-dash{fill:none;stroke:var(--fg,#333);stroke-width:1.2;stroke-dasharray:5 4}
+.kg-head{fill:var(--fg,#333)}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-c{text-anchor:middle}
+</style>
+<defs><marker id="kg-arrow-presentation-keyframes" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<text x="10" y="22" class="kg-t">経路上にキーフレームがある場合</text>
+<path d="M40,58H628" class="kg-ln"/>
+<rect x="28" y="46" width="24" height="24" rx="2" class="kg-hl"/>
+<text x="40" y="63" class="kg-s kg-c">K</text>
+<circle cx="124" cy="58" r="9" class="kg-box"/>
+<circle cx="208" cy="58" r="9" class="kg-box"/>
+<circle cx="292" cy="58" r="9" class="kg-box"/>
+<rect x="364" y="46" width="24" height="24" rx="2" class="kg-hl"/>
+<text x="376" y="63" class="kg-s kg-c">K</text>
+<circle cx="460" cy="58" r="9" class="kg-box"/>
+<circle cx="544" cy="58" r="9" class="kg-box"/>
+<circle cx="628" cy="58" r="12" class="kg-warn"/>
+<path d="M378,42Q503,12 626,42" class="kg-dash" marker-end="url(#kg-arrow-presentation-keyframes)"/>
+<text x="502" y="18" class="kg-s kg-c">最も近いキーフレームから評価</text>
+<text x="40" y="92" class="kg-s kg-c">キーフレーム</text>
+<text x="124" y="92" class="kg-s kg-c">差分</text>
+<text x="628" y="92" class="kg-s kg-c">目標ステップ</text>
+<g transform="translate(0,20)">
+<text x="10" y="114" class="kg-t">経路上にキーフレームがない場合</text>
+<path d="M40,150H628" class="kg-ln"/>
+<circle cx="40" cy="150" r="9" class="kg-box"/>
+<circle cx="124" cy="150" r="9" class="kg-box"/>
+<circle cx="208" cy="150" r="9" class="kg-box"/>
+<circle cx="292" cy="150" r="9" class="kg-box"/>
+<circle cx="376" cy="150" r="9" class="kg-box"/>
+<circle cx="460" cy="150" r="9" class="kg-box"/>
+<circle cx="544" cy="150" r="9" class="kg-box"/>
+<circle cx="628" cy="150" r="12" class="kg-warn"/>
+<path d="M40,135Q334,105 626,135" class="kg-dash" marker-end="url(#kg-arrow-presentation-keyframes)"/>
+<text x="480" y="112" class="kg-s">最初からすべてのレンダーを再実行</text>
+<text x="40" y="184" class="kg-s kg-c">レンダー</text>
+<text x="628" y="184" class="kg-s kg-c">目標ステップ</text>
+</g>
+</svg>

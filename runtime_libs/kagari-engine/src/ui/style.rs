@@ -227,8 +227,9 @@ pub(crate) struct Interaction {
     pub on: bool,
 }
 
-/// `ui.md` §Interaction looks: disabled replaces everything; else the first `Some` of pressed
-/// (while held over the control), focus (focused with focus shown) and hover; else idle.
+/// `docs/std/en/src/ui-style.md` §Interaction looks: disabled replaces everything; else the
+/// first `Some` of pressed (while held over the control), focus (focused with focus shown) and
+/// hover; else idle.
 pub(crate) fn choose(style: &ButtonStyleSpec, i: Interaction) -> LookChoice {
     let choice = |key| LookChoice {
         key,

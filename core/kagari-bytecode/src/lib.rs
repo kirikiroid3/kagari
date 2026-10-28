@@ -6,7 +6,7 @@
 )]
 
 //! The `.kagari` bytecode: the in-memory module, its binary encoding, the load-time verifier
-//! and a disassembler. The format is specified in `docs/syntax/src/bytecode.md`.
+//! and a disassembler. The format is specified in `docs/dev/src/formats/kagari.md`.
 
 mod decode;
 mod disasm;

@@ -960,7 +960,7 @@ impl BodyChecker<'_, '_> {
         }
     }
 
-    /// The call rules (kinds.md#call-rules) and the scene rules.
+    /// The call rules (Reference `concepts/kinds.md#call-rules`) and the scene rules.
     fn check_call(&mut self, expr: ExprId, callee: &Callee, from_form: bool) {
         let Some(kind) = self.callee_kind(callee) else {
             return;

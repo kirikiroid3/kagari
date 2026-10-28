@@ -1,0 +1,8 @@
+[book]
+title = "Kagari 標準ライブラリリファレンス"
+authors = ["Nikaidou Haruki"]
+language = "ja"
+
+[build]
+# Output mirrors the source tree so relative links between books work in the built site.
+build-dir = "../../_site/std/ja/src"

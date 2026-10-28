@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 210" width="100%" style="max-width:880px" role="img" aria-label="Syntax layers: source text is lexed by logos into tokens, parsed into a lossless rowan green tree, validated by source kind, returned as Parse; the typed AST views it and is read by item trees, HIR lowering with form desugaring, the formatter and the IDE layer">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-head{fill:var(--fg,#333)}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+</style>
+<defs><marker id="kg-arrow-syntax-layers" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<rect x="14" y="14" width="120" height="58" rx="4" class="kg-box"/>
+<text x="74" y="38" class="kg-t kg-c">source text</text>
+<text x="74" y="56" class="kg-s kg-c kg-m">&amp;str, SourceKind</text>
+<rect x="160" y="14" width="150" height="58" rx="4" class="kg-box"/>
+<text x="235" y="38" class="kg-t kg-c">lex (logos)</text>
+<text x="235" y="56" class="kg-s kg-c">tokens + lex errors</text>
+<rect x="336" y="14" width="160" height="58" rx="4" class="kg-box"/>
+<text x="416" y="38" class="kg-t kg-c">parser</text>
+<text x="416" y="56" class="kg-s kg-c">rowan green tree + errors</text>
+<rect x="522" y="14" width="160" height="58" rx="4" class="kg-box"/>
+<text x="602" y="38" class="kg-t kg-c">validate</text>
+<text x="602" y="56" class="kg-s kg-c">forms, literals, .kis rule</text>
+<rect x="708" y="14" width="158" height="58" rx="4" class="kg-hl"/>
+<text x="787" y="38" class="kg-t kg-c kg-m">Parse</text>
+<text x="787" y="56" class="kg-s kg-c">lossless, errors sorted</text>
+<path d="M134,43H158" class="kg-ln" marker-end="url(#kg-arrow-syntax-layers)"/>
+<path d="M310,43H334" class="kg-ln" marker-end="url(#kg-arrow-syntax-layers)"/>
+<path d="M496,43H520" class="kg-ln" marker-end="url(#kg-arrow-syntax-layers)"/>
+<path d="M682,43H706" class="kg-ln" marker-end="url(#kg-arrow-syntax-layers)"/>
+<rect x="522" y="108" width="344" height="34" rx="4" class="kg-box"/>
+<text x="694" y="130" class="kg-t kg-c">typed AST view (<tspan class="kg-m">ast::*</tspan>, every accessor <tspan class="kg-m">Option</tspan>)</text>
+<path d="M787,72V106" class="kg-ln" marker-end="url(#kg-arrow-syntax-layers)"/>
+<rect x="14" y="166" width="196" height="34" rx="4" class="kg-box"/>
+<text x="112" y="188" class="kg-t kg-c">item tree (kagari-lang)</text>
+<rect x="226" y="166" width="236" height="34" rx="4" class="kg-box"/>
+<text x="344" y="188" class="kg-t kg-c">HIR lowering, forms desugared</text>
+<rect x="478" y="166" width="180" height="34" rx="4" class="kg-box"/>
+<text x="568" y="188" class="kg-t kg-c">kagari-fmt rules</text>
+<rect x="674" y="166" width="192" height="34" rx="4" class="kg-box"/>
+<text x="770" y="188" class="kg-t kg-c">IDE (CST helpers)</text>
+<path d="M540,142L120,164" class="kg-ln" marker-end="url(#kg-arrow-syntax-layers)"/>
+<path d="M600,142L360,164" class="kg-ln" marker-end="url(#kg-arrow-syntax-layers)"/>
+<path d="M660,142L588,164" class="kg-ln" marker-end="url(#kg-arrow-syntax-layers)"/>
+<path d="M800,142L780,164" class="kg-ln" marker-end="url(#kg-arrow-syntax-layers)"/>
+</svg>

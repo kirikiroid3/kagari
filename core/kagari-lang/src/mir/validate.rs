@@ -2,7 +2,7 @@
 //!
 //! 1. `Step`/`Rng`/`SceneCall` appear only in `Scene` bodies.
 //! 2. `SceneCall` callees are scenes, and a call statement never targets a scene.
-//! 3. Call kinds follow the kind rules of `docs/syntax/src/bytecode.md` § Verification,
+//! 3. Call kinds follow the kind rules of `docs/dev/src/formats/kagari.md#verification`,
 //!    with `Const` bodies treated as `const fn`.
 //! 4. Story variables appear only in `Instant`/`Scene` bodies.
 //! 5. Every referenced local and block exists, and `arg_count < locals.len()`.

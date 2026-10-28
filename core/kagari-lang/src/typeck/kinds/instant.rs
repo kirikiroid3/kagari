@@ -1,5 +1,5 @@
-//! The recursion check of instant procedures (`kinds.md`): a per-item scan of the MIR for
-//! the edges of the call graph, and a program-wide cycle check over them.
+//! The recursion check of instant procedures (Reference `concepts/scenes.md`): a per-item scan
+//! of the MIR for the edges of the call graph, and a program-wide cycle check over them.
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec};

@@ -1,4 +1,4 @@
-//! Story variables that never influence the story (`docs/syntax/src/compilation.md`, stage 5).
+//! Story variables that never influence the story (`docs/dev/src/compiler/analysis.md`).
 //!
 //! A flow-insensitive dependence graph over the MIR of every `pushdown fn` of the program (game
 //! and std), closures included. Its nodes are the story variables, the locals of each body,

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 220" width="100%" style="max-width:880px" role="img" aria-label="Bodies go from HIR and inference results to THIR, then to MIR; const evaluation, the story analysis, the influence and system analyses, the instant recursion check and codegen all read MIR">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-dash{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2;stroke-dasharray:4 3}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-dl{fill:none;stroke:var(--fg,#333);stroke-width:1.2;stroke-dasharray:4 3}
+.kg-head{fill:var(--fg,#333)}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+</style>
+<defs><marker id="kg-arrow-mir-pipeline" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<rect x="14" y="20" width="180" height="46" rx="4" class="kg-box"/>
+<text x="104" y="40" class="kg-t kg-c">HIR body</text>
+<text x="104" y="57" class="kg-s kg-c">+ InferenceResult</text>
+<rect x="250" y="20" width="180" height="46" rx="4" class="kg-box"/>
+<text x="340" y="40" class="kg-t kg-c">THIR</text>
+<text x="340" y="57" class="kg-s kg-c">typed tree, adjustments explicit</text>
+<rect x="486" y="20" width="200" height="46" rx="4" class="kg-hl"/>
+<text x="586" y="40" class="kg-t kg-c">MIR (ItemMir)</text>
+<text x="586" y="57" class="kg-s kg-c">main · closures · promoted</text>
+<rect x="730" y="20" width="136" height="46" rx="4" class="kg-dash"/>
+<text x="798" y="40" class="kg-t kg-m kg-c">dump_item</text>
+<text x="798" y="57" class="kg-s kg-c">tests/mir.rs snapshots</text>
+<path d="M194,43H248" class="kg-ln" marker-end="url(#kg-arrow-mir-pipeline)"/>
+<text x="221" y="36" class="kg-s kg-m kg-c">thir</text>
+<path d="M430,43H484" class="kg-ln" marker-end="url(#kg-arrow-mir-pipeline)"/>
+<text x="457" y="36" class="kg-s kg-m kg-c">item_mir</text>
+<path d="M686,43H728" class="kg-dl" marker-end="url(#kg-arrow-mir-pipeline)"/>
+<rect x="14" y="92" width="180" height="32" rx="4" class="kg-box"/>
+<text x="104" y="112" class="kg-t kg-m kg-c">const_exprs</text>
+<path d="M194,104L290,68" class="kg-dl" marker-end="url(#kg-arrow-mir-pipeline)"/>
+<text x="14" y="142" class="kg-s">promotion (pushdown fn)</text>
+<rect x="14" y="160" width="148" height="46" rx="4" class="kg-box"/>
+<text x="88" y="180" class="kg-t kg-c">Const eval</text>
+<text x="88" y="197" class="kg-s kg-m kg-c">eval/machine</text>
+<rect x="190" y="160" width="148" height="46" rx="4" class="kg-box"/>
+<text x="264" y="180" class="kg-t kg-c">Story analysis</text>
+<text x="264" y="197" class="kg-s kg-m kg-c">analysis/story</text>
+<rect x="366" y="160" width="148" height="46" rx="4" class="kg-box"/>
+<text x="440" y="180" class="kg-t kg-c">Influence, system</text>
+<text x="440" y="197" class="kg-s kg-m kg-c">analysis/</text>
+<rect x="542" y="160" width="148" height="46" rx="4" class="kg-box"/>
+<text x="616" y="180" class="kg-t kg-c">Instant recursion</text>
+<text x="616" y="197" class="kg-s kg-m kg-c">typeck/kinds</text>
+<rect x="718" y="160" width="148" height="46" rx="4" class="kg-box"/>
+<text x="792" y="180" class="kg-t kg-c">Codegen</text>
+<text x="792" y="197" class="kg-s kg-m kg-c">emit/codegen</text>
+<path d="M500,66L96,158" class="kg-ln" marker-end="url(#kg-arrow-mir-pipeline)"/>
+<path d="M540,66L270,158" class="kg-ln" marker-end="url(#kg-arrow-mir-pipeline)"/>
+<path d="M586,66L444,158" class="kg-ln" marker-end="url(#kg-arrow-mir-pipeline)"/>
+<path d="M630,66L616,158" class="kg-ln" marker-end="url(#kg-arrow-mir-pipeline)"/>
+<path d="M670,66L786,158" class="kg-ln" marker-end="url(#kg-arrow-mir-pipeline)"/>
+</svg>

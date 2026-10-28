@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 744 330" width="100%" style="max-width:744px" role="img" aria-label="システム機械はモードのスタックで、その土台のゲームモードが物語機械を収める。セーブが保持するのは物語機械だけ">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-out{fill:none;stroke:var(--fg,#333);stroke-width:1.2;stroke-dasharray:6 4}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-head{fill:var(--fg,#333)}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-c{text-anchor:middle}
+</style>
+<defs><marker id="kg-arrow-system-machines" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<rect x="10" y="10" width="500" height="310" rx="6" class="kg-out"/>
+<text x="24" y="32" class="kg-t">システム機械：モードスタック（上が先頭）</text>
+<rect x="40" y="46" width="440" height="34" rx="4" class="kg-box"/>
+<text x="260" y="68" class="kg-t kg-c">Dialog — 例：確認</text>
+<rect x="40" y="88" width="440" height="34" rx="4" class="kg-box"/>
+<text x="260" y="110" class="kg-t kg-c">GameOverlay — 例：セーブ、バックログ</text>
+<rect x="40" y="130" width="440" height="176" rx="4" class="kg-box"/>
+<text x="56" y="152" class="kg-t">ゲームモード（土台）：System::game ビュー</text>
+<rect x="70" y="164" width="380" height="128" rx="4" class="kg-hl"/>
+<text x="86" y="186" class="kg-t">物語機械</text>
+<text x="86" y="210" class="kg-s">位置、コールスタック、物語変数</text>
+<text x="86" y="230" class="kg-s">論理画面、PRNG の状態</text>
+<text x="86" y="250" class="kg-s">選択のトレース</text>
+<text x="86" y="276" class="kg-s">システムからは Narrative 経由でのみ見える</text>
+<rect x="540" y="46" width="190" height="50" rx="4" class="kg-box"/>
+<text x="635" y="68" class="kg-t kg-c">設定</text>
+<text x="635" y="86" class="kg-s kg-c">グローバル、セーブ外</text>
+<rect x="540" y="110" width="190" height="50" rx="4" class="kg-box"/>
+<text x="635" y="132" class="kg-t kg-c">メタ</text>
+<text x="635" y="150" class="kg-s kg-c">グローバル、セーブ外</text>
+<rect x="540" y="200" width="190" height="50" rx="4" class="kg-box"/>
+<text x="635" y="222" class="kg-t kg-c">セーブスロット</text>
+<text x="635" y="240" class="kg-s kg-c">物語のトレースを保持</text>
+<path d="M450,226H538" class="kg-ln" marker-end="url(#kg-arrow-system-machines)"/>
+<text x="512" y="218" class="kg-s kg-c">セーブ</text>
+</svg>

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 210" width="100%" style="max-width:880px" role="img" aria-label="Emission: the roots are requested as instances, a queue lowers each instance from its MIR, lowering requests further instances, the tables fill on first use, then the module is verified and encoded">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-dl{fill:none;stroke:var(--fg,#333);stroke-width:1.2;stroke-dasharray:4 3}
+.kg-head{fill:var(--fg,#333)}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+</style>
+<defs><marker id="kg-arrow-emit-pipeline" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<rect x="14" y="64" width="150" height="62" rx="4" class="kg-box"/>
+<text x="89" y="86" class="kg-t kg-c">roots</text>
+<text x="89" y="103" class="kg-s kg-c">statics, main,</text>
+<text x="89" y="117" class="kg-s kg-c">entry scenes</text>
+<rect x="194" y="64" width="170" height="62" rx="4" class="kg-box"/>
+<text x="279" y="86" class="kg-t kg-c">instance queue</text>
+<text x="279" y="103" class="kg-s kg-m kg-c">request(Instance)</text>
+<text x="279" y="117" class="kg-s kg-c">interned → FuncId</text>
+<rect x="394" y="64" width="170" height="62" rx="4" class="kg-box"/>
+<text x="479" y="86" class="kg-t kg-c">codegen</text>
+<text x="479" y="103" class="kg-s kg-c">RPO layout · regalloc</text>
+<text x="479" y="117" class="kg-s kg-c">statements · terminators</text>
+<rect x="594" y="64" width="120" height="62" rx="4" class="kg-box"/>
+<text x="654" y="86" class="kg-t kg-c">Module</text>
+<text x="654" y="103" class="kg-s kg-c">tables, functions,</text>
+<text x="654" y="117" class="kg-s kg-c">debug lines</text>
+<rect x="744" y="64" width="122" height="62" rx="4" class="kg-hl"/>
+<text x="805" y="86" class="kg-t kg-c">verify</text>
+<text x="805" y="103" class="kg-s kg-c">then encode</text>
+<text x="805" y="117" class="kg-s kg-m kg-c">.kagari bytes</text>
+<path d="M164,95H192" class="kg-ln" marker-end="url(#kg-arrow-emit-pipeline)"/>
+<path d="M364,95H392" class="kg-ln" marker-end="url(#kg-arrow-emit-pipeline)"/>
+<path d="M564,95H592" class="kg-ln" marker-end="url(#kg-arrow-emit-pipeline)"/>
+<path d="M714,95H742" class="kg-ln" marker-end="url(#kg-arrow-emit-pipeline)"/>
+<path d="M479,64C479,22 279,22 279,62" class="kg-ln" marker-end="url(#kg-arrow-emit-pipeline)"/>
+<text x="379" y="20" class="kg-s kg-c">CALL, FUNC, CLOSURE and constants request more instances</text>
+<rect x="394" y="156" width="170" height="40" rx="4" class="kg-box"/>
+<text x="479" y="173" class="kg-s kg-c">MIR (item_mir) and</text>
+<text x="479" y="187" class="kg-s kg-c">const-eval values</text>
+<path d="M479,156V128" class="kg-dl" marker-end="url(#kg-arrow-emit-pipeline)"/>
+<text x="805" y="150" class="kg-s kg-c">E7001 · E7002 · E7003</text>
+</svg>

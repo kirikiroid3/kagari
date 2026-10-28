@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" width="100%" style="max-width:900px" role="img" aria-label="Text and rendering pipeline: a Text value is flattened into spans and rubies, laid out by kagari-text into a Layout of glyphs, placed in a Node::Text of the Frame; the renderer plans one walk over the Frame, encodes the passes into an Rgba16Float design target, and presents, resolves or copies it to the still; glyph masks come from the atlas">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-head{fill:var(--fg,#333)}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+</style>
+<defs><marker id="kg-arrow-text-render" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<rect x="20" y="24" width="150" height="52" rx="4" class="kg-box"/>
+<text x="95" y="45" class="kg-t kg-c kg-m">Text</text>
+<text x="95" y="64" class="kg-s kg-c">value from bytecode</text>
+<rect x="195" y="24" width="150" height="52" rx="4" class="kg-box"/>
+<text x="270" y="45" class="kg-t kg-c">flatten</text>
+<text x="270" y="64" class="kg-s kg-c">spans, rubies</text>
+<rect x="370" y="24" width="150" height="52" rx="4" class="kg-box"/>
+<text x="445" y="45" class="kg-t kg-c kg-m">layout()</text>
+<text x="445" y="64" class="kg-s kg-c">shape, break, place</text>
+<rect x="545" y="24" width="150" height="52" rx="4" class="kg-box"/>
+<text x="620" y="45" class="kg-t kg-c kg-m">Layout</text>
+<text x="620" y="64" class="kg-s kg-c">glyphs, units</text>
+<rect x="720" y="24" width="150" height="52" rx="4" class="kg-box"/>
+<text x="795" y="45" class="kg-t kg-c kg-m">Node::Text</text>
+<text x="795" y="64" class="kg-s kg-c">plus Reveal</text>
+<path d="M170,50H193" class="kg-ln" marker-end="url(#kg-arrow-text-render)"/>
+<path d="M345,50H368" class="kg-ln" marker-end="url(#kg-arrow-text-render)"/>
+<path d="M520,50H543" class="kg-ln" marker-end="url(#kg-arrow-text-render)"/>
+<path d="M695,50H718" class="kg-ln" marker-end="url(#kg-arrow-text-render)"/>
+<path d="M795,76V104H95V148" class="kg-ln" marker-end="url(#kg-arrow-text-render)"/>
+<text x="450" y="98" class="kg-s kg-c kg-m">Frame</text>
+<rect x="20" y="150" width="150" height="52" rx="4" class="kg-box"/>
+<text x="95" y="171" class="kg-t kg-c">plan</text>
+<text x="95" y="190" class="kg-s kg-c">one walk: verts, passes</text>
+<rect x="195" y="150" width="150" height="52" rx="4" class="kg-box"/>
+<text x="270" y="171" class="kg-t kg-c">encode</text>
+<text x="270" y="190" class="kg-s kg-c">one command encoder</text>
+<rect x="370" y="150" width="150" height="52" rx="4" class="kg-hl"/>
+<text x="445" y="171" class="kg-t kg-c">design target</text>
+<text x="445" y="190" class="kg-s kg-c kg-m">Rgba16Float, linear</text>
+<rect x="720" y="120" width="150" height="40" rx="4" class="kg-box"/>
+<text x="795" y="137" class="kg-t kg-c">present</text>
+<text x="795" y="152" class="kg-s kg-c">letterbox to surface</text>
+<rect x="720" y="170" width="150" height="40" rx="4" class="kg-box"/>
+<text x="795" y="187" class="kg-t kg-c">resolve</text>
+<text x="795" y="202" class="kg-s kg-c">sRGB RGBA8 readback</text>
+<rect x="720" y="220" width="150" height="40" rx="4" class="kg-box"/>
+<text x="795" y="237" class="kg-t kg-c">still copy</text>
+<text x="795" y="252" class="kg-s kg-c">dialog backdrop</text>
+<path d="M170,176H193" class="kg-ln" marker-end="url(#kg-arrow-text-render)"/>
+<path d="M345,176H368" class="kg-ln" marker-end="url(#kg-arrow-text-render)"/>
+<path d="M520,170L718,140" class="kg-ln" marker-end="url(#kg-arrow-text-render)"/>
+<path d="M520,180L718,190" class="kg-ln" marker-end="url(#kg-arrow-text-render)"/>
+<path d="M520,190L718,240" class="kg-ln" marker-end="url(#kg-arrow-text-render)"/>
+<rect x="20" y="236" width="150" height="48" rx="4" class="kg-box"/>
+<text x="95" y="256" class="kg-t kg-c">glyph atlas</text>
+<text x="95" y="273" class="kg-s kg-c">R8 masks, skrifa + zeno</text>
+<path d="M95,236V204" class="kg-ln" marker-end="url(#kg-arrow-text-render)"/>
+</svg>

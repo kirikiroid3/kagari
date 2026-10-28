@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-40 0 784 250" width="100%" style="max-width:784px" role="img" aria-label="ステップのタイムライン：エントリーでフェードが始まり、barrier がカーソルをその終わりへ、wait がさらに進め、begin_text がそこで表示を始め、at_mark が表示中のマーク 1 にカーソルを固定する">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-dash{fill:none;stroke:var(--fg,#333);stroke-width:1.2;stroke-dasharray:5 4}
+.kg-head{fill:var(--fg,#333)}
+.kg-cur{fill:var(--links,#2f5d8a)}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-c{text-anchor:middle}
+</style>
+<defs><marker id="kg-arrow-screen-anim-timeline" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<text x="10" y="20" class="kg-t">1 ステップのタイムライン</text>
+<rect x="40" y="34" width="200" height="22" rx="3" class="kg-box"/>
+<text x="140" y="49" class="kg-s kg-c">背景 fade(ms(500))</text>
+<rect x="360" y="70" width="300" height="22" rx="3" class="kg-hl"/>
+<text x="510" y="85" class="kg-s kg-c">テキスト表示 + ボイス</text>
+<path d="M520,64L528,72L520,80L512,72z" class="kg-cur"/>
+<text x="540" y="62" class="kg-s">mark(1)</text>
+<rect x="520" y="104" width="120" height="22" rx="3" class="kg-box"/>
+<text x="580" y="119" class="kg-s kg-c">表情 fade(ms(300))</text>
+<path d="M30,150H710" class="kg-ln" marker-end="url(#kg-arrow-screen-anim-timeline)"/>
+<text x="712" y="168" class="kg-s">時間</text>
+<path d="M40,145V155M240,145V155M360,145V155" class="kg-ln"/>
+<text x="40" y="168" class="kg-s kg-c">エントリー, 0 ms</text>
+<text x="240" y="168" class="kg-s kg-c">500 ms</text>
+<text x="360" y="168" class="kg-s kg-c">800 ms</text>
+<path d="M40,182L34,194H46z" class="kg-cur"/>
+<text x="40" y="210" class="kg-s kg-c">1 エントリーのカーソル</text>
+<path d="M240,182L234,194H246z" class="kg-cur"/>
+<text x="240" y="210" class="kg-s kg-c">2 barrier()</text>
+<path d="M360,182L354,194H366z" class="kg-cur"/>
+<text x="360" y="210" class="kg-s kg-c">3 wait(ms(300))</text>
+<text x="360" y="224" class="kg-s kg-c">begin_text()</text>
+<path d="M520,182L514,194H526z" class="kg-cur"/>
+<text x="520" y="210" class="kg-s kg-c">4 at_mark(Mark(1))</text>
+<path d="M240,178Q300,170 356,178" class="kg-dash" marker-end="url(#kg-arrow-screen-anim-timeline)"/>
+<path d="M520,100V145" class="kg-dash"/>
+</svg>

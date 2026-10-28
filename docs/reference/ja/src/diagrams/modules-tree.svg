@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="100%" style="max-width:760px" role="img" aria-label="モジュールツリーと各モジュールのファイル：ルートファイル src/main.kix が characters、story、ui を宣言し、story.kix が story/day1.kix の story::day1 を、ui/mod.kis が ui/menu.kis の ui::menu を宣言する">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-head{fill:var(--fg,#333)}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+.kg-e{text-anchor:end}
+</style>
+<defs><marker id="kg-arrow-modules-tree" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<rect x="290" y="10" width="180" height="46" rx="4" class="kg-hl"/>
+<text x="380" y="30" class="kg-t kg-m kg-c">crate</text>
+<text x="380" y="48" class="kg-s kg-c"><tspan class="kg-m">src/main.kix</tspan>（ルート）</text>
+<rect x="30" y="100" width="180" height="46" rx="4" class="kg-box"/>
+<text x="120" y="120" class="kg-t kg-m kg-c">crate::characters</text>
+<text x="120" y="138" class="kg-s kg-m kg-c">src/characters.kis</text>
+<rect x="290" y="100" width="180" height="46" rx="4" class="kg-box"/>
+<text x="380" y="120" class="kg-t kg-m kg-c">crate::story</text>
+<text x="380" y="138" class="kg-s kg-m kg-c">src/story.kix</text>
+<rect x="550" y="100" width="180" height="46" rx="4" class="kg-box"/>
+<text x="640" y="120" class="kg-t kg-m kg-c">crate::ui</text>
+<text x="640" y="138" class="kg-s kg-m kg-c">src/ui/mod.kis</text>
+<rect x="290" y="190" width="180" height="46" rx="4" class="kg-box"/>
+<text x="380" y="210" class="kg-t kg-m kg-c">crate::story::day1</text>
+<text x="380" y="228" class="kg-s kg-m kg-c">src/story/day1.kix</text>
+<rect x="550" y="190" width="180" height="46" rx="4" class="kg-box"/>
+<text x="640" y="210" class="kg-t kg-m kg-c">crate::ui::menu</text>
+<text x="640" y="228" class="kg-s kg-m kg-c">src/ui/menu.kis</text>
+<path d="M330,56L130,98" class="kg-ln" marker-end="url(#kg-arrow-modules-tree)"/>
+<path d="M380,56V98" class="kg-ln" marker-end="url(#kg-arrow-modules-tree)"/>
+<path d="M430,56L630,98" class="kg-ln" marker-end="url(#kg-arrow-modules-tree)"/>
+<path d="M380,146V188" class="kg-ln" marker-end="url(#kg-arrow-modules-tree)"/>
+<path d="M640,146V188" class="kg-ln" marker-end="url(#kg-arrow-modules-tree)"/>
+<text x="238" y="72" class="kg-s kg-m kg-e">mod characters;</text>
+<text x="386" y="82" class="kg-s kg-m">mod story;</text>
+<text x="522" y="72" class="kg-s kg-m">mod ui;</text>
+<text x="386" y="172" class="kg-s kg-m">mod day1;</text>
+<text x="646" y="172" class="kg-s kg-m">mod menu;</text>
+</svg>

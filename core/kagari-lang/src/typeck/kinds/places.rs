@@ -1,5 +1,5 @@
-//! Places: mutability of assigned and mutably borrowed places (values.md#references) and
-//! exclusive `&mut` arguments in the story.
+//! Places: mutability of assigned and mutably borrowed places (Reference
+//! `syntax/values.md#references`) and exclusive `&mut` arguments in the story.
 
 use crate::diagnostic::DiagnosticCode;
 use crate::hir::{Expr, ExprId, UnaryOp};
@@ -185,7 +185,7 @@ impl BodyChecker<'_, '_> {
         }
     }
 
-    /// Assignment and `&mut` need a mutable place (values.md#references).
+    /// Assignment and `&mut` need a mutable place (Reference `syntax/values.md#references`).
     pub(super) fn check_mut_place(&mut self, target: ExprId, access: Access) {
         if self.ty(target).is_none() {
             return;
@@ -329,8 +329,8 @@ impl BodyChecker<'_, '_> {
         }
     }
 
-    /// Exclusivity (values.md#references-in-the-story): a place passed as `&mut` is not
-    /// passed as any other argument of the same call.
+    /// Exclusivity (Reference `syntax/values.md#references-in-the-story`): a place passed as
+    /// `&mut` is not passed as any other argument of the same call.
     pub(super) fn check_exclusive(&mut self, args: &[CallArg]) {
         let places: Vec<(ExprId, Place, bool)> =
             args.iter().filter_map(|&arg| self.arg_place(arg)).collect();

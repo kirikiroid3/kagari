@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 170" width="100%" style="max-width:880px" role="img" aria-label="Instruction encoding: a 64-bit code word with op in bits 0 to 15, a in 16 to 31, b in 32 to 47, c in 48 to 63; a two-word instruction is followed by a 64-bit operand word x">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-dash{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2;stroke-dasharray:4 3}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+</style>
+<text x="14" y="18" class="kg-s">code word (u64, little-endian; bit 0 is the least significant)</text>
+<rect x="14" y="26" width="200" height="46" rx="4" class="kg-hl"/>
+<text x="114" y="46" class="kg-t kg-m kg-c">op: u16</text>
+<text x="114" y="63" class="kg-s kg-c">bits 0–15</text>
+<rect x="218" y="26" width="200" height="46" rx="4" class="kg-box"/>
+<text x="318" y="46" class="kg-t kg-m kg-c">a: u16</text>
+<text x="318" y="63" class="kg-s kg-c">bits 16–31, usually dst</text>
+<rect x="422" y="26" width="200" height="46" rx="4" class="kg-box"/>
+<text x="522" y="46" class="kg-t kg-m kg-c">b: u16</text>
+<text x="522" y="63" class="kg-s kg-c">bits 32–47</text>
+<rect x="626" y="26" width="200" height="46" rx="4" class="kg-box"/>
+<text x="726" y="46" class="kg-t kg-m kg-c">c: u16</text>
+<text x="726" y="63" class="kg-s kg-c">bits 48–63</text>
+<text x="14" y="98" class="kg-s">operand word (2-word instructions only)</text>
+<rect x="14" y="106" width="812" height="46" rx="4" class="kg-dash"/>
+<text x="420" y="126" class="kg-t kg-m kg-c">x: u64</text>
+<text x="420" y="143" class="kg-s kg-c">index, i64 immediate, word-offset jump target, or packed fields (e.g. type | variant &lt;&lt; 32)</text>
+</svg>

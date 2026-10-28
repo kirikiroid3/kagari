@@ -1,7 +1,7 @@
 // The std used the way studios build a title: characters with slots and faces, transitions,
 // a dip to black, a flashback tint, a chapter card, an item popup, a CG still, looping music,
 // sound bursts, mid-line cues, text speed and emphasis, a disabled choice arm, motions and a
-// typed interpolation. The recipes match the standard library book's stage chapter.
+// typed interpolation. The recipes match the staging recipes of the STD Reference.
 
 use std::narrative::Mark;
 use std::narrative::text::{speed, text_style};

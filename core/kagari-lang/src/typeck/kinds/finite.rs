@@ -1,5 +1,5 @@
-//! Finite types (`docs/syntax/src/kinds.md#finite-types`, std book chapter *Checks*): the
-//! types the story may hold at runtime.
+//! Finite types (`docs/reference/en/src/concepts/kinds.md#finite-types`,
+//! `docs/dev/src/std/contract.md#finite-types`): the types the story may hold at runtime.
 
 use crate::hir::FnPtrKind;
 use crate::item_tree::{FnKind, ItemId};

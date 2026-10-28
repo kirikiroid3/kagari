@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 226" width="100%" style="max-width:920px" role="img" aria-label="ビルドと実行：.kis と .kix のソースとアセットをもつ kagari.toml プロジェクトを kagari build が処理し、診断を報告して target/v0 に game.kagari と .kiarchive を書き出す。プロファイル native_v0 のデスクトップランタイムがそれを実行し、設定・メタ・セーブをデータディレクトリに保存する">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-grp{fill:none;stroke:var(--fg,#333);stroke-width:1;stroke-dasharray:5 4;opacity:.7}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-head{fill:var(--fg,#333)}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+</style>
+<defs><marker id="kg-arrow-architecture-pipeline" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<rect x="10" y="14" width="190" height="150" rx="6" class="kg-grp"/>
+<text x="105" y="36" class="kg-s kg-c"><tspan class="kg-m">kagari.toml</tspan> プロジェクト</text>
+<rect x="25" y="50" width="160" height="44" rx="4" class="kg-box"/>
+<text x="105" y="70" class="kg-t kg-m kg-c">src/</text>
+<text x="105" y="86" class="kg-s kg-m kg-c">.kis  .kix</text>
+<rect x="25" y="108" width="160" height="44" rx="4" class="kg-box"/>
+<text x="105" y="128" class="kg-t kg-m kg-c">assets/</text>
+<text x="105" y="144" class="kg-s kg-c">画像、音声、フォント</text>
+<path d="M200,89H238" class="kg-ln" marker-end="url(#kg-arrow-architecture-pipeline)"/>
+<rect x="240" y="54" width="160" height="70" rx="4" class="kg-hl"/>
+<text x="320" y="80" class="kg-t kg-m kg-c">kagari build</text>
+<text x="320" y="98" class="kg-s kg-c">検査、解析、生成、</text>
+<text x="320" y="112" class="kg-s kg-c">アセットのパック</text>
+<path d="M320,124V164" class="kg-ln" marker-end="url(#kg-arrow-architecture-pipeline)"/>
+<rect x="240" y="166" width="160" height="44" rx="4" class="kg-box"/>
+<text x="320" y="186" class="kg-t kg-c">診断</text>
+<text x="320" y="202" class="kg-s kg-c"><tspan class="kg-m">kagari check</tspan>、エディタ</text>
+<path d="M400,89H438" class="kg-ln" marker-end="url(#kg-arrow-architecture-pipeline)"/>
+<rect x="440" y="14" width="190" height="150" rx="6" class="kg-grp"/>
+<text x="535" y="36" class="kg-s kg-m kg-c">target/v0/</text>
+<rect x="455" y="50" width="160" height="44" rx="4" class="kg-box"/>
+<text x="535" y="70" class="kg-t kg-m kg-c">game.kagari</text>
+<text x="535" y="86" class="kg-s kg-c">バイトコード</text>
+<rect x="455" y="108" width="160" height="44" rx="4" class="kg-box"/>
+<text x="535" y="128" class="kg-t kg-m kg-c">*.kiarchive</text>
+<text x="535" y="144" class="kg-s kg-c">アセットアーカイブ</text>
+<path d="M630,89H668" class="kg-ln" marker-end="url(#kg-arrow-architecture-pipeline)"/>
+<rect x="670" y="54" width="120" height="70" rx="4" class="kg-hl"/>
+<text x="730" y="80" class="kg-t kg-c">デスクトップ</text>
+<text x="730" y="96" class="kg-t kg-c">ランタイム</text>
+<text x="730" y="114" class="kg-s kg-m kg-c">native_v0</text>
+<path d="M730,126V164" class="kg-ln" marker-start="url(#kg-arrow-architecture-pipeline)" marker-end="url(#kg-arrow-architecture-pipeline)"/>
+<rect x="660" y="166" width="140" height="44" rx="4" class="kg-box"/>
+<text x="730" y="186" class="kg-t kg-c">データディレクトリ</text>
+<text x="730" y="202" class="kg-s kg-c">設定、メタ、セーブ</text>
+<path d="M790,89H818" class="kg-ln" marker-end="url(#kg-arrow-architecture-pipeline)"/>
+<rect x="820" y="54" width="90" height="70" rx="4" class="kg-box"/>
+<text x="865" y="85" class="kg-t kg-c">実行中の</text>
+<text x="865" y="103" class="kg-t kg-c">ゲーム</text>
+</svg>

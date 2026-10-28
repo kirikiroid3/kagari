@@ -2,7 +2,7 @@
 //! (arithmetic, comparison, conversion to and from [`ConstValue`]) and the builtins. The
 //! MIR executor (`exec`) drives it.
 //!
-//! Values follow `docs/syntax/src/values.md`: every value is copied on assignment and
+//! Values follow `docs/reference/en/src/syntax/values.md`: every value is copied on assignment and
 //! argument passing; a reference is a pointer to a place (a heap cell plus a projection
 //! path), so writes through `&mut` are visible through every alias. The screen parts
 //! builtins hand out (`&mut Entity`, `&mut Prop<T>`, …) are places with a [`ScreenObj`].

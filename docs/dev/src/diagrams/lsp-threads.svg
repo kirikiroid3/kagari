@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 300" width="100%" style="max-width:880px" role="img" aria-label="Language server threads: lsp-server stdio reader and writer threads exchange messages with the main loop over crossbeam channels; the main loop owns the salsa database, answers requests synchronously and applies notifications as database writes; each write spawns a diagnostics thread with a database clone, which a later write cancels, and which publishes diagnostics through the sender">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-dash{fill:none;stroke:var(--fg,#333);stroke-width:1.2;stroke-dasharray:4 3}
+.kg-head{fill:var(--fg,#333)}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+</style>
+<defs><marker id="kg-arrow-lsp-threads" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<rect x="10" y="40" width="110" height="50" rx="4" class="kg-box"/>
+<text x="65" y="62" class="kg-t kg-c">editor</text>
+<text x="65" y="79" class="kg-s kg-c">client</text>
+<rect x="170" y="10" width="150" height="44" rx="4" class="kg-box"/>
+<text x="245" y="30" class="kg-t kg-c">stdin reader</text>
+<text x="245" y="46" class="kg-s kg-m kg-c">lsp-server thread</text>
+<rect x="170" y="76" width="150" height="44" rx="4" class="kg-box"/>
+<text x="245" y="96" class="kg-t kg-c">stdout writer</text>
+<text x="245" y="112" class="kg-s kg-m kg-c">lsp-server thread</text>
+<path d="M120,58L168,34" class="kg-ln" marker-end="url(#kg-arrow-lsp-threads)"/>
+<path d="M168,98L120,76" class="kg-ln" marker-end="url(#kg-arrow-lsp-threads)"/>
+<rect x="390" y="10" width="300" height="140" rx="4" class="kg-hl"/>
+<text x="540" y="32" class="kg-t kg-c">main loop (Server)</text>
+<text x="404" y="56" class="kg-s kg-m">db: RootDatabase</text>
+<text x="404" y="74" class="kg-s kg-m">projects: Vec&lt;LoadedProject&gt;</text>
+<text x="404" y="92" class="kg-s kg-m">open: path → text</text>
+<text x="404" y="116" class="kg-s">requests: answered in place</text>
+<text x="404" y="134" class="kg-s">notifications: db writes, then refresh</text>
+<path d="M320,32H388" class="kg-ln" marker-end="url(#kg-arrow-lsp-threads)"/>
+<text x="330" y="26" class="kg-s kg-m">receiver</text>
+<path d="M388,98H322" class="kg-ln" marker-end="url(#kg-arrow-lsp-threads)"/>
+<text x="330" y="92" class="kg-s kg-m">sender</text>
+<rect x="390" y="200" width="300" height="80" rx="4" class="kg-box"/>
+<text x="540" y="222" class="kg-t kg-c">diagnostics thread</text>
+<text x="404" y="244" class="kg-s kg-m">db.clone(): check(program)…</text>
+<text x="404" y="262" class="kg-s">Cancelled by the next write</text>
+<path d="M540,150V198" class="kg-ln" marker-end="url(#kg-arrow-lsp-threads)"/>
+<text x="548" y="180" class="kg-s">spawn per refresh</text>
+<path d="M390,240C300,240 245,200 245,122" class="kg-dash" marker-end="url(#kg-arrow-lsp-threads)"/>
+<text x="268" y="214" class="kg-s">publishDiagnostics</text>
+<rect x="730" y="76" width="140" height="74" rx="4" class="kg-box"/>
+<text x="800" y="98" class="kg-t kg-c">kagari-lang</text>
+<text x="800" y="116" class="kg-s kg-m kg-c">ide::*, check</text>
+<text x="800" y="132" class="kg-s kg-m kg-c">kagari-fmt</text>
+<path d="M690,112H728" class="kg-ln" marker-end="url(#kg-arrow-lsp-threads)"/>
+</svg>

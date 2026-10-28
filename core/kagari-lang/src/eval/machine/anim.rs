@@ -1,5 +1,5 @@
 //! The const-evaluation rules on animation values and fractions
-//! (`docs/std/src/checks.md#const-evaluation-errors`): the Motion identity rule, easings
+//! (`docs/dev/src/std/contract.md#const-evaluation-errors`): the Motion identity rule, easings
 //! used by applied animations, and `Decimal` fractions of opacity, volume and anchor.
 
 use std::cmp::Ordering;

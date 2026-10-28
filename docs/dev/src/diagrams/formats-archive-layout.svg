@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 200" width="100%" style="max-width:880px" role="img" aria-label="Layout of a .kiarchive: a 64-byte header, the index region (block table, entry table sorted by name, name pool), then the blocks back to back; a patch chain resolves names from the newest layer down to the base">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-head{fill:var(--fg,#333)}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+</style>
+<defs><marker id="kg-arrow-archive" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<text x="14" y="16" class="kg-s">one layer (cg.kiarchive or cg.NNN.kiarchive)</text>
+<rect x="14" y="24" width="120" height="46" rx="4" class="kg-hl"/>
+<text x="74" y="44" class="kg-t kg-c">header</text>
+<text x="74" y="61" class="kg-s kg-c">64 B, CRCs</text>
+<rect x="138" y="24" width="140" height="46" rx="4" class="kg-box"/>
+<text x="208" y="44" class="kg-t kg-c">block table</text>
+<text x="208" y="61" class="kg-s kg-c">32 B per block</text>
+<rect x="282" y="24" width="160" height="46" rx="4" class="kg-box"/>
+<text x="362" y="44" class="kg-t kg-c">entry table</text>
+<text x="362" y="61" class="kg-s kg-c">32 B per name, sorted</text>
+<rect x="446" y="24" width="110" height="46" rx="4" class="kg-box"/>
+<text x="501" y="44" class="kg-t kg-c">name pool</text>
+<text x="501" y="61" class="kg-s kg-c">UTF-8</text>
+<rect x="560" y="24" width="306" height="46" rx="4" class="kg-hl"/>
+<text x="713" y="44" class="kg-t kg-c">blocks, back to back</text>
+<text x="713" y="61" class="kg-s kg-c">Store or LZ4; one file or a solid group each</text>
+<path d="M138,80H556" class="kg-ln"/>
+<text x="347" y="96" class="kg-s kg-c">index region: offset 64, index_len bytes, CRC32 index_crc</text>
+<text x="14" y="128" class="kg-s">patch chain: lookup goes from the newest layer down</text>
+<rect x="14" y="136" width="200" height="46" rx="4" class="kg-box"/>
+<text x="114" y="156" class="kg-t kg-m kg-c">cg.kiarchive</text>
+<text x="114" y="173" class="kg-s kg-c">sequence 0, no tombstones</text>
+<rect x="294" y="136" width="200" height="46" rx="4" class="kg-box"/>
+<text x="394" y="156" class="kg-t kg-m kg-c">cg.001.kiarchive</text>
+<text x="394" y="173" class="kg-s kg-c">parent_crc = base index_crc</text>
+<rect x="574" y="136" width="200" height="46" rx="4" class="kg-box"/>
+<text x="674" y="156" class="kg-t kg-m kg-c">cg.002.kiarchive</text>
+<text x="674" y="173" class="kg-s kg-c">add, replace, delete</text>
+<path d="M294,159H216" class="kg-ln" marker-end="url(#kg-arrow-archive)"/>
+<path d="M574,159H496" class="kg-ln" marker-end="url(#kg-arrow-archive)"/>
+</svg>

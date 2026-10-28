@@ -1,4 +1,5 @@
-//! The mode stack and navigation (`docs/syntax/src/system.md` §Modes, §Operations).
+//! The mode stack and navigation (`docs/dev/src/runtime/engine.md`; for users,
+//! `docs/reference/en/src/concepts/system.md#modes` and `#operations`).
 
 use kagari_vm::{FuncId, HostObj, StoryFiber, StoryStatics, Trap, Value, Vm};
 
@@ -10,7 +11,7 @@ use crate::story::narrative::NarrativeObj;
 use crate::story::{GameFrame, Trace, driver};
 use crate::ui::{self, ModeId};
 
-/// The kind of a mode on the stack (`docs/syntax/src/system.md` §Modes).
+/// The kind of a mode on the stack (`docs/reference/en/src/concepts/system.md#modes`).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum ModeKind {
     Root,

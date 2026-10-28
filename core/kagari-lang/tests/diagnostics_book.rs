@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-//! Every diagnostic code has exactly one entry in the diagnostics book.
+//! Every diagnostic code has exactly one entry in each language of the diagnostics appendix of
+//! The Kagari Reference.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -19,14 +20,10 @@ fn heading_code(line: &str) -> Option<&str> {
     well_formed.then_some(code)
 }
 
-#[test]
-fn every_code_has_one_entry() {
-    let dir = Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../docs/diagnostics/src"
-    ));
+/// The number of `## E2001 …` headings of each code in the Markdown files of `dir`.
+fn documented_codes(dir: &Path) -> BTreeMap<String, usize> {
     let mut found: BTreeMap<String, usize> = BTreeMap::new();
-    for entry in std::fs::read_dir(dir).expect("docs/diagnostics/src") {
+    for entry in std::fs::read_dir(dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display())) {
         let path = entry.unwrap().path();
         if path.extension().is_none_or(|ext| ext != "md") {
             continue;
@@ -38,10 +35,21 @@ fn every_code_has_one_entry() {
             }
         }
     }
+    found
+}
 
+#[test]
+fn every_code_has_one_entry() {
     let mut expected: BTreeMap<String, usize> = BTreeMap::new();
     for code in DiagnosticCode::ALL {
         *expected.entry(code.as_str().to_owned()).or_default() += 1;
     }
-    assert_eq!(found, expected);
+
+    for lang in ["en", "ja"] {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/reference")
+            .join(lang)
+            .join("src/diagnostics");
+        assert_eq!(documented_codes(&dir), expected, "diagnostics appendix ({lang})");
+    }
 }

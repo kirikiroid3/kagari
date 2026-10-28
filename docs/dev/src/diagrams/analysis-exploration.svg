@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 300" width="100%" style="max-width:880px" role="img" aria-label="Story exploration: each context is a scene entered with argument values and story variables; its nodes are suspension states reached by segments of instant code; a call node enters the callee's context and resumes once per exit of it">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-frame{fill:none;stroke:var(--fg,#333);stroke-width:1;stroke-dasharray:6 4}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-call{fill:none;stroke:var(--links,#2f5d8a);stroke-width:1.6}
+.kg-ret{fill:none;stroke:var(--links,#2f5d8a);stroke-width:1.6;stroke-dasharray:5 3}
+.kg-head{fill:var(--fg,#333)}
+.kg-head2{fill:var(--links,#2f5d8a)}
+.kg-t{fill:var(--fg,#333);font-size:12px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+</style>
+<defs>
+<marker id="kg-arrow-analysis-exploration" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker>
+<marker id="kg-arrow-analysis-exploration-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head2"/></marker>
+</defs>
+<rect x="14" y="30" width="430" height="250" rx="6" class="kg-frame"/>
+<text x="24" y="22" class="kg-t kg-m">context (Start, args (), globals G0)</text>
+<rect x="34" y="62" width="80" height="34" rx="17" class="kg-box"/>
+<text x="74" y="83" class="kg-t kg-c">entry</text>
+<rect x="150" y="62" width="120" height="34" rx="4" class="kg-hl"/>
+<text x="210" y="83" class="kg-t kg-c">Step · s!</text>
+<rect x="300" y="62" width="130" height="34" rx="4" class="kg-hl"/>
+<text x="365" y="83" class="kg-t kg-c">Step · choice!</text>
+<rect x="300" y="142" width="130" height="34" rx="4" class="kg-hl"/>
+<text x="365" y="163" class="kg-t kg-c">Call · Visit()</text>
+<rect x="150" y="142" width="120" height="34" rx="4" class="kg-hl"/>
+<text x="210" y="157" class="kg-t kg-c">Rng · Coin</text>
+<text x="210" y="171" class="kg-s kg-c">ROUTE = Leave</text>
+<rect x="300" y="222" width="130" height="34" rx="4" class="kg-hl"/>
+<text x="365" y="237" class="kg-t kg-c">Rng · Coin</text>
+<text x="365" y="251" class="kg-s kg-c">ROUTE = Stay, VISITS = 1</text>
+<rect x="34" y="222" width="120" height="34" rx="4" class="kg-box"/>
+<text x="94" y="237" class="kg-t kg-c">exits</text>
+<text x="94" y="251" class="kg-s kg-c">(ret, globals, outs)</text>
+<path d="M114,79H148" class="kg-ln" marker-end="url(#kg-arrow-analysis-exploration)"/>
+<text x="131" y="110" class="kg-s kg-c">segment</text>
+<path d="M270,79H298" class="kg-ln" marker-end="url(#kg-arrow-analysis-exploration)"/>
+<path d="M365,96V140" class="kg-ln" marker-end="url(#kg-arrow-analysis-exploration)"/>
+<text x="371" y="122" class="kg-s">Stay</text>
+<path d="M330,96L250,140" class="kg-ln" marker-end="url(#kg-arrow-analysis-exploration)"/>
+<text x="262" y="114" class="kg-s">Leave</text>
+<path d="M190,176L120,220" class="kg-ln" marker-end="url(#kg-arrow-analysis-exploration)"/>
+<path d="M300,239H156" class="kg-ln" marker-end="url(#kg-arrow-analysis-exploration)"/>
+<text x="228" y="232" class="kg-s kg-c">2 outcomes each</text>
+<rect x="560" y="30" width="306" height="150" rx="6" class="kg-frame"/>
+<text x="570" y="22" class="kg-t kg-m">context (Visit, args (), globals G1)</text>
+<rect x="580" y="62" width="80" height="34" rx="17" class="kg-box"/>
+<text x="620" y="83" class="kg-t kg-c">entry</text>
+<rect x="690" y="62" width="150" height="34" rx="4" class="kg-hl"/>
+<text x="765" y="83" class="kg-t kg-c">Step · s!</text>
+<rect x="690" y="132" width="150" height="34" rx="4" class="kg-box"/>
+<text x="765" y="153" class="kg-t kg-c">exit e0 · ret ()</text>
+<path d="M660,79H688" class="kg-ln" marker-end="url(#kg-arrow-analysis-exploration)"/>
+<path d="M765,96V130" class="kg-ln" marker-end="url(#kg-arrow-analysis-exploration)"/>
+<path d="M430,159C500,159 540,96 578,88" class="kg-call" marker-end="url(#kg-arrow-analysis-exploration-b)"/>
+<text x="452" y="70" class="kg-s">Call: find or create</text>
+<path d="M690,155C600,190 520,239 432,239" class="kg-ret" marker-end="url(#kg-arrow-analysis-exploration-b)"/>
+<text x="540" y="226" class="kg-s">Return task per exit</text>
+<text x="470" y="262" class="kg-s">node key: (block, kept locals, story variables)</text>
+<text x="470" y="278" class="kg-s">segment: MIR executor in story mode between suspensions</text>
+<text x="470" y="294" class="kg-s">worklist tasks: Start · Step(outcome) · Return(exit); W5006 past state_cap</text>
+</svg>

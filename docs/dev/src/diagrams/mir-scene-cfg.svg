@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 300" width="100%" style="max-width:880px" role="img" aria-label="The MIR of the Start scene of the story fixture: blocks ending in step, scene call and random draw terminators split the scene into segments">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2.4}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-head{fill:var(--fg,#333)}
+.kg-t{fill:var(--fg,#333);font-size:12px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+</style>
+<defs><marker id="kg-arrow-mir-scene-cfg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<rect x="14" y="20" width="150" height="48" rx="4" class="kg-hl"/>
+<text x="89" y="39" class="kg-s kg-c">bb0</text>
+<text x="89" y="57" class="kg-t kg-m kg-c">step(promoted#0)</text>
+<rect x="194" y="20" width="150" height="48" rx="4" class="kg-hl"/>
+<text x="269" y="39" class="kg-s kg-c">bb1 · choice!</text>
+<text x="269" y="57" class="kg-t kg-m kg-c">step(promoted#1)</text>
+<rect x="374" y="20" width="150" height="48" rx="4" class="kg-box"/>
+<text x="449" y="39" class="kg-s kg-c">bb2</text>
+<text x="449" y="57" class="kg-t kg-m kg-c">switch_variant(_2)</text>
+<rect x="554" y="20" width="150" height="48" rx="4" class="kg-hl"/>
+<text x="629" y="39" class="kg-s kg-c">bb3 · Stay</text>
+<text x="629" y="57" class="kg-t kg-m kg-c">scene_call Visit()</text>
+<rect x="554" y="100" width="150" height="48" rx="4" class="kg-box"/>
+<text x="629" y="119" class="kg-s kg-c">bb4 · Leave</text>
+<text x="629" y="137" class="kg-t kg-m kg-c">story ROUTE = Leave</text>
+<rect x="734" y="60" width="132" height="48" rx="4" class="kg-box"/>
+<text x="800" y="79" class="kg-s kg-c">bb5–bb10</text>
+<text x="800" y="97" class="kg-t kg-m kg-c">count(); if … s!</text>
+<rect x="734" y="200" width="132" height="48" rx="4" class="kg-hl"/>
+<text x="800" y="219" class="kg-s kg-c">bb11</text>
+<text x="800" y="237" class="kg-t kg-m kg-c">rng::&lt;Coin&gt;()</text>
+<rect x="554" y="200" width="150" height="48" rx="4" class="kg-box"/>
+<text x="629" y="219" class="kg-s kg-c">bb12</text>
+<text x="629" y="237" class="kg-t kg-m kg-c">switch_variant(_10)</text>
+<rect x="374" y="170" width="150" height="48" rx="4" class="kg-hl"/>
+<text x="449" y="189" class="kg-s kg-c">bb13 · Heads</text>
+<text x="449" y="207" class="kg-t kg-m kg-c">step(promoted#3)</text>
+<rect x="374" y="240" width="150" height="48" rx="4" class="kg-hl"/>
+<text x="449" y="259" class="kg-s kg-c">bb14 · Tails</text>
+<text x="449" y="277" class="kg-t kg-m kg-c">step(promoted#4)</text>
+<rect x="194" y="205" width="150" height="48" rx="4" class="kg-box"/>
+<text x="269" y="224" class="kg-s kg-c">bb15</text>
+<text x="269" y="242" class="kg-t kg-m kg-c">Meta::write; return</text>
+<path d="M164,44H192" class="kg-ln" marker-end="url(#kg-arrow-mir-scene-cfg)"/>
+<path d="M344,44H372" class="kg-ln" marker-end="url(#kg-arrow-mir-scene-cfg)"/>
+<path d="M524,44H552" class="kg-ln" marker-end="url(#kg-arrow-mir-scene-cfg)"/>
+<path d="M524,56L552,118" class="kg-ln" marker-end="url(#kg-arrow-mir-scene-cfg)"/>
+<path d="M704,44L732,74" class="kg-ln" marker-end="url(#kg-arrow-mir-scene-cfg)"/>
+<path d="M704,124L732,96" class="kg-ln" marker-end="url(#kg-arrow-mir-scene-cfg)"/>
+<path d="M800,108V198" class="kg-ln" marker-end="url(#kg-arrow-mir-scene-cfg)"/>
+<path d="M734,224H706" class="kg-ln" marker-end="url(#kg-arrow-mir-scene-cfg)"/>
+<path d="M554,218L526,196" class="kg-ln" marker-end="url(#kg-arrow-mir-scene-cfg)"/>
+<path d="M554,232L526,262" class="kg-ln" marker-end="url(#kg-arrow-mir-scene-cfg)"/>
+<path d="M374,196L346,222" class="kg-ln" marker-end="url(#kg-arrow-mir-scene-cfg)"/>
+<path d="M374,264L346,238" class="kg-ln" marker-end="url(#kg-arrow-mir-scene-cfg)"/>
+<rect x="14" y="100" width="22" height="14" rx="3" class="kg-hl"/>
+<text x="44" y="111" class="kg-s">suspension terminator: Step, Rng or SceneCall</text>
+<rect x="14" y="124" width="22" height="14" rx="3" class="kg-box"/>
+<text x="44" y="135" class="kg-s">statements, Goto, SwitchBool, SwitchVariant, Return</text>
+<text x="14" y="164" class="kg-s">Everything between two suspensions is one segment of instant code.</text>
+</svg>

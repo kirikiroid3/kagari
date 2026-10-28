@@ -1,5 +1,6 @@
 //! Bytecode emission (compilation stage 6): the checked program lowered to a
-//! [`kagari_bytecode::Module`]. See `docs/syntax/src/bytecode.md`.
+//! [`kagari_bytecode::Module`]. See `docs/dev/src/compiler/emit.md` and
+//! `docs/dev/src/formats/kagari.md`.
 //!
 //! Code comes from the MIR of each function (`codegen`); constants, statics and promoted
 //! constants come from const evaluation. Only the functions reachable from `main`, the

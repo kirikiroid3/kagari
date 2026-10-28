@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 310" width="100%" style="max-width:940px" role="img" aria-label="The engine's three entry points per frame: input dispatches and settles; update ticks the story, settles, flushes the reactive graph, settles again, fires the timeline's audio and flushes the stores; frame lays out and draws the mounts into a Frame for the renderer">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-head{fill:var(--fg,#333)}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+</style>
+<defs><marker id="kg-arrow-engine-loop" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<rect x="10" y="20" width="86" height="50" rx="4" class="kg-hl"/>
+<text x="53" y="50" class="kg-t kg-c kg-m">input()</text>
+<rect x="112" y="20" width="104" height="50" rx="4" class="kg-box"/>
+<text x="164" y="40" class="kg-t kg-c kg-m">dispatch</text>
+<text x="164" y="58" class="kg-s kg-c">UI, then bindings</text>
+<rect x="230" y="20" width="104" height="50" rx="4" class="kg-box"/>
+<text x="282" y="40" class="kg-t kg-c kg-m">settle</text>
+<text x="282" y="58" class="kg-s kg-c">nav, story input</text>
+<rect x="348" y="20" width="104" height="50" rx="4" class="kg-box"/>
+<text x="400" y="40" class="kg-t kg-c kg-m">flush_heard</text>
+<text x="400" y="58" class="kg-s kg-c">heard set</text>
+<path d="M96,45H110" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
+<path d="M216,45H228" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
+<path d="M334,45H346" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
+<rect x="10" y="110" width="86" height="50" rx="4" class="kg-hl"/>
+<text x="53" y="140" class="kg-t kg-c kg-m">update()</text>
+<rect x="112" y="110" width="104" height="50" rx="4" class="kg-box"/>
+<text x="164" y="130" class="kg-t kg-c kg-m">driver::tick</text>
+<text x="164" y="148" class="kg-s kg-c">auto, skip</text>
+<rect x="230" y="110" width="104" height="50" rx="4" class="kg-box"/>
+<text x="282" y="130" class="kg-t kg-c">HUD shown</text>
+<text x="282" y="148" class="kg-s kg-c">fade state</text>
+<rect x="348" y="110" width="104" height="50" rx="4" class="kg-box"/>
+<text x="400" y="130" class="kg-t kg-c kg-m">settle</text>
+<text x="400" y="148" class="kg-s kg-c">nav, story input</text>
+<rect x="466" y="110" width="104" height="50" rx="4" class="kg-box"/>
+<text x="518" y="130" class="kg-t kg-c kg-m">ui::flush</text>
+<text x="518" y="148" class="kg-s kg-c">dirty computations</text>
+<rect x="584" y="110" width="104" height="50" rx="4" class="kg-box"/>
+<text x="636" y="130" class="kg-t kg-c kg-m">settle</text>
+<text x="636" y="148" class="kg-s kg-c">nav from effects</text>
+<rect x="702" y="110" width="104" height="50" rx="4" class="kg-box"/>
+<text x="754" y="130" class="kg-t kg-c kg-m">screen.tick</text>
+<text x="754" y="148" class="kg-s kg-c">fire audio</text>
+<rect x="820" y="110" width="104" height="50" rx="4" class="kg-box"/>
+<text x="872" y="130" class="kg-t kg-c">flush</text>
+<text x="872" y="148" class="kg-s kg-c">heard, stores</text>
+<path d="M96,135H110" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
+<path d="M216,135H228" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
+<path d="M334,135H346" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
+<path d="M452,135H464" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
+<path d="M570,135H582" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
+<path d="M688,135H700" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
+<path d="M806,135H818" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
+<rect x="10" y="200" width="86" height="50" rx="4" class="kg-hl"/>
+<text x="53" y="230" class="kg-t kg-c kg-m">frame()</text>
+<rect x="112" y="200" width="104" height="50" rx="4" class="kg-box"/>
+<text x="164" y="220" class="kg-t kg-c kg-m">layout::run</text>
+<text x="164" y="238" class="kg-s kg-c">design px</text>
+<rect x="230" y="200" width="104" height="50" rx="4" class="kg-box"/>
+<text x="282" y="220" class="kg-t kg-c">draw mounts</text>
+<text x="282" y="238" class="kg-s kg-c">still, crash</text>
+<rect x="348" y="200" width="104" height="50" rx="4" class="kg-box"/>
+<text x="400" y="220" class="kg-t kg-c kg-m">Frame</text>
+<text x="400" y="238" class="kg-s kg-c">draw list</text>
+<rect x="466" y="200" width="104" height="50" rx="4" class="kg-hl"/>
+<text x="518" y="220" class="kg-t kg-c kg-m">Renderer</text>
+<text x="518" y="238" class="kg-s kg-c kg-m">kagari-render</text>
+<path d="M96,225H110" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
+<path d="M216,225H228" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
+<path d="M334,225H346" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
+<path d="M452,225H464" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
+<text x="10" y="282" class="kg-s">settle(): apply the pending NavOps in FIFO order, then the pending story input while the game is on top; repeat until both are empty.</text>
+<text x="10" y="300" class="kg-s">A trap anywhere in these steps stops the game: the engine enters the Crashed state and later calls do nothing.</text>
+</svg>

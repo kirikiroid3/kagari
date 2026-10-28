@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 250" width="100%" style="max-width:860px" role="img" aria-label="Two choice arms set different backgrounds; the step after the merge can show either">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-warn{fill:var(--quote-bg,#f6f7f6);stroke:#c98a2b;stroke-width:2;stroke-dasharray:6 4}
+.kg-ln{fill:none;stroke:var(--fg,#333);stroke-width:1.2}
+.kg-head{fill:var(--fg,#333)}
+.kg-t{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-w{fill:#c98a2b;font-size:11px}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+.kg-e{text-anchor:end}
+</style>
+<defs><marker id="kg-arrow-presentation-consistency" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="kg-head"/></marker></defs>
+<rect x="262" y="10" width="220" height="36" rx="4" class="kg-box"/>
+<text x="372" y="33" class="kg-t kg-m kg-c">choice!{ id = "where", … }</text>
+<path d="M330,46L202,88" class="kg-ln" marker-end="url(#kg-arrow-presentation-consistency)"/>
+<text x="268" y="64" class="kg-s kg-m kg-e">Where::Roof</text>
+<path d="M414,46L542,88" class="kg-ln" marker-end="url(#kg-arrow-presentation-consistency)"/>
+<text x="478" y="64" class="kg-s kg-m">Where::Classroom</text>
+<rect x="40" y="90" width="280" height="52" rx="4" class="kg-box"/>
+<text x="180" y="112" class="kg-t kg-c">s!(t!["The wind is cold."])</text>
+<text x="180" y="130" class="kg-s kg-m kg-c">background ← BG::ROOF</text>
+<rect x="424" y="90" width="280" height="52" rx="4" class="kg-box"/>
+<text x="564" y="112" class="kg-t kg-c">s!(t!["It's quiet."])</text>
+<text x="564" y="130" class="kg-s kg-m kg-c">background ← BG::CLASSROOM</text>
+<path d="M180,142L318,184" class="kg-ln" marker-end="url(#kg-arrow-presentation-consistency)"/>
+<path d="M564,142L426,184" class="kg-ln" marker-end="url(#kg-arrow-presentation-consistency)"/>
+<rect x="192" y="186" width="360" height="52" rx="4" class="kg-warn"/>
+<text x="372" y="208" class="kg-t kg-c">s!(who = "Azusa", …)</text>
+<text x="372" y="226" class="kg-s kg-m kg-c">background ∈ { ROOF, CLASSROOM }</text>
+<text x="566" y="208" class="kg-w">the compiler reports this step (W5004)</text>
+<text x="566" y="224" class="kg-w">with both paths</text>
+</svg>

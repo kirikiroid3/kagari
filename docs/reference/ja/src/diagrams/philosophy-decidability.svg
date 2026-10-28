@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 290" width="100%" style="max-width:720px" role="img" aria-label="決定不能性はどこから来るか：データが有限なら、有限オートマトンもプッシュダウンシステム（Kagari の物語）も到達可能性は決定可能である。データが非有界なら、カウンタ二つで既に Minsky 機械になり、チューリング完全なコード（Kagari の fn と const fn）には Rice の定理が適用される。決定可能性の境界は、スタックの有無ではなく、データが有限か非有界かを分ける">
+<style>
+.kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
+.kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2.4}
+.kg-bd{fill:none;stroke:var(--links,#2f5d8a);stroke-width:2;stroke-dasharray:7 5}
+.kg-t{fill:var(--fg,#333);font-size:13px;font-weight:bold}
+.kg-h{fill:var(--fg,#333);font-size:13px}
+.kg-s{fill:var(--fg,#333);font-size:11px;opacity:.75}
+.kg-k{fill:var(--links,#2f5d8a);font-size:11px}
+.kg-m{font-family:monospace}
+.kg-c{text-anchor:middle}
+</style>
+<text x="300" y="32" class="kg-h kg-c">有限データ</text>
+<text x="560" y="32" class="kg-h kg-c">非有界データ</text>
+<text x="90" y="100" class="kg-h kg-c">コールスタックなし</text>
+<text x="90" y="198" class="kg-h kg-c">コールスタックあり</text>
+<text x="90" y="216" class="kg-s kg-c">（再帰）</text>
+<rect x="180" y="50" width="240" height="90" rx="4" class="kg-box"/>
+<text x="300" y="84" class="kg-t kg-c">有限オートマトン</text>
+<text x="300" y="104" class="kg-s kg-c">到達可能性は決定可能</text>
+<rect x="440" y="50" width="240" height="90" rx="4" class="kg-box"/>
+<text x="560" y="84" class="kg-t kg-c">2カウンタ機械</text>
+<text x="560" y="104" class="kg-s kg-c">Minsky 機械：既にチューリング完全</text>
+<text x="560" y="122" class="kg-s kg-c">到達可能性は決定不能</text>
+<rect x="180" y="155" width="240" height="90" rx="4" class="kg-hl"/>
+<text x="300" y="189" class="kg-t kg-c">プッシュダウンシステム</text>
+<text x="300" y="209" class="kg-s kg-c">到達可能性は決定可能</text>
+<text x="300" y="227" class="kg-k kg-c">Kagari の物語：<tspan class="kg-m">pushdown fn</tspan></text>
+<rect x="440" y="155" width="240" height="90" rx="4" class="kg-box"/>
+<text x="560" y="189" class="kg-t kg-c">チューリング完全なコード</text>
+<text x="560" y="209" class="kg-s kg-c">Rice の定理が適用される</text>
+<text x="560" y="227" class="kg-k kg-c">Kagari の <tspan class="kg-m">fn</tspan> と <tspan class="kg-m">const fn</tspan></text>
+<path d="M430,42V256" class="kg-bd"/>
+<text x="430" y="276" class="kg-k kg-c">決定可能性の境界</text>
+</svg>

@@ -1,4 +1,5 @@
-//! The story PRNG: xoroshiro128++ seeded by two SplitMix64 outputs (`bytecode.md` §PRNG).
+//! The story PRNG: xoroshiro128++ seeded by two SplitMix64 outputs
+//! (`docs/dev/src/formats/kagari.md#prng`).
 
 /// xoroshiro128++ state.
 #[derive(Clone, Debug, PartialEq, Eq)]
