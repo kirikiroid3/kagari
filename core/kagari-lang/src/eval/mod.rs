@@ -41,7 +41,6 @@ pub use machine::screen::{
     LogicalScreen, PendingChange, PropTarget, Scheduled, ScheduledKind, Screen, ScreenObj,
     StepState, Target,
 };
-pub use num::{Decimal, Rat};
 pub(crate) use num::{int_bits, is_signed};
 pub use queries::{const_value, promoted_value};
 pub use value::{AssetKind, ConstValue, HandleKind, Text, display_value};

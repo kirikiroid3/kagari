@@ -5,11 +5,12 @@
 
 mod build;
 
+use kagari_num::Decimal;
 use la_arena::{Arena, Idx};
 
 use crate::callee::CalleeKind;
 use crate::eval::std_items::Builtin;
-use crate::eval::{ConstValue, Decimal, Text};
+use crate::eval::{ConstValue, Text};
 use crate::hir::{BinaryOp, ClosureKind, ExprId, Literal, PatId, UnaryOp};
 use crate::infer::Coercion;
 use crate::item_tree::ItemId;

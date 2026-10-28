@@ -6,8 +6,9 @@ use rustc_hash::FxHashSet;
 use crate::diagnostic::{Anchor, DiagnosticCode, Owner};
 use crate::ty::{FnRef, GenericArg, Ty, TyKind};
 
+use kagari_num::Rat;
+
 use super::super::Fault;
-use super::super::num::Rat;
 use super::super::std_items::{Builtin, StdTable};
 use super::super::value::{AssetKind, ConstValue, HandleKind, Text};
 use super::anim;

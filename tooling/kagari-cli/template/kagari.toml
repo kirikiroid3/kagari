@@ -11,4 +11,5 @@ dir = "assets"
 
 [build]
 targets = ["v0"]
+runtime-compatibility = ["native_v0"]
 out-dir = "target"

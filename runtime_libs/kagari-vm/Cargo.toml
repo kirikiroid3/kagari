@@ -1,0 +1,15 @@
+[package]
+name = "kagari-vm"
+description = "The Kagari bytecode interpreter: values, fibers, traps, PRNG and the host interface"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+kagari-bytecode = { workspace = true }
+kagari-num = { workspace = true }
+rustc-hash = { workspace = true }
+
+[dev-dependencies]
+kagari-lang = { workspace = true }

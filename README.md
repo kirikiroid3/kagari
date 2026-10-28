@@ -21,4 +21,70 @@ Compiler stages follow [Compilation](docs/syntax/src/compilation.md#pipeline).
 | `kagari-fmt`  | ✅ Done                         | Width-based formatter (max width 100, 4-space indent), backs `kagari fmt` and LSP formatting.                                                           |
 | `kagari-lsp`  | ✅ Done                         | Run by `kagari lsp`: diagnostics, formatting, go to definition, hover, document symbols.                                                                |
 | Editor support | ✅ Done                        | `tooling/tree-sitter-kagari` grammar and the `tooling/zed-kagari` Zed extension.                                                                        |
-| Runtime / VM  | ❌ Not started                  |                                                                                                                                                         |
+| Runtime | ✅ Done | `kagari-vm`, `kagari-engine`, `kagari-text`, `kagari-render` and the `kagari-desktop-runtime` binary (winit + wgpu, kira audio, gilrs gamepads, headless mode). Profile `native_v0`: the whole std except video and shaders. |
+
+## Running a game
+
+Build the game, then point the runtime at the directory `kagari build` wrote:
+
+```sh
+cargo run -p kagari-cli -- build --manifest-path example/test_game1/kagari.toml
+cargo run --release -p kagari-desktop-runtime -- example/test_game1/target/v0
+```
+
+Without `GAME_DIR`, the runtime uses its own directory, so a shipped game puts the executable next to `game.kagari` and the `.kiarchive` files.
+
+Options:
+
+- `--data-dir DIR`: where settings and saves go. By default they go to the platform data directory under `Kagari/<title>`: `~/.local/share/Kagari/<title>` on Linux, `~/Library/Application Support/Kagari/<title>` on macOS, and `Kagari\<title>` in the roaming AppData folder on Windows.
+- `--backend wayland|x11` (Linux only): the window backend. The default is Wayland when `WAYLAND_DISPLAY` is set, else X11.
+
+Building needs these system packages:
+
+- Debian/Ubuntu: `libasound2-dev libudev-dev pkg-config`.
+- Fedora: `alsa-lib-devel systemd-devel`.
+- macOS and Windows: nothing.
+- NixOS: `direnv allow` (or `nix develop`) enters the flake's dev shell.
+
+At run time the runtime needs a Vulkan, Metal, DX12 or GL driver, plus Wayland or X11 and ALSA on Linux.
+
+### Headless mode
+
+`--headless --script FILE --out DIR [--seed N]` runs the game without a window, audio device or gamepads. The clock only moves on `wait`, saves record the fixed time 2026-01-01 00:00:00, every new story uses seed `N` (default 1), and saves go to `DIR/data` unless `--data-dir` is given. The script holds one command per line; blank lines and lines starting with `#` are skipped.
+
+| Command | Action |
+| ------- | ------ |
+| `wait MS` | Advance the clock by `MS` ms, in steps of at most 16 ms, updating the game at each step |
+| `key KEY` | Press and release a key; `KEY` is a `std::system::Key` variant name (`Space`, `Enter`, `A`, `Digit1`, …) |
+| `down KEY` / `up KEY` | Press / release a key |
+| `click X Y` | Move the mouse to design pixel (`X`, `Y`), then press and release the left button |
+| `move X Y` | Move the mouse |
+| `wheel DY` | Scroll by `DY` notches (`> 0` is up) |
+| `capture NAME` | Write the current frame to `DIR/NAME.png` (`NAME`: 1–64 of `A-Z a-z 0-9 _ -`) |
+| `expect-crash` | The game must have stopped with an error. Without it, any command but `capture` after a crash exits 3; with it, they are ignored |
+| `assert-no-crash` | The game must still be running |
+
+| Exit status | Meaning |
+| ----------- | ------- |
+| 0 | Success |
+| 2 | Usage error, no `game.kagari` in the game directory, or the game cannot start |
+| 3 | The game stopped with an error (a VM panic) |
+| 4 | Window or GPU failure |
+| 5 | Headless script error |
+
+Example, for `example/test_game1`:
+
+```sh
+cat > smoke.txt <<'EOF'
+wait 2000
+capture title
+# the title's Start button
+click 285 265
+wait 1000
+capture first-line
+assert-no-crash
+EOF
+kagari-desktop-runtime example/test_game1/target/v0 --headless --script smoke.txt --out shots --seed 1
+```
+
+It writes `shots/title.png` and `shots/first-line.png`; its saves go to `shots/data`.

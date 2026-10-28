@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use kagari_compat::RuntimeProfile;
 use kagari_lang::{CompileOptions, DEFAULT_RECURSION_DEPTH, DEFAULT_STATE_CAP};
 use serde::Deserialize;
 
@@ -17,6 +18,8 @@ pub struct Manifest {
     pub asset_dir: PathBuf,
     /// The targets `kagari build` builds by default; non-empty, without duplicates.
     pub targets: Vec<Target>,
+    /// The runtime profiles whose asset formats kagari build checks; non-empty, without duplicates.
+    pub runtime_compatibility: Vec<RuntimeProfile>,
     /// The output directory, relative to the project root.
     pub out_dir: PathBuf,
     pub options: CompileOptions,
@@ -58,6 +61,7 @@ struct RawAssets {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 struct RawBuild {
     targets: Option<Vec<String>>,
+    runtime_compatibility: Option<Vec<String>>,
     out_dir: Option<String>,
     state_cap: Option<u32>,
     recursion_depth: Option<u32>,
@@ -94,13 +98,38 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
             let mut targets = Vec::new();
             for name in names {
                 let target = Target::parse(&name).ok_or_else(|| {
-                    format!("unknown target `{name}`; supported targets: {}", supported())
+                    format!("unknown target `{name}`; supported targets: {}", supported_targets())
                 })?;
                 if !targets.contains(&target) {
                     targets.push(target);
                 }
             }
             targets
+        }
+    };
+
+    let runtime_compatibility = match raw.build.runtime_compatibility {
+        None => vec![RuntimeProfile::NativeV0],
+        Some(names) => {
+            if names.is_empty() {
+                return Err(
+                    "`build.runtime-compatibility` must name at least one runtime profile"
+                        .to_owned(),
+                );
+            }
+            let mut profiles = Vec::new();
+            for name in names {
+                let profile = RuntimeProfile::parse(&name).ok_or_else(|| {
+                    format!(
+                        "unknown runtime profile `{name}`; supported runtime profiles: {}",
+                        supported_profiles()
+                    )
+                })?;
+                if !profiles.contains(&profile) {
+                    profiles.push(profile);
+                }
+            }
+            profiles
         }
     };
 
@@ -111,6 +140,7 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
         toolchain,
         asset_dir,
         targets,
+        runtime_compatibility,
         out_dir,
         options: CompileOptions {
             state_cap: raw.build.state_cap.unwrap_or(DEFAULT_STATE_CAP),
@@ -129,10 +159,18 @@ fn relative(path: &str, key: &str) -> Result<PathBuf, String> {
     Ok(path.to_path_buf())
 }
 
-fn supported() -> String {
+fn supported_targets() -> String {
     Target::ALL
         .iter()
         .map(|target| target.as_str())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn supported_profiles() -> String {
+    RuntimeProfile::ALL
+        .iter()
+        .map(|profile| profile.as_str())
         .collect::<Vec<_>>()
         .join(", ")
 }

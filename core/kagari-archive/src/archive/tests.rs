@@ -61,6 +61,16 @@ fn base(files: &[(&str, &[u8])]) -> (Header, Vec<u8>) {
 }
 
 #[test]
+fn archive_stems() {
+    assert_eq!(
+        archive_stem("characters/character1/image/normal.png"),
+        "characters"
+    );
+    assert_eq!(archive_stem("bg.png"), "data");
+    assert_eq!(archive_stem("system-fonts/msgothic.ttc"), "system-fonts");
+}
+
+#[test]
 fn non_solid_round_trip() {
     let mut b = ArchiveBuilder::base(ArchiveOptions::default());
     b.add("a.txt", text(10 * 1024)).unwrap();

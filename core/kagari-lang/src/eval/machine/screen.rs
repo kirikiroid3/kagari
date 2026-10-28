@@ -12,8 +12,9 @@ use std::hash::{Hash, Hasher};
 
 use crate::diagnostic::DiagnosticCode;
 
+use kagari_num::Decimal;
+
 use super::super::Fault;
-use super::super::num::Decimal;
 use super::super::std_items::StdTable;
 use super::super::value::ConstValue;
 use super::anim;

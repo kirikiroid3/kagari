@@ -406,6 +406,12 @@ impl<'db> Emitter<'db> {
             ),
             None => (BcFnKind::Fn, 0),
         };
+        // `std::ui::slider` also receives `LO` and `HI` (`codegen/call.rs::slider_call`).
+        let params = if item == self.std.ui_slider {
+            params.saturating_add(2)
+        } else {
+            params
+        };
         let id = ImportId(index(self.module.imports.len()));
         self.module.imports.push(Import { path, kind, params });
         self.imports.insert(item, id);

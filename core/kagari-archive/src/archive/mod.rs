@@ -27,3 +27,12 @@ pub const MAGIC: [u8; 16] = *b"ARCHKAGARI\0\0V000";
 
 /// Length of the fixed header; the index region starts here.
 pub const HEADER_LEN: u64 = 64;
+
+/// The file extension of an archive (`cg.kiarchive`).
+pub const ARCHIVE_EXTENSION: &str = "kiarchive";
+
+/// The archive an asset path belongs to: its first `/`-separated segment, or `data` for a path
+/// without `/`. `characters/a.png` → `characters`, `bg.png` → `data`.
+pub fn archive_stem(path: &str) -> &str {
+    path.split_once('/').map_or("data", |(stem, _)| stem)
+}

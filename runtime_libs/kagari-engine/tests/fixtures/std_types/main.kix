@@ -1,0 +1,222 @@
+// The story fixture of `core/kagari-lang/tests/bytecode/005__story`, plus a value of every std
+// type the engine builds or reads (`probe`), the UI forms, a voiced line and a screen built
+// through the screen imports (`shot`), so that the program interns every type of
+// `values/table.rs`.
+
+use std::narrative::text::text_style;
+use std::screen::size;
+use std::system::default_bindings;
+
+static mut VISITS: Int<0, 3> = 0;
+static mut ROUTE: Route = Route::Stay;
+static SEEN_END: Meta<bool> = meta(false);
+
+enum Route {
+    Stay,
+    Leave,
+}
+
+enum Coin {
+    Heads,
+    Tails,
+}
+
+const HERO: EntityId = EntityId(1);
+const A_IMG: ImageAsset = asset("a.png");
+const A_SND: AudioAsset = asset("a.ogg");
+const V: VoiceAsset = asset("v.ogg");
+const M: VideoAsset = asset("m.webm");
+
+#[scene]
+#[entry]
+pushdown fn Start() {
+    s!(t!["It begins."]);
+    s!(voice = V, t!["Hello."]);
+    let route = choice!{
+        id = "route",
+        render = |mut screen| {
+            screen.entity(HERO).opacity().change(0.5).apply_animation(instant());
+            screen
+        },
+        t!["Stay"] => Route::Stay,
+        t!["Leave"] => Route::Leave,
+    };
+    match route {
+        Route::Stay => Visit(),
+        Route::Leave => ROUTE = Route::Leave,
+    }
+    count();
+    if VISITS > 0 && ROUTE == Route::Stay {
+        s!(t!["Welcome back."]);
+    }
+    match rng_choose::<Coin>() {
+        Coin::Heads => s!(t!["Heads."]),
+        Coin::Tails => s!(t!["Tails."]),
+    }
+    SEEN_END.write(true);
+}
+
+#[scene]
+pushdown fn Visit() {
+    s!(t!["You stay a while."]);
+}
+
+pushdown fn count() {
+    VISITS += 1;
+}
+
+fn keep<T>(_v: T) {}
+
+/// A screen built through the screen and audio imports.
+fn shot() -> Screen {
+    let mut screen = Screen::empty();
+    screen.entity(HERO).opacity().change(0.5).apply_animation(std::screen::anim::tween(ms(100)));
+    screen.entity(HERO).image().change(A_IMG).apply_animation(std::screen::anim::fade(ms(200)));
+    screen.entity(HERO).set_z(3);
+    screen.wait(ms(50));
+    screen.music().change(std::screen::audio::looped(A_SND)).apply_animation(std::screen::audio::crossfade(ms(300)));
+    screen.play(std::screen::audio::sound(A_SND).delay(ms(10)));
+    screen
+}
+
+fn probe() {
+    keep(shot());
+    let r: Result<i32, bool> = Ok(1);
+    keep(r);
+    keep(Some(1));
+    keep(ms(1));
+    keep(std::screen::Part(1));
+    keep(std::screen::point(1, 2));
+    keep(std::screen::offset(1, 2));
+    keep(std::screen::Insets { top: 0, right: 0, bottom: 0, left: 0 });
+    keep(std::screen::CENTER);
+    keep(std::screen::degrees(1.0));
+    keep(std::screen::Plane::Front);
+    keep(std::screen::Visibility::Hidden);
+    keep(std::screen::Flip::Both);
+    keep(std::screen::VAlign::Top);
+    keep(std::screen::BlendMode::Add);
+    keep(std::screen::movie(M));
+    keep(std::screen::anim::Easing::OutQuad);
+    keep(std::screen::anim::Direction::Left);
+    keep(std::screen::anim::TransitionKind::Crossfade);
+    keep(std::screen::anim::fade(ms(1)));
+    keep(std::screen::anim::shake(1, ms(100), 1));
+    keep(std::screen::anim::tween(ms(1)));
+    keep(std::screen::audio::looped(A_SND));
+    keep(std::screen::audio::sound(A_SND));
+    keep(std::screen::audio::crossfade(ms(1)));
+    keep(std::narrative::text::Mark(1));
+    keep(std::narrative::text::Weight::Bold);
+    keep(std::narrative::text::Emphasis::Dots);
+    keep(std::narrative::text::Reveal::Instant);
+    keep(std::narrative::text::Pause::Click);
+    keep(std::narrative::text::outline(WHITE, 1));
+    keep(std::narrative::text::shadow(WHITE, std::screen::offset(1, 1), 1));
+    keep(std::narrative::text::TextAlign::Center);
+    keep(std::narrative::text::EmphasisStyle::Bold);
+    keep(text_style(20, WHITE));
+    keep(std::narrative::Line { who: None, text: None, voice: None, read: false });
+    keep(std::narrative::MenuArm { text: t!["a"], arm: None });
+    keep(std::narrative::Menu { arms: Vec::new(), align: std::screen::VAlign::Top });
+    keep(std::narrative::HudState {
+        text_window: std::screen::Visibility::Shown,
+        quick_menu: std::screen::Visibility::Shown,
+        side_image: None,
+    });
+    keep(std::narrative::Entry::Chosen(t!["a"]));
+    keep(std::narrative::PlayMode::Auto);
+    keep(volume(5));
+    keep(std::system::Overlay(std::ui::spacer()));
+    keep(std::system::GameOverlay(std::ui::spacer()));
+    keep(std::system::Dialog(std::ui::spacer()));
+    keep(std::system::saves::SaveSlot::Quick);
+    keep(std::system::saves::SaveInfo {
+        time: std::system::saves::Timestamp { year: 2026, month: 1, day: 1, hour: 0, minute: 0, second: 0 },
+        who: None,
+        text: None,
+    });
+    keep(std::ui::Align::Center);
+    keep(std::ui::Fit::Cover);
+    keep(std::ui::style::SliderStyle {
+        track: std::ui::style::Paint::None,
+        fill: std::ui::style::Paint::Color(WHITE),
+        thumb: std::ui::style::Paint::Image(A_IMG),
+        thumb_size: size(1, 1),
+    });
+    keep(std::ui::style::button_style(std::ui::style::Look {
+        background: std::ui::style::Paint::NineSlice {
+            image: A_IMG,
+            insets: std::screen::Insets { top: 1, right: 1, bottom: 1, left: 1 },
+        },
+        text: text_style(20, WHITE),
+    }));
+}
+
+static TEXT_SPEED: Setting<Duration> = setting(ms(30));
+static AUTO_DELAY: Setting<Duration> = setting(ms(1300));
+static AUTO_DELAY_PER_CHAR: Setting<Duration> = setting(ms(60));
+static SKIP_UNREAD: Setting<bool> = setting(false);
+static MASTER: Setting<Volume> = setting(volume(100));
+static MUSIC: Setting<Volume> = setting(volume(60));
+static SOUND: Setting<Volume> = setting(volume(100));
+static VOICE: Setting<Volume> = setting(volume(100));
+static VOICE_SUSTAIN: Setting<bool> = setting(false);
+static WAIT_FOR_VOICE: Setting<bool> = setting(true);
+static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
+static FULLSCREEN: Setting<bool> = setting(false);
+static ANIMATIONS: Setting<bool> = setting(true);
+const FONT: FontAsset = asset("font.ttf");
+
+fn main() -> System {
+    probe();
+    System {
+        title: "Story",
+        resolution: size(1280, 720),
+        start: Title,
+        game: GameView,
+        save_slots: 20,
+        auto_slots: 3,
+        backlog: 200,
+        font: FONT,
+        text: text_style(26, WHITE),
+        settings: Settings {
+            text_speed: TEXT_SPEED,
+            auto_delay: AUTO_DELAY,
+            auto_delay_per_char: AUTO_DELAY_PER_CHAR,
+            skip_unread: SKIP_UNREAD,
+            master: MASTER,
+            music: MUSIC,
+            sound: SOUND,
+            voice: VOICE,
+            voice_sustain: VOICE_SUSTAIN,
+            wait_for_voice: WAIT_FOR_VOICE,
+            window_opacity: WINDOW_OPACITY,
+            fullscreen: FULLSCREEN,
+            animations: ANIMATIONS,
+        },
+        bindings: default_bindings(),
+    }
+}
+
+fn Title() -> RootPage {
+    RootPage(column![
+        button!{on_click = || nav::start(Start, (), |_end| ()), t!["Start"]},
+        text!(t!["Title"]),
+        slider!{value = MASTER.get().level},
+        toggle!{value = FULLSCREEN.get(), t!["Full"]},
+        select!{
+            value = FULLSCREEN.get(),
+            std::ui::option(true, std::ui::label(t!["On"])),
+            std::ui::option(false, std::ui::label(t!["Off"])),
+        },
+        layer![
+            image!(fit = std::ui::Fit::Cover, A_IMG).cover(),
+            image!(fit = std::ui::Fit::Natural, A_IMG).at(std::screen::point(0, 0), std::screen::TOP_LEFT),
+        ],
+    ])
+}
+
+fn GameView(game: Narrative) -> Element {
+    game_screen!(game = game)
+}

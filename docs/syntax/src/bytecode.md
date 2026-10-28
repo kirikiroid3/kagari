@@ -103,7 +103,12 @@ LOAD, STORE, REFFIELD and REFINDEX on a host part panic: host parts are only pas
 imports.
 
 Value operands **auto-deref**: a reference is followed through every reference stored at its
-target, and the final value is read. Operands marked *raw* are taken as they are.
+target, and the final value is read. Operands marked *raw* are taken as they are, so a reference
+can be stored in a field, an element, a cell or an argument.
+
+References to references collapse. STORE, REFFIELD, REFINDEX, VECSET and VECPUSH first follow
+every reference stored along the path or at the target, so they act on the place at the end of
+the chain: a STORE through a reference to a cell that holds a reference writes the pointee.
 
 ## Instructions
 
@@ -137,18 +142,18 @@ decode error.
 | `0x50` | JMP | 2 | x=target | |
 | `0x51` | JMPIF | 2 | a=cond, x=target | |
 | `0x52` | JMPNOT | 2 | a=cond, x=target | |
-| `0x53` | RET | 1 | a (raw) | return |
+| `0x53` | RET | 1 | a (raw) | return; `Uninit` panics |
 | `0x54` | UNREACHABLE | 1 | — | panic |
 | `0x60` | CALL | 2 | a=dst, b=first arg, c=argc, x=function | arguments are the raw registers `b..b+c` |
-| `0x61` | CALLIMP | 2 | a, b, c, x=import | host call |
-| `0x62` | CALLVAL | 2 | a, b, c, x = callee register (bits 0–15) \| expected kind (bits 16–23) | the callee is a FUNC value or a closure; panics if its kind differs |
-| `0x63` | CLOSURE | 2 | a=dst, b=first capture, c=count, x=function | captures are copied by value |
+| `0x61` | CALLIMP | 2 | a, b, c, x=import | host call; arguments are the raw registers `b..b+c` |
+| `0x62` | CALLVAL | 2 | a, b, c, x = callee register (bits 0–15) \| expected kind (bits 16–23) | the callee is a FUNC value or a closure; arguments are raw; panics if its kind differs |
+| `0x63` | CLOSURE | 2 | a=dst, b=first capture, c=count, x=function | captures are raw registers, copied by value |
 | `0x70` | STEP | 1 | a=dst, b=step record | suspend until input; scenes only |
 | `0x71` | RAND | 2 | a=dst, x = kind (bits 32–39: 0 enum, 1 int) \| index (bits 0–31: type or int type) | PRNG draw; scenes only |
-| `0x80` | TUPLE | 1 | a, b=first, c=count | |
-| `0x81` | ARRAY | 1 | a, b, c | |
-| `0x82` | REPEAT | 2 | a, b=value, x=count (u64) | `[v; n]` |
-| `0x83` | ADT | 2 | a, b, c=count, x = type (bits 0–31) \| variant (bits 32–63) | struct or variant value |
+| `0x80` | TUPLE | 1 | a, b=first, c=count | elements are raw |
+| `0x81` | ARRAY | 1 | a, b, c | elements are raw |
+| `0x82` | REPEAT | 2 | a, b=value (raw), x=count (u64) | `[v; n]` |
+| `0x83` | ADT | 2 | a, b, c=count, x = type (bits 0–31) \| variant (bits 32–63) | struct or variant value; fields are raw |
 | `0x84` | FIELD | 1 | a, b, c=field index (immediate) | Tuple or Adt field |
 | `0x85` | ISVAR | 2 | a, b, x = type \| variant << 32 | bool: `b` is that variant |
 | `0x86` | INDEX | 1 | a, b=array or Vec, c=index | panics when out of range |
@@ -189,6 +194,10 @@ instruction when one exists, and otherwise a host call:
 
 An import's `kind` is the builtin's kind (a `pushdown fn` is instant), and its `params` count
 includes `self`.
+
+One import also receives generic arguments: `std::ui::slider::<LO, HI>(props)` is a CALLIMP with
+three arguments, `props` then `LO` and `HI` as `Int`s (each loaded by INT), and its import's
+`params` is 3.
 
 ## Verification
 
@@ -252,7 +261,19 @@ Compound assignment on `Int<lo, hi>` saturates (ICLAMP); that is defined behavio
 ## PRNG
 
 The story PRNG is xoroshiro128++. Its state is `(s0, s1)`, two `u64`, seeded from a `u64` seed by
-two SplitMix64 outputs. All arithmetic wraps.
+two SplitMix64 outputs: `s0` is the first output and `s1` the second. SplitMix64's state `x`
+starts at the seed. All arithmetic wraps.
+
+```text
+splitmix64():
+    x += 0x9E3779B97F4A7C15
+    z = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9
+    z = (z ^ (z >> 27)) * 0x94D049BB133111EB
+    return z ^ (z >> 31)
+```
+
+For seed 0, `(s0, s1)` is `(0xE220A8397B1DCDAF, 0x6E789E6AA1B965F4)`, and the first `next()` is
+`0x6F68E1E7E2646EE1`.
 
 ```text
 next():

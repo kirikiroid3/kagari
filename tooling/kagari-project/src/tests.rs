@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+use kagari_compat::RuntimeProfile;
 use kagari_lang::CompileOptions;
 
 use crate::{MANIFEST_FILE, Project, ProjectError, Target, parse_manifest};
@@ -25,6 +26,7 @@ fn minimal_manifest_gets_defaults() {
     assert_eq!(manifest.targets, [Target::V0]);
     assert_eq!(manifest.out_dir, PathBuf::from("target"));
     assert_eq!(manifest.options, CompileOptions::default());
+    assert_eq!(manifest.runtime_compatibility, [RuntimeProfile::NativeV0]);
 }
 
 #[test]
@@ -47,6 +49,34 @@ fn unknown_targets_are_rejected() {
 fn duplicate_targets_are_removed() {
     let text = format!("{MINIMAL}\n[build]\ntargets = [\"v0\", \"v0\"]\n");
     assert_eq!(parse_manifest(&text).unwrap().targets, [Target::V0]);
+}
+
+#[test]
+fn unknown_runtime_profiles_are_rejected() {
+    let text = format!("{MINIMAL}\n[build]\nruntime-compatibility = [\"web_v0\"]\n");
+    assert_eq!(
+        parse_manifest(&text).unwrap_err(),
+        "unknown runtime profile `web_v0`; supported runtime profiles: native_v0"
+    );
+}
+
+#[test]
+fn empty_runtime_compatibility_is_rejected() {
+    let text = format!("{MINIMAL}\n[build]\nruntime-compatibility = []\n");
+    assert_eq!(
+        parse_manifest(&text).unwrap_err(),
+        "`build.runtime-compatibility` must name at least one runtime profile"
+    );
+}
+
+#[test]
+fn duplicate_runtime_profiles_are_removed() {
+    let text =
+        format!("{MINIMAL}\n[build]\nruntime-compatibility = [\"native_v0\", \"native_v0\"]\n");
+    assert_eq!(
+        parse_manifest(&text).unwrap().runtime_compatibility,
+        [RuntimeProfile::NativeV0]
+    );
 }
 
 #[test]

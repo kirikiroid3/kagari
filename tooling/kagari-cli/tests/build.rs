@@ -3,6 +3,7 @@
 mod common;
 
 use std::fs::File;
+use std::path::Path;
 
 use common::{game, init_project, kagari, stderr};
 use kagari_archive::archive::Archive;
@@ -97,5 +98,71 @@ fn unlisted_targets_are_rejected() {
         stderr(&output).contains("target `v1` is not listed in `build.targets`"),
         "{}",
         stderr(&output)
+    );
+}
+
+/// Declares `decl` in the template's src/main.kis and evaluates `expr` in `main`, so the bytecode
+/// references the asset.
+fn use_asset(dir: &Path, decl: &str, expr: &str) {
+    let main = dir.join("src/main.kis");
+    let source = std::fs::read_to_string(&main).unwrap();
+    let marker = "fn main() -> System {";
+    assert!(source.contains(marker), "{source}");
+    let source = source.replace(
+        marker,
+        &format!("{decl}\n\nfn main() -> System {{\n    let _ = {expr};"),
+    );
+    std::fs::write(&main, source).unwrap();
+}
+
+/// Writes `bytes` to `assets/{path}`, makes `main` reference it, builds, and checks that the
+/// build fails with `expected` on stderr and writes no bytecode.
+fn rejected(path: &str, bytes: &[u8], decl: &str, expr: &str, expected: &str) {
+    let tmp = init_project();
+    let dir = game(&tmp);
+    let file = dir.join("assets").join(path);
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    std::fs::write(&file, bytes).unwrap();
+    use_asset(&dir, decl, expr);
+    let output = kagari(&["build"], &dir);
+    assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
+    assert!(stderr(&output).contains(expected), "{}", stderr(&output));
+    assert!(!dir.join("target/v0/game.kagari").exists());
+}
+
+#[test]
+fn incompatible_image_formats_fail_the_build() {
+    rejected(
+        "bgimage/bad.jxl",
+        &[0xFF, 0x0A, 0x00, 0x00],
+        "const BAD: ImageAsset = asset(\"bgimage/bad.jxl\");",
+        "std::system::seen_image(BAD)",
+        "error: asset `bgimage/bad.jxl` (image): JPEG XL is not supported by runtime profile `native_v0`",
+    );
+}
+
+#[test]
+fn incompatible_audio_formats_fail_the_build() {
+    let mut ogg = b"OggS\x00\x02".to_vec();
+    ogg.extend_from_slice(&[0; 20]);
+    ogg.extend_from_slice(&[0x01, 0x13]);
+    ogg.extend_from_slice(b"OpusHead\x01\x02\x38\x01\x80\xBB\x00\x00\x00\x00\x00");
+    rejected(
+        "music/theme.ogg",
+        &ogg,
+        "const THEME: AudioAsset = asset(\"music/theme.ogg\");",
+        "std::system::heard(THEME)",
+        "error: asset `music/theme.ogg` (audio): Ogg Opus is not supported by runtime profile `native_v0`",
+    );
+}
+
+#[test]
+fn video_assets_fail_the_build() {
+    rejected(
+        "movie/intro.webm",
+        &[0x1A, 0x45, 0xDF, 0xA3],
+        "const INTRO: VideoAsset = asset(\"movie/intro.webm\");",
+        "std::system::watched(INTRO)",
+        "error: asset `movie/intro.webm` (video): video assets are not supported by runtime profile `native_v0`",
     );
 }

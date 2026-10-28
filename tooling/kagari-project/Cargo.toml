@@ -6,6 +6,7 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
+kagari-compat = { workspace = true }
 kagari-lang = { workspace = true }
 serde = { workspace = true }
 toml = { workspace = true }

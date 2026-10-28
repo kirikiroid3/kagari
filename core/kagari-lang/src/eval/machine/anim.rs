@@ -6,8 +6,9 @@ use std::cmp::Ordering;
 
 use crate::diagnostic::DiagnosticCode;
 
+use kagari_num::Decimal;
+
 use super::super::Fault;
-use super::super::num::Decimal;
 use super::super::std_items::{AdtInfo, StdTable};
 use super::super::value::ConstValue;
 

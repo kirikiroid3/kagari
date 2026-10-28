@@ -1,0 +1,15 @@
+[package]
+name = "kagari-render"
+description = "The wgpu compositor for the Kagari engine's Frame draw list"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+kagari-bytecode = { workspace = true }
+kagari-engine = { workspace = true }
+kagari-text = { workspace = true }
+wgpu = { workspace = true }
+bytemuck = { workspace = true }
+log = { workspace = true }

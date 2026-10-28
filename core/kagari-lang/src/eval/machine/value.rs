@@ -7,7 +7,8 @@ use crate::mir::MirSource;
 use crate::signatures::{ItemSig, ProgramSignatures};
 use crate::ty::{Const, FnRef, GenericArg, GenericArgs, IntTy, Ty, TyKind};
 
-use super::super::num::{Decimal, Rat};
+use kagari_num::{Decimal, Rat};
+
 use super::super::value::{AssetKind, HandleKind, Text};
 use super::Place;
 use super::screen::{PendingChange, Screen};

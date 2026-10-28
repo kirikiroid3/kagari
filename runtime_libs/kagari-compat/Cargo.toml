@@ -1,0 +1,9 @@
+[package]
+name = "kagari-compat"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+kagari-bytecode = { workspace = true }

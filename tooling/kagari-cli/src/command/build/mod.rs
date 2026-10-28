@@ -1,6 +1,7 @@
 //! `kagari build`: the project's bytecode and asset archives, per target.
 
 mod archives;
+mod compat;
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -30,6 +31,14 @@ pub fn run(manifest_path: Option<&Path>, targets: &[String]) -> Result<ExitCode,
     let (Some(module), Some(bytes)) = (result.module, result.bytes) else {
         return Ok(exit(true));
     };
+    if compat::check(
+        &module,
+        &result.asset_files,
+        &project.manifest.runtime_compatibility,
+    )? > 0
+    {
+        return Ok(exit(true));
+    }
 
     for target in targets {
         let dir = project.out_dir(target);
@@ -70,7 +79,7 @@ fn remove_outputs(dir: &Path) -> Result<(), Failure> {
         let stale = path.file_name().is_some_and(|name| name == BYTECODE_FILE)
             || path
                 .extension()
-                .is_some_and(|ext| ext == archives::EXTENSION);
+                .is_some_and(|ext| ext == kagari_archive::archive::ARCHIVE_EXTENSION);
         if stale && path.is_file() {
             std::fs::remove_file(&path).map_err(|error| io(&path, error))?;
         }

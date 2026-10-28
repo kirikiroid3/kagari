@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{self, Read, Seek};
 use std::path::{Path, PathBuf};
 
-use super::Error;
+use super::{ARCHIVE_EXTENSION, Error};
 use super::index::{ArchiveIndex, FileLoc, Lookup};
 use super::read::{Archive, BlockCache, read_loc};
 
@@ -118,9 +118,10 @@ pub fn patch_path(base: &Path, n: u32) -> Option<PathBuf> {
     let stem = base
         .file_name()?
         .to_str()?
-        .strip_suffix(".kiarchive")
+        .strip_suffix(ARCHIVE_EXTENSION)?
+        .strip_suffix('.')
         .filter(|stem| !stem.is_empty())?;
-    Some(base.with_file_name(format!("{stem}.{n:03}.kiarchive")))
+    Some(base.with_file_name(format!("{stem}.{n:03}.{ARCHIVE_EXTENSION}")))
 }
 
 /// Opens `base` and its patches 1, 2, … up to the first missing one.

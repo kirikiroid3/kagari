@@ -385,6 +385,8 @@ pub struct StdTable {
     pub meta: ItemId,
     pub push_step: ItemId,
     pub rng_choose: ItemId,
+    /// `std::ui::slider`, whose import also takes its `LO` and `HI`.
+    pub ui_slider: ItemId,
     /// The std file `time.kis`, whose integer overflows are `Duration` overflows.
     pub time_file: SourceFile,
     pub assets: Vec<(ItemId, AssetKind)>,
@@ -520,6 +522,7 @@ pub fn std_table(db: &dyn Db, program: Program) -> Option<StdTable> {
         meta: find("narrative.kis", "Meta")?,
         push_step: find("narrative.kis", "push_step")?,
         rng_choose: find("narrative.kis", "rng_choose")?,
+        ui_slider: find("ui.kis", "slider")?,
         time_file: *std_files.get("time.kis")?,
         assets,
         builtins,

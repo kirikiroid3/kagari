@@ -7,6 +7,7 @@ edition.workspace = true
 
 [dependencies]
 kagari-bytecode = { workspace = true }
+kagari-num = { workspace = true }
 kagari-syntax = { workspace = true }
 kagari-std = { workspace = true }
 rowan = { workspace = true }

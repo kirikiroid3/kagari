@@ -9,8 +9,9 @@ use crate::input::FilePath;
 use crate::item_tree::{ItemId, ItemKind, Shape, item_tree};
 use crate::ty::{FnDefId, FnRef};
 
+use kagari_num::{Decimal, Rat};
+
 use super::machine::screen::Screen;
-use super::num::{Decimal, Rat};
 
 /// A fully evaluated value. Plain data: no references, no captured environments.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

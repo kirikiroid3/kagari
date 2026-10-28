@@ -1,0 +1,29 @@
+[package]
+name = "kagari-desktop-runtime"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "kagari-desktop-runtime"
+path = "src/main.rs"
+
+[dependencies]
+kagari-archive = { workspace = true }
+kagari-engine = { workspace = true }
+kagari-render = { workspace = true }
+wgpu = { workspace = true }
+winit = { workspace = true }
+kira = { workspace = true }
+gilrs = { workspace = true }
+directories = { workspace = true }
+pollster = { workspace = true }
+clap = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+png = { workspace = true }
+jiff = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

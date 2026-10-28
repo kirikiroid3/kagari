@@ -64,3 +64,31 @@ fn unreachable_functions_are_not_emitted() {
     assert!(emitted.contains(&"crate::Visit"), "{emitted:?}");
     assert!(!emitted.contains(&"crate::unused"), "{emitted:?}");
 }
+
+/// `std::ui::slider::<LO, HI>` receives its range: the import takes `props`, `LO` and `HI`.
+#[test]
+fn slider_import_takes_its_range() {
+    let source = include_str!("../../tests/game_source/ui/001__system/main.kix").replace(
+        "fn main() -> System {",
+        "fn main() -> System {\n    let _ = Config;",
+    );
+    let mut files = FxHashMap::default();
+    files.insert(PathBuf::from("/game/main.kix"), source);
+    files.insert(PathBuf::from("/game/font.ttf"), String::new());
+    let db = RootDatabase::new(Arc::new(MemoryFileSystem(files)));
+    let program = db.program(FilePath::disk("/game/main.kix"));
+    let result = build(&db, program);
+    let module = result.module.as_ref().unwrap_or_else(|| {
+        panic!(
+            "{}",
+            crate::render_diagnostics(&db, &result.diagnostics, None)
+        )
+    });
+    let slider = module
+        .imports
+        .iter()
+        .find(|import| module.strings[import.path.0 as usize] == "std::ui::slider")
+        .expect("the slider import is emitted");
+    assert_eq!(slider.params, 3);
+    assert_eq!(kagari_bytecode::verify(module), Ok(()));
+}

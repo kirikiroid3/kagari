@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 kagari-archive = { workspace = true }
 kagari-bytecode = { workspace = true }
+kagari-compat = { workspace = true }
 kagari-fmt = { workspace = true }
 kagari-lang = { workspace = true }
 kagari-lsp = { workspace = true }

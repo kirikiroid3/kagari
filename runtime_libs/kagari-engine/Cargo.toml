@@ -1,0 +1,21 @@
+[package]
+name = "kagari-engine"
+description = "The Kagari engine: std host imports, screen model, timeline, audio model, UI and story driver"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+kagari-bytecode = { workspace = true }
+kagari-vm = { workspace = true }
+kagari-text = { workspace = true }
+image = { workspace = true }
+log = { workspace = true }
+kagari-archive = { workspace = true }
+sha2 = { workspace = true }
+png = { workspace = true }
+
+[dev-dependencies]
+kagari-lang = { workspace = true }
+rustc-hash = { workspace = true }

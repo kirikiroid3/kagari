@@ -4,13 +4,13 @@
 use kagari_bytecode::{CmpOp, FnKind as BcFnKind, Instr, IntUnOp, RandDomain};
 use smallvec::SmallVec;
 
-use crate::eval::machine::value::{GenericEnv, subst_fn_ref, subst_ty};
+use crate::eval::machine::value::{GenericEnv, subst_const, subst_fn_ref, subst_ty};
 use crate::eval::std_items::Builtin;
 use crate::eval::{AssetKind, ConstValue, Text};
 use crate::hir::{ClosureKind, ExprId, FnPtrKind};
 use crate::item_tree::ItemId;
 use crate::mir::{Callee, ConstOperand, Operand, Place};
-use crate::ty::{FnDefId, FnRef, GenericArg, Ty, TyKind};
+use crate::ty::{Const, FnDefId, FnRef, GenericArg, Ty, TyKind};
 
 use super::super::{Emitter, Instance, int_type_of};
 use super::place::is_ref;
@@ -196,6 +196,11 @@ impl FnCodegen<'_, '_> {
             self.emit(Instr::Rand { dst: d, domain });
             return;
         }
+        if item == std.ui_slider {
+            let instr = self.slider_call(item, fn_ref, args, dst);
+            self.emit(instr);
+            return;
+        }
         let instr = match builtin {
             Builtin::Asset => {
                 let asset_item = match fn_ref.args.last() {
@@ -352,6 +357,34 @@ impl FnCodegen<'_, '_> {
         }
     }
 
+    /// `std::ui::slider::<LO, HI>(props)`: the import receives `props`, then `LO` and `HI` as
+    /// `Int`s, because imports carry no generic arguments. The three arguments are placed in
+    /// fresh consecutive scratch registers, so `import_call` never moves one over another.
+    fn slider_call(&mut self, item: ItemId, fn_ref: &FnRef, args: &[R], dst: R) -> Instr {
+        let mut window: SmallVec<[R; 3]> = SmallVec::new();
+        for arg in args {
+            let slot = self.temp();
+            self.mov(slot, *arg);
+            window.push(slot);
+        }
+        for arg in fn_ref.args.iter().take(2) {
+            let value = match arg {
+                GenericArg::Const(value) => match subst_const(value, &self.env) {
+                    Const::Value(value) => i64::try_from(value).unwrap_or(0),
+                    _ => 0,
+                },
+                GenericArg::Type(_) => 0,
+            };
+            let bound = self.temp();
+            self.emit(Instr::Int {
+                dst: reg(bound),
+                value,
+            });
+            window.push(bound);
+        }
+        self.import_call(item, &window, dst)
+    }
+
     /// What `RAND` draws for a value of the type `arg`: a fieldless enum or an `Int<lo, hi>`.
     pub(super) fn rand_domain(&mut self, arg: Option<&GenericArg>) -> Option<RandDomain> {
         let Some(GenericArg::Type(ty)) = arg else {
@@ -430,7 +463,11 @@ pub(super) fn builtin_body(em: &mut Emitter<'_>, instance: &Instance, fn_ref: &F
     match cg.em.std.builtin(item) {
         Some(builtin) => cg.builtin(item, builtin, fn_ref, &args, dst, &ret, None),
         None => {
-            let instr = cg.import_call(item, &args, dst);
+            let instr = if item == cg.em.std.ui_slider {
+                cg.slider_call(item, fn_ref, &args, dst)
+            } else {
+                cg.import_call(item, &args, dst)
+            };
             cg.emit(instr);
         }
     }
