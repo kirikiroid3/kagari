@@ -25,3 +25,5 @@ rustc-ice-*.txt
 
 omp-session-*
 .direnv/
+
+example/test_game1
