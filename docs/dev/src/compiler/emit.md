@@ -68,7 +68,7 @@ flowchart LR
 | `types` | `type_id` | Every ADT the code or a constant mentions: path, `is_enum`, variant names, field names (`None` for positional) |
 | `int_types` | `int_type` | `(lo, hi, bits, signed)` of every integer type an instruction checks against; entry 0 is always `i128` |
 | `imports` | `import` | Host functions: std path, kind (`fn`, `const fn`, instant), parameter count (`self` included; `std::ui::slider` + 2) |
-| `assets` | `asset` | Kind and path of every asset a constant or `asset("…")` names, relative to the asset root (system fonts under `system-fonts/`); `Build::asset_files` holds the source file of each |
+| `assets` | `asset` | Kind and path of every asset a constant or `asset("…")` names, relative to the asset root (system fonts under `system-fonts/`, std assets under `std/`); `Build::asset_files` holds the source file of each, `Build::shader_roles` the `ShaderRole` of each shader (one entry per role a file is used as) |
 | `constants` | `constant`, `text` | Every non-immediate value; children interned first, so a constant refers only to lower indices |
 | `statics` | `statics` | Game story variables, then the `Setting`/`Meta` handles of the game and std, each with its initial value |
 | `functions` | `request`, `run` | Path, kind, flags (`entry`, `main`, `closure`, `synthetic`), `params`, `regs`, code |
@@ -207,7 +207,8 @@ exists, otherwise a host call:
 | ------- | ----------- |
 | `push_step` | `STEP dst, record` |
 | `rng_choose::<T>` | `RAND dst, domain`: `Enum(type)` for a fieldless enum, `Int(int type)` for `Int<lo, hi>` |
-| `asset::<A>("…")`, `system_font("…")` with a constant path | `CONST` of an `Asset` constant (the path resolved against the asset root or the system font directories); otherwise an import call |
+| `asset::<A>("…")`, `system_font("…")` with a constant path | `CONST` of an `Asset` constant (the path resolved against the asset root, the system font directories, or, for a call in a std file, the std directory: `FilePath::Std`); otherwise an import call |
+| `screen::shader::erase_shader`, `erase_args` | `MOVE` (they only forget a type) |
 | `Vec::new`, `len`, `get`, `set`, `push` | `VECNEW`, `LEN`, `VECGET` (with the `Option` type), `VECSET`, `VECPUSH` |
 | `Vec::is_empty` | `LEN`, `INT 0`, `EQ` |
 | `Integer::into` | `MOVE` |

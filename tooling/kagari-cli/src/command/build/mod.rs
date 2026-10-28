@@ -2,6 +2,7 @@
 
 mod archives;
 mod compat;
+mod shaders;
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -37,6 +38,9 @@ pub fn run(manifest_path: Option<&Path>, targets: &[String]) -> Result<ExitCode,
         &project.manifest.runtime_compatibility,
     )? > 0
     {
+        return Ok(exit(true));
+    }
+    if shaders::check(&module, &result.asset_files, &result.shader_roles)? {
         return Ok(exit(true));
     }
 

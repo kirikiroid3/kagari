@@ -4,7 +4,7 @@
 
 レンダーが画面に加える変更は、すべてアニメーションを明示します。このモジュールはその値を宣言します。[`Easing`](#easing) は時間曲線、[`Tween`](#tween) は `Prop` の変更用、[`Transition`](#transition) はレイヤーの差し替え用、[`Motion`](#motion) はエンティティやカメラにかける相対的な軌跡です。いつ始まるかは [`Screen`](./screen.md#timeline-methods) のタイムラインメソッドが決めます。アイテムはすべて `const fn` か単純なデータです。
 
-プレリュードは `Easing`、`Tween`、`Transition`、`Motion`、`tween`、`instant`、`cut`、`fade`、`rule`、`wipe`、`through`、`motion`、`jump`、`nod`、`shake`、`quake` を再エクスポートします。残り（`Direction`、`TransitionKind`、`MotionKey`、`rule_with`、`blinds`）には `use std::screen::anim::…` が必要です。
+プレリュードは `Easing`、`Tween`、`Transition`、`Motion`、`tween`、`instant`、`cut`、`fade`、`rule`、`wipe`、`through`、`motion`、`jump`、`nod`、`shake`、`quake` を再エクスポートします。残り（`Direction`、`TransitionKind`、`MotionKey`、`rule_with`、`masked`、`masked_with`、`blinds`）には `use std::screen::anim::…` が必要です。
 
 ## 概要 {#overview}
 
@@ -13,7 +13,7 @@
 | [`Easing`](#easing) | 列挙型 | 時間曲線 |
 | [`Tween`](#tween)、`tween`、`instant` | 構造体 + コンストラクター | プロパティの動き方 |
 | [`Direction`](#direction) | 列挙型 | 画面上の方向 |
-| [`TransitionKind`](#transitionkind)、[`Transition`](#transition)、`cut`、`fade`、`rule`、`rule_with`、`wipe`、`blinds`、`through` | 列挙型、構造体 + コンストラクター | レイヤーの差し替え方 |
+| [`TransitionKind`](#transitionkind)、[`Transition`](#transition)、`cut`、`fade`、`rule`、`rule_with`、`masked`、`masked_with`、`wipe`、`blinds`、`through` | 列挙型、構造体 + コンストラクター | レイヤーの差し替え方 |
 | [`MotionKey`](#motionkey)、[`Motion`](#motion)、`motion` | 構造体 + コンストラクター | 相対的な軌跡 |
 | [`jump`](#jump)、[`nod`](#nod)、[`shake`](#shake)、[`quake`](#quake) | 関数 | モーションのプリセット |
 
@@ -204,6 +204,7 @@ pub enum TransitionKind {
     Wipe(Direction),
     Blinds { direction: Direction, count: u32 },
     ThroughColor { color: Color, hold: Duration },
+    Masked { mask: Mask, softness: u8, reverse: bool },
 }
 ```
 
@@ -217,8 +218,11 @@ pub enum TransitionKind {
 | `Wipe(direction)` | 新しい内容を `direction` 方向に動きながら見せる |
 | `Blinds { direction, count }` | `direction` に垂直な `count` 本の帯がそれぞれワイプする |
 | `ThroughColor { color, hold }` | `color` へフェードし、`hold` の間保ってから新しい内容をフェードインする |
+| `Masked { mask, softness, reverse }` | マスクの値 ×255 が移動するしきい値以下になった画素から切り替わる |
 
 **ルール。** マスクの輝度が threshold(t) 以下になった画素は新しい内容を表示します。しきい値は 0 → 255、`reverse` なら 255 → 0 と移動します。`softness` は輝度単位でのブレンド幅で、0 は硬い境界です。
+
+**マスク付き。** マスク画像の代わりに[マスクシェーダー](./screen-shader.md#mask)を使う同じ規則です。マスクはレイヤーの矩形の上で計算され、マスクの値 × 255 が threshold(t) 以下になった画素は新しい内容を表示します。マスクの時刻はトランジション開始からの時間なので、アニメーションするマスクはトランジションの間動きます。[`std::shaders::mask`](./shaders-mask.md) に既製のマスクがあるので、トランジションにマスク画像は要りません。
 
 ## 構造体：`Transition` {#transition}
 
@@ -240,6 +244,8 @@ pub const fn cut() -> Transition
 pub const fn fade(duration: Duration) -> Transition
 pub const fn rule(mask: ImageAsset, duration: Duration) -> Transition
 pub const fn rule_with(mask: ImageAsset, softness: u8, reverse: bool, duration: Duration) -> Transition
+pub const fn masked(mask: Mask, duration: Duration) -> Transition
+pub const fn masked_with(mask: Mask, softness: u8, reverse: bool, duration: Duration) -> Transition
 pub const fn wipe(direction: Direction, duration: Duration) -> Transition
 pub const fn blinds(direction: Direction, count: u32, duration: Duration) -> Transition
 pub const fn through(color: Color, duration: Duration, hold: Duration) -> Transition
@@ -251,15 +257,22 @@ pub const fn through(color: Color, duration: Duration, hold: Duration) -> Transi
 | `fade(d)` | `Crossfade` | `d` かけたクロスフェード |
 | `rule(mask, d)` | `Rule`、softness 0、反転なし | 硬い境界のルール（マスク）トランジション |
 | `rule_with(mask, softness, reverse, d)` | `Rule` | 同上。輝度 `softness` 単位のブレンド幅と向きを指定 |
+| `masked(mask, d)` | `Masked`、softness 0、反転なし | 硬い境界の、マスクシェーダーによるトランジション |
+| `masked_with(mask, softness, reverse, d)` | `Masked` | 同上。値 × 255 で `softness` 単位のブレンド幅と向きを指定 |
 | `wipe(dir, d)` | `Wipe(dir)` | `dir` 方向に動くワイプ |
 | `blinds(dir, count, d)` | `Blinds` | `dir` 方向にワイプする `count` 本の帯 |
 | `through(color, d, hold)` | `ThroughColor` | 古い内容が `d / 2` かけて `color` へフェードし、`hold` 保ってから新しい内容が `d / 2` かけてフェードイン。合計 `d + hold` |
 
 ```kis
+use std::screen::CENTER;
+use std::screen::anim::masked;
+use std::shaders::mask::radial;
+
 const BLINDS_RULE: ImageAsset = asset("rule/blinds.png");
 
 screen.background().change(BG::STATION).apply_animation(rule(BLINDS_RULE, ms(1000)));
 screen.background().change(BG::NIGHT).apply_animation(through(BLACK, ms(1000), ms(200)));
+screen.background().change(BG::ROOF).apply_animation(masked(radial(CENTER), ms(1000)));
 ```
 
 ### `transition.ease(easing)`、`transition.delay(delay)` {#transition-ease}

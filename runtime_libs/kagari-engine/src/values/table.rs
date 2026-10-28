@@ -5,7 +5,6 @@
 /// A std struct or enum. A struct is one variant named like the struct.
 pub(crate) struct AdtDecl {
     pub path: &'static str,
-    #[cfg_attr(not(test), expect(dead_code, reason = "read by the drift test"))]
     pub is_enum: bool,
     pub variants: &'static [VariantDecl],
 }
@@ -65,11 +64,7 @@ std_adts! {
     Visibility = "std::screen::Visibility", true, [Shown(), Hidden()];
     Flip = "std::screen::Flip", true, [None(), Horizontal(), Vertical(), Both()];
     VAlign = "std::screen::VAlign", true, [Top(), Middle(), Bottom()];
-    BlendMode = "std::screen::BlendMode", true, [
-        Normal(), Add(), Multiply(), Screen(), Overlay(), Darken(), Lighten(), ColorDodge(),
-        ColorBurn(), HardLight(), SoftLight(), Difference(), Exclusion(), Hue(), Saturation(),
-        Color(), Luminosity(),
-    ];
+    Pose = "std::screen::Pose", false, [Pose(position, scale, rotation)];
     Movie = "std::screen::Movie", false, [Movie(video, looping)];
 
     Easing = "std::screen::anim::Easing", true, [
@@ -84,7 +79,7 @@ std_adts! {
     Direction = "std::screen::anim::Direction", true, [Left(), Right(), Up(), Down()];
     TransitionKind = "std::screen::anim::TransitionKind", true, [
         Cut(), Crossfade(), Rule(mask, softness, reverse), Wipe(_), Blinds(direction, count),
-        ThroughColor(color, hold),
+        ThroughColor(color, hold), Masked(mask, softness, reverse),
     ];
     Transition = "std::screen::anim::Transition", false, [Transition(kind, duration, easing, delay)];
     MotionKey = "std::screen::anim::MotionKey", false, [MotionKey(at, offset, scale, rotation, easing)];
@@ -93,6 +88,18 @@ std_adts! {
     Loop = "std::screen::audio::Loop", false, [Loop(audio, loop_start, loop_end)];
     Sound = "std::screen::audio::Sound", false, [Sound(audio, volume, start, end, delay)];
     AudioFade = "std::screen::audio::AudioFade", false, [AudioFade(fade_out, fade_in, overlap)];
+
+    Filter = "std::screen::shader::Filter", false, [Filter(shader, args)];
+    Mix = "std::screen::shader::Mix", false, [Mix(shader, args)];
+    Mask = "std::screen::shader::Mask", false, [Mask(shader, args)];
+    ShaderPaint = "std::screen::shader::Paint", false, [Paint(texture, args, size, mask)];
+    LocalMotionBehavior = "std::screen::shader::LocalMotionBehavior", true, [
+        Periodic(after, period), Stall(after),
+    ];
+    LocalMotion = "std::screen::shader::LocalMotion", false, [LocalMotion(shader, args, behavior)];
+    TransitionalMotion = "std::screen::shader::TransitionalMotion", false, [TransitionalMotion(
+        shader, args, duration, easing, delay
+    )];
 
     Mark = "std::narrative::text::Mark", false, [Mark(_)];
     Weight = "std::narrative::text::Weight", true, [Regular(), Bold()];

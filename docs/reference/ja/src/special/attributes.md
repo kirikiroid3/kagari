@@ -1,12 +1,13 @@
 # 属性 {#attributes}
 
-属性はアイテムの直前に `#[name]` と書きます。Kagari の属性はちょうど 4 つで、どれも引数を取りません。ゲームが使うのはそのうち 3 つで、`#[builtin]` は標準ライブラリ専用です。
+属性はアイテムの直前に `#[name]` と書きます。Kagari の属性はちょうど 5 つで、どれも引数を取りません。ゲームが使うのはそのうち 4 つで、`#[builtin]` は標準ライブラリ専用です。
 
 | 属性 | 付けられる場所 | 意味 | 誤用 |
 | ---- | -------------- | ---- | ---- |
 | [`#[scene]`](#scene) | `pushdown fn` | シーン：ステップの実行、シーンの呼び出し、乱数の取得ができる | `E3018` |
 | [`#[entry]`](#entry) | `#[scene]` の関数 | エントリーシーン：システムがここから物語を開始できる | `E3018`、`E3008`、`E3009` |
 | [`#[must_use]`](#must_use) | `struct`、`enum` | その型の値は完了させなければならず、捨ててはいけない | `E3018`。使用箇所で警告 `W3023` |
+| [`#[shader_arg]`](#shader_arg) | `struct` | その型をシェーダーの引数にできる | `E3018`、`E3025`、`E3026` |
 | [`#[builtin]`](#builtin) | 標準ライブラリのみ：関数、構造体、トレイト | コンパイラとエンジンが実装する | `E1008`、`E1009`、`E1013` |
 
 ## 構文 {#syntax}
@@ -24,7 +25,7 @@ pub pushdown fn Main() {
 - 複数の属性を、1 行にでも別々の行にでも、任意の順序で重ねられます。
 - `///` のドキュメントコメントはコメントであり、属性ではありません。
 - 内部属性（`#![…]`）は存在せず、属性の後には必ずアイテムが続かなければなりません。どちらも構文エラーです（`E0001`）。文や式に属性は付けられません。
-- 4 つ以外の名前は `E1006` で、その属性は無視されます。
+- 5 つ以外の名前は `E1006` で、その属性は無視されます。
 - `#[must_use("reason")]` のように引数付きで書いた属性は `E1007` です。属性自体は適用されます。
 
 *暫定。* パーサーは構造体のフィールド、タプルのフィールド、列挙型のバリアントに付いた属性も受け付けますが、現在のコンパイラはそこでは属性を無視します。未知の名前も同様です。この挙動に頼らないでください。
@@ -91,6 +92,26 @@ const fn roof(mut screen: Screen) -> Screen {
 
 ゲームが自分の型に付けることもできます。その場合、警告は値を完了させる手段としてその型のメソッドを列挙します。
 
+## `#[shader_arg]` {#shader_arg}
+
+`struct` に付けた `#[shader_arg]` は、その型をシェーダーの引数型にします。型は `ShaderArg` を実装するので、`ColorShader<Memory>` のようなシェーダーアセットがその型を引数に取れ、エンジンがその値をシェーダーに渡します。それ以外のアイテムに付けると `E3018` です。
+
+```kis
+use std::screen::shader::ColorShader;
+
+#[shader_arg]
+struct Memory {
+    strength: Decimal,
+}
+
+const MEMORY: ColorShader<Memory> = asset("memory.wgsl");
+```
+
+- 構造体は 1 つ以上の名前付きフィールドを持ち、型パラメータを持ちません。const パラメータは使えます（そうでなければ `E3025`）。
+- どのフィールドも、シェーダーが読める型を持ちます：`bool`、`i32`、`u32`、`Decimal`、`Rat`、std の型 `Color`、`Point`、`Offset`、`Size`、`Anchor`、`Angle`、`Duration`、フィールドのない列挙型、`#[shader_arg]` 構造体、またはこれらの配列 `[T; N]`（`N` > 0）です。それ以外の型のフィールドや長さ 0 の配列は、そのフィールドで `E3026` になります。
+
+各フィールドがどのようにシェーダーに渡るかは、STD リファレンスの [シェーダーの書き方](../../../../std/ja/src/guides/shaders.md#arguments) で説明します。
+
 ## `#[builtin]` {#builtin}
 
 `#[builtin]` は、コンパイラとエンジンが実装するアイテムを表します。標準ライブラリでのみ使えます（`E1008`）。`std` の宣言を読むときに目にします。
@@ -119,7 +140,9 @@ const fn roof(mut screen: Screen) -> Screen {
 | [`E1008`](../diagnostics/modules.md#e1008) | 標準ライブラリの外の `#[builtin]` |
 | [`E1009`](../diagnostics/modules.md#e1009) | 本体を持つ `#[builtin]` 関数、またはフィールドを持つ `#[builtin]` 構造体 |
 | [`E1013`](../diagnostics/modules.md#e1013) | `#[builtin]` のない標準ライブラリのトレイト |
-| [`E3018`](../diagnostics/kinds.md#e3018) | `pushdown fn` 以外への `#[scene]`、`#[scene]` のない `#[entry]`、構造体・列挙型以外への `#[must_use]` |
+| [`E3018`](../diagnostics/kinds.md#e3018) | `pushdown fn` 以外への `#[scene]`、`#[scene]` のない `#[entry]`、構造体・列挙型以外への `#[must_use]`、構造体以外への `#[shader_arg]` |
 | [`E3008`](../diagnostics/kinds.md#e3008)、[`E3009`](../diagnostics/kinds.md#e3009) | エントリーシーンの引数型または戻り値型が有限でない、または `Text` を含む |
 | [`E2027`](../diagnostics/types.md#e2027) | `#[entry]` シーンでないものに対する `nav::start` |
 | [`W3023`](../diagnostics/kinds.md#w3023) | 捨てられた、または完了されなかった `#[must_use]` の値 |
+| [`E3025`](../diagnostics/kinds.md#e3025) | 名前付きフィールドを持たない、または型パラメータを持つ `#[shader_arg]` 構造体 |
+| [`E3026`](../diagnostics/kinds.md#e3026) | シェーダーが読めない型の `#[shader_arg]` フィールド、または長さ 0 の配列 |

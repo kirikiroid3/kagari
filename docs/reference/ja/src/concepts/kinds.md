@@ -99,7 +99,7 @@ pushdown fn Greeting() {
 | 有限型の構造体、タプル、配列 `[T; N]` | 第一級のクロージャ |
 | 有限な `T` の `Option<T>` | シグナル、設定値、メタの値 |
 | `Text`（値はプログラム中の定数テキスト） | 自分自身を含む型（再帰型） |
-| アセット型 `ImageAsset`、`AudioAsset`、`VoiceAsset`、`VideoAsset`、`FontAsset`、`ShaderAsset`（値はプログラム中のアセット定数） | `EntityId`、`Part`、`Mark`、`Duration`、`Color`（Rust の整数を持つ） |
+| ファイルのアセット型 `ImageAsset`、`AudioAsset`、`VoiceAsset`、`VideoAsset`、`FontAsset`（値はプログラム中のアセット定数） | `EntityId`、`Part`、`Mark`、`Duration`、`Color`（Rust の整数を持つ）。`ColorShader<A>` などのシェーダー型 |
 | `pushdown fn`、`scene fn`、`const fn` のポインタ（値はプログラム中の名前付き関数） | |
 | 有限な `T` の `&T`、`&mut T`（引数として） | |
 

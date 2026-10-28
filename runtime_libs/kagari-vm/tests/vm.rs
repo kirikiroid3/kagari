@@ -389,9 +389,23 @@ fn type_table_resolves_module_and_synthetic_types() {
         .expect("std::Option interned");
     let mut vm = Vm::new(Rc::clone(&program));
     let types = vm.types_mut();
-    assert_eq!(types.resolve("std::Option", &[]), AdtTy::Module(option));
-    assert_eq!(types.resolve("x::Y", &["A", "B"]), AdtTy::Synthetic(0));
-    assert_eq!(types.resolve("x::Y", &["A", "B"]), AdtTy::Synthetic(0));
+    assert_eq!(
+        types.resolve("std::Option", &[], true),
+        AdtTy::Module(option)
+    );
+    assert!(types.is_enum(AdtTy::Module(option)));
+    assert_eq!(
+        types.resolve("x::Y", &["A", "B"], true),
+        AdtTy::Synthetic(0)
+    );
+    assert_eq!(
+        types.resolve("x::Y", &["A", "B"], true),
+        AdtTy::Synthetic(0)
+    );
+    assert_eq!(types.resolve("x::S", &["S"], false), AdtTy::Synthetic(1));
+    assert!(types.is_enum(AdtTy::Synthetic(0)));
+    assert!(!types.is_enum(AdtTy::Synthetic(1)));
+    assert!(!types.is_enum(AdtTy::Synthetic(7)));
     assert_eq!(types.variant_name(AdtTy::Synthetic(0), 1), "B");
     assert_eq!(types.path(AdtTy::Synthetic(0)), "x::Y");
 }

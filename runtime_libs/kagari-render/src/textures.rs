@@ -5,8 +5,8 @@ use std::collections::{HashMap, HashSet};
 use kagari_bytecode::AssetId;
 use kagari_engine::{AssetStore, ThumbKey};
 
-use crate::layers::linear_texture;
 use crate::Gfx;
+use crate::layers::linear_texture;
 
 /// Image textures above this total (`w·h·4` summed) evict the least recently used ones.
 const IMAGE_BUDGET: u64 = 512 * 1024 * 1024;
@@ -43,13 +43,7 @@ pub(crate) fn premultiply(rgba: &[u8]) -> Vec<u8> {
 }
 
 /// Uploads premultiplied RGBA8 as an `Rgba8Unorm` texture with its bind group.
-fn upload(
-    gfx: &Gfx,
-    label: &str,
-    width: u32,
-    height: u32,
-    premultiplied: &[u8],
-) -> Entry {
+fn upload(gfx: &Gfx, label: &str, width: u32, height: u32, premultiplied: &[u8]) -> Entry {
     let size = wgpu::Extent3d {
         width,
         height,
@@ -214,7 +208,11 @@ impl TextureCache {
 
     /// Evicts least recently used images not used this frame while over the budget.
     pub fn evict(&mut self) {
-        let mut total: u64 = self.images.values().map(Entry::bytes).fold(0, u64::saturating_add);
+        let mut total: u64 = self
+            .images
+            .values()
+            .map(Entry::bytes)
+            .fold(0, u64::saturating_add);
         if total <= IMAGE_BUDGET {
             return;
         }
@@ -237,14 +235,21 @@ impl TextureCache {
 }
 
 /// Why a `width`×`height` thumbnail of `len` bytes cannot become a texture, if it cannot.
-pub(crate) fn thumbnail_problem(width: u32, height: u32, len: usize, max_dim: u32) -> Option<String> {
+pub(crate) fn thumbnail_problem(
+    width: u32,
+    height: u32,
+    len: usize,
+    max_dim: u32,
+) -> Option<String> {
     let expected = (width as usize)
         .saturating_mul(height as usize)
         .saturating_mul(4);
     if width == 0 || height == 0 || len != expected {
         Some(format!("has {len} bytes, expected {width}×{height}×4"))
     } else if width > max_dim || height > max_dim {
-        Some(format!("is {width}×{height}, larger than the GPU limit {max_dim}"))
+        Some(format!(
+            "is {width}×{height}, larger than the GPU limit {max_dim}"
+        ))
     } else {
         None
     }

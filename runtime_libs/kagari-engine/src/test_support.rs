@@ -21,12 +21,28 @@ use crate::{EngineState, HostCtx, Platform};
 /// The fixture that interns every std type of `values/table.rs`.
 pub(crate) const STD_TYPES: &str = include_str!("../tests/fixtures/std_types/main.kix");
 
-/// Compiles `source` as `/game/main.kix`, with empty assets `font.ttf`, `a.png`, `a.ogg`,
-/// `v.ogg` and `m.webm`; panics on an error diagnostic.
+/// The empty asset files every fixture compiles with.
+const ASSETS: [&str; 12] = [
+    "font.ttf",
+    "a.png",
+    "a.ogg",
+    "v.ogg",
+    "m.webm",
+    "glow.wgsl",
+    "sepia.wgsl",
+    "blend.wgsl",
+    "round.wgsl",
+    "spots.wgsl",
+    "bob.wgsl",
+    "arc.wgsl",
+];
+
+/// Compiles `source` as `/game/main.kix`, with the empty [`ASSETS`]; panics on an error
+/// diagnostic.
 pub(crate) fn compile(source: &str) -> Vec<u8> {
     let mut files = rustc_hash::FxHashMap::default();
     files.insert(PathBuf::from("/game/main.kix"), source.to_owned());
-    for asset in ["font.ttf", "a.png", "a.ogg", "v.ogg", "m.webm"] {
+    for asset in ASSETS {
         files.insert(PathBuf::from(format!("/game/{asset}")), String::new());
     }
     let db = RootDatabase::new(Arc::new(MemoryFileSystem(files)));

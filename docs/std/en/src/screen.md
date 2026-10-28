@@ -17,8 +17,10 @@ const fn azusa_smiles(mut screen: Screen) -> Screen {
 
 Every item of this module is `const fn` or plain data, so renders are evaluated at compile time
 and the compiler can compare screens. The timeline methods of `Screen` are described here; the
-animation values they schedule are in [`std::screen::anim`](./screen-anim.md), and the audio
-values in [`std::screen::audio`](./screen-audio.md). Character helpers built on this module are in
+animation values they schedule are in [`std::screen::anim`](./screen-anim.md), the audio values
+in [`std::screen::audio`](./screen-audio.md), and the shader effects (filters, mixes, masks,
+paints and shader motions) in [`std::screen::shader`](./screen-shader.md), with ready-made
+shaders in [`std::shaders`](./shaders.md). Character helpers built on this module are in
 [`std::stage`](./stage.md); complete examples are in [Staging Recipes](./guides/staging.md).
 
 The prelude re-exports `Screen`, `Render`, `EntityId`, `Part`, `Point`, `Offset`, `Size`,
@@ -32,9 +34,9 @@ The prelude re-exports `Screen`, `Render`, `EntityId`, `Part`, `Point`, `Offset`
 | [`Render`](#render) | type | `const fn(Screen) -> Screen` |
 | [`EntityId`](#entityid), [`BACKGROUND`](#background) | struct, constant | entity identity |
 | [`Part`](#part), [`MAIN`](#main) | struct, constant | image layer key |
-| [`Point`](#point), [`Offset`](#offset), [`Size`](#size), [`Insets`](#insets), [`Anchor`](#anchor), [`Angle`](#angle) | structs + constructors | geometry |
+| [`Point`](#point), [`Offset`](#offset), [`Size`](#size), [`Insets`](#insets), [`Anchor`](#anchor), [`Angle`](#angle), [`Pose`](#pose) | structs + constructors | geometry |
 | [`Color`](#color) and constants | struct + constructors | sRGB colour |
-| [`Plane`](#plane), [`Visibility`](#visibility), [`Flip`](#flip), [`VAlign`](#valign), [`BlendMode`](#blendmode) | enums | layout options |
+| [`Plane`](#plane), [`Visibility`](#visibility), [`Flip`](#flip), [`VAlign`](#valign) | enums | layout options |
 | [`Screen`](#screen) | builtin struct | the screen and the step's timeline |
 | [`Entity`](#entity) | builtin struct | a thing on the screen |
 | [`Prop`](#prop), [`Change`](#change) | builtin structs | interpolated properties |
@@ -56,8 +58,9 @@ scheduled animations, one-shot sounds and the `ChoiceMenu` belong to the step an
 it.
 
 Animations never change the start or end state: a tween or transition runs from the old value to
-the value set by `change`, and a motion ends at identity. So a click, skip, or the `animations`
-setting being off can never change the logical screen.
+the value set by `change`, a motion ends at identity, and a shader motion changes only how an
+entity is drawn. So a click, skip, or the `animations` setting being off can never change the
+logical screen.
 
 ## Step entry {#step-entry}
 
@@ -214,6 +217,21 @@ pub const fn degrees(d: Decimal) -> Angle
 
 A rotation, clockwise; `degrees(d)` is a rotation of `d` degrees. Kind: `const fn` · Builtin: no.
 
+### Struct: `Pose` {#pose}
+
+```kis
+pub struct Pose {
+    pub position: Point,
+    pub scale: Decimal,
+    pub rotation: Angle,
+}
+pub const fn pose(position: Point, scale: Decimal, rotation: Angle) -> Pose
+```
+
+Where an entity is: its position, scale and rotation, as the entity's
+[properties](#entity-properties) hold them; `pose(position, scale, rotation)` builds one. Used by
+[`Entity::travel`](#entity-travel). Kind: `const fn` · Builtin: no.
+
 ## Colour {#colour}
 
 ### Struct: `Color` {#color}
@@ -252,7 +270,7 @@ pub const TRANSPARENT: Color = Color { r: 0, g: 0, b: 0, a: 0 };
 
 Opaque black, opaque white, and fully transparent.
 
-## Planes, flips and blend modes {#planes-flips-and-blend-modes}
+## Planes and flips {#planes-and-flips}
 
 ### Enum: `Plane` {#plane}
 
@@ -304,54 +322,46 @@ pub enum VAlign {
 
 Vertical placement; used by [`ChoiceMenu::set_align`](#choicemenu-set_align).
 
-### Enum: `BlendMode` {#blendmode}
+## Shader effects {#shader-effects}
+
+Shaders are WGSL files run by the renderer. The screen holds them as **effect values** that pair a
+shader with its arguments; [`std::screen::shader`](./screen-shader.md) declares them, and
+[`std::shaders`](./shaders.md) has ready-made ones. Every effect slot is optional; `None` is no
+effect.
+
+| Slot | Value | Effect |
+| ---- | ----- | ------ |
+| [`Screen::filter`](#screen-filter) | `Prop<Option<Filter>>` | recolours the `Background`, `Stage` and `Front` planes |
+| [`Entity::filter`](#entity-filter) | `Prop<Option<Filter>>` | recolours the entity |
+| [`Entity::mix`](#entity-mix) | `Prop<Option<Mix>>` | composites the entity over what is below it; `None` is normal source-over |
+| [`Entity::mask`](#entity-mask) | `Prop<Option<Mask>>` | multiplies the entity's alpha over its box |
+| [`Entity::local_motion`](#entity-local_motion) | `Prop<Option<LocalMotion>>` | moves the entity around its pose, for drawing only |
+| [`Entity::travel`](#entity-travel) | a call | moves the entity to a new pose along a shader path |
+| [`ImageLayer::paint`](#imagelayer) | a layer swap | generated content in place of an image |
+
+**Tweening an effect.** An effect slot is a `Prop`, so its change takes a tween. When the old and
+the new value use the same shader (and, for a local motion, the same behaviour), the tween
+interpolates the arguments: decimals, colours, points, sizes, angles and durations move with the
+tween's easing; integers, `bool` and enums switch at the start. Any other change, including from
+or to `None`, switches at the start of the tween.
 
 ```kis
-pub enum BlendMode {
-    Normal,
-    Add,
-    Multiply,
-    Screen,
-    Overlay,
-    Darken,
-    Lighten,
-    ColorDodge,
-    ColorBurn,
-    HardLight,
-    SoftLight,
-    Difference,
-    Exclusion,
-    Hue,
-    Saturation,
-    Color,
-    Luminosity,
-}
+use std::shaders::color::blur;
+
+screen.filter().change(Some(blur(0.0))).apply_animation(instant());
+screen.wait(ms(500));
+screen.filter().change(Some(blur(6.0))).apply_animation(tween(ms(1500)));
 ```
 
-How an entity is composited over what is drawn below it. The variants follow the CSS blend modes;
-`Add` is additive blending. The spawn default is `Normal`.
+**Effect time.** A shader sees the time in seconds since its effect started, and the time keeps
+running across steps while the slot keeps the same shader. See
+[Effect time](./guides/shaders.md#effect-time). With the `animations` setting off, every effect
+time is 0.
 
-## Filters and shaders {#filters-and-shaders}
-
-> **Stability:** Tentative — `native_v0`, today the only runtime profile, rejects `.wgsl` shader
-> assets at build, so filters and shader content cannot be used yet; the native renderer draws
-> none of them (see [Runtime Profiles](./appendix/profiles.md#using-an-unsupported-item)). Only `change(None)` builds; it stays on the
-> logical screen and has no visible effect.
-
-- Filters, weather and particles are all `ShaderAsset`s: WGSL shader files (`.wgsl`).
-- A **filter** post-processes what is drawn. An entity has its own filter
-  ([`Entity::filter`](#entity-filter)); the screen filter ([`Screen::filter`](#screen-filter))
-  applies to the `Background`, `Stage` and `Front` planes. `None` is no filter.
-- Weather and particles are entities whose **`shader`** ([`Entity::shader`](#entity-shader)) is
-  set: the shader generates the entity's content, which is drawn in the entity's plane and ordered
-  by its `z`, like any other entity.
-- No shader ships with `std`; a studio provides its own.
-
-```kis
-const SEPIA: ShaderAsset = asset("sepia.wgsl");
-
-screen.filter().change(Some(SEPIA)).apply_animation(tween(ms(500)));
-```
+**When a shader cannot run.** `kagari build` checks every shader the game uses, so a broken shader
+does not build. A GPU that cannot run shaders of a role draws the slot as if it were `None` (a
+travel moves in a straight line, a masked transition crossfades, a paint draws nothing) and logs a
+warning. The logical screen is the same either way.
 
 ## Struct: `Screen` {#screen}
 
@@ -408,10 +418,10 @@ const fn roof_evening(_screen: Screen) -> Screen {
 | position, anchor | (0, 0), `TOP_LEFT` |
 | scale, rotation | 1.0, 0° |
 | **opacity** | **0.0** |
-| filter, shader | `None`, `None` |
+| filter, mix, mask, local motion | `None` |
 | fill, fill size | `TRANSPARENT`, `None` (whole screen) |
 | layers | no parts, no label, no movie |
-| flip, blend, gate | `Flip::None`, `Normal`, `None` |
+| flip, gate | `Flip::None`, `None` |
 
 A spawned entity is invisible, so every appearance states its animation:
 
@@ -499,12 +509,11 @@ Builtin: yes.
 ### `screen.filter()` {#screen-filter}
 
 ```kis
-#[builtin] pub const fn filter(&mut self) -> &mut Prop<Option<ShaderAsset>>;
+#[builtin] pub const fn filter(&mut self) -> &mut Prop<Option<shader::Filter>>;
 ```
 
-The shader that post-processes the `Background`, `Stage` and `Front` planes; `None` is no filter.
-See [Filters and shaders](#filters-and-shaders). Kind: `const fn` · Builtin: yes · Profile: `native_v0`
-rejects shader assets at build; the native renderer does not draw filters.
+The colour filter over the `Background`, `Stage` and `Front` planes, applied after the camera;
+`None` is no filter. See [Shader effects](#shader-effects). Kind: `const fn` · Builtin: yes.
 
 ### `screen.music()`, `screen.ambience(channel)` {#screen-music}
 
@@ -564,15 +573,16 @@ Builtin: yes.
 #[builtin] pub struct Entity;
 ```
 
-A thing on the screen: a transform, an opacity, a filter, a shader, a fill and layers. The
-component set is fixed; studios add no components.
+A thing on the screen: a transform, an opacity, a colour filter, a mix, a mask, a local motion, a
+fill and layers. The component set is fixed; studios add no components.
 
 | Kind of member | Members | Changed with |
 | -------------- | ------- | ------------ |
-| Interpolated properties | `position`, `scale`, `rotation`, `opacity`, `filter`, `shader`, `fill` | `change(v).apply_animation(Tween)` |
-| Layers | `part(p)`, `image()`, `label()`, `movie()` | `change(x).apply_animation(Transition)` |
-| Layout settings | `set_plane`, `set_z`, `set_anchor`, `set_flip`, `set_blend`, `set_fill_size`, `gate` | direct setters, not interpolable |
+| Interpolated properties | `position`, `scale`, `rotation`, `opacity`, `filter`, `mix`, `mask`, `local_motion`, `fill` | `change(v).apply_animation(Tween)` |
+| Layers | `part(p)`, `image()`, `label()`, `movie()` | `change(x)` or `paint(p)`, then `apply_animation(Transition)` |
+| Layout settings | `set_plane`, `set_z`, `set_anchor`, `set_flip`, `set_fill_size`, `gate` | direct setters, not interpolable |
 | Relative motion | `apply_animation(Motion)` | see [`Motion`](./screen-anim.md#motion) |
+| Shader path | `travel(to, motion)` | see [`travel`](#entity-travel) |
 
 ### Interpolated properties {#entity-properties}
 
@@ -588,20 +598,78 @@ component set is fixed; studios add no components.
 - `opacity` is a fraction `0.0..=1.0`; spawned entities start at 0.0.
 - Kind: `const fn` · Builtin: yes.
 
-<a id="entity-shader"></a>
-
-### `entity.filter()`, `entity.shader()` {#entity-filter}
+### `entity.filter()` {#entity-filter}
 
 ```kis
-#[builtin] pub const fn filter(&mut self) -> &mut Prop<Option<ShaderAsset>>;
-#[builtin] pub const fn shader(&mut self) -> &mut Prop<Option<ShaderAsset>>;
+#[builtin] pub const fn filter(&mut self) -> &mut Prop<Option<shader::Filter>>;
 ```
 
-`filter` is the shader that post-processes this entity; `None` is no filter. `shader` is content
-generated by a shader (rain, snow, particles), drawn in the entity's plane and z order; `None`
-draws nothing. See [Filters and shaders](#filters-and-shaders). Kind: `const fn` · Builtin: yes ·
-Profile: `native_v0` rejects shader assets at build; the native renderer draws neither filters
-nor shader content.
+The colour filter over this entity; `None` is no filter. The filter covers everything the entity
+draws, after its mask and motion, in screen space. See [Shader effects](#shader-effects).
+Kind: `const fn` · Builtin: yes.
+
+### `entity.mix()` {#entity-mix}
+
+```kis
+#[builtin] pub const fn mix(&mut self) -> &mut Prop<Option<shader::Mix>>;
+```
+
+How the entity composites over what is below it; `None` is normal source-over. Blend modes such as
+multiply or screen are mixes ([`std::shaders::mix`](./shaders-mix.md)). The entity's opacity
+applies before the mix. Kind: `const fn` · Builtin: yes.
+
+```kis
+screen.entity(TINT).mix().change(Some(std::shaders::mix::color())).apply_animation(instant());
+```
+
+### `entity.mask()` {#entity-mask}
+
+```kis
+#[builtin] pub const fn mask(&mut self) -> &mut Prop<Option<shader::Mask>>;
+```
+
+The alpha over the entity's box: everything the entity draws in its box is multiplied by the
+mask, which moves, scales and rotates with the entity. A fill without a fill size covers the whole
+screen and is not masked. `None` is no mask. Kind: `const fn` · Builtin: yes.
+
+### `entity.local_motion()` {#entity-local_motion}
+
+```kis
+#[builtin] pub const fn local_motion(&mut self) -> &mut Prop<Option<shader::LocalMotion>>;
+```
+
+A motion around the entity's pose that only changes how it is drawn; `None` is no motion. The
+shader starts from the pose the entity has at each frame, tweens and
+[`Motion`](./screen-anim.md#motion)s included, so a bobbing character can still walk. The logical
+position, scale and rotation do not change. A fill without a fill size is not moved.
+Kind: `const fn` · Builtin: yes.
+
+```kis
+screen.entity(HANAKO).local_motion().change(Some(std::shaders::motion::bob(20.0, ms(1000)))).apply_animation(instant());
+```
+
+### `entity.travel(to, motion)` {#entity-travel}
+
+```kis
+#[builtin] pub const fn travel(&mut self, to: Pose, motion: shader::TransitionalMotion);
+```
+
+Moves the entity to `to` along the path of `motion`. Kind: `const fn` · Builtin: yes.
+
+- The logical pose becomes `to` at once: a later `position().get()` in the same render sees
+  `to.position`.
+- `travel` schedules a tween of `position`, `scale` and `rotation` each, with the motion's
+  duration, easing and delay, plus the shader path. While the travel runs, the shader decides the
+  drawn pose from the start pose, `to` and the eased progress. When it ends, the entity is at `to`.
+- Where the shader cannot run, the entity moves along the plain tweens: in a straight line.
+- A local motion of the entity runs on top of the travel.
+- An invalid easing is a const-evaluation error, as for a tween.
+
+```kis
+use std::screen::{degrees, pose};
+
+screen.entity(BIRD).travel(pose(point(900, 400), 1.0, degrees(0.0)), std::shaders::motion::arc(200.0, ms(1200)));
+```
 
 ### `entity.fill()` {#entity-fill}
 
@@ -654,7 +722,6 @@ movies.
 #[builtin] pub const fn set_z(&mut self, z: i32);
 #[builtin] pub const fn set_anchor(&mut self, anchor: Anchor);
 #[builtin] pub const fn set_flip(&mut self, flip: Flip);
-#[builtin] pub const fn set_blend(&mut self, blend: BlendMode);
 #[builtin] pub const fn set_fill_size(&mut self, size: Option<Size>);
 ```
 
@@ -664,7 +731,6 @@ movies.
 | `set_z(z)` | sets the order inside the plane; higher draws later |
 | `set_anchor(a)` | sets the point of the entity that sits at its position |
 | `set_flip(f)` | mirrors the drawing |
-| `set_blend(b)` | sets how the entity composites over what is below it |
 | `set_fill_size(s)` | sets the fill's size; `None` covers the whole screen |
 
 Setters take effect at once; they are not animated. Kind: `const fn` · Builtin: yes.
@@ -709,13 +775,17 @@ logical state does not change. Kind: `const fn` · Builtin: yes.
 
 - Planes are drawn in the order `Background < Stage < Front < (text window, drawn by the game
   view) < OverWindow`. Inside a plane, `z` ascends, then `EntityId` ascends: `z` is the analog of
-  CSS `z-index`. Shader-generated content (weather, particles) is ordered the same way.
-- Inside an entity, the order is fill, parts by ascending `Part`, movie, label.
-- The anchor point sits at `position`. The entity size is the size of the `MAIN` part's image,
-  else the fill size, else the label box. Scale and rotation pivot on the anchor.
+  CSS `z-index`.
+- Inside an entity, the order is fill, parts by ascending `Part` (images and paints), movie,
+  label.
+- The anchor point sits at `position`. The entity size is the size of the `MAIN` part's image or
+  paint, else the fill size, else the label box. Scale and rotation pivot on the anchor.
+- An entity's effects nest, innermost first: the mask over the entity's box, then the local motion
+  (and travel), then the filter, then the mix with the opacity. A fill without a fill size is
+  drawn inside the filter and the mix but is neither moved nor masked.
 - The camera applies to `Background`, `Stage` and `Front` only: offset translates, zoom and
   rotation pivot on the screen centre.
-- The screen filter applies to the same three planes.
+- The screen filter applies to the same three planes, after the camera.
 
 ## Struct: `Prop` {#prop}
 
@@ -771,12 +841,25 @@ content to the new one at `cursor + delay`. `clear()` swaps to nothing.
 impl ImageLayer {
     #[builtin] pub const fn get(&self) -> Option<ImageAsset>;
     #[builtin] pub const fn change(&mut self, image: ImageAsset) -> &mut Swap;
+    #[builtin] pub const fn paint(&mut self, paint: shader::Paint) -> &mut Swap;
     #[builtin] pub const fn clear(&mut self) -> &mut Swap;
 }
 ```
 
-An image layer of an entity. `get()` is the image shown, if any. `change(image)` swaps the image
-for `image`; `clear()` swaps it for nothing. Kind: `const fn` · Builtin: yes.
+An image layer of an entity. Kind: `const fn` · Builtin: yes.
+
+- `get()` is the image shown, if any; `None` also when the layer shows a paint.
+- `change(image)` swaps the content for `image`.
+- `paint(p)` swaps the content for the generated [`Paint`](./screen-shader.md#paint) `p`: content
+  of `p`'s size that a texture shader draws, such as a gradient or rain. It is placed, flipped and
+  swapped like an image of that size, and as the `MAIN` part it gives the entity its size.
+- `clear()` swaps the content for nothing.
+
+```kis
+use std::screen::{degrees, rgba, size};
+
+screen.entity(RAIN).image().paint(std::shaders::texture::rain(rgba(200, 210, 255, 160), 30, 900.0, degrees(10.0), size(1920, 1080))).apply_animation(fade(ms(500)));
+```
 
 ### Struct: `LabelLayer` {#labellayer}
 

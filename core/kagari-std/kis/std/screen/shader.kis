@@ -1,0 +1,171 @@
+//! Shaders: the six shader roles, their typed arguments, and the effect values the screen holds.
+
+use crate::{Asset, ShaderAsset};
+use crate::screen::Size;
+use crate::screen::anim::Easing;
+use crate::time::{Duration, ZERO};
+
+/// Types a shader can read as its arguments: `()` and `#[shader_arg]` structs.
+#[builtin]
+pub trait ShaderArg {}
+/// The shader asset types, one per role.
+#[builtin]
+pub trait Shader {}
+
+/// A WGSL file that recolours what is below it; used by `filter`.
+#[builtin]
+pub struct ColorShader<A>;
+impl<A> Asset for ColorShader<A> {}
+impl<A> Eq for ColorShader<A> {}
+impl<A> Shader for ColorShader<A> {}
+/// A WGSL file that composites an entity over what is below it; used by `mix`.
+#[builtin]
+pub struct MixShader<A>;
+impl<A> Asset for MixShader<A> {}
+impl<A> Eq for MixShader<A> {}
+impl<A> Shader for MixShader<A> {}
+/// A WGSL file that generates image content; used by `paint`.
+#[builtin]
+pub struct TextureShader<A>;
+impl<A> Asset for TextureShader<A> {}
+impl<A> Eq for TextureShader<A> {}
+impl<A> Shader for TextureShader<A> {}
+/// A WGSL file that computes an alpha value per pixel; used by `mask`.
+#[builtin]
+pub struct MaskShader<A>;
+impl<A> Asset for MaskShader<A> {}
+impl<A> Eq for MaskShader<A> {}
+impl<A> Shader for MaskShader<A> {}
+/// A WGSL file that moves an entity around its pose; used by `local_motion`.
+#[builtin]
+pub struct LocalMotionShader<A>;
+impl<A> Asset for LocalMotionShader<A> {}
+impl<A> Eq for LocalMotionShader<A> {}
+impl<A> Shader for LocalMotionShader<A> {}
+/// A WGSL file that moves an entity from one pose to another; used by `transitional_motion`.
+#[builtin]
+pub struct TransitionalMotionShader<A>;
+impl<A> Asset for TransitionalMotionShader<A> {}
+impl<A> Eq for TransitionalMotionShader<A> {}
+impl<A> Shader for TransitionalMotionShader<A> {}
+
+/// Shader arguments with their type erased.
+#[builtin]
+pub struct ShaderArgs;
+impl Eq for ShaderArgs {}
+
+/// The shader file `shader`, without its role.
+#[builtin]
+const fn erase_shader<S: Shader>(shader: S) -> ShaderAsset;
+/// `args`, without its type.
+#[builtin]
+const fn erase_args<A: ShaderArg>(args: A) -> ShaderArgs;
+
+/// A colour filter: a colour shader with its arguments.
+pub struct Filter {
+    shader: ShaderAsset,
+    args: ShaderArgs,
+}
+/// The filter `shader` with `args`.
+pub const fn filter<A: ShaderArg>(shader: ColorShader<A>, args: A) -> Filter {
+    Filter { shader: erase_shader(shader), args: erase_args(args) }
+}
+
+/// A way to composite: a mix shader with its arguments.
+pub struct Mix {
+    shader: ShaderAsset,
+    args: ShaderArgs,
+}
+/// The mix `shader` with `args`.
+pub const fn mix<A: ShaderArg>(shader: MixShader<A>, args: A) -> Mix {
+    Mix { shader: erase_shader(shader), args: erase_args(args) }
+}
+
+/// An alpha mask: a mask shader with its arguments.
+pub struct Mask {
+    shader: ShaderAsset,
+    args: ShaderArgs,
+}
+/// The mask `shader` with `args`.
+pub const fn mask<A: ShaderArg>(shader: MaskShader<A>, args: A) -> Mask {
+    Mask { shader: erase_shader(shader), args: erase_args(args) }
+}
+
+/// Generated image content of `size` pixels: a texture shader with its arguments, optionally
+/// masked.
+pub struct Paint {
+    texture: ShaderAsset,
+    args: ShaderArgs,
+    size: Size,
+    mask: Option<Mask>,
+}
+/// The content `shader` draws with `args`, `size` pixels large, unmasked.
+pub const fn paint<A: ShaderArg>(shader: TextureShader<A>, args: A, size: Size) -> Paint {
+    Paint { texture: erase_shader(shader), args: erase_args(args), size, mask: None }
+}
+impl Paint {
+    /// This paint with its alpha multiplied by `mask`.
+    pub const fn masked(mut self, mask: Mask) -> Paint {
+        self.mask = Some(mask);
+        self
+    }
+}
+
+/// How a local motion's time runs.
+pub enum LocalMotionBehavior {
+    /// Runs `after` once, then loops the following `period`; a `period` of zero holds at `after`.
+    Periodic { after: Duration, period: Duration },
+    /// Runs until `after`, then holds.
+    Stall { after: Duration },
+}
+
+/// A motion around the entity's pose: a local motion shader with its arguments and time rule.
+pub struct LocalMotion {
+    shader: ShaderAsset,
+    args: ShaderArgs,
+    behavior: LocalMotionBehavior,
+}
+/// The local motion `shader` with `args`, its time mapped by `behavior`.
+pub const fn local_motion<A: ShaderArg>(
+    shader: LocalMotionShader<A>,
+    args: A,
+    behavior: LocalMotionBehavior,
+) -> LocalMotion {
+    LocalMotion { shader: erase_shader(shader), args: erase_args(args), behavior }
+}
+
+/// A path from one pose to another: a transitional motion shader with its arguments and timing.
+pub struct TransitionalMotion {
+    shader: ShaderAsset,
+    args: ShaderArgs,
+    duration: Duration,
+    easing: Easing,
+    delay: Duration,
+}
+/// The transitional motion `shader` with `args` over `duration`, linear, without delay.
+pub const fn transitional_motion<A: ShaderArg>(
+    shader: TransitionalMotionShader<A>,
+    args: A,
+    duration: Duration,
+) -> TransitionalMotion {
+    TransitionalMotion {
+        shader: erase_shader(shader),
+        args: erase_args(args),
+        duration,
+        easing: Easing::Linear,
+        delay: ZERO,
+    }
+}
+impl TransitionalMotion {
+    /// This motion with `easing` on its progress.
+    pub const fn ease(mut self, easing: Easing) -> TransitionalMotion {
+        self.easing = easing;
+        self
+    }
+
+    /// This motion, starting `delay` after the cursor.
+    pub const fn delay(mut self, delay: Duration) -> TransitionalMotion {
+        self.delay = delay;
+        self
+    }
+}

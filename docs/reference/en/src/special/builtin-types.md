@@ -21,7 +21,8 @@ the value that is copied is the handle, so both copies name the same stored thin
 | `Rat`, `Decimal` | `#[builtin]` struct | no | yes | `fn`, `const fn` | [`std`](../../../../std/en/src/std.md) |
 | `String` | `#[builtin]` struct | no | yes | `fn`, `const fn` | [`std`](../../../../std/en/src/std.md) |
 | `Text` | `#[builtin]` struct | yes | yes | all | [`std::narrative::text`](../../../../std/en/src/narrative-text.md) |
-| `ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset`, `ShaderAsset` | `#[builtin]` structs | yes | yes | all | [`std`](../../../../std/en/src/std.md) |
+| `ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset` | `#[builtin]` structs | yes | yes | all | [`std`](../../../../std/en/src/std.md) |
+| `ColorShader<A>`, `MixShader<A>`, `TextureShader<A>`, `MaskShader<A>`, `LocalMotionShader<A>`, `TransitionalMotionShader<A>` | `#[builtin]` structs | no | yes | `const fn` | [`std::screen::shader`](../../../../std/en/src/screen-shader.md) |
 | `Vec<T>` | `#[builtin]` struct | no | if `T: Eq` | `fn`, `const fn` | [`std`](../../../../std/en/src/std.md) |
 | `Range<T>` | struct | if `T` is | if `T: Eq` | all | [`std`](../../../../std/en/src/std.md) |
 | `Option<T>`, `Result<T, E>` | enums | if the arguments are | if the arguments are | all | [`std`](../../../../std/en/src/std.md) |
@@ -88,8 +89,10 @@ game shows is `Text`.
 
 ### Asset types {#asset-types}
 
-`ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset` and `ShaderAsset` name files
-packed with the game. A value is created only by a constant call of `asset` or `system_font`:
+`ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset` and `FontAsset` name files packed with the
+game, and so do the six shader types (`ColorShader<A>` and the others), which name WGSL files
+(`.wgsl`) of one role with arguments of type `A`. A value is created only by a constant call of
+`asset` or `system_font`:
 
 ```kis
 const CG_001: ImageAsset = asset("cg_001.png");
@@ -99,13 +102,17 @@ const GOTHIC: FontAsset = system_font("msgothic.ttc");
 
 - The type argument of `asset::<A>` is inferred from the constant's type and must implement
   [`Asset`](./traits.md#asset).
-- The argument must be a string literal (`E2028`), not empty (`E1028`), and inside the asset
-  directory (`E1029`); a missing file is `E1027`. `system_font` has its own rules (`E1030`–`E1032`);
-  see the STD Reference, [`std`](../../../../std/en/src/std.md).
-- **Finite.** The values of an asset type are exactly the asset constants of the program, so the
-  story may hold them, and a misspelled asset is a name-resolution error instead of a runtime
-  failure.
+- The argument must be a string literal (`E2028`), not empty (`E1028`), inside the asset
+  directory (`E1029`) and outside its reserved top-level directories `system-fonts` and `std`
+  (`E1032`); a missing file is `E1027`. `system_font` has its own rules (`E1030`, `E1031`); see
+  the STD Reference, [`std`](../../../../std/en/src/std.md).
+- **Finite.** The values of a file asset type are exactly the asset constants of the program, so
+  the story may hold them, and a misspelled asset is a name-resolution error instead of a runtime
+  failure. The shader types are not finite; a shader is used by renders, not by the story.
 - `Eq`: yes.
+- `ShaderAsset`, the role-less identity of a shader file that effect values hold, is not `Asset`
+  and not in the prelude; games do not name it. See
+  [`std::screen::shader`](../../../../std/en/src/screen-shader.md).
 
 ### `Setting<T>` and `Meta<T>` {#setting-and-meta}
 

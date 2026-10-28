@@ -231,7 +231,7 @@ pushdown fn Moves() {
 
 ## E3018 `misplaced-attribute` {#e3018}
 
-**エラー。** 属性が、適用できないアイテムに使われています。たとえば `fn` への `#[scene]`、`#[scene]` のない `#[entry]`、関数への `#[must_use]` です。
+**エラー。** 属性が、適用できないアイテムに使われています。たとえば `fn` への `#[scene]`、`#[scene]` のない `#[entry]`、関数への `#[must_use]`、構造体以外への `#[shader_arg]` です。
 
 ```kis
 #[scene] fn not_a_story() {}
@@ -326,3 +326,27 @@ pushdown fn flip() -> Coin {
 ```
 
 修正方法: 関数に `#[scene]` を付けるか、シーンで値を引いてから渡します。
+
+## E3025 `shader-arg-shape` {#e3025}
+
+**エラー。** `#[shader_arg]` の構造体が、名前付きフィールドを 1 つ以上持つレコード構造体ではないか、型パラメータを持っています。シェーダーは引数を、型の決まった名前付きメンバーを持つ WGSL の構造体として読みます。配列の長さのような const パラメータは使えます。
+
+```kis
+#[shader_arg]
+struct Pair(Decimal, Decimal);
+```
+
+修正方法: フィールドに名前を付け、型パラメータをなくします。例: `#[shader_arg] struct Pair { a: Decimal, b: Decimal }`。
+
+## E3026 `shader-arg-field` {#e3026}
+
+**エラー。** `#[shader_arg]` の構造体のフィールドが、シェーダーが読めない型であるか、長さ 0 の配列です。使えるフィールドの型は `bool`、`i32`、`u32`、`Decimal`、`Rat`、`Color`、`Point`、`Offset`、`Size`、`Anchor`、`Angle`、`Duration`、フィールドのない enum、他の `#[shader_arg]` 構造体、およびこれらの空でない配列です。
+
+```kis
+#[shader_arg]
+struct Caption {
+    text: String,
+}
+```
+
+修正方法: シェーダーには数値のデータだけを渡します。例: `#[shader_arg] struct Caption { strength: Decimal }`。

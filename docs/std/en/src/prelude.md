@@ -12,7 +12,7 @@ or `use std::narrative::text::speed;`.
 ## Declaration
 
 ```kis
-pub use crate::{String, Vec, Rat, Decimal, Range, Option, Result, Eq, Integer, RandChoose, ImageAsset, AudioAsset, VoiceAsset, VideoAsset, FontAsset, ShaderAsset, asset, system_font};
+pub use crate::{String, Vec, Rat, Decimal, Range, Option, Result, Eq, Integer, RandChoose, ImageAsset, AudioAsset, VoiceAsset, VideoAsset, FontAsset, asset, system_font};
 pub use crate::Option::{None, Some};
 pub use crate::Result::{Err, Ok};
 pub use crate::time::{Duration, ms, secs};
@@ -30,7 +30,7 @@ pub use crate::ui::{signal, Element};
 
 |From|Names|Page|
 |---|---|---|
-|`std`|`String`, `Vec`, `Rat`, `Decimal`, `Range`, `Option`, `Result`, `Eq`, `Integer`, `RandChoose`, `ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset`, `ShaderAsset`, `asset`, `system_font`|[std](./std.md)|
+|`std`|`String`, `Vec`, `Rat`, `Decimal`, `Range`, `Option`, `Result`, `Eq`, `Integer`, `RandChoose`, `ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset`, `asset`, `system_font`|[std](./std.md)|
 |`std::Option`|`None`, `Some`|[std](./std.md#enum-optiont)|
 |`std::Result`|`Err`, `Ok`|[std](./std.md#enum-resultt-e)|
 |`std::time`|`Duration`, `ms`, `secs`|[std::time](./time.md)|

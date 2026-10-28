@@ -2,6 +2,7 @@
 //! the typed decoders build on.
 
 mod decode;
+mod shader_args;
 mod table;
 #[cfg(test)]
 mod tests;
@@ -25,7 +26,7 @@ impl StdTypes {
         let tys = std::array::from_fn(|index| {
             let decl = &STD_ADTS[index];
             let names: Vec<&str> = decl.variants.iter().map(|v| v.name).collect();
-            types.resolve(decl.path, &names)
+            types.resolve(decl.path, &names, decl.is_enum)
         });
         StdTypes { tys }
     }

@@ -80,7 +80,7 @@ pub fn describe(format: AssetFormat) -> &'static str {
 /// Whether `profile` supports assets of `kind` at all.
 pub fn supports_kind(profile: RuntimeProfile, kind: AssetKind) -> bool {
     match profile {
-        RuntimeProfile::NativeV0 => !matches!(kind, AssetKind::Video | AssetKind::Shader),
+        RuntimeProfile::NativeV0 => !matches!(kind, AssetKind::Video),
     }
 }
 
@@ -103,7 +103,8 @@ pub fn supports(profile: RuntimeProfile, kind: AssetKind, format: AssetFormat) -
                 F::OggVorbis | F::Flac | F::WavPcm | F::WavFloat | F::Mp3
             ),
             AssetKind::Font => matches!(format, F::TrueType | F::OpenTypeCff | F::FontCollection),
-            AssetKind::Video | AssetKind::Shader => false,
+            AssetKind::Shader => matches!(format, F::Wgsl),
+            AssetKind::Video => false,
         },
     }
 }

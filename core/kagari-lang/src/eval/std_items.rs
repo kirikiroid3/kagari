@@ -9,6 +9,8 @@ use crate::input::{FilePath, Program, SourceFile};
 use crate::item_tree::ItemIndex;
 use crate::item_tree::{FnKind, ItemId, ItemKind, ItemParent, Shape, item_tree};
 
+use kagari_shader::ShaderRole;
+
 use super::value::{AssetKind, ConstValue, adt_variants};
 
 /// A `#[builtin]` function (or `Integer` trait method) the evaluator implements.
@@ -16,6 +18,8 @@ use super::value::{AssetKind, ConstValue, adt_variants};
 pub enum Builtin {
     Asset,
     SystemFont,
+    ShaderErase,
+    ShaderArgsErase,
     VecNew,
     VecLen,
     VecIsEmpty,
@@ -50,7 +54,10 @@ pub enum Builtin {
     EntityRotation,
     EntityOpacity,
     EntityFilter,
-    EntityShader,
+    EntityMix,
+    EntityMask,
+    EntityLocalMotion,
+    EntityTravel,
     EntityFill,
     EntityPart,
     EntityLabel,
@@ -59,7 +66,6 @@ pub enum Builtin {
     EntitySetZ,
     EntitySetAnchor,
     EntitySetFlip,
-    EntitySetBlend,
     EntitySetFillSize,
     EntityGate,
     EntityApplyAnimation,
@@ -68,6 +74,7 @@ pub enum Builtin {
     ChangeApplyAnimation,
     ImageLayerGet,
     ImageLayerChange,
+    ImageLayerPaint,
     ImageLayerClear,
     LabelLayerChange,
     LabelLayerClear,
@@ -109,6 +116,18 @@ pub(crate) const BUILTINS_LEN: usize = BUILTINS.len();
 const BUILTINS: &[(&str, &str, &str, Builtin)] = &[
     ("mod.kis", "", "asset", Builtin::Asset),
     ("mod.kis", "", "system_font", Builtin::SystemFont),
+    (
+        "screen/shader.kis",
+        "",
+        "erase_shader",
+        Builtin::ShaderErase,
+    ),
+    (
+        "screen/shader.kis",
+        "",
+        "erase_args",
+        Builtin::ShaderArgsErase,
+    ),
     ("mod.kis", "Vec", "new", Builtin::VecNew),
     ("mod.kis", "Vec", "len", Builtin::VecLen),
     ("mod.kis", "Vec", "is_empty", Builtin::VecIsEmpty),
@@ -163,7 +182,15 @@ const BUILTINS: &[(&str, &str, &str, Builtin)] = &[
     ("screen.kis", "Entity", "rotation", Builtin::EntityRotation),
     ("screen.kis", "Entity", "opacity", Builtin::EntityOpacity),
     ("screen.kis", "Entity", "filter", Builtin::EntityFilter),
-    ("screen.kis", "Entity", "shader", Builtin::EntityShader),
+    ("screen.kis", "Entity", "mix", Builtin::EntityMix),
+    ("screen.kis", "Entity", "mask", Builtin::EntityMask),
+    (
+        "screen.kis",
+        "Entity",
+        "local_motion",
+        Builtin::EntityLocalMotion,
+    ),
+    ("screen.kis", "Entity", "travel", Builtin::EntityTravel),
     ("screen.kis", "Entity", "fill", Builtin::EntityFill),
     ("screen.kis", "Entity", "part", Builtin::EntityPart),
     ("screen.kis", "Entity", "label", Builtin::EntityLabel),
@@ -177,7 +204,6 @@ const BUILTINS: &[(&str, &str, &str, Builtin)] = &[
         Builtin::EntitySetAnchor,
     ),
     ("screen.kis", "Entity", "set_flip", Builtin::EntitySetFlip),
-    ("screen.kis", "Entity", "set_blend", Builtin::EntitySetBlend),
     (
         "screen.kis",
         "Entity",
@@ -205,6 +231,12 @@ const BUILTINS: &[(&str, &str, &str, Builtin)] = &[
         "ImageLayer",
         "change",
         Builtin::ImageLayerChange,
+    ),
+    (
+        "screen.kis",
+        "ImageLayer",
+        "paint",
+        Builtin::ImageLayerPaint,
     ),
     (
         "screen.kis",
@@ -367,7 +399,7 @@ pub struct StdTable {
     pub plane: AdtInfo,
     pub visibility: AdtInfo,
     pub flip: AdtInfo,
-    pub blend_mode: AdtInfo,
+    pub pose: AdtInfo,
     pub valign: AdtInfo,
     pub mark: AdtInfo,
     pub text_effect: AdtInfo,
@@ -375,6 +407,7 @@ pub struct StdTable {
     pub easing: AdtInfo,
     pub tween: AdtInfo,
     pub transition: AdtInfo,
+    pub transitional_motion: AdtInfo,
     pub motion: AdtInfo,
     pub motion_key: AdtInfo,
     pub sound: AdtInfo,
@@ -433,8 +466,14 @@ pub fn std_table(db: &dyn Db, program: Program) -> Option<StdTable> {
         })
     };
     let mut assets = Vec::new();
-    for kind in AssetKind::ALL {
+    for kind in AssetKind::FILES {
         assets.push((find("mod.kis", kind.type_name())?, kind));
+    }
+    for role in ShaderRole::ALL {
+        assets.push((
+            find("screen/shader.kis", role.type_name())?,
+            AssetKind::Shader(role),
+        ));
     }
     let mut builtins = FxHashMap::default();
     for (name, &file) in &std_files {
@@ -504,7 +543,7 @@ pub fn std_table(db: &dyn Db, program: Program) -> Option<StdTable> {
         plane: adt("screen.kis", "Plane")?,
         visibility: adt("screen.kis", "Visibility")?,
         flip: adt("screen.kis", "Flip")?,
-        blend_mode: adt("screen.kis", "BlendMode")?,
+        pose: adt("screen.kis", "Pose")?,
         valign: adt("screen.kis", "VAlign")?,
         mark: adt("narrative/text.kis", "Mark")?,
         text_effect: adt("narrative/text.kis", "TextEffect")?,
@@ -512,6 +551,7 @@ pub fn std_table(db: &dyn Db, program: Program) -> Option<StdTable> {
         easing: adt("screen/anim.kis", "Easing")?,
         tween: adt("screen/anim.kis", "Tween")?,
         transition: adt("screen/anim.kis", "Transition")?,
+        transitional_motion: adt("screen/shader.kis", "TransitionalMotion")?,
         motion: adt("screen/anim.kis", "Motion")?,
         motion_key: adt("screen/anim.kis", "MotionKey")?,
         sound: adt("screen/audio.kis", "Sound")?,

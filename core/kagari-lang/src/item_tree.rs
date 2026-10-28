@@ -229,7 +229,7 @@ pub struct BlockScope {
     pub items: Vec<ItemIndex>,
 }
 
-const KNOWN_ATTRIBUTES: &[&str] = &["scene", "entry", "must_use", "builtin"];
+const KNOWN_ATTRIBUTES: &[&str] = &["scene", "entry", "must_use", "builtin", "shader_arg"];
 
 #[salsa::tracked(returns(ref), no_eq)]
 pub fn item_tree_raw(db: &dyn Db, file: SourceFile) -> ItemTreeRaw {

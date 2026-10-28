@@ -215,7 +215,19 @@ impl FnCodegen<'_, '_> {
                 let kind = asset_item.and_then(|item| std.asset_kind(item));
                 match (asset, kind) {
                     (Some(path), Some(kind)) => {
-                        let file = self.em.program.asset_root(self.em.db).join(path);
+                        // Assets declared in std are std files; others lie in the asset
+                        // directory.
+                        let in_std = self.body.is_some_and(|body| {
+                            matches!(
+                                body.source.owner().file.path(self.em.db),
+                                crate::input::FilePath::Std(_)
+                            )
+                        });
+                        let file = if in_std {
+                            crate::input::FilePath::Std(path.into())
+                        } else {
+                            self.em.program.asset_root(self.em.db).join(path)
+                        };
                         let value = ConstValue::Asset { kind, path: file };
                         self.load_value(dst, &value);
                         return;
@@ -241,6 +253,8 @@ impl FnCodegen<'_, '_> {
                     None => self.import_call(item, args, dst),
                 }
             }
+            // The erasure intrinsics only forget a type.
+            Builtin::ShaderErase | Builtin::ShaderArgsErase => Instr::Move { dst: d, src: a },
             Builtin::VecNew => Instr::VecNew { dst: d },
             Builtin::VecLen => Instr::Len { dst: d, src: a },
             Builtin::VecIsEmpty => {

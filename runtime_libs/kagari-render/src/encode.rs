@@ -1,22 +1,36 @@
-//! The second phase of a frame: uploads the planned vertices and uniforms, then records every
-//! pass and copy into one command encoder.
+//! The second phase of a frame: uploads the planned vertices, uniforms and shader arguments, then
+//! records the motion compute pass and every render pass and copy into one command encoder.
 
 use std::collections::HashMap;
+
+use kagari_shader::{MAX_ARGS_BYTES, STATES_BYTES, TRANSFORMS_BYTES};
 
 use crate::Gfx;
 use crate::atlas::GlyphAtlas;
 use crate::layers::LayerPool;
-use crate::pipelines::UNIFORM_SIZE;
-use crate::plan::{BindKey, Op, Plan, PxRect, Target};
+use crate::pipelines::{MOTION_UNIFORM_SIZE, UNIFORM_SIZE};
+use crate::plan::{BindKey, DrawPipe, Op, Plan, PxRect, Target, TransitionMask};
+use crate::shaders::ShaderCache;
 use crate::textures::{Still, TextureCache};
 
 const INITIAL_VERTEX_BYTES: u64 = 64 * 1024;
 
-/// The vertex buffer, the uniform buffer and the group-0 bind group over it.
+/// The identity displacement of motion slot 0: rows `(1, 0, 0, 0)` and `(0, 1, 0, 0)`.
+const IDENTITY_ROWS: [f32; 8] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+
+/// The per-frame buffers and the bind groups over them: vertices, uniforms (group 0 together with
+/// the motion displacement rows), shader arguments and the motion buffers.
 pub(crate) struct FrameBuffers {
     vertex: wgpu::Buffer,
     uniform: wgpu::Buffer,
+    /// The raster group 0: the uniforms and the displacement rows.
     pub bind: wgpu::BindGroup,
+    /// Motion displacement rows (uniform for raster draws, storage for the motion pass).
+    transforms: wgpu::Buffer,
+    /// The shader arguments and their group-2 bind group (user shaders only).
+    args: Option<(wgpu::Buffer, wgpu::BindGroup)>,
+    /// The motion pass's group 0 (over `uniform`) and group 1 (states and rows).
+    motion: Option<(wgpu::BindGroup, wgpu::BindGroup)>,
 }
 
 fn buffer(gfx: &Gfx, label: &str, size: u64, usage: wgpu::BufferUsages) -> wgpu::Buffer {
@@ -28,19 +42,55 @@ fn buffer(gfx: &Gfx, label: &str, size: u64, usage: wgpu::BufferUsages) -> wgpu:
     })
 }
 
-fn uniform_bind(gfx: &Gfx, uniform: &wgpu::Buffer) -> wgpu::BindGroup {
+fn binding(buffer: &wgpu::Buffer, size: u64) -> wgpu::BindingResource<'_> {
+    wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+        buffer,
+        offset: 0,
+        size: wgpu::BufferSize::new(size),
+    })
+}
+
+fn uniform_bind(gfx: &Gfx, uniform: &wgpu::Buffer, transforms: &wgpu::Buffer) -> wgpu::BindGroup {
     gfx.device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("kagari uniforms"),
         layout: &gfx.pipes.uniforms,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: binding(uniform, UNIFORM_SIZE),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: binding(transforms, TRANSFORMS_BYTES),
+            },
+        ],
+    })
+}
+
+fn args_buffer(gfx: &Gfx, size: u64) -> Option<(wgpu::Buffer, wgpu::BindGroup)> {
+    let user = gfx.pipes.user.as_ref()?;
+    let args = buffer(gfx, "kagari shader args", size, wgpu::BufferUsages::STORAGE);
+    let bind = gfx.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("kagari shader args"),
+        layout: &user.args,
         entries: &[wgpu::BindGroupEntry {
             binding: 0,
-            resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                buffer: uniform,
-                offset: 0,
-                size: wgpu::BufferSize::new(UNIFORM_SIZE),
-            }),
+            resource: binding(&args, u64::from(MAX_ARGS_BYTES)),
         }],
-    })
+    });
+    Some((args, bind))
+}
+
+fn motion_uniform_bind(gfx: &Gfx, uniform: &wgpu::Buffer) -> Option<wgpu::BindGroup> {
+    let motion = gfx.pipes.user.as_ref()?.motion.as_ref()?;
+    Some(gfx.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("kagari motion uniform"),
+        layout: &motion.uniform,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: binding(uniform, MOTION_UNIFORM_SIZE),
+        }],
+    }))
 }
 
 /// Doubles `cap` until it holds `len`.
@@ -60,14 +110,57 @@ impl FrameBuffers {
             slot.saturating_mul(64),
             wgpu::BufferUsages::UNIFORM,
         );
+        let motion_layouts = gfx.pipes.user.as_ref().and_then(|u| u.motion.as_ref());
+        let mut usage = wgpu::BufferUsages::UNIFORM;
+        if motion_layouts.is_some() {
+            usage |= wgpu::BufferUsages::STORAGE;
+        }
+        let transforms = buffer(gfx, "kagari motion transforms", TRANSFORMS_BYTES, usage);
+        gfx.queue
+            .write_buffer(&transforms, 0, bytemuck::cast_slice(&IDENTITY_ROWS));
+        let motion = match (motion_layouts, motion_uniform_bind(gfx, &uniform)) {
+            (Some(layouts), Some(uniform_bind)) => {
+                let states = buffer(
+                    gfx,
+                    "kagari motion states",
+                    STATES_BYTES,
+                    wgpu::BufferUsages::STORAGE,
+                );
+                let buffers = gfx.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("kagari motion buffers"),
+                    layout: &layouts.buffers,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: binding(&states, STATES_BYTES),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: binding(&transforms, TRANSFORMS_BYTES),
+                        },
+                    ],
+                });
+                Some((uniform_bind, buffers))
+            }
+            _ => None,
+        };
         FrameBuffers {
-            vertex: buffer(gfx, "kagari vertices", INITIAL_VERTEX_BYTES, wgpu::BufferUsages::VERTEX),
-            bind: uniform_bind(gfx, &uniform),
+            vertex: buffer(
+                gfx,
+                "kagari vertices",
+                INITIAL_VERTEX_BYTES,
+                wgpu::BufferUsages::VERTEX,
+            ),
+            bind: uniform_bind(gfx, &uniform, &transforms),
+            args: args_buffer(gfx, u64::from(MAX_ARGS_BYTES)),
+            motion,
+            transforms,
             uniform,
         }
     }
 
-    /// Writes the plan's vertices and uniforms, growing either buffer by doubling.
+    /// Writes the plan's vertices, uniforms and arguments, growing each buffer by doubling. The
+    /// argument buffer always holds `MAX_ARGS_BYTES` past the last offset, the binding size.
     pub fn upload(&mut self, gfx: &Gfx, plan: &Plan) {
         let verts: &[u8] = bytemuck::cast_slice(&plan.verts);
         let vlen = verts.len() as u64;
@@ -87,13 +180,30 @@ impl FrameBuffers {
                 grown(self.uniform.size(), ulen),
                 wgpu::BufferUsages::UNIFORM,
             );
-            self.bind = uniform_bind(gfx, &self.uniform);
+            self.bind = uniform_bind(gfx, &self.uniform, &self.transforms);
+            if let (Some((uniform_bind, _)), Some(new)) =
+                (&mut self.motion, motion_uniform_bind(gfx, &self.uniform))
+            {
+                *uniform_bind = new;
+            }
+        }
+        let alen = (plan.args.len() as u64).saturating_add(u64::from(MAX_ARGS_BYTES));
+        if let Some((args, _)) = &self.args
+            && alen > args.size()
+            && let Some(new) = args_buffer(gfx, grown(args.size(), alen))
+        {
+            self.args = Some(new);
         }
         if !verts.is_empty() {
             gfx.queue.write_buffer(&self.vertex, 0, verts);
         }
         if !plan.uniforms.is_empty() {
             gfx.queue.write_buffer(&self.uniform, 0, &plan.uniforms);
+        }
+        if let Some((args, _)) = &self.args
+            && !plan.args.is_empty()
+        {
+            gfx.queue.write_buffer(args, 0, &plan.args);
         }
     }
 }
@@ -114,6 +224,7 @@ pub(crate) struct Resources<'a> {
     pub textures: &'a TextureCache,
     pub atlas: &'a GlyphAtlas,
     pub still: Option<&'a Still>,
+    pub shaders: &'a ShaderCache,
     pub buffers: &'a FrameBuffers,
 }
 
@@ -145,18 +256,19 @@ impl Resources<'_> {
             BindKey::Layer(src) | BindKey::Blur { src } => {
                 Some(gfx.pipes.textures(&gfx.device, &layers(&[src])?))
             }
-            BindKey::Blend { src, backdrop } => {
-                Some(gfx.pipes.textures(&gfx.device, &layers(&[src, backdrop])?))
-            }
+            BindKey::Pair { a, b } => Some(gfx.pipes.textures(&gfx.device, &layers(&[a, b])?)),
             BindKey::Transition { from, to, mask } => {
                 let mut views = layers(&[from, to])?;
                 let mask = match mask {
-                    Some(id) => &self.textures.get_image(id)?.view,
-                    None => &self.textures.white.view,
+                    TransitionMask::Image(id) => &self.textures.get_image(id)?.view,
+                    TransitionMask::Layer(id) => self.layers.view(id)?,
+                    TransitionMask::None => &self.textures.white.view,
                 };
                 views.push(mask);
                 Some(gfx.pipes.textures(&gfx.device, &views))
             }
+            BindKey::Empty => Some(gfx.pipes.empty_bind.clone()),
+            BindKey::White => Some(self.textures.white.bind.clone()),
         }
     }
 }
@@ -169,12 +281,42 @@ fn extent(rect: &PxRect) -> wgpu::Extent3d {
     }
 }
 
-/// Records every op of `plan` into `encoder`.
+/// Records the motion stages of `plan` in one compute pass.
+fn encode_motion(res: &Resources<'_>, plan: &Plan, encoder: &mut wgpu::CommandEncoder) {
+    let (Some((uniform, buffers)), Some((_, args))) = (&res.buffers.motion, &res.buffers.args)
+    else {
+        return;
+    };
+    if plan.compute.is_empty() {
+        return;
+    }
+    let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+        label: Some("kagari motion"),
+        timestamp_writes: None,
+    });
+    for op in &plan.compute {
+        let Some(pipeline) = res.shaders.compute(op.shader, op.role) else {
+            continue;
+        };
+        pass.set_pipeline(pipeline);
+        pass.set_bind_group(0, uniform, &[op.uniform]);
+        pass.set_bind_group(1, buffers, &[]);
+        pass.set_bind_group(2, args, &[op.args]);
+        pass.dispatch_workgroups(1, 1, 1);
+    }
+}
+
+/// Records every op of `plan` into `encoder`: the motion pass first, then the passes and copies.
 pub(crate) fn encode(res: &Resources<'_>, plan: &Plan, encoder: &mut wgpu::CommandEncoder) {
+    encode_motion(res, plan, encoder);
     let mut binds: HashMap<BindKey, Option<wgpu::BindGroup>> = HashMap::new();
     for op in &plan.ops {
         match op {
-            Op::Pass { target, clear, draws } => {
+            Op::Pass {
+                target,
+                clear,
+                draws,
+            } => {
                 let Some(view) = res.view(*target) else {
                     log::error!("render target {target:?} is gone; pass skipped");
                     continue;
@@ -209,9 +351,22 @@ pub(crate) fn encode(res: &Resources<'_>, plan: &Plan, encoder: &mut wgpu::Comma
                     let Some(Some(bind)) = binds.get(&draw.bind) else {
                         continue;
                     };
+                    let pipeline = match draw.pipe {
+                        DrawPipe::Fixed(pipe) => res.gfx.pipes.get(pipe),
+                        DrawPipe::User(id, role) => match res.shaders.render(id, role) {
+                            Some(p) => p,
+                            None => continue,
+                        },
+                    };
+                    if let Some(offset) = draw.args {
+                        let Some((_, args)) = &res.buffers.args else {
+                            continue;
+                        };
+                        pass.set_bind_group(2, args, &[offset]);
+                    }
                     let s = draw.scissor;
                     pass.set_scissor_rect(s.x, s.y, s.w, s.h);
-                    pass.set_pipeline(res.gfx.pipes.get(draw.pipe));
+                    pass.set_pipeline(pipeline);
                     pass.set_bind_group(0, &res.buffers.bind, &[draw.uniform]);
                     pass.set_bind_group(1, bind, &[]);
                     pass.draw(draw.verts.clone(), 0..1);

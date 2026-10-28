@@ -156,7 +156,7 @@ pub mod AZUSA {
 
 | 元のモジュール | 名前 |
 | -------------- | ---- |
-| `std` | `String`、`Vec`、`Rat`、`Decimal`、`Range`、`Option`、`Result`、`Eq`、`Integer`、`RandChoose`、`ImageAsset`、`AudioAsset`、`VoiceAsset`、`VideoAsset`、`FontAsset`、`ShaderAsset`、`asset`、`system_font`。バリアント `None`、`Some`、`Ok`、`Err` |
+| `std` | `String`、`Vec`、`Rat`、`Decimal`、`Range`、`Option`、`Result`、`Eq`、`Integer`、`RandChoose`、`ImageAsset`、`AudioAsset`、`VoiceAsset`、`VideoAsset`、`FontAsset`、`asset`、`system_font`。バリアント `None`、`Some`、`Ok`、`Err` |
 | `std::time` | `Duration`、`ms`、`secs` |
 | `std::screen` | `Screen`、`Render`、`EntityId`、`Part`、`Point`、`Offset`、`Size`、`Anchor`、`Color`、`Plane`、`Visibility`、`point`、`offset`、`rgb`、`hex`、`BLACK`、`WHITE`、`TRANSPARENT` |
 | `std::screen::anim` | `Easing`、`Tween`、`Transition`、`Motion`、`tween`、`instant`、`cut`、`fade`、`rule`、`wipe`、`through`、`motion`、`jump`、`nod`、`shake`、`quake` |
@@ -182,7 +182,7 @@ const AZUSA_0072: VoiceAsset = asset("voice/azusa_0072.ogg");
 #[builtin] pub const fn asset<A: Asset>(path: narrative::Text) -> A;
 ```
 
-アセット型は 6 つあり、トレイト `Asset` を実装するのはこれらだけです。
+次の型がトレイト `Asset` を実装します。
 
 | 型 | ファイル |
 | -- | -------- |
@@ -191,17 +191,17 @@ const AZUSA_0072: VoiceAsset = asset("voice/azusa_0072.ogg");
 | `VoiceAsset` | 台詞に結び付くボイスファイル |
 | `VideoAsset` | 動画 |
 | `FontAsset` | フォント |
-| `ShaderAsset` | WGSL シェーダー（`.wgsl`）。フィルター、または天候やパーティクルなどの生成コンテンツ |
+| `ColorShader<A>`、`MixShader<A>`、`TextureShader<A>`、`MaskShader<A>`、`LocalMotionShader<A>`、`TransitionalMotionShader<A>` | 1 つのロールの WGSL シェーダー（`.wgsl`）。引数の型は `A`。[`std::screen::shader`](../../../../std/ja/src/screen-shader.md) を参照 |
 
 `A` は定数の型で決まります。`asset::<ImageAsset>("…")` と明示することもできます。パスは次の規則に従います。
 
 - 文字列リテラルであり（[`E2028`](../diagnostics/types.md#e2028)）、空ではないこと（[`E1028`](../diagnostics/modules.md#e1028)）。
 - **アセットディレクトリ**からの相対パスであること。アセットディレクトリは `kagari.toml` の `[assets] dir` で、既定はプロジェクトディレクトリの `assets` です。ディレクトリの区切りには `/` と `\` のどちらも使えます。
 - アセットディレクトリの外に出ないこと。絶対パス、ドライブ（`C:`）、外に出る `..` は使えません（[`E1029`](../diagnostics/modules.md#e1029)）。
-- システムフォント用に予約された最上位ディレクトリ `system-fonts` に入らないこと（[`E1032`](../diagnostics/modules.md#e1032)）。
+- 最上位ディレクトリ `system-fonts` と `std` に入らないこと。これらはシステムフォントと標準ライブラリ自身のアセットのために予約されています（[`E1032`](../diagnostics/modules.md#e1032)）。
 - ゲームのコンパイル時にファイルが存在すること（[`E1027`](../diagnostics/modules.md#e1027)）。ファイルがなければプレイ中の失敗ではなくコンパイルエラーになります。
 
-アセット型は[有限型](../concepts/kinds.md#finite-types)です。その値はちょうどプログラムのアセット定数です。そのため物語は、たとえばルートに応じてボイスを選ぶように、実行時にアセットを選べます。2 つのアセット値は、同じファイルを指すとき等しくなります。
+ファイルのアセット型は[有限型](../concepts/kinds.md#finite-types)です。その値はちょうどプログラムのアセット定数です。そのため物語は、たとえばルートに応じてボイスを選ぶように、実行時にアセットを選べます。2 つのアセット値は、同じファイルを指すとき等しくなります。シェーダー型は有限型ではなく、レンダーが使います。
 
 ### システムフォント {#system-fonts}
 
@@ -235,5 +235,6 @@ const GOTHIC: FontAsset = system_font("msgothic.ttc");
 | `cg/cg_001.png` | `cg.kiarchive` |
 | `logo.png`（アセットディレクトリの直下） | `data.kiarchive` |
 | システムフォント `msgothic.ttc` | `system-fonts.kiarchive`（`system-fonts/msgothic.ttc` として） |
+| `BLUR`（`std::shaders::color::BLUR`）などの `std` のシェーダー | `std.kiarchive`（`std/shaders/color/blur.wgsl` として） |
 
 つまり、ファイルを最上位ディレクトリでどうまとめるかによって、ゲームのデータがどのアーカイブに分かれるかが決まります。ビルドの出力については [`kagari` CLI](../tools/cli.md) を参照してください。

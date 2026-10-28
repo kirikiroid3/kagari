@@ -9,7 +9,7 @@
 //! into a linear-light, premultiplied `Rgba16Float` target, then letterboxed onto a surface
 //! ([`Renderer::render`]), kept offscreen ([`Renderer::render_offscreen`]) or read back as
 //! sRGB RGBA8 ([`Renderer::render_to_rgba`]). Glyph masks come from the engine's
-//! `AssetStore::fonts()`.
+//! `AssetStore::fonts()`, user shader sources from `AssetStore::shader_source`.
 
 mod atlas;
 mod blur;
@@ -18,6 +18,7 @@ mod layers;
 mod pipelines;
 mod plan;
 mod readback;
+mod shaders;
 mod text;
 mod textures;
 mod viewport;
@@ -32,6 +33,7 @@ use crate::layers::{LayerPool, linear_texture};
 use crate::pipelines::{Pipe, Pipelines, uniform_slot};
 use crate::plan::Planner;
 use crate::readback::Readback;
+use crate::shaders::ShaderCache;
 use crate::textures::{Still, TextureCache};
 
 /// The device, the queue and the pipelines, shared by every cache.
@@ -47,6 +49,7 @@ pub struct Renderer {
     textures: TextureCache,
     atlas: GlyphAtlas,
     layers: LayerPool,
+    shaders: ShaderCache,
     buffers: FrameBuffers,
     design: Option<DesignTarget>,
     still: Option<Still>,
@@ -56,7 +59,11 @@ pub struct Renderer {
 
 impl Renderer {
     /// `target_format` is the format of the views [`Renderer::render`] presents into.
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, target_format: wgpu::TextureFormat) -> Renderer {
+    pub fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        target_format: wgpu::TextureFormat,
+    ) -> Renderer {
         let gfx = Gfx {
             device: device.clone(),
             queue: queue.clone(),
@@ -67,6 +74,7 @@ impl Renderer {
             textures: TextureCache::new(&gfx),
             atlas: GlyphAtlas::new(&gfx),
             layers: LayerPool::default(),
+            shaders: ShaderCache::default(),
             buffers: FrameBuffers::new(&gfx, slot),
             design: None,
             still: None,
@@ -78,7 +86,13 @@ impl Renderer {
 
     /// Renders `frame` at design size, then letterboxes it into `target` (size =
     /// `viewport.surface`). Glyph masks come from `assets.fonts()`.
-    pub fn render(&mut self, frame: &Frame, assets: &AssetStore, target: &wgpu::TextureView, viewport: Viewport) {
+    pub fn render(
+        &mut self,
+        frame: &Frame,
+        assets: &AssetStore,
+        target: &wgpu::TextureView,
+        viewport: Viewport,
+    ) {
         let mut encoder = self.prepare(frame, assets);
         if let Some(design) = &self.design {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -125,7 +139,13 @@ impl Renderer {
 
     /// `frame` stretched to `width`×`height`: sRGB RGBA8, straight alpha (always 255),
     /// row-major, `width·height·4` bytes; empty on failure.
-    pub fn render_to_rgba(&mut self, frame: &Frame, assets: &AssetStore, width: u32, height: u32) -> Vec<u8> {
+    pub fn render_to_rgba(
+        &mut self,
+        frame: &Frame,
+        assets: &AssetStore,
+        width: u32,
+        height: u32,
+    ) -> Vec<u8> {
         if width == 0 || height == 0 {
             return Vec::new();
         }
@@ -134,7 +154,11 @@ impl Renderer {
             log::error!("frame readback failed: {width}×{height} exceeds the GPU limit {max}");
             return Vec::new();
         }
-        if self.readback.as_ref().is_none_or(|r| r.size != (width, height)) {
+        if self
+            .readback
+            .as_ref()
+            .is_none_or(|r| r.size != (width, height))
+        {
             self.readback = Readback::new(&self.gfx, (width, height));
         }
         let mut encoder = self.prepare(frame, assets);
@@ -186,12 +210,18 @@ impl Renderer {
         let mut stack: Vec<&Node> = frame.nodes.iter().collect();
         while let Some(node) = stack.pop() {
             match node {
-                Node::Group { children, .. } => stack.extend(children),
+                Node::Group { children, .. }
+                | Node::Filter { children, .. }
+                | Node::Mix { children, .. }
+                | Node::Masked { children, .. }
+                | Node::Motion { children, .. } => stack.extend(children),
                 Node::Transition { from, to, .. } => {
                     stack.extend(from);
                     stack.extend(to);
                 }
-                Node::Thumbnail { slot, generation, .. } => {
+                Node::Thumbnail {
+                    slot, generation, ..
+                } => {
                     let fresh = self.textures.thumb(*slot).map(|(g, _)| g) == Some(*generation)
                         || self.textures.thumb_rejected(*slot, *generation);
                     if !fresh && !out.contains(&(*slot, *generation)) {
@@ -207,7 +237,14 @@ impl Renderer {
     /// Uploads a save thumbnail. `rgba`: straight-alpha sRGB RGBA8; a length other than
     /// `width·height·4`, or a side above the GPU's texture limit, is logged and keeps the old
     /// texture.
-    pub fn set_thumbnail(&mut self, slot: ThumbKey, generation: u64, width: u32, height: u32, rgba: &[u8]) {
+    pub fn set_thumbnail(
+        &mut self,
+        slot: ThumbKey,
+        generation: u64,
+        width: u32,
+        height: u32,
+        rgba: &[u8],
+    ) {
         self.textures
             .set_thumbnail(&self.gfx, slot, generation, width, height, rgba);
     }
@@ -241,6 +278,7 @@ impl Renderer {
             &mut self.textures,
             &mut self.atlas,
             &mut self.layers,
+            &mut self.shaders,
             assets,
             size,
             usize::try_from(self.slot).unwrap_or(usize::MAX),
@@ -251,7 +289,9 @@ impl Renderer {
         let mut encoder = self
             .gfx
             .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("kagari frame") });
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("kagari frame"),
+            });
         let Some(design) = &self.design else {
             return encoder;
         };
@@ -263,6 +303,7 @@ impl Renderer {
                 textures: &self.textures,
                 atlas: &self.atlas,
                 still: self.still.as_ref(),
+                shaders: &self.shaders,
                 buffers: &self.buffers,
             },
             &plan,

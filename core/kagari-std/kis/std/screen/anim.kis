@@ -2,6 +2,7 @@
 //! motions.
 
 use crate::screen::{Angle, Color, Offset, degrees, offset};
+use crate::screen::shader::Mask;
 use crate::time::{Duration, ZERO, ms};
 
 /// A timing curve (easings.net); `In` means a slow start.
@@ -92,6 +93,8 @@ pub enum TransitionKind {
     Blinds { direction: Direction, count: u32 },
     /// Fades to `color`, holds it, then fades in the new content.
     ThroughColor { color: Color, hold: Duration },
+    /// A pixel switches once the mask's value ×255 is at most the sweeping threshold.
+    Masked { mask: Mask, softness: u8, reverse: bool },
 }
 /// A layer swap with its timing.
 pub struct Transition {
@@ -117,8 +120,26 @@ pub const fn rule(mask: ImageAsset, duration: Duration) -> Transition {
     rule_with(mask, 0, false, duration)
 }
 /// A rule (mask) transition with a blend ramp of `softness` luminance units.
-pub const fn rule_with(mask: ImageAsset, softness: u8, reverse: bool, duration: Duration) -> Transition {
+pub const fn rule_with(
+    mask: ImageAsset,
+    softness: u8,
+    reverse: bool,
+    duration: Duration,
+) -> Transition {
     transition(TransitionKind::Rule { mask, softness, reverse }, duration)
+}
+/// A transition through a mask shader, with hard edges.
+pub const fn masked(mask: Mask, duration: Duration) -> Transition {
+    masked_with(mask, 0, false, duration)
+}
+/// A transition through a mask shader, with a blend ramp of `softness` units of the value ×255.
+pub const fn masked_with(
+    mask: Mask,
+    softness: u8,
+    reverse: bool,
+    duration: Duration,
+) -> Transition {
+    transition(TransitionKind::Masked { mask, softness, reverse }, duration)
 }
 /// A wipe moving in `direction`.
 pub const fn wipe(direction: Direction, duration: Duration) -> Transition {
@@ -172,7 +193,13 @@ impl Motion {
     }
 
     /// Appends a key with easing Linear.
-    pub const fn key_full(mut self, at: Duration, offset: Offset, scale: Decimal, rotation: Angle) -> Motion {
+    pub const fn key_full(
+        mut self,
+        at: Duration,
+        offset: Offset,
+        scale: Decimal,
+        rotation: Angle,
+    ) -> Motion {
         self.keys.push(MotionKey { at, offset, scale, rotation, easing: Easing::Linear });
         self
     }

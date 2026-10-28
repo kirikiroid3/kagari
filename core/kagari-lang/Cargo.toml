@@ -10,6 +10,7 @@ kagari-bytecode = { workspace = true }
 kagari-num = { workspace = true }
 kagari-syntax = { workspace = true }
 kagari-std = { workspace = true }
+kagari-shader = { workspace = true }
 rowan = { workspace = true }
 salsa = { workspace = true }
 rustc-hash = { workspace = true }

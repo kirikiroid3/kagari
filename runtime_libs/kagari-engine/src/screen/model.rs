@@ -10,8 +10,9 @@ use std::rc::Rc;
 use kagari_vm::{AssetId, Decimal, HostObject, StaticId, Text, Trap, Value, value_eq};
 
 use crate::values::{
-    AudioFade, BlendMode, Flip, LoopSpec, Motion, MovieSpec, Plane, SoundSpec, Transition, Tween,
-    VAlign, Visibility, check_easing, check_fraction, check_motion, host_trap,
+    AudioFade, EffectSpec, Flip, LoopSpec, Motion, MovieSpec, PaintSpec, Plane, PoseSpec,
+    SoundSpec, Transition, TransitionalMotionSpec, Tween, VAlign, Visibility, check_easing,
+    check_fraction, check_motion, host_trap,
 };
 
 /// A screen. Equality compares the logical screen only.
@@ -27,7 +28,7 @@ pub(crate) struct LogicalScreen {
     pub entities: BTreeMap<u32, Entity>,
     pub hud: Hud,
     pub camera: Camera,
-    pub filter: Option<AssetId>,
+    pub filter: Option<Rc<EffectSpec>>,
     pub music: Channel,
     pub ambience: [Channel; 4],
 }
@@ -41,18 +42,35 @@ pub(crate) struct Entity {
     pub scale: Decimal,
     pub rotation: Decimal,
     pub opacity: Decimal,
-    pub filter: Option<AssetId>,
-    pub shader: Option<AssetId>,
+    pub filter: Option<Rc<EffectSpec>>,
+    pub mix: Option<Rc<EffectSpec>>,
+    pub mask: Option<Rc<EffectSpec>>,
+    pub local_motion: Option<Rc<EffectSpec>>,
     pub fill: [u8; 4],
     pub fill_size: Option<[u32; 2]>,
-    pub parts: BTreeMap<u8, AssetId>,
+    pub parts: BTreeMap<u8, PartContent>,
     pub label: Option<Text>,
     pub label_style: Option<Value>,
     pub label_width: Option<u32>,
     pub movie: Option<MovieSpec>,
     pub flip: Flip,
-    pub blend: BlendMode,
     pub gate: Option<StaticId>,
+}
+
+/// What an image layer (a part or the side image) shows.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum PartContent {
+    Image(AssetId),
+    Paint(Rc<PaintSpec>),
+}
+
+impl From<PartContent> for LayerContent {
+    fn from(content: PartContent) -> LayerContent {
+        match content {
+            PartContent::Image(image) => LayerContent::Image(image),
+            PartContent::Paint(paint) => LayerContent::Paint(paint),
+        }
+    }
 }
 
 fn values_eq(a: Option<Value>, b: Option<Value>) -> bool {
@@ -73,14 +91,15 @@ impl PartialEq for Entity {
             && self.rotation == other.rotation
             && self.opacity == other.opacity
             && self.filter == other.filter
-            && self.shader == other.shader
+            && self.mix == other.mix
+            && self.mask == other.mask
+            && self.local_motion == other.local_motion
             && self.fill == other.fill
             && self.fill_size == other.fill_size
             && self.parts == other.parts
             && self.label_width == other.label_width
             && self.movie == other.movie
             && self.flip == other.flip
-            && self.blend == other.blend
             && self.gate == other.gate
             && values_eq(
                 self.label.clone().map(Value::Text),
@@ -94,7 +113,7 @@ impl PartialEq for Entity {
 pub(crate) struct Hud {
     pub text_window: Visibility,
     pub quick_menu: Visibility,
-    pub side_image: Option<AssetId>,
+    pub side_image: Option<PartContent>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -183,6 +202,12 @@ pub(crate) enum ScheduledKind {
     },
     /// `replay_bgm()`.
     ReplayMusic,
+    /// `Entity::travel`: the entity's path from `from` to `to`, drawn by the motion's shader.
+    Travel {
+        motion: TransitionalMotionSpec,
+        from: PoseSpec,
+        to: PoseSpec,
+    },
 }
 
 /// What an animation applies to.
@@ -193,6 +218,8 @@ pub(crate) enum Target {
     Channel(ChannelId),
     Entity(u32),
     Camera,
+    /// The travels of an entity.
+    Travel(u32),
 }
 
 /// An interpolated property (`Prop<T>`).
@@ -215,7 +242,9 @@ pub(crate) enum EntityProp {
     Rotation,
     Opacity,
     Filter,
-    Shader,
+    Mix,
+    Mask,
+    LocalMotion,
     Fill,
 }
 
@@ -247,14 +276,15 @@ pub(crate) enum PartTarget {
 }
 
 /// The value of a property.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum PropValue {
     Point([i32; 2]),
     Offset([i32; 2]),
     Decimal(Decimal),
     Angle(Decimal),
     Color([u8; 4]),
-    Shader(Option<AssetId>),
+    /// A filter, mix, mask or local motion; `None` is no effect.
+    Effect(Option<Rc<EffectSpec>>),
     Visibility(Visibility),
 }
 
@@ -262,8 +292,20 @@ pub(crate) enum PropValue {
 #[derive(Clone, Debug)]
 pub(crate) enum LayerContent {
     Image(AssetId),
+    Paint(Rc<PaintSpec>),
     Label(Text),
     Movie(MovieSpec),
+}
+
+impl LayerContent {
+    /// The content of an image layer; `None` for a label or a movie.
+    pub fn part(self) -> Option<PartContent> {
+        match self {
+            LayerContent::Image(image) => Some(PartContent::Image(image)),
+            LayerContent::Paint(paint) => Some(PartContent::Paint(paint)),
+            LayerContent::Label(_) | LayerContent::Movie(_) => None,
+        }
+    }
 }
 
 /// A change that happens only when [`ScreenObj::commit`] gives it an animation.
@@ -296,7 +338,9 @@ impl Entity {
             rotation: Decimal::ZERO,
             opacity: Decimal::ZERO,
             filter: None,
-            shader: None,
+            mix: None,
+            mask: None,
+            local_motion: None,
             fill: [0, 0, 0, 0],
             fill_size: None,
             parts: BTreeMap::new(),
@@ -305,7 +349,6 @@ impl Entity {
             label_width: None,
             movie: None,
             flip: Flip::None,
-            blend: BlendMode::Normal,
             gate: None,
         }
     }
@@ -316,15 +359,17 @@ impl Entity {
             EntityProp::Scale => PropValue::Decimal(self.scale),
             EntityProp::Rotation => PropValue::Angle(self.rotation),
             EntityProp::Opacity => PropValue::Decimal(self.opacity),
-            EntityProp::Filter => PropValue::Shader(self.filter),
-            EntityProp::Shader => PropValue::Shader(self.shader),
+            EntityProp::Filter => PropValue::Effect(self.filter.clone()),
+            EntityProp::Mix => PropValue::Effect(self.mix.clone()),
+            EntityProp::Mask => PropValue::Effect(self.mask.clone()),
+            EntityProp::LocalMotion => PropValue::Effect(self.local_motion.clone()),
             EntityProp::Fill => PropValue::Color(self.fill),
         }
     }
 
     pub fn layer(&self, target: LayerTarget) -> Option<LayerContent> {
         match target {
-            LayerTarget::Part(_, part) => self.parts.get(&part).copied().map(LayerContent::Image),
+            LayerTarget::Part(_, part) => self.parts.get(&part).cloned().map(LayerContent::from),
             LayerTarget::Label(_) => self.label.clone().map(LayerContent::Label),
             LayerTarget::Movie(_) => self.movie.clone().map(LayerContent::Movie),
             LayerTarget::SideImage => None,
@@ -365,7 +410,7 @@ impl LogicalScreen {
             PropTarget::CameraOffset => PropValue::Offset(self.camera.offset),
             PropTarget::CameraZoom => PropValue::Decimal(self.camera.zoom),
             PropTarget::CameraRotation => PropValue::Angle(self.camera.rotation),
-            PropTarget::ScreenFilter => PropValue::Shader(self.filter),
+            PropTarget::ScreenFilter => PropValue::Effect(self.filter.clone()),
             PropTarget::ChannelVolume(channel) => PropValue::Decimal(self.channel(channel).volume),
         }
     }
@@ -376,7 +421,7 @@ impl LogicalScreen {
             LayerTarget::Part(id, _) | LayerTarget::Label(id) | LayerTarget::Movie(id) => {
                 self.entities.get(&id)?.layer(target)
             }
-            LayerTarget::SideImage => self.hud.side_image.map(LayerContent::Image),
+            LayerTarget::SideImage => self.hud.side_image.clone().map(LayerContent::from),
         }
     }
 }
@@ -476,8 +521,10 @@ impl ScreenObj {
                     (EntityProp::Scale, PropValue::Decimal(d)) => entity.scale = d,
                     (EntityProp::Rotation, PropValue::Angle(d)) => entity.rotation = d,
                     (EntityProp::Opacity, PropValue::Decimal(d)) => entity.opacity = d,
-                    (EntityProp::Filter, PropValue::Shader(s)) => entity.filter = s,
-                    (EntityProp::Shader, PropValue::Shader(s)) => entity.shader = s,
+                    (EntityProp::Filter, PropValue::Effect(e)) => entity.filter = e,
+                    (EntityProp::Mix, PropValue::Effect(e)) => entity.mix = e,
+                    (EntityProp::Mask, PropValue::Effect(e)) => entity.mask = e,
+                    (EntityProp::LocalMotion, PropValue::Effect(e)) => entity.local_motion = e,
                     (EntityProp::Fill, PropValue::Color(c)) => entity.fill = c,
                     _ => return Err(mismatch()),
                 }
@@ -491,7 +538,7 @@ impl ScreenObj {
             (PropTarget::CameraOffset, PropValue::Offset(o)) => self.logical.camera.offset = o,
             (PropTarget::CameraZoom, PropValue::Decimal(d)) => self.logical.camera.zoom = d,
             (PropTarget::CameraRotation, PropValue::Angle(d)) => self.logical.camera.rotation = d,
-            (PropTarget::ScreenFilter, PropValue::Shader(s)) => self.logical.filter = s,
+            (PropTarget::ScreenFilter, PropValue::Effect(e)) => self.logical.filter = e,
             (PropTarget::ChannelVolume(channel), PropValue::Decimal(d)) => {
                 self.channel_mut(channel).volume = d;
             }
@@ -506,7 +553,7 @@ impl ScreenObj {
             LayerTarget::Part(id, _) | LayerTarget::Label(id) | LayerTarget::Movie(id) => {
                 self.entity_mut(id).layer(target)
             }
-            LayerTarget::SideImage => self.logical.hud.side_image.map(LayerContent::Image),
+            LayerTarget::SideImage => self.logical.hud.side_image.clone().map(LayerContent::from),
         }
     }
 
@@ -516,8 +563,9 @@ impl ScreenObj {
         content: Option<LayerContent>,
     ) -> Result<(), Trap> {
         match (target, content) {
-            (LayerTarget::Part(id, part), Some(LayerContent::Image(image))) => {
-                self.entity_mut(id).parts.insert(part, image);
+            (LayerTarget::Part(id, part), Some(content)) => {
+                let content = content.part().ok_or_else(mismatch)?;
+                self.entity_mut(id).parts.insert(part, content);
             }
             (LayerTarget::Part(id, part), None) => {
                 self.entity_mut(id).parts.remove(&part);
@@ -530,8 +578,8 @@ impl ScreenObj {
                 self.entity_mut(id).movie = Some(movie);
             }
             (LayerTarget::Movie(id), None) => self.entity_mut(id).movie = None,
-            (LayerTarget::SideImage, Some(LayerContent::Image(image))) => {
-                self.logical.hud.side_image = Some(image);
+            (LayerTarget::SideImage, Some(content)) => {
+                self.logical.hud.side_image = Some(content.part().ok_or_else(mismatch)?);
             }
             (LayerTarget::SideImage, None) => self.logical.hud.side_image = None,
             _ => return Err(mismatch()),
@@ -560,7 +608,7 @@ impl ScreenObj {
         match (change, animation) {
             (PendingChange::Prop(target, value), Animation::Tween(tween)) => {
                 check_easing(&tween.easing)?;
-                self.set_prop(target, value)?;
+                self.set_prop(target, value.clone())?;
                 self.schedule(
                     Some(Target::Prop(target)),
                     ScheduledKind::Tween { tween, value },
@@ -570,13 +618,14 @@ impl ScreenObj {
             (PendingChange::Layer(target, content), Animation::Transition(transition)) => {
                 check_easing(&transition.easing)?;
                 self.set_layer(target, content.clone())?;
+                let delay = transition.delay_ms;
                 self.schedule(
                     Some(Target::Layer(target)),
                     ScheduledKind::Transition {
                         transition,
                         content,
                     },
-                    transition.delay_ms,
+                    delay,
                 )
             }
             (PendingChange::Channel(channel, track), Animation::Fade(fade)) => {
@@ -595,6 +644,44 @@ impl ScreenObj {
                 "`apply_animation` was given an animation of the wrong kind",
             )),
         }
+    }
+
+    /// `Entity::travel(to, motion)`: the pose becomes `to` at once through three tweens with the
+    /// motion's timing, and the travel itself is scheduled for the motion shader.
+    pub fn travel(
+        &mut self,
+        id: u32,
+        to: PoseSpec,
+        motion: TransitionalMotionSpec,
+    ) -> Result<(), Trap> {
+        let entity = self.entity_mut(id);
+        let from = PoseSpec {
+            position: entity.position,
+            scale: entity.scale,
+            rotation: entity.rotation,
+        };
+        check_easing(&motion.easing)?;
+        let tween = Tween {
+            duration_ms: motion.duration_ms,
+            easing: motion.easing,
+            delay_ms: motion.delay_ms,
+        };
+        for (prop, value) in [
+            (EntityProp::Position, PropValue::Point(to.position)),
+            (EntityProp::Scale, PropValue::Decimal(to.scale)),
+            (EntityProp::Rotation, PropValue::Angle(to.rotation)),
+        ] {
+            self.commit(
+                PendingChange::Prop(PropTarget::Entity(id, prop), value),
+                Animation::Tween(tween),
+            )?;
+        }
+        let delay = motion.delay_ms;
+        self.schedule(
+            Some(Target::Travel(id)),
+            ScheduledKind::Travel { motion, from, to },
+            delay,
+        )
     }
 
     /// `apply_animation(motion)` on an entity or the camera: checks the identity rule and

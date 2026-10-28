@@ -27,6 +27,7 @@
 | `#[scene]` | `pushdown fn` | シーン：ステップの実行、シーンの呼び出し、乱数の取得ができる |
 | `#[entry]` | 引数型と戻り値型が有限で `Text` を含まない `#[scene]` | システムがここから物語を開始できる |
 | `#[must_use]` | `struct`、`enum` | 値を捨てる、または完了させないと警告 `W3023` |
+| `#[shader_arg]` | シェーダーが読める型の名前付きフィールドを持つ `struct` | その構造体をシェーダーの引数にできる |
 | `#[builtin]` | 関数、構造体、トレイト | コンパイラとエンジンが実装する。標準ライブラリのみ |
 
 引数を取る属性はありません。[属性](../special/attributes.md)を参照してください。
@@ -85,7 +86,8 @@
 | 物語変数 | `static mut NAME: FiniteType = constant;` |
 | 設定 | `static NAME: Setting<T> = setting(init);` |
 | メタフィールド | `static NAME: Meta<T> = meta(init);` |
-| アセット | `const NAME: ImageAsset = asset("path");`。`AudioAsset`、`VoiceAsset`、`VideoAsset`、`FontAsset`、`ShaderAsset` も同様 |
+| アセット | `const NAME: ImageAsset = asset("path");`。`AudioAsset`、`VoiceAsset`、`VideoAsset`、`FontAsset` も同様 |
+| シェーダー | `const NAME: ColorShader<Args> = asset("name.wgsl");`。`MixShader`、`TextureShader`、`MaskShader`、`LocalMotionShader`、`TransitionalMotionShader` も同様。`Args` は `()` か `#[shader_arg]` 構造体 |
 | システムフォント | `const NAME: FontAsset = system_font("path");` |
 | エンティティ ID | `const NAME: EntityId = EntityId(n);`。`n` は 1 以上（0 は `BACKGROUND`） |
 | レンダー | `const fn name(mut screen: Screen) -> Screen { …; screen }` |

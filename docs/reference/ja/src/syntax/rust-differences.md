@@ -22,7 +22,7 @@ Kagari の構文は Rust の部分集合にいくつかの追加を加えたも�
 | `let … else`、`if let … && …` の連鎖、ラベル付きブロック | `match`、入れ子の `if let`、ループのラベル |
 | スライスパターン、`&` パターン、`ref`、`name @ pattern` | 使えるパターンの形は[パターン](./patterns.md#pattern-forms)を参照 |
 | 構造体更新構文 `S { a: 1, ..base }` | すべてのフィールドを書きます |
-| `#[derive]`、`#[cfg]`、`#[test]` などの属性 | `#[scene]`、`#[entry]`、`#[must_use]`（と標準ライブラリの `#[builtin]`）だけです。それ以外の属性は `E1006` です。[属性](../special/attributes.md)を参照 |
+| `#[derive]`、`#[cfg]`、`#[test]` などの属性 | `#[scene]`、`#[entry]`、`#[must_use]`、`#[shader_arg]`（と標準ライブラリの `#[builtin]`）だけです。それ以外の属性は `E1006` です。[属性](../special/attributes.md)を参照 |
 | `pub(crate)`、`pub(super)` | `pub` だけです |
 | 値としての開いた範囲 `a..`、`..b`、`..=b`、`..` | 範囲式には両端が必要です（`E2030`）。パターンでは `a..` と `..=b` は使えますが、`..b` はありません。[範囲パターン](./patterns.md#range-patterns)を参照 |
 

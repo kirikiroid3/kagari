@@ -23,11 +23,15 @@ pub fn check(
     let mut errors: usize = 0;
     for (asset, file) in module.assets.iter().zip(files) {
         let path = archives::asset_path(module, asset)?;
-        let disk = archives::disk_file(path, file)?;
         let mut head = Vec::new();
-        File::open(disk)
-            .and_then(|file| file.take(SNIFF_LIMIT).read_to_end(&mut head))
-            .map_err(|error| io(disk, error))?;
+        match archives::source(file)? {
+            archives::Source::Disk(disk) => {
+                File::open(disk)
+                    .and_then(|file| file.take(SNIFF_LIMIT).read_to_end(&mut head))
+                    .map_err(|error| io(disk, error))?;
+            }
+            archives::Source::Std(text) => head.extend_from_slice(text.as_bytes()),
+        }
         let format = sniff(asset.kind, &head);
         let kind = asset.kind.name();
         for &profile in profiles {

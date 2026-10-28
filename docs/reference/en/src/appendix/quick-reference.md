@@ -29,6 +29,7 @@ directly before `fn` or `Fn`; `scene` only in the pointer type `scene fn(…) ->
 | `#[scene]` | `pushdown fn` | A scene: may run steps, call scenes and draw random values |
 | `#[entry]` | a `#[scene]` with finite parameter and return types that contain no `Text` | The system can start the story here |
 | `#[must_use]` | `struct`, `enum` | Dropping a value, or never completing it, is warning `W3023` |
+| `#[shader_arg]` | `struct` with named fields of shader-readable types | The struct can be a shader's arguments |
 | `#[builtin]` | functions, structs, traits | Implemented by the compiler and the engine; standard library only |
 
 No attribute takes arguments. See [Attributes](../special/attributes.md).
@@ -89,7 +90,8 @@ in `fn` code. See [Forms](../syntax/forms.md) and [Steps](../concepts/steps.md).
 | Story variable | `static mut NAME: FiniteType = constant;` |
 | Setting | `static NAME: Setting<T> = setting(init);` |
 | Meta field | `static NAME: Meta<T> = meta(init);` |
-| Asset | `const NAME: ImageAsset = asset("path");`, likewise `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset`, `ShaderAsset` |
+| Asset | `const NAME: ImageAsset = asset("path");`, likewise `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset` |
+| Shader | `const NAME: ColorShader<Args> = asset("name.wgsl");`, likewise `MixShader`, `TextureShader`, `MaskShader`, `LocalMotionShader`, `TransitionalMotionShader`; `Args` is `()` or a `#[shader_arg]` struct |
 | System font | `const NAME: FontAsset = system_font("path");` |
 | Entity id | `const NAME: EntityId = EntityId(n);`, with `n` ≥ 1 (0 is `BACKGROUND`) |
 | Render | `const fn name(mut screen: Screen) -> Screen { …; screen }` |

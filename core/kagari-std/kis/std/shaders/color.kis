@@ -1,0 +1,113 @@
+//! Colour shaders for `Entity::filter` and `Screen::filter`: the CSS filter functions, computed on
+//! sRGB values like CSS, and a Gaussian blur.
+
+use crate::screen::Angle;
+use crate::screen::shader::{ColorShader, Filter, filter};
+
+/// The strength of a one-parameter filter.
+#[shader_arg]
+pub struct Amount {
+    /// The CSS amount: 0.0 leaves `grayscale`, `sepia` and `invert` without effect, 1.0 leaves
+    /// `saturate`, `brightness` and `contrast` without effect.
+    pub amount: Decimal,
+}
+
+/// CSS `grayscale()`.
+pub const GRAYSCALE: ColorShader<Amount> = asset("shaders/color/grayscale.wgsl");
+/// CSS `sepia()`.
+pub const SEPIA: ColorShader<Amount> = asset("shaders/color/sepia.wgsl");
+/// CSS `saturate()`.
+pub const SATURATE: ColorShader<Amount> = asset("shaders/color/saturate.wgsl");
+/// CSS `invert()`.
+pub const INVERT: ColorShader<Amount> = asset("shaders/color/invert.wgsl");
+/// CSS `brightness()`.
+pub const BRIGHTNESS: ColorShader<Amount> = asset("shaders/color/brightness.wgsl");
+/// CSS `contrast()`.
+pub const CONTRAST: ColorShader<Amount> = asset("shaders/color/contrast.wgsl");
+
+/// Removes colour: 0.0 leaves it, 1.0 is fully grey (clamped to 0.0..=1.0).
+pub const fn grayscale(amount: Decimal) -> Filter {
+    filter(GRAYSCALE, Amount { amount })
+}
+/// Tints brown: 0.0 leaves the colour, 1.0 is fully sepia (clamped to 0.0..=1.0).
+pub const fn sepia(amount: Decimal) -> Filter {
+    filter(SEPIA, Amount { amount })
+}
+/// Scales saturation: 0.0 is grey, 1.0 leaves the colour, above 1.0 oversaturates.
+pub const fn saturate(amount: Decimal) -> Filter {
+    filter(SATURATE, Amount { amount })
+}
+/// Inverts the colour: 0.0 leaves it, 1.0 is fully inverted (clamped to 0.0..=1.0).
+pub const fn invert(amount: Decimal) -> Filter {
+    filter(INVERT, Amount { amount })
+}
+/// Multiplies the colour by `amount`: 1.0 leaves it, 0.0 is black.
+pub const fn brightness(amount: Decimal) -> Filter {
+    filter(BRIGHTNESS, Amount { amount })
+}
+/// Scales contrast around mid grey: 1.0 leaves the colour, 0.0 is mid grey.
+pub const fn contrast(amount: Decimal) -> Filter {
+    filter(CONTRAST, Amount { amount })
+}
+
+/// The arguments of `HUE_ROTATE`.
+#[shader_arg]
+pub struct HueRotate {
+    /// How far the hues turn.
+    pub angle: Angle,
+}
+/// CSS `hue-rotate()`.
+pub const HUE_ROTATE: ColorShader<HueRotate> = asset("shaders/color/hue_rotate.wgsl");
+/// Turns every hue by `angle`.
+pub const fn hue_rotate(angle: Angle) -> Filter {
+    filter(HUE_ROTATE, HueRotate { angle })
+}
+
+/// The seven CSS filter amounts of `adjust`.
+#[shader_arg]
+pub struct Adjust {
+    /// As in `grayscale`.
+    pub grayscale: Decimal,
+    /// As in `sepia`.
+    pub sepia: Decimal,
+    /// As in `saturate`.
+    pub saturate: Decimal,
+    /// As in `hue_rotate`.
+    pub hue: Angle,
+    /// As in `invert`.
+    pub invert: Decimal,
+    /// As in `brightness`.
+    pub brightness: Decimal,
+    /// As in `contrast`.
+    pub contrast: Decimal,
+}
+/// The amounts that change nothing; start from it and set the ones you need.
+pub const NEUTRAL: Adjust = Adjust {
+    grayscale: 0.0,
+    sepia: 0.0,
+    saturate: 1.0,
+    hue: Angle { degrees: 0.0 },
+    invert: 0.0,
+    brightness: 1.0,
+    contrast: 1.0,
+};
+/// The seven filters in one pass (TyranoScript `[filter]`).
+pub const ADJUST: ColorShader<Adjust> = asset("shaders/color/adjust.wgsl");
+/// Applies the filters of `a` in TyranoScript `[filter]` order: grayscale, sepia, saturate, hue,
+/// invert, brightness, contrast. Tweening between two `adjust` filters moves every amount.
+pub const fn adjust(a: Adjust) -> Filter {
+    filter(ADJUST, a)
+}
+
+/// The arguments of `BLUR`.
+#[shader_arg]
+pub struct Blur {
+    /// The standard deviation, in pixels; 0.0 or less is no blur.
+    pub radius: Decimal,
+}
+/// A Gaussian blur.
+pub const BLUR: ColorShader<Blur> = asset("shaders/color/blur.wgsl");
+/// Blurs with a standard deviation of `radius` pixels (CSS `blur()`).
+pub const fn blur(radius: Decimal) -> Filter {
+    filter(BLUR, Blur { radius })
+}

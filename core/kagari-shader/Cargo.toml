@@ -1,0 +1,15 @@
+[package]
+name = "kagari-shader"
+version = "0.1.0"
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[features]
+validate = ["dep:naga"]
+
+[dependencies]
+naga = { workspace = true, optional = true }
+
+[dev-dependencies]
+kagari-std.workspace = true

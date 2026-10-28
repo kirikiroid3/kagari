@@ -16,14 +16,49 @@ pub struct Frame {
 
 #[derive(Clone, Debug)]
 pub enum Node {
-    /// Children drawn into an isolated layer, then composited with `opacity` and `blend`.
-    /// The renderer may skip isolation when blend is Normal and there is at most one child.
+    /// Children drawn into an isolated layer, then composited source-over with `opacity`.
+    /// The renderer may skip isolation when there is at most one child.
     Group {
         transform: Affine,
         opacity: f32,
-        blend: Blend,
         clip: Option<Rect>,
         children: Vec<Node>,
+    },
+    /// Children drawn into an isolated layer, then run through a colour shader
+    /// (`ColorShader`) in screen space.
+    Filter {
+        effect: ShaderEffect,
+        children: Vec<Node>,
+    },
+    /// Children drawn into an isolated layer, then composited over the backdrop by a mixing
+    /// shader (`MixShader`), which returns the final pixel. `opacity` scales the source.
+    Mix {
+        effect: ShaderEffect,
+        opacity: f32,
+        children: Vec<Node>,
+    },
+    /// Children drawn into an isolated layer whose alpha is multiplied by a mask shader
+    /// (`MaskShader`) evaluated over `rect` (in the current transform).
+    Masked {
+        effect: ShaderEffect,
+        rect: Rect,
+        children: Vec<Node>,
+    },
+    /// GPU motion: `stages` (at most one transitional, then at most one local) compute a pose
+    /// from `pose`; children are displaced by `P·M(result)·M(pose)⁻¹·P⁻¹` (P = the current
+    /// transform, M(x) = T(position)·R(rotation)·S(scale)).
+    Motion {
+        stages: Vec<MotionStage>,
+        pose: Pose,
+        children: Vec<Node>,
+    },
+    /// A texture shader (`TextureShader`) over `rect`, optionally multiplied by a mask shader.
+    Paint {
+        rect: Rect,
+        texture: ShaderEffect,
+        mask: Option<ShaderEffect>,
+        flip_x: bool,
+        flip_y: bool,
     },
     Image {
         rect: Rect,
@@ -86,28 +121,37 @@ pub struct Rect {
     pub h: f32,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Blend {
-    Normal,
-    Add,
-    Multiply,
-    Screen,
-    Overlay,
-    Darken,
-    Lighten,
-    ColorDodge,
-    ColorBurn,
-    HardLight,
-    SoftLight,
-    Difference,
-    Exclusion,
-    Hue,
-    Saturation,
-    Color,
-    Luminosity,
+/// A user shader invocation: the shader file, its packed `Args` (WGSL storage layout) and its
+/// effect time in seconds.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ShaderEffect {
+    pub shader: AssetId,
+    pub args: Rc<[u8]>,
+    pub time: f32,
 }
 
+/// A motion pose: anchor position in design px, scale, rotation in radians (clockwise, y down).
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Pose {
+    pub position: [f32; 2],
+    pub scale: f32,
+    pub rotation: f32,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum MotionStage {
+    Local {
+        effect: ShaderEffect,
+    },
+    Transitional {
+        effect: ShaderEffect,
+        from: Pose,
+        to: Pose,
+        progress: f32,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum TransitionDraw {
     Crossfade,
     Rule {
@@ -126,6 +170,13 @@ pub enum TransitionDraw {
     ThroughColor {
         color: [f32; 4],
         hold_fraction: f32,
+    },
+    /// A pixel switches once the mask shader's value ×255 is at most the sweeping threshold
+    /// (the rule math of `Rule`).
+    Masked {
+        mask: ShaderEffect,
+        softness: u8,
+        reverse: bool,
     },
 }
 

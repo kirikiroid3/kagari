@@ -89,7 +89,7 @@ keyframe-check = false
 | `dir` | 文字列（パス） | `"assets"` | アセットディレクトリ。`asset("…")` のパスはここからの相対パスです。 |
 | `system-fonts` | 真偽値 | `true` | `system_font("…")` がビルドするマシンにインストールされたフォントを指せるかどうか。`false` のとき、`system_font` の呼び出しはすべて `E1031` になります。 |
 
-アセットディレクトリ直下の `system-fonts/` ディレクトリは予約されています。システムフォントはビルド出力の中でこの名前の下に格納されます。
+アセットディレクトリ直下の `system-fonts/` と `std/` ディレクトリは予約されています（`E1032`）。システムフォントと、シェーダーなど標準ライブラリ自身のアセットは、ビルド出力の中でこれらの名前の下に格納されます。
 
 `system_font("…")` は、ゲームをビルドするマシンの次のディレクトリを順に探します。
 
@@ -150,6 +150,7 @@ target/v0/
 | `characters/character1/image/normal.png` | `characters.kiarchive`（最上位のディレクトリごとに 1 つ） |
 | `title.png`（アセットディレクトリ直下） | `data.kiarchive` |
 | システムフォント（例: `system-fonts/msgothic.ttc`） | `system-fonts.kiarchive` |
+| 標準ライブラリのアセット（例: `std::shaders` のシェーダー `std/shaders/color/blur.wgsl`） | `std.kiarchive` |
 
 アーカイブ内のエントリ名はアセットの完全なパスです。ランタイムは、ゲームがあるアーカイブのアセットを初めて必要としたときにそのアーカイブを開きます。アーカイブが見つからなくても起動時のエラーにはなりません。ランタイムは警告をログに出し、そのアセットは使用時に存在しないものとして扱われます。
 
@@ -164,14 +165,25 @@ target/v0/
 | 画像 | PNG（APNG は既定の画像を表示）、ベースラインおよびプログレッシブ JPEG、非可逆・可逆・拡張（アルファまたはメタデータ付き）WebP |
 | オーディオ、ボイス | Ogg Vorbis、FLAC、WAV（PCM または IEEE 浮動小数点）、MP3 |
 | フォント | TrueType、OpenType（CFF）、TrueType/OpenType コレクション |
-| 動画、シェーダー | なし |
+| シェーダー | WGSL ソース（UTF-8 テキスト） |
+| 動画 | なし |
 
-それ以外はすべて拒否されます。アニメーション WebP、算術・可逆・階層・12 ビット符号化の JPEG、GIF、BMP、AVIF、JPEG XL、Ogg Opus、Ogg FLAC、その他のコーデックの Ogg、圧縮 WAV、AAC/M4A、WOFF、WOFF2 です。動画とシェーダーのアセットは内容にかかわらず拒否されます。問題はアセットとプロファイルの組ごとに 1 行ずつ出力されます。
+それ以外はすべて拒否されます。アニメーション WebP、算術・可逆・階層・12 ビット符号化の JPEG、GIF、BMP、AVIF、JPEG XL、Ogg Opus、Ogg FLAC、その他のコーデックの Ogg、圧縮 WAV、AAC/M4A、WOFF、WOFF2 です。動画のアセットは内容にかかわらず拒否されます。問題はアセットとプロファイルの組ごとに 1 行ずつ出力されます。
 
 ```text
 error: asset `bgimage/bad.jxl` (image): JPEG XL is not supported by runtime profile `native_v0`
 error: asset `movie/intro.webm` (video): video assets are not supported by runtime profile `native_v0`
 ```
+
+### シェーダーの検査 {#shader-check}
+
+プロファイルの検査に続いて、`kagari build` は参照されるすべてのシェーダーを、標準ライブラリのものも含め、その定数が宣言するロールとしてコンパイルします（`ColorShader<…>` はカラーシェーダーとして検査する、など）。2 つのロールで使われるファイルはロールごとに 1 回ずつ検査します。不正なシェーダーごとに 1 行出力し、誤りが `.wgsl` ファイル内にあればその行番号を示します。
+
+```text
+error: shader `shader/broken.wgsl` (color): line 4: no definition in scope for identifier: `undefined_name`
+```
+
+ロールは `color`、`mix`、`texture`、`mask`、`local motion`、`transitional motion` です。
 
 このときビルドは、出力ディレクトリを作らず以前の出力も削除せずに、ステータス 1 で終了します。STD リファレンスの[ランタイムプロファイル](../../../../std/ja/src/appendix/profiles.md)も参照してください。
 

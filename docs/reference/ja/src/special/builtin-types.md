@@ -14,7 +14,8 @@ Kagari のすべての型は値セマンティクスを持ちます。代入、�
 | `Rat`、`Decimal` | `#[builtin]` 構造体 | いいえ | はい | `fn`、`const fn` | [`std`](../../../../std/ja/src/std.md) |
 | `String` | `#[builtin]` 構造体 | いいえ | はい | `fn`、`const fn` | [`std`](../../../../std/ja/src/std.md) |
 | `Text` | `#[builtin]` 構造体 | はい | はい | すべて | [`std::narrative::text`](../../../../std/ja/src/narrative-text.md) |
-| `ImageAsset`、`AudioAsset`、`VoiceAsset`、`VideoAsset`、`FontAsset`、`ShaderAsset` | `#[builtin]` 構造体 | はい | はい | すべて | [`std`](../../../../std/ja/src/std.md) |
+| `ImageAsset`、`AudioAsset`、`VoiceAsset`、`VideoAsset`、`FontAsset` | `#[builtin]` 構造体 | はい | はい | すべて | [`std`](../../../../std/ja/src/std.md) |
+| `ColorShader<A>`、`MixShader<A>`、`TextureShader<A>`、`MaskShader<A>`、`LocalMotionShader<A>`、`TransitionalMotionShader<A>` | `#[builtin]` 構造体 | いいえ | はい | `const fn` | [`std::screen::shader`](../../../../std/ja/src/screen-shader.md) |
 | `Vec<T>` | `#[builtin]` 構造体 | いいえ | `T: Eq` なら | `fn`、`const fn` | [`std`](../../../../std/ja/src/std.md) |
 | `Range<T>` | 構造体 | `T` が有限なら | `T: Eq` なら | すべて | [`std`](../../../../std/ja/src/std.md) |
 | `Option<T>`、`Result<T, E>` | 列挙型 | 型引数が有限なら | 型引数が `Eq` なら | すべて | [`std`](../../../../std/ja/src/std.md) |
@@ -64,7 +65,7 @@ const NAME: Text = "Mio";
 
 ### アセット型 {#asset-types}
 
-`ImageAsset`、`AudioAsset`、`VoiceAsset`、`VideoAsset`、`FontAsset`、`ShaderAsset` は、ゲームと一緒にパックされるファイルを指します。値は `asset` または `system_font` の定数呼び出しでのみ作られます。
+`ImageAsset`、`AudioAsset`、`VoiceAsset`、`VideoAsset`、`FontAsset` は、ゲームと一緒にパックされるファイルを指します。6 つのシェーダー型（`ColorShader<A>` など）も同様で、引数の型が `A` である 1 つのロールの WGSL ファイル（`.wgsl`）を指します。値は `asset` または `system_font` の定数呼び出しでのみ作られます。
 
 ```kis
 const CG_001: ImageAsset = asset("cg_001.png");
@@ -73,9 +74,10 @@ const GOTHIC: FontAsset = system_font("msgothic.ttc");
 ```
 
 - `asset::<A>` の型引数は定数の型から推論され、[`Asset`](./traits.md#asset) を実装していなければなりません。
-- 引数は文字列リテラルで（`E2028`）、空でなく（`E1028`）、アセットディレクトリの中を指す必要があります（`E1029`）。ファイルがなければ `E1027` です。`system_font` には独自の規則があります（`E1030`–`E1032`）。STD Reference の [`std`](../../../../std/ja/src/std.md) を参照してください。
-- **有限。** アセット型の値はちょうどプログラムのアセット定数なので、物語はそれを保持でき、アセット名の綴り間違いは実行時の失敗ではなく名前解決のエラーになります。
+- 引数は文字列リテラルで（`E2028`）、空でなく（`E1028`）、アセットディレクトリの中で（`E1029`）その予約されたディレクトリ `system-fonts` と `std` の外を指す必要があります（`E1032`）。ファイルがなければ `E1027` です。`system_font` には独自の規則があります（`E1030`、`E1031`）。STD Reference の [`std`](../../../../std/ja/src/std.md) を参照してください。
+- **有限。** ファイルのアセット型の値はちょうどプログラムのアセット定数なので、物語はそれを保持でき、アセット名の綴り間違いは実行時の失敗ではなく名前解決のエラーになります。シェーダー型は有限型ではありません。シェーダーを使うのはレンダーで、物語ではありません。
 - `Eq`：はい。
+- 効果値が保持する、ロールを持たないシェーダーファイルの識別子 `ShaderAsset` は、`Asset` ではなく、プレリュードにもありません。ゲームが名前で書くことはありません。[`std::screen::shader`](../../../../std/ja/src/screen-shader.md) を参照してください。
 
 ### `Setting<T>` と `Meta<T>` {#setting-and-meta}
 

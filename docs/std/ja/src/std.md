@@ -14,6 +14,7 @@ pub mod stage;
 pub mod narrative;
 pub mod ui;
 pub mod system;
+pub mod shaders;
 ```
 
 `Int<lo, hi>`、Rust の整数型（`u8` … `u128`、`i8` … `i128`、`usize`、`isize`）、`bool` は言語の型で、std のアイテムではありません。`Int<lo, hi>` は整数 `lo..=hi` を保持し、物語が実行時に保持できる唯一の整数型です。[数値](../../../reference/ja/src/syntax/numbers.md) を参照してください。
@@ -312,10 +313,9 @@ impl Asset for AudioAsset {}
 impl Asset for VoiceAsset {}
 impl Asset for VideoAsset {}
 impl Asset for FontAsset {}
-impl Asset for ShaderAsset {}
 ```
 
-値がちょうどプログラムのアセット定数である型です。[`asset`](#function-assetpath) の境界です。
+値がちょうどプログラムのアセット定数である型です。[`asset`](#function-assetpath) の境界です。下の 5 つのファイル型と、[`std::screen::shader`](./screen-shader.md) の 6 つのシェーダー型（`ColorShader<A>` など）が実装しています。
 
 - Kind: — · Builtin: yes
 
@@ -332,7 +332,7 @@ impl Asset for ShaderAsset {}
 #[builtin] pub struct ShaderAsset;
 ```
 
-アセットファイルの種類ごとの不透明な型です。6 つすべてが `Eq` かつ `Asset` で、すべて有限型です：アセット型の値はちょうどその定数です。
+アセットファイルの種類ごとの不透明な型です。6 つすべてが `Eq` です。最初の 5 つは `Asset` で、有限型です：アセット型の値はちょうどその定数です。
 
 - Kind: — · Builtin: yes
 
@@ -343,12 +343,13 @@ impl Asset for ShaderAsset {}
 |`VoiceAsset`|行に結び付いたボイスファイル|`Say::voice`、`Narrative::replay_voice`|
 |`VideoAsset`|動画ファイル|ムービーレイヤー|
 |`FontAsset`|フォントファイル|`System::font`、`TextEffect::font`、`TextStyle::font`|
-|`ShaderAsset`|WGSL シェーダーファイル（`.wgsl`）：フィルター、または天候やパーティクルなどの生成コンテンツ|`Screen::filter`、`Entity::filter`、`Entity::shader`|
+|`ShaderAsset`|任意のロールのシェーダーファイルの識別子。効果値が保持する|[`std::screen::shader`](./screen-shader.md) の効果値|
+
+`ShaderAsset` は `Asset` ではなく、プレリュードにもありません。ゲームはシェーダーを `ColorShader<A>` などロールの型で宣言し、`ShaderAsset` を名前で書くことはありません。
 
 ランタイムがどのファイル形式をデコードできるかは [ランタイムプロファイル](./appendix/profiles.md) に記載しています。
 
 - `VideoAsset` — Profile: not in `native_v0`。
-- `ShaderAsset` — Profile: not in `native_v0`。
 
 ## Function: `asset(path)` {#function-assetpath}
 
@@ -370,9 +371,10 @@ const THEME: AudioAsset = asset("bgm/theme.ogg");
 
 - 型引数 `A` は定数の型から推論され、アセット型でなければなりません（そうでなければ [`E2026`](../../../reference/ja/src/diagnostics/types.md#e2026)）。
 - 引数は文字列リテラルでなければならず（[`E2028`](../../../reference/ja/src/diagnostics/types.md#e2028)）、空であってはなりません（[`E1028`](../../../reference/ja/src/diagnostics/modules.md#e1028)）。
-- パスはアセットディレクトリ（`kagari.toml` の `[assets] dir`、既定は `assets`。マニフェストがなければルートファイルのディレクトリ）からの相対パスで、そこから外へ出てはなりません（[`E1029`](../../../reference/ja/src/diagnostics/modules.md#e1029)）。
+- パスはアセットディレクトリ（`kagari.toml` の `[assets] dir`、既定は `assets`。マニフェストがなければルートファイルのディレクトリ）からの相対パスで、そこから外へ出てはなりません（[`E1029`](../../../reference/ja/src/diagnostics/modules.md#e1029)）。`std` の中では、パスは `std` 自身からの相対パスで、`std` は [`std::shaders`](./shaders.md) のファイルを同梱しています。
 - ファイルがなければコンパイルエラーです（[`E1027`](../../../reference/ja/src/diagnostics/modules.md#e1027)）。表情、曲、ボイスは定数なので、名前の綴り間違いは実行時の失敗ではなく名前解決のエラーになります。
-- `kagari build` は、プログラムが使うすべてのアセットの形式をプロジェクトのランタイムプロファイルに照らして検査します。[ランタイムプロファイル](./appendix/profiles.md) を参照してください。
+- アセットディレクトリ直下の `system-fonts` と `std` ディレクトリは、システムフォントと std のアセットのために予約されています（[`E1032`](../../../reference/ja/src/diagnostics/modules.md#e1032)）。
+- `kagari build` は、プログラムが使うすべてのアセットの形式をプロジェクトのランタイムプロファイルに照らして検査し、すべてのシェーダーをそのロールに照らして検査します。[ランタイムプロファイル](./appendix/profiles.md) と [シェーダーの検査](./guides/shaders.md#checking-shaders) を参照してください。
 
 ## Function: `system_font(path)` {#function-system_fontpath}
 

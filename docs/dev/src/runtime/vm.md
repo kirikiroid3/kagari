@@ -77,8 +77,10 @@ borrowed (a re-entrant write through an alias) is a host trap ("cell already bor
 `AdtTy` is either `Module(TypeId)` or `Synthetic(u32)`. The engine builds std values (an
 `Option`, a `Duration`, …) even when the program never interned that type; `TypeTable::resolve`
 returns the module's id when the path exists and otherwise registers a stable synthetic type
-with the given variant names. Equality compares `AdtTy`, so both sides must resolve the same
-way; the engine resolves all std types once at boot (`StdTypes::resolve`).
+with the given variant names and enum flag. Equality compares `AdtTy`, so both sides must resolve
+the same way; the engine resolves all std types once at boot (`StdTypes::resolve`).
+`TypeTable::is_enum` tells an enum from a struct (the module's type table, or the synthetic
+registration); the engine uses it to pass fieldless enum variants to shaders as their index.
 
 ## Frames and runs
 

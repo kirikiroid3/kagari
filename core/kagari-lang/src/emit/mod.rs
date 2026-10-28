@@ -43,6 +43,8 @@ use crate::signatures::{ProgramSignatures, display_ty, program_signatures};
 use crate::thir::PromotedId;
 use crate::ty::{Const, FnDefId, FnRef, GenericArg, GenericArgs, IntTy, Ty, TyKind};
 
+use kagari_shader::ShaderRole;
+
 /// The result of [`build`].
 pub struct Build {
     /// The diagnostics of [`check`], then those of emission.
@@ -54,6 +56,9 @@ pub struct Build {
     /// The file of each entry of `module.assets`, by index: in the asset directory or in a
     /// system font directory.
     pub asset_files: Vec<FilePath>,
+    /// The shader role of each entry of `module.assets`, parallel to `asset_files`; `None` for
+    /// other asset kinds. A file used under two roles has one entry per role.
+    pub shader_roles: Vec<Option<ShaderRole>>,
 }
 
 /// Checks the program and, without errors, emits, verifies and encodes its bytecode.
@@ -64,6 +69,7 @@ pub fn build(db: &dyn Db, program: Program) -> Build {
         module: None,
         bytes: None,
         asset_files: Vec::new(),
+        shader_roles: Vec::new(),
     };
     if diagnostics
         .iter()
@@ -75,7 +81,7 @@ pub fn build(db: &dyn Db, program: Program) -> Build {
     validate_mir(db, program);
     let (emitted, has_main, mut errors) = emit(db, program);
     diagnostics.append(&mut errors);
-    let Some((module, asset_files)) = emitted else {
+    let Some((module, asset_files, shader_roles)) = emitted else {
         return failed(diagnostics);
     };
     // Without `main` the entry scenes and statics are still lowered and verified, so their
@@ -110,6 +116,7 @@ pub fn build(db: &dyn Db, program: Program) -> Build {
         module: Some(module),
         bytes: Some(bytes),
         asset_files,
+        shader_roles,
     }
 }
 
@@ -157,8 +164,8 @@ fn root_diagnostic(
     )
 }
 
-/// A module and the file of each of its assets, by index.
-type Emitted = (Module, Vec<FilePath>);
+/// A module and the file and shader role of each of its assets, by index.
+type Emitted = (Module, Vec<FilePath>, Vec<Option<ShaderRole>>);
 
 /// Emits the module of a checked program: the module and its asset files (`None` after an
 /// emission error), whether it has a `main`, and the emission errors.
@@ -215,6 +222,8 @@ struct Emitter<'db> {
     root_dir: Option<PathBuf>,
     /// The file of each entry of `module.assets`, by index.
     asset_files: Vec<FilePath>,
+    /// The shader role of each entry of `module.assets`, by index.
+    shader_roles: Vec<Option<ShaderRole>>,
     module: Module,
     strings: FxHashMap<Arc<str>, StrId>,
     types: FxHashMap<ItemId, TypeId>,
@@ -273,7 +282,7 @@ fn bc_asset_kind(kind: AssetKind) -> BcAssetKind {
         AssetKind::Voice => BcAssetKind::Voice,
         AssetKind::Video => BcAssetKind::Video,
         AssetKind::Font => BcAssetKind::Font,
-        AssetKind::Shader => BcAssetKind::Shader,
+        AssetKind::Shader(_) => BcAssetKind::Shader,
     }
 }
 
@@ -298,6 +307,7 @@ impl<'db> Emitter<'db> {
             main,
             root_dir,
             asset_files: Vec::new(),
+            shader_roles: Vec::new(),
             module: Module {
                 options: Options {
                     max_call_depth: program.options(db).recursion_depth,
@@ -432,6 +442,10 @@ impl<'db> Emitter<'db> {
             path: shown,
         });
         self.asset_files.push(path.clone());
+        self.shader_roles.push(match kind {
+            AssetKind::Shader(role) => Some(role),
+            _ => None,
+        });
         self.assets.insert(key, id);
         id
     }
@@ -987,6 +1001,6 @@ impl<'db> Emitter<'db> {
             })
             .collect();
         self.module.debug = Some(Debug { files, functions });
-        Ok((self.module, self.asset_files))
+        Ok((self.module, self.asset_files, self.shader_roles))
     }
 }

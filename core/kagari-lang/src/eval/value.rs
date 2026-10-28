@@ -10,6 +10,7 @@ use crate::item_tree::{ItemId, ItemKind, Shape, item_tree};
 use crate::ty::{FnDefId, FnRef};
 
 use kagari_num::{Decimal, Rat};
+use kagari_shader::ShaderRole;
 
 use super::machine::screen::Screen;
 
@@ -107,7 +108,7 @@ impl ConstValue {
     }
 }
 
-/// The six asset types.
+/// The asset types: five file kinds and the six shader roles.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum AssetKind {
     Image,
@@ -115,20 +116,20 @@ pub enum AssetKind {
     Voice,
     Video,
     Font,
-    Shader,
+    Shader(ShaderRole),
 }
 
 impl AssetKind {
-    pub const ALL: [AssetKind; 6] = [
+    /// The kinds whose std type is declared in `mod.kis`.
+    pub const FILES: [AssetKind; 5] = [
         AssetKind::Image,
         AssetKind::Audio,
         AssetKind::Voice,
         AssetKind::Video,
         AssetKind::Font,
-        AssetKind::Shader,
     ];
 
-    /// The std type name, e.g. `ImageAsset`.
+    /// The std type name, e.g. `ImageAsset` or `ColorShader`.
     pub fn type_name(self) -> &'static str {
         match self {
             AssetKind::Image => "ImageAsset",
@@ -136,7 +137,7 @@ impl AssetKind {
             AssetKind::Voice => "VoiceAsset",
             AssetKind::Video => "VideoAsset",
             AssetKind::Font => "FontAsset",
-            AssetKind::Shader => "ShaderAsset",
+            AssetKind::Shader(role) => role.type_name(),
         }
     }
 }

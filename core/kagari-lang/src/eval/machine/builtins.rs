@@ -202,12 +202,18 @@ impl Machine<'_> {
                 let kind = asset_item
                     .and_then(|item| std.asset_kind(item))
                     .ok_or(ErrorKind::Abort)?;
-                if !matches!(site.at, Some(Anchor::Node(Owner::Body(_), _))) {
+                let Some(Anchor::Node(Owner::Body(owner), _)) = site.at else {
                     return Err(ErrorKind::Abort);
-                }
-                let file = self.program.asset_root(self.db).join(&path);
+                };
+                // Assets declared in std are std files; others lie in the asset directory.
+                let file = match owner.file.path(self.db) {
+                    crate::input::FilePath::Std(_) => crate::input::FilePath::Std(path),
+                    crate::input::FilePath::Disk(_) => self.program.asset_root(self.db).join(&path),
+                };
                 Ok(Value::Asset { kind, path: file })
             }
+            // The erasure intrinsics only forget a type.
+            Builtin::ShaderErase | Builtin::ShaderArgsErase => Ok(Self::arg(&args, 0)?.clone()),
             Builtin::SystemFont => {
                 let Text::Plain(path) = self.text_arg(&args, 0)? else {
                     return Err(ErrorKind::Abort);
@@ -389,7 +395,9 @@ impl Machine<'_> {
             | Builtin::EntityRotation
             | Builtin::EntityOpacity
             | Builtin::EntityFilter
-            | Builtin::EntityShader
+            | Builtin::EntityMix
+            | Builtin::EntityMask
+            | Builtin::EntityLocalMotion
             | Builtin::EntityFill => {
                 let (place, id) = self.entity_receiver(&args)?;
                 let prop = match builtin {
@@ -398,13 +406,22 @@ impl Machine<'_> {
                     Builtin::EntityRotation => EntityProp::Rotation,
                     Builtin::EntityOpacity => EntityProp::Opacity,
                     Builtin::EntityFilter => EntityProp::Filter,
-                    Builtin::EntityShader => EntityProp::Shader,
+                    Builtin::EntityMix => EntityProp::Mix,
+                    Builtin::EntityMask => EntityProp::Mask,
+                    Builtin::EntityLocalMotion => EntityProp::LocalMotion,
                     _ => EntityProp::Fill,
                 };
                 Ok(Self::obj_ref(
                     &place,
                     ScreenObj::Prop(PropTarget::Entity(id, prop)),
                 ))
+            }
+            Builtin::EntityTravel => {
+                let to = self.const_arg(&args, 1)?;
+                let motion = self.const_arg(&args, 2)?;
+                let (place, id) = self.entity_receiver(&args)?;
+                self.screen_at(&place)?.travel(id, to, motion, std)?;
+                Ok(Value::unit())
             }
             Builtin::EntityPart => {
                 let part =
@@ -428,7 +445,6 @@ impl Machine<'_> {
             | Builtin::EntitySetZ
             | Builtin::EntitySetAnchor
             | Builtin::EntitySetFlip
-            | Builtin::EntitySetBlend
             | Builtin::EntitySetFillSize
             | Builtin::EntityGate => {
                 let value = self.const_arg(&args, 1)?;
@@ -442,7 +458,6 @@ impl Machine<'_> {
                     Builtin::EntitySetZ => entity.z = value.as_int().ok_or(ErrorKind::Abort)?,
                     Builtin::EntitySetAnchor => entity.anchor = value,
                     Builtin::EntitySetFlip => entity.flip = value,
-                    Builtin::EntitySetBlend => entity.blend = value,
                     Builtin::EntitySetFillSize => entity.fill_size = value,
                     _ => entity.gate = value,
                 }
@@ -480,11 +495,18 @@ impl Machine<'_> {
                 let (place, Some(ScreenObj::Layer(target))) = self.receiver_obj(&args)? else {
                     return Err(ErrorKind::Abort);
                 };
-                let content = self.screen_at(&place)?.layer(target, std);
+                // `None` also when the layer shows a paint.
+                let content = self
+                    .screen_at(&place)?
+                    .layer(target, std)
+                    .filter(|content| matches!(content, ConstValue::Asset { .. }));
                 let content = content.map(|content| self.thaw(&content));
                 Ok(self.option_value(content))
             }
-            Builtin::ImageLayerChange | Builtin::LabelLayerChange | Builtin::MovieLayerChange => {
+            Builtin::ImageLayerChange
+            | Builtin::ImageLayerPaint
+            | Builtin::LabelLayerChange
+            | Builtin::MovieLayerChange => {
                 let content = self.const_arg(&args, 1)?;
                 if let ConstValue::Text(text) = &content {
                     check_marks(text, std)?;

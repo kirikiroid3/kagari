@@ -23,11 +23,12 @@ runtime-compatibility = ["native_v0"]
 
 |モジュール|`native_v0` での対応|
 |---|---|
-|`std`（型、トレイト、`asset`、`system_font`）|対応。ただし `VideoAsset` と `ShaderAsset` のファイルは使えません（後述）|
+|`std`（型、トレイト、`asset`、`system_font`）|対応。ただし `VideoAsset` のファイルは使えません（後述）|
 |`std::time`|対応|
 |`std::narrative`|対応：`Say`、無効なアームを含む `Choice`、`rng_choose`、`Meta`、`Narrative` のすべてのメソッド。時間付き入力は予定で、どのプロファイルにもありません|
 |`std::narrative::text`|対応：ルビとモノルビ、すべてのテキスト効果（スタイル、圏点、表示速度、ポーズ、マーク）、`hanging_indent` と `vertical` を含む `TextStyle` のすべてのフィールド|
-|`std::screen`|対応。ただしムービーレイヤー（`Entity::movie`、`MovieLayer`）とシェーダー（`Screen::filter`、`Entity::filter`、`Entity::shader`）は、動画とシェーダーのアセットが必要なため使えません|
+|`std::screen`|対応。ただしムービーレイヤー（`Entity::movie`、`MovieLayer`）は、動画アセットが必要なため使えません|
+|`std::screen::shader`、`std::shaders`|対応。すべてのシェーダーは `kagari build` で検証されます。ストレージバッファを持たない GPU（モーションのロールではコンピュートを持たない GPU）では、ランタイムは効果をかけずに内容を描きます|
 |`std::screen::anim`|対応|
 |`std::screen::audio`|対応|
 |`std::stage`|対応|
@@ -44,7 +45,7 @@ runtime-compatibility = ["native_v0"]
 |`AudioAsset`、`VoiceAsset`|Ogg Vorbis、FLAC、WAV（PCM）、WAV（IEEE 浮動小数点）、MP3|Ogg Opus、Ogg FLAC、その他の Ogg コーデック、圧縮 WAV、AAC/M4A|
 |`FontAsset`|TrueType、OpenType（CFF）、TrueType/OpenType コレクション（`.ttc`）|WOFF、WOFF2|
 |`VideoAsset`|—|すべての形式：動画アセットには対応していません|
-|`ShaderAsset`|—|すべての形式：シェーダーアセット（WGSL）には対応していません|
+|`ColorShader`、`MixShader`、`TextureShader`、`MaskShader`、`LocalMotionShader`、`TransitionalMotionShader`|そのロールとして検証を通る WGSL ソース（UTF-8 テキスト）|テキストでないデータ、誤りのある WGSL|
 
 ## 対応していないアイテムを使った場合 {#using-an-unsupported-item}
 
@@ -56,16 +57,21 @@ error: asset `music/theme.ogg` (audio): Ogg Opus is not supported by runtime pro
 error: asset `bgimage/bad.jxl` (image): JPEG XL is not supported by runtime profile `native_v0`
 ```
 
-したがって、`native_v0` を対象とするゲームは `VideoAsset` や `ShaderAsset` の定数をどこにも使えません。その他のアセットは対応する形式に変換してください。これらのアセットを受け取るアイテムについては次のとおりです。
+したがって、`native_v0` を対象とするゲームは `VideoAsset` の定数をどこにも使えません。その他のアセットは対応する形式に変換してください。動画アセットを受け取るアイテムについては次のとおりです。
 
 |アイテム|`kagari build` 時|`native_v0` の実行時|
 |---|---|---|
 |`MovieLayer::change(…)`（`Movie` は `VideoAsset` を保持します）|拒否（動画アセット）|—|
-|`Screen::filter`、`Entity::filter`、`Entity::shader` に対する `Prop::change(Some(SHADER))`|拒否（シェーダーアセット）|—|
 |`system::watched(VIDEO)`|拒否（動画アセット）|—|
-|`Entity::movie()`、`MovieLayer::clear(…)`、フィルターやシェーダーのプロパティに対する `change(None)`|受理|論理画面（セーブ、等価性、一貫性）には保持されますが、描画はされません。描くものがないためです|
+|`Entity::movie()`、`MovieLayer::clear(…)`|受理|論理画面（セーブ、等価性、一貫性）には保持されますが、描画はされません。描くものがないためです|
 
-デスクトップランタイムのレンダラーは動画を再生せず、ゲームが用意したシェーダーも実行しません。そのため `native_v0` ではムービーレイヤーとフィルターがピクセルを生むことはなく、`watched` の集合が埋まることもありません。
+デスクトップランタイムのレンダラーは動画を再生しません。そのため `native_v0` ではムービーレイヤーがピクセルを生むことはなく、`watched` の集合が埋まることもありません。
+
+**不正なシェーダーはビルドを失敗させます。** `kagari build` はプログラムが使うすべてのシェーダーを、`std::shaders` のものも含め、その型が示すロールとしてコンパイルし、不正なシェーダーとロールの組ごとにエラーを 1 行出力します。誤りが `.wgsl` ファイル内にあればその行を示します。
+
+```text
+error: shader `shader/broken.wgsl` (color): line 4: no definition in scope for identifier: `undefined_name`
+```
 
 `native_v0` は唯一のプロファイルで、`runtime-compatibility` は空にできないため、すべての `kagari build` は `native_v0` に照らして検査します。現在、プロジェクトがこの検査を外すことはできません。
 

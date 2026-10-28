@@ -12,7 +12,7 @@ const fn azusa_smiles(mut screen: Screen) -> Screen {
 }
 ```
 
-このモジュールのアイテムはすべて `const fn` か単純なデータです。そのためレンダーはコンパイル時に評価され、コンパイラは画面同士を比較できます。`Screen` のタイムラインメソッドはこのページで説明します。それらがスケジュールするアニメーション値は [`std::screen::anim`](./screen-anim.md) に、オーディオ値は [`std::screen::audio`](./screen-audio.md) にあります。このモジュールの上に作られたキャラクター用ヘルパーは [`std::stage`](./stage.md) に、完全な例は [演出レシピ](./guides/staging.md) にあります。
+このモジュールのアイテムはすべて `const fn` か単純なデータです。そのためレンダーはコンパイル時に評価され、コンパイラは画面同士を比較できます。`Screen` のタイムラインメソッドはこのページで説明します。それらがスケジュールするアニメーション値は [`std::screen::anim`](./screen-anim.md) に、オーディオ値は [`std::screen::audio`](./screen-audio.md) に、シェーダー効果（フィルター、ミックス、マスク、ペイント、シェーダーモーション）は [`std::screen::shader`](./screen-shader.md) にあり、既製のシェーダーは [`std::shaders`](./shaders.md) にあります。このモジュールの上に作られたキャラクター用ヘルパーは [`std::stage`](./stage.md) に、完全な例は [演出レシピ](./guides/staging.md) にあります。
 
 プレリュードは `Screen`、`Render`、`EntityId`、`Part`、`Point`、`Offset`、`Size`、`Anchor`、`Color`、`Plane`、`Visibility`、`point`、`offset`、`rgb`、`hex`、`BLACK`、`WHITE`、`TRANSPARENT` を再エクスポートします。それ以外のアイテムには `use std::screen::…` が必要です。
 
@@ -23,9 +23,9 @@ const fn azusa_smiles(mut screen: Screen) -> Screen {
 | [`Render`](#render) | 型 | `const fn(Screen) -> Screen` |
 | [`EntityId`](#entityid)、[`BACKGROUND`](#background) | 構造体、定数 | エンティティの識別子 |
 | [`Part`](#part)、[`MAIN`](#main) | 構造体、定数 | 画像レイヤーのキー |
-| [`Point`](#point)、[`Offset`](#offset)、[`Size`](#size)、[`Insets`](#insets)、[`Anchor`](#anchor)、[`Angle`](#angle) | 構造体 + コンストラクター | 幾何 |
+| [`Point`](#point)、[`Offset`](#offset)、[`Size`](#size)、[`Insets`](#insets)、[`Anchor`](#anchor)、[`Angle`](#angle)、[`Pose`](#pose) | 構造体 + コンストラクター | 幾何 |
 | [`Color`](#color) と定数 | 構造体 + コンストラクター | sRGB 色 |
-| [`Plane`](#plane)、[`Visibility`](#visibility)、[`Flip`](#flip)、[`VAlign`](#valign)、[`BlendMode`](#blendmode) | 列挙型 | レイアウトの選択肢 |
+| [`Plane`](#plane)、[`Visibility`](#visibility)、[`Flip`](#flip)、[`VAlign`](#valign) | 列挙型 | レイアウトの選択肢 |
 | [`Screen`](#screen) | ビルトイン構造体 | 画面とステップのタイムライン |
 | [`Entity`](#entity) | ビルトイン構造体 | 画面上のもの |
 | [`Prop`](#prop)、[`Change`](#change) | ビルトイン構造体 | 補間されるプロパティ |
@@ -44,7 +44,7 @@ const fn azusa_smiles(mut screen: Screen) -> Screen {
 
 スナップショット、画面の等価性、一貫性チェックは論理画面だけを使います。タイムライン、スケジュールされたアニメーション、ワンショットサウンド、`ChoiceMenu` はステップに属し、論理画面には含まれません。
 
-アニメーションが開始状態や終了状態を変えることはありません。トゥイーンやトランジションは古い値から `change` で設定した値まで進み、モーションは恒等変換で終わります。そのためクリック、スキップ、`animations` 設定のオフが論理画面を変えることはありません。
+アニメーションが開始状態や終了状態を変えることはありません。トゥイーンやトランジションは古い値から `change` で設定した値まで進み、モーションは恒等変換で終わり、シェーダーモーションはエンティティの描き方だけを変えます。そのためクリック、スキップ、`animations` 設定のオフが論理画面を変えることはありません。
 
 ## ステップのエントリー {#step-entry}
 
@@ -187,6 +187,19 @@ pub const fn degrees(d: Decimal) -> Angle
 
 時計回りの回転です。`degrees(d)` は `d` 度の回転です。種別：`const fn` · ビルトイン：いいえ。
 
+### 構造体：`Pose` {#pose}
+
+```kis
+pub struct Pose {
+    pub position: Point,
+    pub scale: Decimal,
+    pub rotation: Angle,
+}
+pub const fn pose(position: Point, scale: Decimal, rotation: Angle) -> Pose
+```
+
+エンティティがどこにあるか、つまりエンティティの[プロパティ](#entity-properties)が持つ位置、拡大率、回転です。`pose(position, scale, rotation)` で作ります。[`Entity::travel`](#entity-travel) で使います。種別：`const fn` · ビルトイン：いいえ。
+
 ## 色 {#colour}
 
 ### 構造体：`Color` {#color}
@@ -224,7 +237,7 @@ pub const TRANSPARENT: Color = Color { r: 0, g: 0, b: 0, a: 0 };
 
 不透明な黒、不透明な白、完全な透明です。
 
-## プレーン、反転、ブレンドモード {#planes-flips-and-blend-modes}
+## プレーンと反転 {#planes-and-flips}
 
 ### 列挙型：`Plane` {#plane}
 
@@ -275,46 +288,33 @@ pub enum VAlign {
 
 垂直方向の配置です。[`ChoiceMenu::set_align`](#choicemenu-set_align) で使います。
 
-### 列挙型：`BlendMode` {#blendmode}
+## シェーダー効果 {#shader-effects}
+
+シェーダーはレンダラーが実行する WGSL ファイルです。画面はシェーダーを、シェーダーとその引数を組にした**効果値**として持ちます。効果値は [`std::screen::shader`](./screen-shader.md) で宣言され、既製のものが [`std::shaders`](./shaders.md) にあります。効果のスロットはどれも省略可能で、`None` は効果なしです。
+
+| スロット | 値 | 効果 |
+| ---- | ----- | ------ |
+| [`Screen::filter`](#screen-filter) | `Prop<Option<Filter>>` | `Background`、`Stage`、`Front` プレーンの色を変える |
+| [`Entity::filter`](#entity-filter) | `Prop<Option<Filter>>` | エンティティの色を変える |
+| [`Entity::mix`](#entity-mix) | `Prop<Option<Mix>>` | エンティティを下にあるものへ合成する。`None` は通常のソースオーバー |
+| [`Entity::mask`](#entity-mask) | `Prop<Option<Mask>>` | エンティティの矩形の上でアルファを乗算する |
+| [`Entity::local_motion`](#entity-local_motion) | `Prop<Option<LocalMotion>>` | エンティティをポーズの周りで動かす（描画だけ） |
+| [`Entity::travel`](#entity-travel) | 呼び出し | シェーダーの経路に沿ってエンティティを新しいポーズへ動かす |
+| [`ImageLayer::paint`](#imagelayer) | レイヤーの差し替え | 画像の代わりに生成された内容 |
+
+**効果のトゥイーン。** 効果のスロットは `Prop` なので、変更にはトゥイーンを与えます。古い値と新しい値が同じシェーダー（ローカルモーションでは同じ振る舞いも）を使うとき、トゥイーンは引数を補間します。小数、色、点、サイズ、角度、長さはトゥイーンのイージングに従って動き、整数、`bool`、列挙型は開始時に切り替わります。`None` から、または `None` への変更を含め、それ以外の変更はトゥイーンの開始時に切り替わります。
 
 ```kis
-pub enum BlendMode {
-    Normal,
-    Add,
-    Multiply,
-    Screen,
-    Overlay,
-    Darken,
-    Lighten,
-    ColorDodge,
-    ColorBurn,
-    HardLight,
-    SoftLight,
-    Difference,
-    Exclusion,
-    Hue,
-    Saturation,
-    Color,
-    Luminosity,
-}
+use std::shaders::color::blur;
+
+screen.filter().change(Some(blur(0.0))).apply_animation(instant());
+screen.wait(ms(500));
+screen.filter().change(Some(blur(6.0))).apply_animation(tween(ms(1500)));
 ```
 
-エンティティを下に描画されたものへどう合成するかです。各バリアントは CSS のブレンドモードに従い、`Add` は加算合成です。生成時の既定値は `Normal` です。
+**効果の時刻。** シェーダーは効果が始まってからの秒数を受け取ります。スロットが同じシェーダーを保つ間、時刻はステップをまたいで進み続けます。[効果の時刻](./guides/shaders.md#effect-time) を参照してください。`animations` 設定がオフのとき、効果の時刻はすべて 0 です。
 
-## フィルターとシェーダー {#filters-and-shaders}
-
-> **安定性:** 暫定 — 現在唯一のランタイムプロファイルである `native_v0` はビルド時に `.wgsl` シェーダーアセットを拒否するため、フィルターとシェーダーの生成内容はまだ使えません。ネイティブレンダラーもこれらを描画しません（[ランタイムプロファイル](./appendix/profiles.md#using-an-unsupported-item) を参照）。ビルドできるのは `change(None)` だけで、論理画面に残りますが見た目には影響しません。
-
-- フィルター、天候、パーティクルはすべて `ShaderAsset`、つまり WGSL シェーダーファイル（`.wgsl`）です。
-- **フィルター**は描画されたものを後処理します。エンティティは自分のフィルター（[`Entity::filter`](#entity-filter)）を持ち、画面フィルター（[`Screen::filter`](#screen-filter)）は `Background`、`Stage`、`Front` プレーンにかかります。`None` はフィルターなしです。
-- 天候とパーティクルは **`shader`**（[`Entity::shader`](#entity-shader)）を設定したエンティティです。シェーダーがエンティティの内容を生成し、その内容はほかのエンティティと同じく、エンティティのプレーンに描画され `z` で順序付けられます。
-- `std` にはシェーダーが同梱されていません。スタジオが自分で用意します。
-
-```kis
-const SEPIA: ShaderAsset = asset("sepia.wgsl");
-
-screen.filter().change(Some(SEPIA)).apply_animation(tween(ms(500)));
-```
+**シェーダーを実行できないとき。** `kagari build` はゲームが使うすべてのシェーダーを検査するので、壊れたシェーダーはビルドできません。あるロールのシェーダーを実行できない GPU では、そのスロットを `None` と同じように描き（トラベルは直線で動き、マスク付きトランジションはクロスフェードになり、ペイントは何も描きません）、警告をログに出します。論理画面はどちらでも同じです。
 
 ## 構造体：`Screen` {#screen}
 
@@ -367,10 +367,10 @@ const fn roof_evening(_screen: Screen) -> Screen {
 | position, anchor | (0, 0), `TOP_LEFT` |
 | scale, rotation | 1.0, 0° |
 | **opacity** | **0.0** |
-| filter, shader | `None`, `None` |
+| filter, mix, mask, local motion | `None` |
 | fill, fill size | `TRANSPARENT`, `None`（画面全体） |
 | layers | パーツなし、ラベルなし、ムービーなし |
-| flip, blend, gate | `Flip::None`, `Normal`, `None` |
+| flip, gate | `Flip::None`, `None` |
 
 生成されたエンティティは見えないので、登場のたびにアニメーションを明示します。
 
@@ -453,10 +453,10 @@ screen.background().change(BG::ROOF).apply_animation(fade(ms(500)));
 ### `screen.filter()` {#screen-filter}
 
 ```kis
-#[builtin] pub const fn filter(&mut self) -> &mut Prop<Option<ShaderAsset>>;
+#[builtin] pub const fn filter(&mut self) -> &mut Prop<Option<shader::Filter>>;
 ```
 
-`Background`、`Stage`、`Front` プレーンを後処理するシェーダーです。`None` はフィルターなしです。[フィルターとシェーダー](#filters-and-shaders) を参照してください。種別：`const fn` · ビルトイン：はい · プロファイル：`native_v0` はビルド時にシェーダーアセットを拒否し、ネイティブレンダラーはフィルターを描画しません。
+`Background`、`Stage`、`Front` プレーンにカメラの後でかかる色フィルターです。`None` はフィルターなしです。[シェーダー効果](#shader-effects) を参照してください。種別：`const fn` · ビルトイン：はい。
 
 ### `screen.music()`、`screen.ambience(channel)` {#screen-music}
 
@@ -510,14 +510,15 @@ screen.background().change(BG::ROOF).apply_animation(fade(ms(500)));
 #[builtin] pub struct Entity;
 ```
 
-画面上のものです。変換、不透明度、フィルター、シェーダー、塗り、レイヤーを持ちます。コンポーネントの集合は固定で、スタジオがコンポーネントを追加することはありません。
+画面上のものです。変換、不透明度、色フィルター、ミックス、マスク、ローカルモーション、塗り、レイヤーを持ちます。コンポーネントの集合は固定で、スタジオがコンポーネントを追加することはありません。
 
 | メンバーの種類 | メンバー | 変更方法 |
 | -------------- | ------- | ------------ |
-| 補間されるプロパティ | `position`, `scale`, `rotation`, `opacity`, `filter`, `shader`, `fill` | `change(v).apply_animation(Tween)` |
-| レイヤー | `part(p)`, `image()`, `label()`, `movie()` | `change(x).apply_animation(Transition)` |
-| レイアウト設定 | `set_plane`, `set_z`, `set_anchor`, `set_flip`, `set_blend`, `set_fill_size`, `gate` | 直接設定。補間不可 |
+| 補間されるプロパティ | `position`, `scale`, `rotation`, `opacity`, `filter`, `mix`, `mask`, `local_motion`, `fill` | `change(v).apply_animation(Tween)` |
+| レイヤー | `part(p)`, `image()`, `label()`, `movie()` | `change(x)` または `paint(p)` の後に `apply_animation(Transition)` |
+| レイアウト設定 | `set_plane`, `set_z`, `set_anchor`, `set_flip`, `set_fill_size`, `gate` | 直接設定。補間不可 |
 | 相対モーション | `apply_animation(Motion)` | [`Motion`](./screen-anim.md#motion) を参照 |
+| シェーダーの経路 | `travel(to, motion)` | [`travel`](#entity-travel) を参照 |
 
 ### 補間されるプロパティ {#entity-properties}
 
@@ -533,16 +534,65 @@ screen.background().change(BG::ROOF).apply_animation(fade(ms(500)));
 - `opacity` は割合 `0.0..=1.0` です。生成されたエンティティは 0.0 から始まります。
 - 種別：`const fn` · ビルトイン：はい。
 
-<a id="entity-shader"></a>
-
-### `entity.filter()`、`entity.shader()` {#entity-filter}
+### `entity.filter()` {#entity-filter}
 
 ```kis
-#[builtin] pub const fn filter(&mut self) -> &mut Prop<Option<ShaderAsset>>;
-#[builtin] pub const fn shader(&mut self) -> &mut Prop<Option<ShaderAsset>>;
+#[builtin] pub const fn filter(&mut self) -> &mut Prop<Option<shader::Filter>>;
 ```
 
-`filter` はこのエンティティを後処理するシェーダーで、`None` はフィルターなしです。`shader` はシェーダーが生成する内容（雨、雪、パーティクル）で、エンティティのプレーンと z 順序で描画されます。`None` は何も描画しません。[フィルターとシェーダー](#filters-and-shaders) を参照してください。種別：`const fn` · ビルトイン：はい · プロファイル：`native_v0` はビルド時にシェーダーアセットを拒否し、ネイティブレンダラーはフィルターもシェーダーの生成内容も描画しません。
+このエンティティにかかる色フィルターです。`None` はフィルターなしです。フィルターはエンティティが描くものすべてに、マスクとモーションの後、画面空間でかかります。[シェーダー効果](#shader-effects) を参照してください。種別：`const fn` · ビルトイン：はい。
+
+### `entity.mix()` {#entity-mix}
+
+```kis
+#[builtin] pub const fn mix(&mut self) -> &mut Prop<Option<shader::Mix>>;
+```
+
+エンティティを下にあるものへどう合成するかです。`None` は通常のソースオーバーです。乗算やスクリーンなどのブレンドモードはミックスです（[`std::shaders::mix`](./shaders-mix.md)）。エンティティの不透明度はミックスの前にかかります。種別：`const fn` · ビルトイン：はい。
+
+```kis
+screen.entity(TINT).mix().change(Some(std::shaders::mix::color())).apply_animation(instant());
+```
+
+### `entity.mask()` {#entity-mask}
+
+```kis
+#[builtin] pub const fn mask(&mut self) -> &mut Prop<Option<shader::Mask>>;
+```
+
+エンティティの矩形にかかるアルファです。エンティティが矩形の中に描くものすべてにマスクが乗算され、マスクはエンティティと一緒に移動、拡大縮小、回転します。塗りサイズのない塗りは画面全体を覆い、マスクされません。`None` はマスクなしです。種別：`const fn` · ビルトイン：はい。
+
+### `entity.local_motion()` {#entity-local_motion}
+
+```kis
+#[builtin] pub const fn local_motion(&mut self) -> &mut Prop<Option<shader::LocalMotion>>;
+```
+
+エンティティのポーズの周りで、描き方だけを変えるモーションです。`None` はモーションなしです。シェーダーは毎フレーム、トゥイーンと [`Motion`](./screen-anim.md#motion) を反映したエンティティのポーズから始めるので、上下に揺れるキャラクターも歩かせられます。論理的な位置、拡大率、回転は変わりません。塗りサイズのない塗りは動きません。種別：`const fn` · ビルトイン：はい。
+
+```kis
+screen.entity(HANAKO).local_motion().change(Some(std::shaders::motion::bob(20.0, ms(1000)))).apply_animation(instant());
+```
+
+### `entity.travel(to, motion)` {#entity-travel}
+
+```kis
+#[builtin] pub const fn travel(&mut self, to: Pose, motion: shader::TransitionalMotion);
+```
+
+`motion` の経路に沿ってエンティティを `to` へ動かします。種別：`const fn` · ビルトイン：はい。
+
+- 論理的なポーズはすぐに `to` になります。同じレンダーの後の `position().get()` は `to.position` を返します。
+- `travel` は `position`、`scale`、`rotation` それぞれに、モーションの長さ、イージング、遅延のトゥイーンをスケジュールし、さらにシェーダーの経路をスケジュールします。トラベルの間は、開始時のポーズ、`to`、イージング適用後の進行度から、シェーダーが描くポーズを決めます。終わるとエンティティは `to` にあります。
+- シェーダーを実行できない環境では、エンティティは通常のトゥイーンに沿って、つまり直線で動きます。
+- エンティティのローカルモーションはトラベルの上に重なって動きます。
+- 不正なイージングは、トゥイーンと同じく定数評価エラーです。
+
+```kis
+use std::screen::{degrees, pose};
+
+screen.entity(BIRD).travel(pose(point(900, 400), 1.0, degrees(0.0)), std::shaders::motion::arc(200.0, ms(1200)));
+```
 
 ### `entity.fill()` {#entity-fill}
 
@@ -590,7 +640,6 @@ pub const fn image(&mut self) -> &mut ImageLayer {
 #[builtin] pub const fn set_z(&mut self, z: i32);
 #[builtin] pub const fn set_anchor(&mut self, anchor: Anchor);
 #[builtin] pub const fn set_flip(&mut self, flip: Flip);
-#[builtin] pub const fn set_blend(&mut self, blend: BlendMode);
 #[builtin] pub const fn set_fill_size(&mut self, size: Option<Size>);
 ```
 
@@ -600,7 +649,6 @@ pub const fn image(&mut self) -> &mut ImageLayer {
 | `set_z(z)` | プレーン内の順序を設定する。大きいほど後に描画される |
 | `set_anchor(a)` | エンティティのうち位置に置かれる点を設定する |
 | `set_flip(f)` | 描画を鏡像反転する |
-| `set_blend(b)` | 下にあるものへの合成方法を設定する |
 | `set_fill_size(s)` | 塗りのサイズを設定する。`None` は画面全体 |
 
 設定は即座に反映され、アニメーションしません。種別：`const fn` · ビルトイン：はい。
@@ -640,11 +688,12 @@ const fn clock_overlay(mut screen: Screen) -> Screen {
 
 ### 描画順序 {#drawing-order}
 
-- プレーンは `Background < Stage < Front <（ゲームビューが描くテキストウィンドウ）< OverWindow` の順に描画されます。プレーン内では `z` の昇順、次に `EntityId` の昇順です。`z` は CSS の `z-index` に相当します。シェーダーが生成する内容（天候、パーティクル）も同じ規則で順序付けられます。
-- エンティティ内の順序は、塗り、`Part` 昇順のパーツ、ムービー、ラベルです。
-- アンカー点は `position` に置かれます。エンティティのサイズは `MAIN` パーツの画像のサイズ、なければ塗りサイズ、なければラベルのボックスです。拡大縮小と回転はアンカーを中心に行われます。
+- プレーンは `Background < Stage < Front <（ゲームビューが描くテキストウィンドウ）< OverWindow` の順に描画されます。プレーン内では `z` の昇順、次に `EntityId` の昇順です。`z` は CSS の `z-index` に相当します。
+- エンティティ内の順序は、塗り、`Part` 昇順のパーツ（画像とペイント）、ムービー、ラベルです。
+- アンカー点は `position` に置かれます。エンティティのサイズは `MAIN` パーツの画像またはペイントのサイズ、なければ塗りサイズ、なければラベルのボックスです。拡大縮小と回転はアンカーを中心に行われます。
+- エンティティの効果は、内側から順に入れ子になります。エンティティの矩形にかかるマスク、ローカルモーション（とトラベル）、フィルター、不透明度付きのミックスです。塗りサイズのない塗りはフィルターとミックスの内側に描かれますが、動きもマスクもされません。
 - カメラは `Background`、`Stage`、`Front` にだけかかります。オフセットは平行移動し、ズームと回転は画面中心を軸にします。
-- 画面フィルターも同じ 3 つのプレーンにかかります。
+- 画面フィルターも同じ 3 つのプレーンに、カメラの後でかかります。
 
 ## 構造体：`Prop` {#prop}
 
@@ -691,11 +740,23 @@ impl<T> Change<T> {
 impl ImageLayer {
     #[builtin] pub const fn get(&self) -> Option<ImageAsset>;
     #[builtin] pub const fn change(&mut self, image: ImageAsset) -> &mut Swap;
+    #[builtin] pub const fn paint(&mut self, paint: shader::Paint) -> &mut Swap;
     #[builtin] pub const fn clear(&mut self) -> &mut Swap;
 }
 ```
 
-エンティティの画像レイヤーです。`get()` は表示中の画像（あれば）です。`change(image)` は画像を `image` に差し替え、`clear()` は何もない状態に差し替えます。種別：`const fn` · ビルトイン：はい。
+エンティティの画像レイヤーです。種別：`const fn` · ビルトイン：はい。
+
+- `get()` は表示中の画像（あれば）です。レイヤーがペイントを表示しているときも `None` です。
+- `change(image)` は内容を `image` に差し替えます。
+- `paint(p)` は内容を、生成された [`Paint`](./screen-shader.md#paint) `p` に差し替えます。グラデーションや雨など、テクスチャーシェーダーが描く `p` のサイズの内容です。そのサイズの画像と同じように配置、反転、差し替えされ、`MAIN` パーツならエンティティのサイズを決めます。
+- `clear()` は何もない状態に差し替えます。
+
+```kis
+use std::screen::{degrees, rgba, size};
+
+screen.entity(RAIN).image().paint(std::shaders::texture::rain(rgba(200, 210, 255, 160), 30, 900.0, degrees(10.0), size(1920, 1080))).apply_animation(fade(ms(500)));
+```
 
 ### 構造体：`LabelLayer` {#labellayer}
 

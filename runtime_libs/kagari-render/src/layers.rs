@@ -19,7 +19,11 @@ pub(crate) struct LayerPool {
 }
 
 /// A linear-light target texture with every usage the renderer needs.
-pub(crate) fn linear_texture(device: &wgpu::Device, label: &str, size: (u32, u32)) -> wgpu::Texture {
+pub(crate) fn linear_texture(
+    device: &wgpu::Device,
+    label: &str,
+    size: (u32, u32),
+) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
         label: Some(label),
         size: wgpu::Extent3d {

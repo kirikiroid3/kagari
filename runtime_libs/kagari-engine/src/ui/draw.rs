@@ -13,8 +13,8 @@ use super::style::{ButtonStyleSpec, LookKey, Paint, SliderStyleSpec, choose, loo
 use super::text::{Px, TextAlign, TextStyleSpec, TextSystem};
 use crate::EngineState;
 use crate::assets::AssetStore;
-use crate::frame::{Affine, Blend, Node, Rect, Reveal};
-use crate::screen::draw::{draw_screen, image_layer_node};
+use crate::frame::{Affine, Node, Rect, Reveal};
+use crate::screen::draw::{content_size, draw_screen, image_layer_node};
 use crate::screen::sample::{VisualLayer, VisualScreen};
 use crate::story::reveal::{ClickWait, MessageView};
 use crate::system::SystemState;
@@ -146,12 +146,19 @@ fn fade_window(nodes: &mut [Node], k: f32) {
         match node {
             Node::Fill { color, .. } => *color = color.map(|c| c * k),
             Node::Image { tint, .. } | Node::NineSlice { tint, .. } => *tint = tint.map(|c| c * k),
-            Node::Group { children, .. } => fade_window(children, k),
+            Node::Group { children, .. }
+            | Node::Filter { children, .. }
+            | Node::Mix { children, .. }
+            | Node::Masked { children, .. }
+            | Node::Motion { children, .. } => fade_window(children, k),
             Node::Transition { from, to, .. } => {
                 fade_window(from, k);
                 fade_window(to, k);
             }
-            Node::Text { .. } | Node::Still { .. } | Node::Thumbnail { .. } => {}
+            Node::Text { .. }
+            | Node::Paint { .. }
+            | Node::Still { .. }
+            | Node::Thumbnail { .. } => {}
         }
     }
 }
@@ -187,7 +194,6 @@ fn group(opacity: f32, clip: Option<Rect>, children: Vec<Node>) -> Node {
     Node::Group {
         transform: Affine::IDENTITY,
         opacity,
-        blend: Blend::Normal,
         clip,
         children,
     }
@@ -534,24 +540,20 @@ impl Drawer<'_> {
         out.push(Node::Group {
             transform,
             opacity: 1.0,
-            blend: Blend::Normal,
             clip: Some(rect),
             children: vec![planes.world],
         });
         let mut above = Vec::new();
         let side = &v.hud.side_image;
-        let side_asset = match side {
+        let side_content = match side {
             VisualLayer::Empty => None,
-            VisualLayer::Shown(a) => Some(*a),
-            VisualLayer::Transition { from, to, .. } => to.or(*from),
+            VisualLayer::Shown(content) => Some(content),
+            VisualLayer::Transition { from, to, .. } => to.as_ref().or(from.as_ref()),
         };
         if !self.game.hide_window
-            && let Some(asset) = side_asset
+            && let Some(content) = side_content
         {
-            let ih = self
-                .assets
-                .image_size(asset)
-                .map_or(0.0, |(_, ih)| ih as f32);
+            let ih = content_size(content, self.assets).map_or(0.0, |(_, ih)| ih as f32);
             if let Some(node) = image_layer_node(side, [0.0, fh - ih], self.assets) {
                 above.push(group(v.hud.text_window.clamp(0.0, 1.0), None, vec![node]));
             }
@@ -561,7 +563,6 @@ impl Drawer<'_> {
             self.deferred.push(Node::Group {
                 transform,
                 opacity: 1.0,
-                blend: Blend::Normal,
                 clip: Some(rect),
                 children: above,
             });

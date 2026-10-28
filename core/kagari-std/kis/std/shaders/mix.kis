@@ -1,0 +1,118 @@
+//! Mix shaders for `Entity::mix`: the W3C blend modes, additive compositing and frosted glass.
+
+use crate::screen::Color;
+use crate::screen::shader::{Mix, MixShader, mix};
+
+/// W3C `multiply`.
+pub const MULTIPLY: MixShader<()> = asset("shaders/mix/multiply.wgsl");
+/// W3C `screen`.
+pub const SCREEN: MixShader<()> = asset("shaders/mix/screen.wgsl");
+/// W3C `overlay`.
+pub const OVERLAY: MixShader<()> = asset("shaders/mix/overlay.wgsl");
+/// W3C `darken`.
+pub const DARKEN: MixShader<()> = asset("shaders/mix/darken.wgsl");
+/// W3C `lighten`.
+pub const LIGHTEN: MixShader<()> = asset("shaders/mix/lighten.wgsl");
+/// W3C `color-dodge`.
+pub const COLOR_DODGE: MixShader<()> = asset("shaders/mix/color_dodge.wgsl");
+/// W3C `color-burn`.
+pub const COLOR_BURN: MixShader<()> = asset("shaders/mix/color_burn.wgsl");
+/// W3C `hard-light`.
+pub const HARD_LIGHT: MixShader<()> = asset("shaders/mix/hard_light.wgsl");
+/// W3C `soft-light`.
+pub const SOFT_LIGHT: MixShader<()> = asset("shaders/mix/soft_light.wgsl");
+/// W3C `difference`.
+pub const DIFFERENCE: MixShader<()> = asset("shaders/mix/difference.wgsl");
+/// W3C `exclusion`.
+pub const EXCLUSION: MixShader<()> = asset("shaders/mix/exclusion.wgsl");
+/// W3C `hue`.
+pub const HUE: MixShader<()> = asset("shaders/mix/hue.wgsl");
+/// W3C `saturation`.
+pub const SATURATION: MixShader<()> = asset("shaders/mix/saturation.wgsl");
+/// W3C `color`.
+pub const COLOR: MixShader<()> = asset("shaders/mix/color.wgsl");
+/// W3C `luminosity`.
+pub const LUMINOSITY: MixShader<()> = asset("shaders/mix/luminosity.wgsl");
+/// Additive: the colours add, the alphas composite source-over.
+pub const ADD: MixShader<()> = asset("shaders/mix/add.wgsl");
+
+/// Multiplies the colours: always darker.
+pub const fn multiply() -> Mix {
+    mix(MULTIPLY, ())
+}
+/// Multiplies the inverted colours: always lighter.
+pub const fn screen() -> Mix {
+    mix(SCREEN, ())
+}
+/// Multiply or screen, by the colour below.
+pub const fn overlay() -> Mix {
+    mix(OVERLAY, ())
+}
+/// The darker of the two colours, per channel.
+pub const fn darken() -> Mix {
+    mix(DARKEN, ())
+}
+/// The lighter of the two colours, per channel.
+pub const fn lighten() -> Mix {
+    mix(LIGHTEN, ())
+}
+/// Brightens the colour below to reflect the entity.
+pub const fn color_dodge() -> Mix {
+    mix(COLOR_DODGE, ())
+}
+/// Darkens the colour below to reflect the entity.
+pub const fn color_burn() -> Mix {
+    mix(COLOR_BURN, ())
+}
+/// Multiply or screen, by the entity's colour.
+pub const fn hard_light() -> Mix {
+    mix(HARD_LIGHT, ())
+}
+/// A softer `hard_light`.
+pub const fn soft_light() -> Mix {
+    mix(SOFT_LIGHT, ())
+}
+/// The absolute difference of the colours.
+pub const fn difference() -> Mix {
+    mix(DIFFERENCE, ())
+}
+/// Like `difference`, with lower contrast.
+pub const fn exclusion() -> Mix {
+    mix(EXCLUSION, ())
+}
+/// The entity's hue with the saturation and luminosity below.
+pub const fn hue() -> Mix {
+    mix(HUE, ())
+}
+/// The entity's saturation with the hue and luminosity below.
+pub const fn saturation() -> Mix {
+    mix(SATURATION, ())
+}
+/// The entity's hue and saturation with the luminosity below.
+pub const fn color() -> Mix {
+    mix(COLOR, ())
+}
+/// The entity's luminosity with the hue and saturation below.
+pub const fn luminosity() -> Mix {
+    mix(LUMINOSITY, ())
+}
+/// Adds the entity's light to what is below.
+pub const fn add() -> Mix {
+    mix(ADD, ())
+}
+
+/// The arguments of `FROSTED_GLASS`.
+#[shader_arg]
+pub struct FrostedGlass {
+    /// The blur's standard deviation, in pixels.
+    pub radius: Decimal,
+    /// The glass colour laid over the blurred backdrop.
+    pub tint: Color,
+}
+/// Frosted glass (TyranoScript `[position_filter]`).
+pub const FROSTED_GLASS: MixShader<FrostedGlass> = asset("shaders/mix/frosted_glass.wgsl");
+/// Where the entity has content, blurs what is below it by `radius` pixels and lays `tint` over
+/// it, then draws the entity on top.
+pub const fn frosted_glass(radius: Decimal, tint: Color) -> Mix {
+    mix(FROSTED_GLASS, FrostedGlass { radius, tint })
+}

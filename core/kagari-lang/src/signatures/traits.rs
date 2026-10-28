@@ -214,6 +214,14 @@ impl TraitSolver<'_> {
                     && adt.variants.iter().all(|variant| variant.fields.is_empty())
             }));
         }
+        if Some(trait_item) == self.sigs.std.shader_arg {
+            // `()` and `#[shader_arg]` structs.
+            return match ty.kind() {
+                TyKind::Tuple(elems) => elems.is_empty(),
+                TyKind::Adt { item, .. } => self.sigs.adt(*item).is_some_and(|adt| adt.shader_arg),
+                _ => false,
+            };
+        }
         false
     }
 

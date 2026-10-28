@@ -9,6 +9,7 @@ edition.workspace = true
 [dependencies]
 kagari-bytecode = { workspace = true }
 kagari-vm = { workspace = true }
+kagari-shader = { workspace = true }
 kagari-text = { workspace = true }
 image = { workspace = true }
 log = { workspace = true }

@@ -7,11 +7,13 @@ use kagari_vm::{AssetId, StaticId, Value};
 
 use super::*;
 use crate::assets::AssetStore;
-use crate::frame::Frame;
+use crate::frame::{Frame, MotionStage, ShaderEffect};
 use crate::saves::Timestamp;
-use crate::screen::sample::{VisualCamera, VisualEntity, VisualHud, VisualLayer, VisualScreen};
+use crate::screen::sample::{
+    VisualCamera, VisualContent, VisualEntity, VisualHud, VisualLayer, VisualScreen,
+};
 use crate::test_support::{FakePlatform, STD_TYPES, engine};
-use crate::values::{BlendMode, Flip, Plane};
+use crate::values::{Flip, Plane};
 use crate::{EngineState, Platform};
 
 /// `FakePlatform`, except that PNG assets are a 100×200 image.
@@ -84,9 +86,16 @@ fn entity(id: u32) -> VisualEntity {
         label_style: None,
         label_width: None,
         flip: Flip::None,
-        blend: BlendMode::Normal,
         gate: None,
+        filter: None,
+        mix: None,
+        mask: None,
+        stages: Vec::new(),
     }
+}
+
+fn image(id: AssetId) -> VisualLayer<VisualContent> {
+    VisualLayer::Shown(VisualContent::Image(id))
 }
 
 fn screen(entities: Vec<VisualEntity>) -> VisualScreen {
@@ -102,6 +111,7 @@ fn screen(entities: Vec<VisualEntity>) -> VisualScreen {
             quick_menu: 1.0,
             side_image: VisualLayer::Empty,
         },
+        filter: None,
     }
 }
 
@@ -169,7 +179,7 @@ fn anchored_scaled_main_image() {
     e.position = [640.0, 720.0];
     e.anchor = [0.5, 1.0];
     e.scale = 2.0;
-    e.parts.push((0, VisualLayer::Shown(png)));
+    e.parts.push((0, image(png)));
     let planes = draw(&mut state, &screen(vec![e]));
     let (m, children) = local(&world_children(&planes)[0]);
     let Node::Image { rect, .. } = &children[0] else {
@@ -192,7 +202,7 @@ fn gated_entity_is_skipped_unless_setting_true() {
         .unwrap();
     let gate = StaticId(u32::try_from(index).unwrap());
     let mut e = entity(1);
-    e.parts.push((0, VisualLayer::Shown(png)));
+    e.parts.push((0, image(png)));
     e.gate = Some(gate);
     let v = screen(vec![e]);
     assert!(world_children(&draw(&mut state, &v)).is_empty());
@@ -205,7 +215,7 @@ fn transparent_entity_is_skipped() {
     let (mut state, png) = setup();
     let mut e = entity(1);
     e.opacity = 0.0;
-    e.parts.push((0, VisualLayer::Shown(png)));
+    e.parts.push((0, image(png)));
     assert!(world_children(&draw(&mut state, &screen(vec![e]))).is_empty());
 }
 
@@ -214,7 +224,7 @@ fn flip_x_mirrors_a_non_main_part() {
     let (mut state, png) = setup();
     let mut e = entity(1);
     e.fill_size = Some([300, 300]);
-    e.parts.push((1, VisualLayer::Shown(png)));
+    e.parts.push((1, image(png)));
     e.flip = Flip::Horizontal;
     let planes = draw(&mut state, &screen(vec![e]));
     let (_, children) = local(&world_children(&planes)[0]);
@@ -229,10 +239,10 @@ fn flip_x_mirrors_a_non_main_part() {
 fn over_window_entity_is_outside_the_camera() {
     let (mut state, png) = setup();
     let mut stage = entity(1);
-    stage.parts.push((0, VisualLayer::Shown(png)));
+    stage.parts.push((0, image(png)));
     let mut over = entity(2);
     over.plane = Plane::OverWindow;
-    over.parts.push((0, VisualLayer::Shown(png)));
+    over.parts.push((0, image(png)));
     let planes = draw(&mut state, &screen(vec![stage, over]));
     assert_eq!(world_children(&planes).len(), 1);
     assert_eq!(planes.over_window.len(), 1);
@@ -259,10 +269,9 @@ fn image_layer_transition_spans_both_images() {
     let (state, png) = setup();
     let layer = VisualLayer::Transition {
         from: None,
-        to: Some(png),
-        kind: crate::values::TransitionKind::Crossfade,
+        to: Some(VisualContent::Image(png)),
+        kind: TransitionDraw::Crossfade,
         progress: 0.25,
-        hold_fraction: 0.0,
     };
     let node = image_layer_node(&layer, [10.0, 520.0], &state.assets).unwrap();
     let Node::Transition {
@@ -277,4 +286,79 @@ fn image_layer_transition_spans_both_images() {
     );
     assert!(from.is_empty());
     assert_eq!(to.len(), 1);
+}
+
+fn shader(id: u32) -> ShaderEffect {
+    ShaderEffect {
+        shader: AssetId(id),
+        args: std::rc::Rc::from(vec![0u8; 4]),
+        time: 0.0,
+    }
+}
+
+#[test]
+fn entity_effects_nest_mix_filter_motion_and_mask() {
+    let (mut state, png) = setup();
+    let mut e = entity(1);
+    e.position = [50.0, 60.0];
+    e.scale = 0.0;
+    e.parts.push((0, image(png)));
+    e.mix = Some(shader(1));
+    e.filter = Some(shader(2));
+    e.mask = Some(shader(3));
+    e.stages = vec![MotionStage::Local { effect: shader(4) }];
+    let planes = draw(&mut state, &screen(vec![e]));
+    let Node::Mix { children, .. } = &world_children(&planes)[0] else {
+        panic!("{planes:?}", planes = world_children(&planes))
+    };
+    let [Node::Filter { children, .. }] = children.as_slice() else {
+        panic!("{children:?}")
+    };
+    let [Node::Motion { pose, children, .. }] = children.as_slice() else {
+        panic!("{children:?}")
+    };
+    // A zero scale is drawn at 1 under a motion.
+    assert_eq!((pose.position, pose.scale), ([50.0, 60.0], 1.0));
+    let [Node::Group { children, .. }] = children.as_slice() else {
+        panic!("{children:?}")
+    };
+    let [Node::Masked { rect, children, .. }] = children.as_slice() else {
+        panic!("{children:?}")
+    };
+    assert_eq!((rect.w, rect.h), (100.0, 200.0));
+    assert!(matches!(children.as_slice(), [Node::Image { .. }]));
+}
+
+#[test]
+fn screen_filter_wraps_the_camera_group() {
+    let (mut state, _) = setup();
+    let mut v = screen(Vec::new());
+    v.filter = Some(shader(1));
+    let planes = draw(&mut state, &v);
+    let Node::Filter { children, .. } = &planes.world else {
+        panic!("{:?}", planes.world)
+    };
+    assert!(matches!(children.as_slice(), [Node::Group { .. }]));
+}
+
+#[test]
+fn paint_part_sizes_the_entity() {
+    let (mut state, _) = setup();
+    let mut e = entity(1);
+    e.anchor = [0.5, 0.5];
+    e.parts.push((
+        0,
+        VisualLayer::Shown(VisualContent::Paint(crate::screen::sample::VisualPaint {
+            size: [40, 30],
+            texture: shader(1),
+            mask: None,
+        })),
+    ));
+    let planes = draw(&mut state, &screen(vec![e]));
+    let (m, children) = local(&world_children(&planes)[0]);
+    let Node::Paint { rect, .. } = &children[0] else {
+        panic!("{children:?}")
+    };
+    assert_eq!((rect.w, rect.h), (40.0, 30.0));
+    close(apply(m, [0.0, 0.0]), [-20.0, -15.0]);
 }

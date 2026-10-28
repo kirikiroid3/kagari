@@ -73,7 +73,8 @@ impl Readback {
 
     /// Maps the buffer after `submission` and returns the rows without padding.
     pub fn read(&self, gfx: &Gfx, submission: wgpu::SubmissionIndex) -> Result<Vec<u8>, String> {
-        let result: Arc<Mutex<Option<Result<(), wgpu::BufferAsyncError>>>> = Arc::new(Mutex::new(None));
+        let result: Arc<Mutex<Option<Result<(), wgpu::BufferAsyncError>>>> =
+            Arc::new(Mutex::new(None));
         let sink = result.clone();
         self.buffer.map_async(wgpu::MapMode::Read, .., move |r| {
             if let Ok(mut slot) = sink.lock() {
@@ -96,7 +97,10 @@ impl Readback {
             None => return Err("the buffer was not mapped in time".to_owned()),
         }
         let out = {
-            let view = self.buffer.get_mapped_range(..).map_err(|e| e.to_string())?;
+            let view = self
+                .buffer
+                .get_mapped_range(..)
+                .map_err(|e| e.to_string())?;
             let row = (self.size.0 as usize).saturating_mul(4);
             let mut out = Vec::with_capacity(row.saturating_mul(self.size.1 as usize));
             for chunk in view.chunks(self.padded as usize).take(self.size.1 as usize) {

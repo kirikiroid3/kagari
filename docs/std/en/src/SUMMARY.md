@@ -13,6 +13,13 @@
 - [std::screen](./screen.md)
   - [std::screen::anim](./screen-anim.md)
   - [std::screen::audio](./screen-audio.md)
+  - [std::screen::shader](./screen-shader.md)
+- [std::shaders](./shaders.md)
+  - [std::shaders::color](./shaders-color.md)
+  - [std::shaders::mix](./shaders-mix.md)
+  - [std::shaders::mask](./shaders-mask.md)
+  - [std::shaders::texture](./shaders-texture.md)
+  - [std::shaders::motion](./shaders-motion.md)
 - [std::stage](./stage.md)
 - [std::system](./system.md)
   - [std::system::nav](./system-nav.md)
@@ -24,6 +31,7 @@
 
 - [Staging Recipes](./guides/staging.md)
 - [System Recipes](./guides/system.md)
+- [Writing Shaders](./guides/shaders.md)
 
 # Appendices
 

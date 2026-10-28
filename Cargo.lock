@@ -1567,6 +1567,8 @@ dependencies = [
  "kagari-lang",
  "kagari-lsp",
  "kagari-project",
+ "kagari-shader",
+ "kagari-std",
  "kagari-syntax",
  "tempfile",
 ]
@@ -1607,6 +1609,7 @@ dependencies = [
  "kagari-archive",
  "kagari-bytecode",
  "kagari-lang",
+ "kagari-shader",
  "kagari-text",
  "kagari-vm",
  "log",
@@ -1633,6 +1636,7 @@ dependencies = [
  "insta",
  "kagari-bytecode",
  "kagari-num",
+ "kagari-shader",
  "kagari-std",
  "kagari-syntax",
  "la-arena",
@@ -1689,9 +1693,19 @@ dependencies = [
  "bytemuck",
  "kagari-bytecode",
  "kagari-engine",
+ "kagari-shader",
  "kagari-text",
  "log",
+ "naga",
  "wgpu",
+]
+
+[[package]]
+name = "kagari-shader"
+version = "0.1.0"
+dependencies = [
+ "kagari-std",
+ "naga",
 ]
 
 [[package]]

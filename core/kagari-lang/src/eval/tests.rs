@@ -1250,6 +1250,7 @@ fn finite_domain_sizes_and_values() {
             is_enum,
             builtin: false,
             must_use: false,
+            shader_arg: false,
             variants,
         })
     };
@@ -1584,13 +1585,14 @@ fn overflow_in_duration_code_is_a_duration_overflow() {
 
 const GAME: &str = "
 use std::stage::{Character, character};
+use std::screen::shader::{ColorShader, filter};
 
 const A: EntityId = EntityId(3);
 const IMG: ImageAsset = asset(\"a.png\");
 const D: Duration = secs(2).plus(ms(250)).times(2).div(3);
 const J: Motion = jump(20, ms(300));
 const Q: Motion = quake(8, 4, ms(200));
-const SEPIA: ShaderAsset = asset(\"sepia.wgsl\");
+const SEPIA: ColorShader<()> = asset(\"sepia.wgsl\");
 const COLOR: Color = hex(0x382010);
 static PETALS: Setting<bool> = setting(true);
 static mut DAY: Int<1, 3> = 2;
@@ -1619,7 +1621,7 @@ const fn petals(mut screen: Screen) -> Screen {
     screen.entity(A).image().change(IMG).apply_animation(fade(ms(500)));
     screen.entity(A).apply_animation(J);
     screen.camera().apply_animation(Q);
-    screen.filter().change(Some(SEPIA)).apply_animation(tween(D));
+    screen.filter().change(Some(filter(SEPIA, ()))).apply_animation(tween(D));
     CH.show(&mut screen, IMG, point(100, 200), tween(ms(300)));
     screen
 }
@@ -1784,12 +1786,18 @@ fn evaluates_a_game_end_to_end() {
             .make(vec![ConstValue::Int(110), ConstValue::Int(195)])
     );
     assert_eq!(entity.opacity, ConstValue::Decimal(Decimal::ONE));
+    let Some(Some(ConstValue::Adt { fields, .. })) = std.as_option(&screen.logical.filter) else {
+        panic!("no screen filter");
+    };
     assert_eq!(
-        screen.logical.filter,
-        std.some(ConstValue::Asset {
-            kind: AssetKind::Shader,
-            path: FilePath::disk("/game/sepia.wgsl"),
-        })
+        fields.iter().cloned().collect::<Vec<_>>(),
+        vec![
+            ConstValue::Asset {
+                kind: AssetKind::Shader(kagari_shader::ShaderRole::Color),
+                path: FilePath::disk("/game/sepia.wgsl"),
+            },
+            ConstValue::Tuple(imbl::Vector::new()),
+        ]
     );
     let motions = screen
         .step
@@ -1856,5 +1864,151 @@ fn evaluates_a_game_end_to_end() {
             variant: 2,
             fields: imbl::vector![]
         })
+    );
+}
+
+const SHADERS: &str = "
+use std::screen::{Pose, degrees, pose, size};
+use std::screen::shader::{
+    ColorShader, TextureShader, TransitionalMotionShader, filter, paint, transitional_motion,
+};
+
+#[shader_arg]
+struct Amount { amount: Decimal }
+
+const SEPIA: ColorShader<Amount> = asset(\"sepia.wgsl\");
+const SPOTS: TextureShader<()> = asset(\"sepia.wgsl\");
+const PATH: TransitionalMotionShader<()> = asset(\"sepia.wgsl\");
+const A: EntityId = EntityId(3);
+
+const fn tinted(amount: Decimal) -> Screen {
+    let mut screen = Screen::empty();
+    screen.filter().change(Some(filter(SEPIA, Amount { amount }))).apply_animation(instant());
+    screen
+}
+const HALF: Screen = tinted(0.5);
+const FULL: Screen = tinted(1.0);
+const HALF_AGAIN: Screen = tinted(0.5);
+
+const fn travelled() -> Screen {
+    let mut screen = Screen::empty();
+    screen.entity(A).position().change(point(10, 20)).apply_animation(instant());
+    screen.entity(A).travel(
+        pose(point(900, 400), 2.0, degrees(90.0)),
+        transitional_motion(PATH, (), ms(1200)).delay(ms(100)),
+    );
+    screen
+}
+const TRAVELLED: Screen = travelled();
+
+const fn painted() -> Screen {
+    let mut screen = Screen::empty();
+    screen.entity(A).image().paint(paint(SPOTS, (), size(400, 300))).apply_animation(cut());
+    screen
+}
+const PAINTED: Screen = painted();
+const fn painted_get() -> bool {
+    let mut screen = painted();
+    match screen.entity(A).image().get() {
+        None => true,
+        Some(_) => false,
+    }
+}
+const PAINTED_GET: bool = painted_get();
+";
+
+fn shader_screen(eval: &ConstEval, db: &RootDatabase, program: Program, name: &str) -> Screen {
+    match &eval.consts[&item(db, program, name)] {
+        ConstValue::Screen(screen) => (**screen).clone(),
+        other => panic!("{name} is not a screen: {other:?}"),
+    }
+}
+
+#[test]
+fn shader_effects_on_the_screen() {
+    let (db, program) = setup_at("/game/main.kix", SHADERS);
+    let diags: Vec<String> = check(&db, program)
+        .iter()
+        .map(|diag| format!("{}: {}", diag.code.as_str(), diag.message))
+        .collect();
+    assert!(diags.is_empty(), "{diags:#?}");
+    let std = std_table(&db, program);
+    let eval = const_eval(&db, program);
+
+    // Screens differing only in filter arguments differ.
+    let half = shader_screen(eval, &db, program, "HALF");
+    // `erase_shader` and `erase_args` are the identity.
+    let Some(Some(ConstValue::Adt { fields, .. })) = std.as_option(&half.logical.filter) else {
+        panic!("no screen filter");
+    };
+    assert_eq!(
+        fields[0],
+        ConstValue::Asset {
+            kind: AssetKind::Shader(kagari_shader::ShaderRole::Color),
+            path: FilePath::disk("/game/sepia.wgsl"),
+        }
+    );
+    assert!(
+        matches!(&fields[1], ConstValue::Adt { fields, .. } if fields[0] == ConstValue::Decimal(Decimal::new(5, 1)))
+    );
+    assert_ne!(half, shader_screen(eval, &db, program, "FULL"));
+    assert_eq!(half, shader_screen(eval, &db, program, "HALF_AGAIN"));
+
+    // `travel` sets the logical pose and schedules three tweens and the path.
+    let travelled = shader_screen(eval, &db, program, "TRAVELLED");
+    let entity = &travelled.logical.entities[&3];
+    assert_eq!(
+        entity.position,
+        std.point
+            .make(vec![ConstValue::Int(900), ConstValue::Int(400)])
+    );
+    assert_eq!(entity.scale, ConstValue::Decimal(Decimal::from_int(2)));
+    let pose_tweens = travelled
+        .step
+        .scheduled
+        .iter()
+        .filter(|scheduled| {
+            matches!(
+                (&scheduled.kind, scheduled.target),
+                (
+                    ScheduledKind::Tween(_),
+                    Some(Target::Prop(PropTarget::Entity(
+                        3,
+                        EntityProp::Position | EntityProp::Scale | EntityProp::Rotation
+                    )))
+                )
+            ) && scheduled.start.offset_ms == 100
+        })
+        .count();
+    assert_eq!(pose_tweens, 3);
+    let travels: Vec<&Scheduled> = travelled
+        .step
+        .scheduled
+        .iter()
+        .filter(|scheduled| matches!(scheduled.kind, ScheduledKind::Travel { .. }))
+        .collect();
+    assert_eq!(travels.len(), 1);
+    assert_eq!(travels[0].target, Some(Target::Travel(3)));
+    assert_eq!(travels[0].start.offset_ms, 100);
+    let ScheduledKind::Travel { from, .. } = &travels[0].kind else {
+        unreachable!()
+    };
+    assert_eq!(
+        from.field(0),
+        Some(
+            &std.point
+                .make(vec![ConstValue::Int(10), ConstValue::Int(20)])
+        )
+    );
+
+    // `paint` swaps a part; `ImageLayer::get` is `None` on it.
+    let painted = shader_screen(eval, &db, program, "PAINTED");
+    assert!(matches!(
+        painted.logical.entities[&3].parts.get(&0),
+        Some(ConstValue::Adt { .. })
+    ));
+    assert_eq!(
+        eval.consts[&item(&db, program, "PAINTED_GET")],
+        ConstValue::Bool(true)
     );
 }

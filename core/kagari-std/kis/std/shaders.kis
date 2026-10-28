@@ -1,0 +1,8 @@
+//! The std shader library: colour filters, mix modes, procedural masks, textures and motions,
+//! ready-made effect values over WGSL files shipped with std.
+
+pub mod color;
+pub mod mix;
+pub mod mask;
+pub mod texture;
+pub mod motion;

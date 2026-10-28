@@ -49,7 +49,7 @@ Item-level checks happen while the tree is built, since they need no names:
 | `E1012`, `E1013` | A `trait` outside std; a std trait that is not `#[builtin]` |
 
 Placement rules for attributes that need the item kind in a wider sense (`#[scene]` only on a
-`pushdown fn`, `#[entry]` only with `#[scene]`, `#[must_use]` only on structs and enums) are kind
+`pushdown fn`, `#[entry]` only with `#[scene]`, `#[must_use]` only on structs and enums, `#[shader_arg]` only on structs) are kind
 checks (`E3018`), not item-tree checks.
 
 ## HIR
@@ -244,13 +244,14 @@ during body resolution:
 
 | Function | Rules |
 | -------- | ----- |
-| `asset("p")` | Not empty (`E1028`); joined to `Program::asset_root`, must stay strictly inside it (`E1029`); must not enter the reserved `system-fonts/` directory (`E1032`); the `AssetFile` must exist (`E1027`) |
+| `asset("p")` | Not empty (`E1028`); joined to `Program::asset_root`, must stay strictly inside it (`E1029`); must not enter the reserved `system-fonts/` or `std/` directory (`E1032`, `assets::is_reserved` names the directory); the `AssetFile` must exist (`E1027`) |
 | `system_font("p")` | Program option `system_fonts` (`E1031`); not empty (`E1028`); relative and never above its directory (`assets::stays_inside`, `E1029`); found in the first `font_dirs` entry that has it (`E1030`, listing the directories searched) |
 
 A path that is not a string literal is `E2028`, reported by inference, since only a literal can be
 checked here. Existence goes through `AssetFile` inputs, so the language server re-checks when an
 asset appears or disappears (`set_asset_exists`). The bytecode path of an asset (relative to the
-asset root, or `system-fonts/<path in its font directory>`) comes from `assets::bytecode_path` at
+asset root, `system-fonts/<path in its font directory>`, or `std/<name>` for an asset std declares)
+comes from `assets::bytecode_path` at
 emit time.
 
 ## Debugging

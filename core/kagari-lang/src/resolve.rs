@@ -950,8 +950,8 @@ impl<'a> Resolver<'a> {
 
     /// `asset("path")` and `system_font("path")` in a disk file. An asset path must be
     /// non-empty and name an existing file inside the program's asset directory, outside its
-    /// reserved `system-fonts` directory; a system font path must name an existing file in a
-    /// system font directory, and the program must allow system fonts.
+    /// reserved `system-fonts` and `std` directories; a system font path must name an existing
+    /// file in a system font directory, and the program must allow system fonts.
     fn check_asset(&mut self, callee: ExprId, args: &[ExprId]) {
         let callee = self.out.exprs.get(&callee);
         let is = |def: Option<Def>| def.is_some_and(|def| callee == Some(&Resolution::Def(def)));
@@ -993,14 +993,16 @@ impl<'a> Resolver<'a> {
             );
             return;
         };
-        if assets::is_reserved(&asset_path, asset_root) {
+        if let Some(dir) = assets::is_reserved(&asset_path, asset_root) {
+            let what = if dir == assets::STD_ASSETS_DIR {
+                "std assets"
+            } else {
+                "system fonts"
+            };
             self.diag(
                 range,
                 DiagnosticCode::ResolveReservedAssetDir,
-                format!(
-                    "asset path `{path}` enters `{}`, which is reserved for system fonts",
-                    assets::SYSTEM_FONTS_DIR
-                ),
+                format!("asset path `{path}` enters `{dir}`, which is reserved for {what}"),
             );
             return;
         }

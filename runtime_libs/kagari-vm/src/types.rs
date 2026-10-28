@@ -16,8 +16,8 @@ pub struct TypeTable {
     by_path: FxHashMap<Box<str>, u32>,
 }
 
-/// A synthetic type: its path and variant names.
-type Synthetic = (Box<str>, Box<[Box<str>]>);
+/// A synthetic type: its path, variant names and whether it is an enum.
+type Synthetic = (Box<str>, Box<[Box<str>]>, bool);
 
 const UNKNOWN: &str = "<unknown>";
 
@@ -31,8 +31,9 @@ impl TypeTable {
     }
 
     /// The module TypeId of `path` when interned, else a stable synthetic id registered on
-    /// first request, with the given variant names (the first registration's names stand).
-    pub fn resolve(&mut self, path: &str, variants: &[&str]) -> AdtTy {
+    /// first request, with the given variant names and enum flag (the first registration's
+    /// stand).
+    pub fn resolve(&mut self, path: &str, variants: &[&str], is_enum: bool) -> AdtTy {
         if let Some(ty) = self.program.find_type(path) {
             return AdtTy::Module(ty);
         }
@@ -40,10 +41,29 @@ impl TypeTable {
             return AdtTy::Synthetic(id);
         }
         let id = u32::try_from(self.synthetic.len()).unwrap_or(u32::MAX);
-        self.synthetic
-            .push((path.into(), variants.iter().map(|&v| v.into()).collect()));
+        self.synthetic.push((
+            path.into(),
+            variants.iter().map(|&v| v.into()).collect(),
+            is_enum,
+        ));
         self.by_path.insert(path.into(), id);
         AdtTy::Synthetic(id)
+    }
+
+    /// Whether `ty` is an enum (rather than a struct); `false` when out of range.
+    pub fn is_enum(&self, ty: AdtTy) -> bool {
+        match ty {
+            AdtTy::Module(id) => self
+                .program
+                .module()
+                .types
+                .get(id.0 as usize)
+                .is_some_and(|adt| adt.is_enum),
+            AdtTy::Synthetic(id) => self
+                .synthetic
+                .get(id as usize)
+                .is_some_and(|(_, _, is_enum)| *is_enum),
+        }
     }
 
     /// The path of `ty`; `"<unknown>"` when out of range.
@@ -56,7 +76,7 @@ impl TypeTable {
             AdtTy::Synthetic(id) => self
                 .synthetic
                 .get(id as usize)
-                .map_or(UNKNOWN, |(path, _)| path),
+                .map_or(UNKNOWN, |(path, _, _)| path),
         }
     }
 
@@ -76,7 +96,7 @@ impl TypeTable {
             AdtTy::Synthetic(id) => self
                 .synthetic
                 .get(id as usize)
-                .and_then(|(_, variants)| variants.get(variant as usize))
+                .and_then(|(_, variants, _)| variants.get(variant as usize))
                 .map_or(UNKNOWN, |name| name),
         }
     }

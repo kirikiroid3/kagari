@@ -11,6 +11,10 @@ use crate::input::{FilePath, Program};
 /// directory of this name, so an asset and a system font never share a bytecode path.
 pub const SYSTEM_FONTS_DIR: &str = "system-fonts";
 
+/// The top-level bytecode directory of the assets std declares (`std/shaders/…`).
+/// `asset("…")` paths may not enter the directory of this name either.
+pub const STD_ASSETS_DIR: &str = "std";
+
 /// `rel` joined to `dir`, when the result lies strictly inside `dir`.
 pub(crate) fn inside(dir: &FilePath, rel: &str) -> Option<FilePath> {
     let file = dir.join(rel);
@@ -46,16 +50,16 @@ pub(crate) fn stays_inside(rel: &str) -> bool {
     depth > 0
 }
 
-/// Whether `file`, inside the asset directory `root`, lies in its reserved `system-fonts`
-/// directory.
-pub(crate) fn is_reserved(file: &FilePath, root: &FilePath) -> bool {
+/// The reserved top-level directory (`system-fonts` or `std`) that `file`, inside the asset
+/// directory `root`, lies in, if any.
+pub(crate) fn is_reserved(file: &FilePath, root: &FilePath) -> Option<&'static str> {
     let (FilePath::Disk(path), FilePath::Disk(root)) = (file, root) else {
-        return false;
+        return None;
     };
-    path.strip_prefix(root)
-        .ok()
-        .and_then(|rel| rel.components().next())
-        .is_some_and(|first| first == Component::Normal(SYSTEM_FONTS_DIR.as_ref()))
+    let first = path.strip_prefix(root).ok()?.components().next()?;
+    [SYSTEM_FONTS_DIR, STD_ASSETS_DIR]
+        .into_iter()
+        .find(|dir| first == Component::Normal(dir.as_ref()))
 }
 
 /// The file `system_font(rel)` names: `rel` in the first system font directory that has it.
@@ -110,10 +114,21 @@ mod tests {
     }
 
     #[test]
-    fn the_system_fonts_directory_is_reserved() {
+    fn the_reserved_directories() {
         let root = FilePath::disk("/game/assets");
-        assert!(is_reserved(&root.join("system-fonts/a.ttf"), &root));
-        assert!(!is_reserved(&root.join("fonts/system-fonts/a.ttf"), &root));
-        assert!(!is_reserved(&root.join("system-fonts.ttf"), &root));
+        assert_eq!(
+            is_reserved(&root.join("system-fonts/a.ttf"), &root),
+            Some(SYSTEM_FONTS_DIR)
+        );
+        assert_eq!(
+            is_reserved(&root.join("std/x.wgsl"), &root),
+            Some(STD_ASSETS_DIR)
+        );
+        assert_eq!(
+            is_reserved(&root.join("fonts/system-fonts/a.ttf"), &root),
+            None
+        );
+        assert_eq!(is_reserved(&root.join("system-fonts.ttf"), &root), None);
+        assert_eq!(is_reserved(&root.join("stdlib/x.wgsl"), &root), None);
     }
 }

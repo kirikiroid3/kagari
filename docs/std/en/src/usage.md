@@ -67,9 +67,8 @@ not looked up yet.
 4. **Changes need animations.** Every visible property is a `Prop<T>` (interpolated, takes a
    `Tween`) or a layer (`ImageLayer`, `LabelLayer`, `MovieLayer`, swapped with a `Transition`).
    Only non-interpolable layout settings (`set_plane`, `set_z`, `set_anchor`, `set_flip`,
-   `set_blend`, `set_fill_size`, `gate`) are direct setters. `Change<T>`, `Swap` and
-   `ChannelChange` are `#[must_use]`: a change with no `apply_animation` does not happen
-   (warning `W3023`).
+   `set_fill_size`, `gate`) are direct setters. `Change<T>`, `Swap` and `ChannelChange` are
+   `#[must_use]`: a change with no `apply_animation` does not happen (warning `W3023`).
 5. **Animations never change the start or end state.** The logical screen of a step is the
    persistent state after its render: entities with their components, plus the Hud, camera,
    screen filter and audio channels. That is what snapshots, equality and the consistency check
@@ -86,8 +85,9 @@ not looked up yet.
 7. **Type-checkable without overloading or coercion.** Asset-typed functions use a trait bound;
    interpolation uses a trait bound. The few special signatures (`nav::start`) are listed in
    [Compiler Rules for std Items](./appendix/rules.md). Only `std` declares traits, all
-   `#[builtin]`: `Eq`, `Integer`, `RandChoose`, `Asset`, `Step` and `ToText`. Games never implement
-   them; `Eq` is automatic.
+   `#[builtin]`: `Eq`, `Integer`, `RandChoose`, `Asset`, `Step`, `ToText`, `ShaderArg` and
+   `Shader`. Games never implement them; `Eq` is automatic, and `ShaderArg` comes with
+   `#[shader_arg]`.
 8. **References** are shared pointers. In `const fn` and `fn` code they may be bound to locals, so
    a render names an entity once and changes it in several statements. In a `pushdown fn` they are
    parameters only.

@@ -38,7 +38,8 @@ reference page. Reference and STD pages link to the Develop Guide only from thei
 
 - Plain, precise, reference-style English. Present tense. Short sentences. Tables for enumerable
   facts. No marketing tone, no emoji.
-- Code blocks are tagged `kis` (plain Kagari), `kix` (uses forms), `rust`, `sh`, `toml` or `text`.
+- Code blocks are tagged `kis` (plain Kagari), `kix` (uses forms), `wgsl`, `rust`, `sh`, `toml` or
+  `text`.
 - Every Kagari example must be valid against the current code and std: names, signatures, forms.
   Prefer examples that also appear in a test fixture (for instance
   `core/kagari-lang/tests/game_source/script/001__book_examples`).
@@ -109,6 +110,8 @@ Use these renderings consistently. The Japanese edition of the engine proposal
 | asset | アセット | diagnostic | 診断 |
 | runtime | ランタイム | headless mode | ヘッドレスモード |
 | stability: Stable / Tentative / Planned | 安定 / 暫定 / 予定 | studio | スタジオ |
+| shader / role / effect value | シェーダー / ロール / 効果値 | mix / mask / paint | ミックス / マスク / ペイント |
+| local motion / transitional motion | ローカルモーション / 遷移モーション | travel / pose | トラベル / ポーズ |
 
 A new term that recurs gets a row here and in the Reference's glossary appendix in the same change.
 

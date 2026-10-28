@@ -20,7 +20,8 @@
 ```kix
 use std::narrative::Mark;
 use std::narrative::text::text_style;
-use std::screen::{BOTTOM_CENTER, BlendMode};
+use std::screen::BOTTOM_CENTER;
+use std::screen::shader::{ColorShader, filter};
 use std::stage::{hide_all, side_face};
 
 const HANAKO: Character = character(EntityId(1)).offset(offset(0, 40)).anchor(BOTTOM_CENTER);
@@ -51,7 +52,12 @@ mod CG {
 
 const BLINDS_RULE: ImageAsset = asset("rule_blinds.png");
 const KEY_ITEM: ImageAsset = asset("item_key.png");
-const MEMORY: ShaderAsset = asset("memory.wgsl");
+/// The arguments of the flashback filter.
+#[shader_arg]
+struct Memory {
+    strength: Decimal,
+}
+const MEMORY: ColorShader<Memory> = asset("memory.wgsl");
 const THEME: AudioAsset = asset("bgm_theme.ogg");
 const KNOCK: AudioAsset = asset("se_knock.ogg");
 ```
@@ -101,16 +107,16 @@ const fn night_falls(mut screen: Screen) -> Screen {
 
 ## 回想 {#flashback}
 
-舞台の上にカラーブレンドの塗りを重ね、シェーダーの画面フィルターを加えます。色調は、終了用のレンダーがフェードさせて削除するまで論理画面に残ります。
+舞台の上に `color` ミックスシェーダーで合成する塗りを重ね、型付きの引数を持つシェーダーの画面フィルターを加えます。色調は、終了用のレンダーがフェードさせて削除するまで論理画面に残ります。
 
 ```kix
-/// Tints the stage with a colour blend and a shader filter, for a memory.
+/// Tints the stage with a colour mix and a shader filter, for a memory.
 const fn flashback(mut screen: Screen) -> Screen {
     screen.entity(TINT).set_plane(Plane::Front);
-    screen.entity(TINT).set_blend(BlendMode::Color);
+    screen.entity(TINT).mix().change(Some(std::shaders::mix::color())).apply_animation(instant());
     screen.entity(TINT).fill().change(hex(0x382000)).apply_animation(instant());
     screen.entity(TINT).opacity().change(0.6).apply_animation(tween(ms(800)));
-    screen.filter().change(Some(MEMORY)).apply_animation(tween(ms(800)));
+    screen.filter().change(Some(filter(MEMORY, Memory { strength: 0.8 }))).apply_animation(tween(ms(800)));
     screen
 }
 

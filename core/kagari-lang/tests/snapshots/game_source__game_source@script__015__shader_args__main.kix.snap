@@ -1,0 +1,52 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/script/015__shader_args/main.kix
+---
+script/015__shader_args/main.kix:55:1: error[E3018]: `#[shader_arg]` applies only to structs
+script/015__shader_args/main.kix:61:1: error[E3025]: a `#[shader_arg]` struct needs named fields and no type parameters
+script/015__shader_args/main.kix:65:1: error[E3025]: a `#[shader_arg]` struct needs named fields and no type parameters
+script/015__shader_args/main.kix:73:11: error[E3026]: field `name` has type `String`, which a shader cannot read
+script/015__shader_args/main.kix:75:14: error[E3026]: field `weights` is an array of length 0
+--- resolutions ---
+script/015__shader_args/main.kix:13:15 Point -> struct std::screen::Point
+script/015__shader_args/main.kix:14:12 Color -> struct std::screen::Color
+script/015__shader_args/main.kix:15:13 Decimal -> struct std::Decimal
+script/015__shader_args/main.kix:20:22 usize -> prim usize
+script/015__shader_args/main.kix:21:9 bool -> prim bool
+script/015__shader_args/main.kix:22:12 u32 -> prim u32
+script/015__shader_args/main.kix:23:12 i32 -> prim i32
+script/015__shader_args/main.kix:24:13 Rat -> struct std::Rat
+script/015__shader_args/main.kix:25:12 Angle -> struct std::screen::Angle
+script/015__shader_args/main.kix:26:13 Anchor -> struct std::screen::Anchor
+script/015__shader_args/main.kix:27:13 Offset -> struct std::screen::Offset
+script/015__shader_args/main.kix:28:11 Size -> struct std::screen::Size
+script/015__shader_args/main.kix:29:13 Duration -> struct std::time::Duration
+script/015__shader_args/main.kix:30:11 Tone -> enum crate::Tone
+script/015__shader_args/main.kix:31:13 Spot -> struct crate::Spot
+script/015__shader_args/main.kix:31:19 N -> generic N
+script/015__shader_args/main.kix:34:18 ShaderArg -> trait std::screen::shader::ShaderArg
+script/015__shader_args/main.kix:34:29 args -> local args@34:29
+script/015__shader_args/main.kix:34:35 A -> generic A
+script/015__shader_args/main.kix:34:41 A -> generic A
+script/015__shader_args/main.kix:35:5 args -> local args@34:29
+script/015__shader_args/main.kix:37:15 spot -> local spot@37:15
+script/015__shader_args/main.kix:37:21 Spot -> struct crate::Spot
+script/015__shader_args/main.kix:37:30 Glow -> struct crate::Glow
+script/015__shader_args/main.kix:38:5 args -> fn crate::args
+script/015__shader_args/main.kix:38:10 Glow -> struct crate::Glow
+script/015__shader_args/main.kix:42:17 Rat::new -> fn std::Rat::new
+script/015__shader_args/main.kix:43:16 degrees -> fn std::screen::degrees
+script/015__shader_args/main.kix:44:17 CENTER -> const std::screen::CENTER
+script/015__shader_args/main.kix:45:17 offset -> fn std::screen::offset
+script/015__shader_args/main.kix:46:15 size -> fn std::screen::size
+script/015__shader_args/main.kix:47:17 ms -> fn std::time::ms
+script/015__shader_args/main.kix:48:15 Tone::Warm -> variant crate::Tone::Warm
+script/015__shader_args/main.kix:49:17 spot -> local spot@37:15
+script/015__shader_args/main.kix:49:23 spot -> local spot@37:15
+script/015__shader_args/main.kix:52:21 args -> fn crate::args
+script/015__shader_args/main.kix:62:13 Decimal -> struct std::Decimal
+script/015__shader_args/main.kix:62:22 Decimal -> struct std::Decimal
+script/015__shader_args/main.kix:67:12 T -> generic T
+script/015__shader_args/main.kix:73:11 String -> struct std::String
+script/015__shader_args/main.kix:75:15 Decimal -> struct std::Decimal

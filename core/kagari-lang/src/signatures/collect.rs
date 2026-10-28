@@ -145,6 +145,7 @@ fn item_sig(
                 is_enum: false,
                 builtin: data.has_attr("builtin"),
                 must_use: data.has_attr("must_use"),
+                shader_arg: data.has_attr("shader_arg"),
                 variants: vec![VariantDef {
                     name: data.name.clone().unwrap_or_default(),
                     shape: shape.clone(),
@@ -174,6 +175,7 @@ fn item_sig(
                 is_enum: true,
                 builtin: data.has_attr("builtin"),
                 must_use: data.has_attr("must_use"),
+                shader_arg: data.has_attr("shader_arg"),
                 variants,
             })
         }
@@ -321,16 +323,28 @@ fn std_items(db: &dyn Db, maps: &DefMaps) -> StdItems {
             "VoiceAsset",
             "VideoAsset",
             "FontAsset",
-            "ShaderAsset",
         ]
         .iter()
         .filter_map(|name| ty(&[name]))
+        .collect(),
+        shader_arg_std: [
+            ["screen", "Color"],
+            ["screen", "Point"],
+            ["screen", "Offset"],
+            ["screen", "Size"],
+            ["screen", "Anchor"],
+            ["screen", "Angle"],
+            ["time", "Duration"],
+        ]
+        .iter()
+        .filter_map(|path| ty(path))
         .collect(),
         eq: ty(&["Eq"]),
         integer,
         asset: ty(&["Asset"]),
         step: ty(&["narrative", "Step"]),
         rand_choose: ty(&["RandChoose"]),
+        shader_arg: ty(&["screen", "shader", "ShaderArg"]),
         to_text: ty(&["narrative", "text", "ToText"]),
         push_step: value(&["narrative", "push_step"]),
         rng_choose: value(&["narrative", "rng_choose"]),

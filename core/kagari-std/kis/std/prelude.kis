@@ -1,14 +1,91 @@
 //! Names imported into every module.
 
-pub use crate::{String, Vec, Rat, Decimal, Range, Option, Result, Eq, Integer, RandChoose, ImageAsset, AudioAsset, VoiceAsset, VideoAsset, FontAsset, ShaderAsset, asset, system_font};
+pub use crate::{
+    String,
+    Vec,
+    Rat,
+    Decimal,
+    Range,
+    Option,
+    Result,
+    Eq,
+    Integer,
+    RandChoose,
+    ImageAsset,
+    AudioAsset,
+    VoiceAsset,
+    VideoAsset,
+    FontAsset,
+    asset,
+    system_font,
+};
 pub use crate::Option::{None, Some};
 pub use crate::Result::{Err, Ok};
 pub use crate::time::{Duration, ms, secs};
-pub use crate::screen::{Screen, Render, EntityId, Part, Point, Offset, Size, Anchor, Color, Plane, Visibility, point, offset, rgb, hex, BLACK, WHITE, TRANSPARENT};
-pub use crate::screen::anim::{Easing, Tween, Transition, Motion, tween, instant, cut, fade, rule, wipe, through, motion, jump, nod, shake, quake};
+pub use crate::screen::{
+    Screen,
+    Render,
+    EntityId,
+    Part,
+    Point,
+    Offset,
+    Size,
+    Anchor,
+    Color,
+    Plane,
+    Visibility,
+    point,
+    offset,
+    rgb,
+    hex,
+    BLACK,
+    WHITE,
+    TRANSPARENT,
+};
+pub use crate::screen::anim::{
+    Easing,
+    Tween,
+    Transition,
+    Motion,
+    tween,
+    instant,
+    cut,
+    fade,
+    rule,
+    wipe,
+    through,
+    motion,
+    jump,
+    nod,
+    shake,
+    quake,
+};
 pub use crate::screen::audio::{looped, sound, crossfade};
 pub use crate::stage::{Character, character};
-pub use crate::narrative::{Text, TextEffect, Say, Choice, ChoiceArm, push_step, rng_choose, Meta, meta, Narrative};
+pub use crate::narrative::{
+    Text,
+    TextEffect,
+    Say,
+    Choice,
+    ChoiceArm,
+    push_step,
+    rng_choose,
+    Meta,
+    meta,
+    Narrative,
+};
 pub use crate::narrative::text::{emphasis, dots, color_text, bold, pause, click_wait, mark};
-pub use crate::system::{nav, Setting, setting, System, Settings, Volume, volume, RootPage, Overlay, GameOverlay, Dialog};
+pub use crate::system::{
+    nav,
+    Setting,
+    setting,
+    System,
+    Settings,
+    Volume,
+    volume,
+    RootPage,
+    Overlay,
+    GameOverlay,
+    Dialog,
+};
 pub use crate::ui::{signal, Element};

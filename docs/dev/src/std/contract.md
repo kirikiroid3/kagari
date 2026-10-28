@@ -13,7 +13,7 @@ Where in the code:
 
 - `core/kagari-lang/src/signatures/collect.rs` (`std_items`) and `signatures/mod.rs`
   (`StdItems`): the std items the checker knows, by path.
-- `core/kagari-lang/src/signatures/traits.rs`: `Eq`, `RandChoose` and explicit impls.
+- `core/kagari-lang/src/signatures/traits.rs`: `Eq`, `RandChoose`, `ShaderArg` and explicit impls.
 - `core/kagari-lang/src/infer/`: `call.rs` (`nav::start`, `asset`, `system_font`,
   `Integer::into`), `expr.rs` (literals, ranges, `for` element types), `ops.rs` (operators on
   `Decimal`/`Rat`, `Eq` obligations), `finish.rs` (lossy `into`).
@@ -48,7 +48,8 @@ Every std item follows these rules. They are what makes the checker's special ca
 4. **Changes need animations.** Every visible property is a `Prop<T>` (interpolated, takes a
    `Tween`) or a layer (`ImageLayer`, `LabelLayer`, `MovieLayer`, swapped with a
    `Transition`). Only non-interpolable layout settings (`set_plane`, `set_z`, `set_anchor`,
-   `set_flip`, `set_blend`, `set_fill_size`, `gate`) are direct setters. `Change<T>`, `Swap` and
+   `set_flip`, `set_fill_size`, `gate`) are direct setters; `Entity::travel` sets the pose through
+   tweens and schedules its path. `Change<T>`, `Swap` and
    `ChannelChange` are `#[must_use]`: a change without `apply_animation` does not happen.
 5. **Animations never change the start or end state.** The logical screen of a step is the
    persistent state after its render: entities with their components, plus the Hud, camera,
@@ -64,8 +65,8 @@ Every std item follows these rules. They are what makes the checker's special ca
    helpers and constant data; `std::stage` is the reference example of such a layer.
 7. **Type-checkable without overloading or coercion.** Asset-typed functions use a trait bound
    (`A: Asset`); interpolation uses a trait bound. The few special signatures are listed below.
-   Only std declares traits, all `#[builtin]`: `Eq`, `Integer`, `RandChoose`, `Asset`, `Step`
-   and `ToText`. Users never implement them; `Eq` is structural.
+   Only std declares traits, all `#[builtin]`: `Eq`, `Integer`, `RandChoose`, `Asset`, `Step`,
+   `ToText`, `ShaderArg` and `Shader`. Users never implement them; `Eq` is structural.
 8. **References** are shared pointers. In `const fn` and `fn` code they may be bound to locals,
    so a render names an entity once and changes it in several statements. In a `pushdown fn`
    they are parameters only.
@@ -101,9 +102,10 @@ const fn hanako_appears(mut screen: Screen) -> Screen {
 ## Finite types {#finite-types}
 
 The story may hold at run time only values of finite types (`typeck/kinds/finite.rs`). Of the
-`#[builtin]` types, only `Text` and the six asset types (`ImageAsset`, `AudioAsset`,
-`VoiceAsset`, `VideoAsset`, `FontAsset`, `ShaderAsset`) are finite. Every other builtin type is
-not: `Screen`, `Narrative`, `Vec`, `String`, `Rat`, `Decimal`, `Setting`, `Meta` and the screen
+`#[builtin]` types, only `Text` and the five file asset types (`ImageAsset`, `AudioAsset`,
+`VoiceAsset`, `VideoAsset`, `FontAsset`) are finite. Every other builtin type is not: the shader
+types (`ShaderAsset`, the six role types `ColorShader<A>` … `TransitionalMotionShader<A>`,
+`ShaderArgs`), `Screen`, `Narrative`, `Vec`, `String`, `Rat`, `Decimal`, `Setting`, `Meta` and the screen
 state types. `Render` is `const fn(Screen) -> Screen`, a `const fn` pointer, so it is finite.
 
 Ordinary std structs are finite exactly when their fields are. `EntityId`, `Part` and `Mark`
@@ -140,6 +142,9 @@ tabulated like any `const fn` call, so a line stays a finite function of the sto
   are never `Eq`. `==` on a non-`Eq` type is `E2017`.
 - `RandChoose` holds for `Int<lo, hi>` (explicit impl) and for fieldless, non-builtin enums
   with at least one variant. This is what makes RAND's verifier rule hold.
+- `ShaderArg` holds for `()` and for structs with `#[shader_arg]`; the field rules (`E3025`,
+  `E3026`) make every such type packable into the WGSL storage layout the engine uses.
+  `Shader` holds only through the explicit impls on the six role types.
 - `Integer`, `Asset` and `ToText` hold only through their explicit impls in std. `Step` is
   implemented by `Say` and `Choice<A, N>`; its `Output` is the step's result type.
 
@@ -172,6 +177,20 @@ The only builtin whose const generic arguments reach the engine: the emitter app
 `Change<T>`, `Swap` and `ChannelChange` are `#[must_use]`. A pending change that is discarded,
 or bound to a local and never completed with `apply_animation`, is warning `W3023`, and the
 change does not happen.
+
+## Shaders {#shaders}
+
+- Each shader role has its own asset type in `std::screen::shader` (`ColorShader<A>`,
+  `MixShader<A>`, `TextureShader<A>`, `MaskShader<A>`, `LocalMotionShader<A>`,
+  `TransitionalMotionShader<A>`), each with explicit `Asset`, `Eq` and `Shader` impls. The
+  evaluator's `StdTable::assets` maps them to `AssetKind::Shader(role)`; emission records the
+  role of each shader asset in `Build::shader_roles` so the build validates the WGSL per role.
+- `A` is the argument type: `()` or a `#[shader_arg]` struct (`ShaderArg`, `E3025`, `E3026`).
+- Effect values (`Filter`, `Mix`, `Mask`, `Paint`, `LocalMotion`, `TransitionalMotion`) hold a
+  `ShaderAsset` and `ShaderArgs`; only their constructors build them, through the private
+  intrinsics `erase_shader`/`erase_args` (identity at compile time, `MOVE` in bytecode).
+- `asset("…")` in a std file names a std file (`FilePath::Std`), bytecode path `std/<name>`;
+  user asset paths may not enter a top-level `std/` directory (`E1032`).
 
 ## `for` loops {#for-loops}
 

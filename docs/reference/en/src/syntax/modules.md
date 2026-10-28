@@ -193,7 +193,7 @@ over it. It contains:
 
 | From | Names |
 | ---- | ----- |
-| `std` | `String`, `Vec`, `Rat`, `Decimal`, `Range`, `Option`, `Result`, `Eq`, `Integer`, `RandChoose`, `ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset`, `ShaderAsset`, `asset`, `system_font`; the variants `None`, `Some`, `Ok`, `Err` |
+| `std` | `String`, `Vec`, `Rat`, `Decimal`, `Range`, `Option`, `Result`, `Eq`, `Integer`, `RandChoose`, `ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset`, `asset`, `system_font`; the variants `None`, `Some`, `Ok`, `Err` |
 | `std::time` | `Duration`, `ms`, `secs` |
 | `std::screen` | `Screen`, `Render`, `EntityId`, `Part`, `Point`, `Offset`, `Size`, `Anchor`, `Color`, `Plane`, `Visibility`, `point`, `offset`, `rgb`, `hex`, `BLACK`, `WHITE`, `TRANSPARENT` |
 | `std::screen::anim` | `Easing`, `Tween`, `Transition`, `Motion`, `tween`, `instant`, `cut`, `fade`, `rule`, `wipe`, `through`, `motion`, `jump`, `nod`, `shake`, `quake` |
@@ -219,7 +219,7 @@ const AZUSA_0072: VoiceAsset = asset("voice/azusa_0072.ogg");
 #[builtin] pub const fn asset<A: Asset>(path: narrative::Text) -> A;
 ```
 
-There are six asset types, the only types that implement the trait `Asset`:
+These types implement the trait `Asset`:
 
 | Type | File |
 | ---- | ---- |
@@ -228,7 +228,7 @@ There are six asset types, the only types that implement the trait `Asset`:
 | `VoiceAsset` | a voice file, bound to a line |
 | `VideoAsset` | a movie |
 | `FontAsset` | a font |
-| `ShaderAsset` | a WGSL shader (`.wgsl`): a filter, or generated content such as weather or particles |
+| `ColorShader<A>`, `MixShader<A>`, `TextureShader<A>`, `MaskShader<A>`, `LocalMotionShader<A>`, `TransitionalMotionShader<A>` | a WGSL shader (`.wgsl`) of one role, with arguments of type `A`; see [`std::screen::shader`](../../../../std/en/src/screen-shader.md) |
 
 The type of the constant chooses `A`; `asset::<ImageAsset>("…")` names it explicitly. The path
 follows these rules:
@@ -239,15 +239,17 @@ follows these rules:
   in the project directory. Both `/` and `\` separate directories.
 - It stays inside the asset directory: no absolute path, no drive (`C:`), and no `..` that
   leaves it ([`E1029`](../diagnostics/modules.md#e1029)).
-- It does not enter the top-level directory `system-fonts`, which is reserved for system fonts
+- It does not enter the top-level directories `system-fonts` and `std`, which are reserved for
+  system fonts and the standard library's own assets
   ([`E1032`](../diagnostics/modules.md#e1032)).
 - The file exists when the game is compiled
   ([`E1027`](../diagnostics/modules.md#e1027)), so a missing file is a compile error, not a
   failure during play.
 
-An asset type is a [finite type](../concepts/kinds.md#finite-types): its values are exactly the
-asset constants of the program. The story may therefore choose between assets at runtime, for
-example a voice line by route. Two asset values are equal when they name the same file.
+A file asset type is a [finite type](../concepts/kinds.md#finite-types): its values are exactly
+the asset constants of the program. The story may therefore choose between assets at runtime, for
+example a voice line by route. Two asset values are equal when they name the same file. The
+shader types are not finite; renders use them.
 
 ### System fonts
 
@@ -288,6 +290,7 @@ separators, and goes into the archive named after the first directory of that pa
 | `cg/cg_001.png` | `cg.kiarchive` |
 | `logo.png` (directly in the asset directory) | `data.kiarchive` |
 | a system font `msgothic.ttc` | `system-fonts.kiarchive`, as `system-fonts/msgothic.ttc` |
+| a `std` shader such as `std::shaders::color::BLUR` | `std.kiarchive`, as `std/shaders/color/blur.wgsl` |
 
 Grouping files by top-level directory therefore decides how the game's data is split into
 archives. See [The `kagari` CLI](../tools/cli.md) for the build output.

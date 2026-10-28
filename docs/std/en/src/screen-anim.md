@@ -11,8 +11,8 @@ they start. Every item is `const fn` or plain data.
 
 The prelude re-exports `Easing`, `Tween`, `Transition`, `Motion`, `tween`, `instant`, `cut`,
 `fade`, `rule`, `wipe`, `through`, `motion`, `jump`, `nod`, `shake` and `quake`. The rest
-(`Direction`, `TransitionKind`, `MotionKey`, `rule_with`, `blinds`) needs a
-`use std::screen::anim::…`.
+(`Direction`, `TransitionKind`, `MotionKey`, `rule_with`, `masked`, `masked_with`, `blinds`)
+needs a `use std::screen::anim::…`.
 
 ## Overview
 
@@ -21,7 +21,7 @@ The prelude re-exports `Easing`, `Tween`, `Transition`, `Motion`, `tween`, `inst
 | [`Easing`](#easing) | enum | timing curve |
 | [`Tween`](#tween), `tween`, `instant` | struct + constructors | how a property moves |
 | [`Direction`](#direction) | enum | screen direction |
-| [`TransitionKind`](#transitionkind), [`Transition`](#transition), `cut`, `fade`, `rule`, `rule_with`, `wipe`, `blinds`, `through` | enum, struct + constructors | how a layer swaps |
+| [`TransitionKind`](#transitionkind), [`Transition`](#transition), `cut`, `fade`, `rule`, `rule_with`, `masked`, `masked_with`, `wipe`, `blinds`, `through` | enum, struct + constructors | how a layer swaps |
 | [`MotionKey`](#motionkey), [`Motion`](#motion), `motion` | structs + constructor | relative paths |
 | [`jump`](#jump), [`nod`](#nod), [`shake`](#shake), [`quake`](#quake) | functions | motion presets |
 
@@ -228,6 +228,7 @@ pub enum TransitionKind {
     Wipe(Direction),
     Blinds { direction: Direction, count: u32 },
     ThroughColor { color: Color, hold: Duration },
+    Masked { mask: Mask, softness: u8, reverse: bool },
 }
 ```
 
@@ -242,10 +243,17 @@ to 1.
 | `Wipe(direction)` | reveals the new content moving in `direction` |
 | `Blinds { direction, count }` | `count` stripes perpendicular to `direction`, each wiping |
 | `ThroughColor { color, hold }` | fades to `color`, holds it for `hold`, then fades in the new content |
+| `Masked { mask, softness, reverse }` | a pixel switches once the mask's value ×255 is at most the sweeping threshold |
 
 **Rule.** A pixel shows the new content once the mask's luminance is ≤ threshold(t). The
 threshold sweeps 0 → 255, or 255 → 0 with `reverse`. `softness` is the width of the blend ramp in
 luminance units; 0 gives hard edges.
+
+**Masked.** The same rule with a [mask shader](./screen-shader.md#mask) instead of a mask image:
+the mask is computed over the layer's box, and a pixel shows the new content once the mask's
+value × 255 is ≤ threshold(t). The mask's time is the time since the transition started, so an
+animated mask moves while the transition runs. [`std::shaders::mask`](./shaders-mask.md) has
+ready-made masks, so a transition needs no mask image.
 
 ## Struct: `Transition` {#transition}
 
@@ -269,6 +277,8 @@ pub const fn cut() -> Transition
 pub const fn fade(duration: Duration) -> Transition
 pub const fn rule(mask: ImageAsset, duration: Duration) -> Transition
 pub const fn rule_with(mask: ImageAsset, softness: u8, reverse: bool, duration: Duration) -> Transition
+pub const fn masked(mask: Mask, duration: Duration) -> Transition
+pub const fn masked_with(mask: Mask, softness: u8, reverse: bool, duration: Duration) -> Transition
 pub const fn wipe(direction: Direction, duration: Duration) -> Transition
 pub const fn blinds(direction: Direction, count: u32, duration: Duration) -> Transition
 pub const fn through(color: Color, duration: Duration, hold: Duration) -> Transition
@@ -280,15 +290,22 @@ pub const fn through(color: Color, duration: Duration, hold: Duration) -> Transi
 | `fade(d)` | `Crossfade` | a crossfade over `d` |
 | `rule(mask, d)` | `Rule`, softness 0, not reversed | a rule (mask) transition with hard edges |
 | `rule_with(mask, softness, reverse, d)` | `Rule` | the same, with a blend ramp of `softness` luminance units and direction |
+| `masked(mask, d)` | `Masked`, softness 0, not reversed | a transition through a mask shader, with hard edges |
+| `masked_with(mask, softness, reverse, d)` | `Masked` | the same, with a blend ramp of `softness` units of the value × 255 and direction |
 | `wipe(dir, d)` | `Wipe(dir)` | a wipe moving in `dir` |
 | `blinds(dir, count, d)` | `Blinds` | `count` stripes wiping in `dir` |
 | `through(color, d, hold)` | `ThroughColor` | the old content fades to `color` over `d / 2`, holds `hold`, then the new content fades in over `d / 2`; the total is `d + hold` |
 
 ```kis
+use std::screen::CENTER;
+use std::screen::anim::masked;
+use std::shaders::mask::radial;
+
 const BLINDS_RULE: ImageAsset = asset("rule/blinds.png");
 
 screen.background().change(BG::STATION).apply_animation(rule(BLINDS_RULE, ms(1000)));
 screen.background().change(BG::NIGHT).apply_animation(through(BLACK, ms(1000), ms(200)));
+screen.background().change(BG::ROOF).apply_animation(masked(radial(CENTER), ms(1000)));
 ```
 
 ### `transition.ease(easing)`, `transition.delay(delay)` {#transition-ease}

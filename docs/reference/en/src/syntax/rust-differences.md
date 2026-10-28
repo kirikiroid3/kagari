@@ -25,7 +25,7 @@ differently.
 | `let … else`, `if let … && …` chains, labelled blocks | `match`, nested `if let`, and labels on loops |
 | Slice patterns, `&` patterns, `ref`, `name @ pattern` | See [Patterns](./patterns.md#pattern-forms) for the supported forms |
 | Struct update syntax `S { a: 1, ..base }` | Write every field |
-| `#[derive]`, `#[cfg]`, `#[test]` and other attributes | Only `#[scene]`, `#[entry]` and `#[must_use]` (and `#[builtin]` in the standard library). Any other attribute is `E1006`. See [Attributes](../special/attributes.md) |
+| `#[derive]`, `#[cfg]`, `#[test]` and other attributes | Only `#[scene]`, `#[entry]`, `#[must_use]` and `#[shader_arg]` (and `#[builtin]` in the standard library). Any other attribute is `E1006`. See [Attributes](../special/attributes.md) |
 | `pub(crate)`, `pub(super)` | Only `pub` |
 | Open ranges `a..`, `..b`, `..=b`, `..` as values | A range expression needs both bounds (`E2030`). In patterns, `a..` and `..=b` exist, but `..b` does not; see [Range patterns](./patterns.md#range-patterns) |
 

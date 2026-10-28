@@ -166,3 +166,28 @@ fn video_assets_fail_the_build() {
         "error: asset `movie/intro.webm` (video): video assets are not supported by runtime profile `native_v0`",
     );
 }
+
+#[test]
+fn invalid_shaders_fail_the_build() {
+    rejected(
+        "shader/broken.wgsl",
+        b"alias Args = KgNoArgs;\n\nfn effect(uv: vec2<f32>) -> vec4<f32> {\n    return undefined_name;\n}\n",
+        "const BROKEN: std::screen::shader::ColorShader<()> = asset(\"shader/broken.wgsl\");",
+        "std::screen::shader::filter(BROKEN, ())",
+        "error: shader `shader/broken.wgsl` (color): line",
+    );
+}
+
+#[test]
+fn std_shaders_are_packed_into_the_std_archive() {
+    let tmp = init_project();
+    let dir = game(&tmp);
+    use_asset(&dir, "", "std::shaders::color::blur(4.0)");
+    let output = kagari(&["build"], &dir);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    let archive = dir.join("target/v0/std.kiarchive");
+    assert!(archive.is_file());
+    let mut archive = Archive::open(File::open(&archive).unwrap()).unwrap();
+    let blur = archive.read("std/shaders/color/blur.wgsl").unwrap();
+    assert!(blur.is_some_and(|text| !text.is_empty()));
+}

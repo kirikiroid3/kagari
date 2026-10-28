@@ -9,7 +9,11 @@ edition.workspace = true
 [dependencies]
 kagari-bytecode = { workspace = true }
 kagari-engine = { workspace = true }
+kagari-shader = { workspace = true, features = ["validate"] }
 kagari-text = { workspace = true }
 wgpu = { workspace = true }
 bytemuck = { workspace = true }
 log = { workspace = true }
+
+[dev-dependencies]
+naga = { workspace = true }

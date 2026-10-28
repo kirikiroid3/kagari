@@ -149,7 +149,7 @@ impl Db for RootDatabase {
             return *asset;
         }
         let exists = match &path {
-            FilePath::Std(_) => false,
+            FilePath::Std(name) => kagari_std::file(name).is_some(),
             FilePath::Disk(disk) => self.fs.exists(disk),
         };
         let asset = AssetFile::new(self, path.clone(), exists);

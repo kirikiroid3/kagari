@@ -1,7 +1,8 @@
 //! Packs the assets the bytecode references into `.kiarchive` files: one per top-level
 //! directory of the bytecode asset paths, and `data.kiarchive` for files directly in the asset
 //! directory. An entry's name is the asset path in the bytecode, so system fonts, named
-//! `system-fonts/…`, go into `system-fonts.kiarchive`.
+//! `system-fonts/…`, go into `system-fonts.kiarchive`, and std assets, named `std/…` and read
+//! from the compiler's embedded std files, go into `std.kiarchive`.
 
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -22,11 +23,21 @@ pub fn asset_path<'m>(module: &'m Module, asset: &Asset) -> Result<&'m str, Fail
         .ok_or_else(|| Failure("the bytecode names an asset with no path".to_owned()))
 }
 
-/// The file on disk behind the asset at bytecode path `path`.
-pub fn disk_file<'f>(path: &str, file: &'f FilePath) -> Result<&'f Path, Failure> {
+/// Where the bytes of an asset come from.
+pub enum Source<'f> {
+    /// A file on disk.
+    Disk(&'f Path),
+    /// A file embedded in `kagari_std`.
+    Std(&'static str),
+}
+
+/// The source of an asset whose file is `file`.
+pub fn source(file: &FilePath) -> Result<Source<'_>, Failure> {
     match file {
-        FilePath::Disk(file) => Ok(file),
-        _ => Err(Failure(format!("asset `{path}` is not a file on disk"))),
+        FilePath::Disk(file) => Ok(Source::Disk(file)),
+        FilePath::Std(name) => kagari_std::file(name)
+            .map(Source::Std)
+            .ok_or_else(|| Failure(format!("std asset `{name}` is missing"))),
     }
 }
 
@@ -37,14 +48,14 @@ pub fn write(
     files: &[FilePath],
     dir: &Path,
 ) -> Result<Vec<(PathBuf, usize)>, Failure> {
-    let mut groups: BTreeMap<String, BTreeMap<String, &Path>> = BTreeMap::new();
+    let mut groups: BTreeMap<String, BTreeMap<String, Source<'_>>> = BTreeMap::new();
     for (asset, file) in module.assets.iter().zip(files) {
         let path = asset_path(module, asset)?;
-        let file = disk_file(path, file)?;
+        let source = source(file)?;
         groups
             .entry(archive_stem(path).to_owned())
             .or_default()
-            .insert(path.to_owned(), file);
+            .insert(path.to_owned(), source);
     }
 
     let mut written = Vec::new();
@@ -54,8 +65,13 @@ pub fn write(
             Failure(format!("{}: {error}", archive.display()))
         };
         let mut builder = ArchiveBuilder::base(ArchiveOptions::default());
-        for (entry, file) in &entries {
-            builder.add_file(entry, file).map_err(failed)?;
+        for (entry, source) in &entries {
+            match source {
+                Source::Disk(file) => builder.add_file(entry, file).map_err(failed)?,
+                Source::Std(text) => builder
+                    .add(entry, text.as_bytes().to_vec())
+                    .map_err(failed)?,
+            }
         }
         let out = File::create(&archive).map_err(|error| io(&archive, error))?;
         builder.finish(out).map_err(failed)?;

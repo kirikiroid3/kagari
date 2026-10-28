@@ -37,6 +37,7 @@
 - [The Engine](./runtime/engine.md)
 - [Saves, Traces and Snapshots](./runtime/saves.md)
 - [Text and Rendering](./runtime/text-render.md)
+- [Shaders](./runtime/shaders.md)
 - [The Desktop Runtime](./runtime/desktop.md)
 
 # Tooling

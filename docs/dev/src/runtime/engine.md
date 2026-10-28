@@ -27,8 +27,8 @@ between std declarations and these imports is in [Builtins and the Host ABI](../
 | `input/` | `InputEvent`, `Key`, `MouseButton`, `PadButton`, dispatch (`mod.rs`) and `System::bindings` (`bindings.rs`) |
 | `store/` | `settings.kisave` and `meta.kisave` (`mod.rs`), VM values as `.kisave` tables (`value.rs`) |
 | `saves/` | slots, saving, autosave and loading (`mod.rs`), the file layout and choice IDs (`trace.rs`), replay and `Divergence` (`replay.rs`) |
-| `values/` | `STD_ADTS` (`table.rs`, the std types the engine reads or builds, in declaration order), `StdTypes`, typed decoders (`decode.rs`) |
-| `assets.rs` | `AssetStore`: lazily decoded images, fonts, audio lengths, save thumbnails |
+| `values/` | `STD_ADTS` (`table.rs`, the std types the engine reads or builds, in declaration order), `StdTypes`, typed decoders (`decode.rs`), shader arguments (`shader_args.rs`) |
+| `assets.rs` | `AssetStore`: lazily decoded images, fonts, shader sources, audio lengths, save thumbnails |
 | `frame.rs` | the `Frame` draw list |
 | `test_support.rs`, `tests/` | fixture compilation through `kagari-lang`, a fake platform, engine tests |
 
@@ -367,10 +367,10 @@ compiler's `core/kagari-lang/src/eval/machine/screen.rs` with typed fields
 ([Constant Evaluation](../compiler/eval.md)). It has two parts:
 
 - `LogicalScreen`, the persistent state after a render: entities (`BTreeMap<u32, Entity>` with
-  plane, z, position, anchor, scale, rotation, opacity, filter, shader, fill, parts, label, movie,
-  flip, blend mode and gate), the HUD (text window, quick menu, side image), the camera, the
-  screen filter, the music channel and four ambience channels. Screen equality compares only
-  this part; the consistency analysis relies on that.
+  plane, z, position, anchor, scale, rotation, opacity, filter, mix, mask, local motion, fill,
+  parts (an image or a paint each), label, movie, flip and gate), the HUD (text window, quick
+  menu, side image), the camera, the screen filter, the music channel and four ambience
+  channels. Screen equality compares only this part; the consistency analysis relies on that.
 - `StepState`, which belongs to one step: the timeline cursor, the text start cursor, the
   scheduled items, the choice menu's disabled arms and alignment, and despawning entities.
 
@@ -391,10 +391,10 @@ per scheduled item. Each item starts at a `Cursor`:
 | `Barrier(n)` | the end of the first `n` items (`barrier()`) |
 
 plus the animation's delay. Item lengths are the tween or transition duration (plus the hold of
-`ThroughColor`), the motion's last key times its repeat count, the fade lengths of an audio
-change, or the sound length. With the `animations` setting off, delays and visual lengths are 0;
-audio lengths are kept. The text start (where the reveal and the voice begin) is computed from
-the `begin_text` cursor, ignoring items that depend on a mark.
+`ThroughColor`), the motion's last key times its repeat count, the travel's duration, the fade
+lengths of an audio change, or the sound length. With the `animations` setting off, delays and
+visual lengths are 0; audio lengths are kept. The text start (where the reveal and the voice
+begin) is computed from the `begin_text` cursor, ignoring items that depend on a mark.
 
 `tick(now)` resolves the starts it can and fires the audio of items that have started.
 `complete_all(now)` (a click, skip, an overlay) ends every resolved item now and drops one-shots
@@ -406,6 +406,69 @@ of the latest earlier item on the same target (the cut-to-end rule), or from the
 applies to tweens; transitions give a layer pair with a progress; motions add their relative
 path. Entities are sorted by `(plane, z, id)`. Drawing is described in
 [Text and Rendering](./text-render.md#how-the-engine-builds-a-frame).
+
+### Shader effects
+
+A `Filter`, `Mix`, `Mask` or `LocalMotion` value, the texture and mask of a `Paint` and the shader
+of a `TransitionalMotion` decode into an `EffectSpec` (`values/decode.rs`): the shader asset, the
+argument value as the program built it, the argument converted for the shader (`ArgValue`,
+`values/shader_args.rs`), its bytes in WGSL storage layout (`kagari_shader::pack`) and, for a
+local motion, its `LocalMotionBehavior`. Conversion happens when the value is set, so a value a
+shader cannot read traps in the import that received it (`` `<import path>`: shader arguments
+contain a … value ``). Two effects are equal when their shader, behaviour and argument values
+are, as in the compiler. Arguments over `kagari_shader::MAX_ARGS_BYTES` (16384) are logged and
+the effect is not drawn.
+
+| Argument value | `ArgValue` |
+| -------------- | ---------- |
+| `bool` | `U32` 0 or 1 |
+| integer | `I32` when it fits, else `U32` when it fits, else a trap |
+| `Decimal`, `Rat` | `F32` (nearest) |
+| `Color` | `Vec4`, premultiplied linear |
+| `Point`, `Offset`, `Size` | `Vec2` in px |
+| `Anchor` | `Vec2` of fractions |
+| `Angle` | `F32` in radians, clockwise |
+| `Duration` | `F32` in seconds |
+| a fieldless enum variant (`TypeTable::is_enum`) | `U32` of the variant index |
+| another struct | `Struct` of its fields, in order |
+| `[T; N]` | `Array` |
+| `()` | `U32(0)` (`KgNoArgs`) |
+
+**Sampling an effect.** `sample_effect` follows the property's chain like `sample_prop`. When the
+active tween runs between two effects of the same shader and behaviour, the arguments interpolate
+(`kagari_shader::lerp` at the eased progress: floats mix, integers switch to the new value);
+otherwise the new effect shows from the tween's start. The result is a `frame::ShaderEffect`:
+the shader, the packed arguments and the effect time.
+
+**The effect clock.** Each effect has a slot (`EffectSlot`: the screen filter, an entity's
+filter, mix, mask or local motion, or the paint of an image layer) and a key (`EffectKey`: the
+shader, the paint's mask shader, the local motion's behaviour); changing only the arguments
+keeps the key. At time `t`, the clock's origin is the earliest start of the trailing run of
+started items on the slot that all carry the current key. When that run is every started item
+and the step's base has the same key, the origin is the one carried over from the previous step
+(`ScreenRuntime::carried`, filled by `enter_step` from the previous runtime's `final_origins`);
+if none was carried, or the run is empty, it is the step entry. The effect time is
+`(t − origin) / 1000` seconds, 0 when animations are off. The `from` side of a layer
+transition takes its origin just before the transition started; the mask of a `Masked`
+transition runs on the seconds since the transition started.
+
+**Local motion.** `LocalMotionBehavior::map_ms` maps the clock before the shader sees it:
+`Stall { after }` holds at `after`; `Periodic { after, period }` runs to `after`, then loops
+`period` (a zero period holds at `after`).
+
+**Travel.** `Entity::travel(to, motion)` reads the entity's pose as `from`, checks the motion's
+easing, commits three tweens (position, scale, rotation to `to`, with the motion's duration,
+easing and delay), so the logical pose is `to` at once, then schedules
+`ScheduledKind::Travel { motion, from, to }` on `Target::Travel(id)` with the motion's delay.
+While the latest started travel runs, the entity gets a `MotionStage::Transitional` with the
+eased progress and the seconds since the travel started; afterwards the tweens have reached
+`to`. A local motion adds a `MotionStage::Local` after it; the stage input is the pose the CPU
+sampled (tweens and keyframed motions included).
+
+**Assets.** `enter_step` loads the source of every shader the new and the base logical screen
+use, and of the effects, paints, masked transitions and travels the step schedules
+(`AssetStore::ensure_shader`; a source that is not UTF-8 is an asset error). The renderer reads
+them with `AssetStore::shader_source`.
 
 ## Audio model
 
@@ -481,10 +544,11 @@ starts. Read flags, seen sets and meta are never reverted by a load or a rewind.
 
 `AssetStore` decodes on first use and keeps everything for the process lifetime: images
 (`image` crate, to straight-alpha RGBA8), fonts (all loaded at boot, in asset order, into
-`kagari_text::Fonts`), audio lengths (through `Platform::audio_duration_ms`, cached) and save
-thumbnails (with a generation counter so the renderer can tell a replaced thumbnail). A step's
-images, transition contents and rule masks are loaded at step entry, so a missing image traps
-there rather than mid-animation.
+`kagari_text::Fonts`), shader sources (UTF-8 WGSL), audio lengths (through
+`Platform::audio_duration_ms`, cached) and save thumbnails (with a generation counter so the
+renderer can tell a replaced thumbnail). A step's images, shaders, transition contents and rule
+masks are loaded at step entry, so a missing image or shader traps there rather than
+mid-animation.
 
 ## Profile `native_v0` and `kagari-compat`
 
@@ -501,7 +565,8 @@ not consult it.
 | Image | PNG, baseline and progressive JPEG, lossy, lossless and extended WebP | `image` with features `png`, `jpeg`, `webp` (engine) |
 | Audio, voice | Ogg Vorbis, FLAC, WAV (PCM, IEEE float), MP3 | `kira` with features `ogg`, `vorbis`, `flac`, `wav`, `pcm`, `mp3` (desktop) |
 | Font | TrueType, OpenType (CFF), collections (face 0) | `skrifa` (`kagari-text`) |
-| Video, shader | none | movies, entity shaders and filters are modelled in the screen but never drawn |
+| Shader | WGSL of the six roles | `kagari-shader` (preludes, validation), `kagari-render` (pipelines) |
+| Video | none | movies are modelled in the screen but never drawn |
 
 The table and the decoder features must agree: a format `supports` accepts must decode at run
 time. `watched` is never set by `native_v0`, since no movie plays.

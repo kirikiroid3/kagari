@@ -80,10 +80,12 @@ and saves are not kept.
 
 ## Runtime profile `native_v0`
 
-The desktop runtime implements the runtime profile `native_v0`: the whole std except video and
-shaders. Its asset formats are listed in [Runtime profiles](./projects.md#runtime-profiles);
-`kagari build` rejects assets it cannot decode, so a game that builds with
-`runtime-compatibility = ["native_v0"]` has no unsupported asset at run time. See also
+The desktop runtime implements the runtime profile `native_v0`: the whole std except video. Its
+asset formats are listed in [Runtime profiles](./projects.md#runtime-profiles); `kagari build`
+rejects assets it cannot decode and shaders that do not validate, so a game that builds with
+`runtime-compatibility = ["native_v0"]` has no unsupported asset at run time. Shaders need a GPU
+with storage buffers, and motion shaders also compute shaders; on a GPU without them the runtime
+logs a warning and draws those effects as if they were not set. See also
 [Runtime Profiles](../../../../std/en/src/appendix/profiles.md) in the STD Reference.
 
 The runtime keeps going when a device is missing:

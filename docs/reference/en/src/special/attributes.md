@@ -1,7 +1,7 @@
 # Attributes
 
-An attribute is written `#[name]` directly before an item. Kagari has exactly four attributes and
-none of them takes arguments. Games use three of them; `#[builtin]` is reserved for the standard
+An attribute is written `#[name]` directly before an item. Kagari has exactly five attributes and
+none of them takes arguments. Games use four of them; `#[builtin]` is reserved for the standard
 library.
 
 | Attribute | Allowed on | Meaning | Misuse |
@@ -9,6 +9,7 @@ library.
 | [`#[scene]`](#scene) | `pushdown fn` | A scene: may run steps, call scenes and draw random values | `E3018` |
 | [`#[entry]`](#entry) | a `#[scene]` function | An entry scene: the system can start the story here | `E3018`, `E3008`, `E3009` |
 | [`#[must_use]`](#must_use) | `struct`, `enum` | A value of the type must be completed, not dropped | `E3018`; warning `W3023` at the use |
+| [`#[shader_arg]`](#shader_arg) | `struct` | The type can be a shader's arguments | `E3018`, `E3025`, `E3026` |
 | [`#[builtin]`](#builtin) | standard library only: functions, structs, traits | Implemented by the compiler and the engine | `E1008`, `E1009`, `E1013` |
 
 ## Syntax
@@ -29,7 +30,7 @@ pub pushdown fn Main() {
 - `///` doc comments are comments, not attributes.
 - Inner attributes (`#![…]`) do not exist, and an attribute must be followed by an item: both are
   syntax errors (`E0001`). Attributes cannot be put on statements or expressions.
-- A name other than the four is `E1006`, and the attribute is ignored.
+- A name other than the five is `E1006`, and the attribute is ignored.
 - An attribute written with arguments, such as `#[must_use("reason")]`, is `E1007`; the attribute
   still applies.
 
@@ -111,6 +112,33 @@ const fn roof(mut screen: Screen) -> Screen {
 A game may mark its own types too. The warning then lists the type's methods as the ways to
 complete the value.
 
+## `#[shader_arg]` {#shader_arg}
+
+`#[shader_arg]` on a `struct` makes it a shader argument type: the type implements `ShaderArg`, so
+a shader asset such as `ColorShader<Memory>` can take it, and the engine passes its value to the
+shader. On any other item it is `E3018`.
+
+```kis
+use std::screen::shader::ColorShader;
+
+#[shader_arg]
+struct Memory {
+    strength: Decimal,
+}
+
+const MEMORY: ColorShader<Memory> = asset("memory.wgsl");
+```
+
+- The struct has named fields, at least one, and no type parameters; const parameters are allowed
+  (`E3025` otherwise).
+- Every field has a type a shader can read: `bool`, `i32`, `u32`, `Decimal`, `Rat`, the std types
+  `Color`, `Point`, `Offset`, `Size`, `Anchor`, `Angle` and `Duration`, an enum without fields, a
+  `#[shader_arg]` struct, or an array `[T; N]` of one of these with `N` > 0. Any other field type,
+  or an array of length 0, is `E3026` at the field.
+
+How each field reaches the shader is described in
+[Writing Shaders](../../../../std/en/src/guides/shaders.md#arguments) in the STD Reference.
+
 ## `#[builtin]` {#builtin}
 
 `#[builtin]` marks an item that the compiler and the engine implement. It is allowed only in the
@@ -140,7 +168,9 @@ A function without a body that is not `#[builtin]` is `E1010`.
 | [`E1008`](../diagnostics/modules.md#e1008) | `#[builtin]` outside the standard library |
 | [`E1009`](../diagnostics/modules.md#e1009) | A `#[builtin]` function with a body, or a `#[builtin]` struct with fields |
 | [`E1013`](../diagnostics/modules.md#e1013) | A standard library trait without `#[builtin]` |
-| [`E3018`](../diagnostics/kinds.md#e3018) | `#[scene]` not on a `pushdown fn`, `#[entry]` without `#[scene]`, `#[must_use]` not on a struct or enum |
+| [`E3018`](../diagnostics/kinds.md#e3018) | `#[scene]` not on a `pushdown fn`, `#[entry]` without `#[scene]`, `#[must_use]` not on a struct or enum, `#[shader_arg]` not on a struct |
 | [`E3008`](../diagnostics/kinds.md#e3008), [`E3009`](../diagnostics/kinds.md#e3009) | An entry scene's parameter or return type is not finite, or contains `Text` |
 | [`E2027`](../diagnostics/types.md#e2027) | `nav::start` of something that is not an `#[entry]` scene |
 | [`W3023`](../diagnostics/kinds.md#w3023) | A `#[must_use]` value dropped or never completed |
+| [`E3025`](../diagnostics/kinds.md#e3025) | A `#[shader_arg]` struct without named fields, or with type parameters |
+| [`E3026`](../diagnostics/kinds.md#e3026) | A `#[shader_arg]` field of a type a shader cannot read, or an array of length 0 |

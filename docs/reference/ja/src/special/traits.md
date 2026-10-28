@@ -2,7 +2,7 @@
 
 Kagari のトレイトはゲームのための道具ではありません。標準ライブラリが固定のトレイト群を宣言し、どれも [`#[builtin]`](./attributes.md#builtin) が付いています。それらを実装するのも標準ライブラリだけです。トレイトがあるのは、オーバーロードや暗黙の変換なしに `std` のシグネチャを型検査するため、そしてコンパイラが規則を述べられるようにするため（「`==` には `Eq` が必要」「`rng_choose` は `RandChoose` を引く」）です。
 
-ゲームがこれらのトレイトを使う方法は一つだけです。自分のジェネリックパラメータへの**境界**です。そのうち `Eq` と `RandChoose` の二つは、ゲームが宣言した適切な型に対して自動的にも成り立ちます。
+ゲームがこれらのトレイトを使う方法は一つだけです。自分のジェネリックパラメータへの**境界**です。そのうち `Eq` と `RandChoose` の二つは、ゲームが宣言した適切な型に対して自動的にも成り立ち、`ShaderArg` はゲームが [`#[shader_arg]`](./attributes.md#shader_arg) を付けた構造体に成り立ちます。
 
 ## 概要 {#overview}
 
@@ -12,8 +12,10 @@ Kagari のトレイトはゲームのための道具ではありません。標�
 | [`Integer`](#integer) | `std` | あり | `Int<lo, hi>` と Rust の整数 | `into`、`saturate` |
 | [`ToText`](#totext) | `std::narrative::text` | なし | `Text`、`String`、整数、`Rat`、`Decimal` | `t![…]` の `{expr}`、`to_text` |
 | [`RandChoose`](#randchoose) | `std` | あり | `Int<lo, hi>` とフィールドのないすべての列挙型 | `rng_choose` |
-| [`Asset`](#asset) | `std` | なし | 6 つのアセット型 | `asset` |
+| [`Asset`](#asset) | `std` | なし | 5 つのファイルのアセット型と 6 つのシェーダー型 | `asset` |
 | [`Step`](#step) | `std::narrative` | なし | `Say`、`Choice<A, N>` | `push_step`、`s!`、`choice!` |
+| [`ShaderArg`](#shaderarg) | `std::screen::shader` | なし | `()` と `#[shader_arg]` 構造体 | `filter` などのシェーダーのコンストラクター |
+| [`Shader`](#shader) | `std::screen::shader` | なし | 6 つのシェーダー型 | `std` の内部 |
 
 プレリュードにないトレイトは、`std::narrative::text::ToText` のようにパスで書くか、`use` でインポートします。
 
@@ -64,7 +66,7 @@ const fn describe<T: Eq + ToText>(a: T, b: T) -> Text {
 | タプル、配列 | すべての要素型が `Eq` のとき |
 | Kagari で宣言された構造体と列挙型（皆さんのものも `std` のものも） | すべてのバリアントのすべてのフィールドが `Eq` のとき。同じように組み立てられた二つの値が等しくなります |
 | `&T`、`&mut T` | `T` が `Eq` のとき。指す先の値を比較します |
-| `#[builtin]` 型 | `std` の `impl Eq` によってのみ：`String`、`Eq` な `T` の `Vec<T>`、`Rat`、`Decimal`、`Text`、`Screen`、6 つのアセット型 |
+| `#[builtin]` 型 | `std` の `impl Eq` によってのみ：`String`、`Eq` な `T` の `Vec<T>`、`Rat`、`Decimal`、`Text`、`Screen`、6 つのアセット型、6 つのシェーダー型、`ShaderArgs` |
 | クロージャ | 決してならない |
 
 したがって `Setting<T>`、`Meta<T>`、`Narrative`、`Element`、`Placed`、`Arm`、`Divergence`、画面の部品（`Entity`、`Prop<T>`、各レイヤー、`Hud`、`ChoiceMenu`、`Camera`、`Channel`）、保留中の変更（`Change<T>`、`Swap`、`ChannelChange`）は `Eq` ではなく、それらを含む構造体や列挙型も `Eq` ではありません。Kagari に浮動小数点数がない理由の一つは、すべての数値型を `Eq` にするためです。
@@ -143,7 +145,7 @@ pushdown fn Morning() {
 #[builtin] pub const fn asset<A: Asset>(path: narrative::Text) -> A;
 ```
 
-`Asset` は、値がちょうどプログラムのアセット定数である型を表します。`ImageAsset`、`AudioAsset`、`VoiceAsset`、`VideoAsset`、`FontAsset`、`ShaderAsset` です。これはアセット定数を宣言する `asset` の境界です。[アセット型](./builtin-types.md#asset-types)を参照してください。
+`Asset` は、値がちょうどプログラムのアセット定数である型を表します。`ImageAsset`、`AudioAsset`、`VoiceAsset`、`VideoAsset`、`FontAsset` と、6 つのシェーダー型 `ColorShader<A>`、`MixShader<A>`、`TextureShader<A>`、`MaskShader<A>`、`LocalMotionShader<A>`、`TransitionalMotionShader<A>` です。これはアセット定数を宣言する `asset` の境界です。[アセット型](./builtin-types.md#asset-types)を参照してください。
 
 ## `Step` {#step}
 
@@ -155,6 +157,22 @@ pushdown fn Morning() {
 ```
 
 `Step` は、物語が中断できる値を表します。実装するのは、`s!(…)` と書くステップ `Say`（`Output = ()`）と、`choice!{…}` と書くステップ `Choice<A, N>`（`Output = A`、アームの値の型）です。`push_step` はステップを実行し、その出力で再開します。関連型を持つ唯一のトレイトです。ステップを実行できるのはシーンだけです（`E3002`）。[ステップ](../concepts/steps.md)を参照してください。
+
+## `ShaderArg` {#shaderarg}
+
+```kis
+#[builtin] pub trait ShaderArg {}
+```
+
+`ShaderArg` は、シェーダーが引数として受け取れる型を表します。ユニット型 `()` と、[`#[shader_arg]`](./attributes.md#shader_arg) を付けたすべての構造体です。`std::screen::shader` のコンストラクターは、`filter<A: ShaderArg>(shader: ColorShader<A>, args: A)` のように引数型をこれで制約します。[`std::screen::shader`](../../../../std/ja/src/screen-shader.md) を参照してください。
+
+## `Shader` {#shader}
+
+```kis
+#[builtin] pub trait Shader {}
+```
+
+`Shader` は 6 つのシェーダー型を表します。標準ライブラリが任意のロールのシェーダーを受け取るために使うもので、ゲームが使うことはありません。
 
 ## クロージャ型はトレイトではない {#closure-types-are-not-traits}
 

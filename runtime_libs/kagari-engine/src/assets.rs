@@ -1,5 +1,5 @@
-//! Decoded assets: images, fonts, audio durations and save thumbnails. Assets load lazily from
-//! the platform on first use and stay cached for the process lifetime.
+//! Decoded assets: images, fonts, shader sources, audio durations and save thumbnails. Assets
+//! load lazily from the platform on first use and stay cached for the process lifetime.
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -35,6 +35,8 @@ pub struct AssetStore {
     fonts: Fonts,
     font_ids: Vec<Option<FontId>>,
     audio_ms: Vec<Option<Option<u32>>>,
+    /// WGSL sources, indexed like `images`.
+    shaders: Vec<Option<Rc<str>>>,
     thumbs: HashMap<ThumbKey, Thumbnail>,
     next_generation: u64,
 }
@@ -52,6 +54,7 @@ impl AssetStore {
             fonts: Fonts::new(),
             font_ids: vec![None; count],
             audio_ms: vec![None; count],
+            shaders: vec![None; count],
             thumbs: HashMap::new(),
             next_generation: 1,
         }
@@ -72,6 +75,11 @@ impl AssetStore {
 
     pub fn image_size(&self, id: AssetId) -> Option<(u32, u32)> {
         self.image(id).map(|image| (image.width, image.height))
+    }
+
+    /// The WGSL source of a loaded shader asset.
+    pub fn shader_source(&self, id: AssetId) -> Option<&str> {
+        self.shaders.get(index(id))?.as_deref()
     }
 
     pub fn fonts(&self) -> &Fonts {
@@ -176,6 +184,22 @@ impl AssetStore {
             });
         }
         Ok((width, height))
+    }
+
+    /// Loads the WGSL source of a shader asset; a source that is not UTF-8 is an error, like an
+    /// image that does not decode.
+    pub(crate) fn ensure_shader(&mut self, id: AssetId, p: &mut dyn Platform) -> Result<(), Trap> {
+        if self.shader_source(id).is_some() {
+            return Ok(());
+        }
+        self.check_kind(id, |k| k == AssetKind::Shader, "a shader")?;
+        let bytes = self.read(id, p)?;
+        let source =
+            String::from_utf8(bytes).map_err(|e| self.error(id, format!("decode failed: {e}")))?;
+        if let Some(slot) = self.shaders.get_mut(index(id)) {
+            *slot = Some(Rc::from(source));
+        }
+        Ok(())
     }
 
     pub(crate) fn ensure_font(

@@ -15,7 +15,8 @@
 //!   folded and exempt), and entry scenes without `Text`;
 //! - second-class references and closures in the story, and exclusive `&mut` arguments;
 //! - mutability of assigned and mutably borrowed places, in all code;
-//! - placement of `#[scene]`, `#[entry]` and `#[must_use]`;
+//! - placement of `#[scene]`, `#[entry]`, `#[must_use]` and `#[shader_arg]`, and the shape and
+//!   field types of `#[shader_arg]` structs;
 //! - `choice!` ids and arms, mono ruby readings, constant text effects;
 //! - unused `#[must_use]` values (a warning).
 //!
@@ -167,6 +168,10 @@ impl<'db> Env<'db> {
                         "`#[must_use]` is only allowed on a struct or an enum, but this is a `{}`",
                         data.kind_name()
                     ),
+                },
+                "shader_arg" => match data.kind {
+                    ItemKind::Struct { .. } => continue,
+                    _ => "`#[shader_arg]` applies only to structs".to_owned(),
                 },
                 _ => continue,
             };
@@ -336,7 +341,107 @@ impl<'db> Env<'db> {
                     ));
                 }
             }
+            (Some(ItemSig::Adt(adt)), SignatureKind::Struct { fields }) if adt.shader_arg => {
+                self.check_shader_arg(item, adt, signature, fields, out);
+            }
             _ => {}
+        }
+    }
+
+    /// A `#[shader_arg]` struct: named fields, no type parameters, and only field types a
+    /// shader can read.
+    fn check_shader_arg(
+        &self,
+        item: ItemId,
+        adt: &crate::signatures::AdtDef,
+        signature: &Signature,
+        fields: &[(Option<crate::hir::Name>, crate::hir::TypeRefId)],
+        out: &mut Vec<Diag>,
+    ) {
+        let named = adt.variants.first().is_some_and(|variant| {
+            matches!(&variant.shape, crate::item_tree::Shape::Record(names) if !names.is_empty())
+        });
+        let type_params = signature
+            .generics
+            .iter()
+            .any(|param| matches!(param.kind, crate::hir::GenericParamKind::Type { .. }));
+        if !named || type_params {
+            let attr = item_tree(self.db, item.file)
+                .item(item.index)
+                .and_then(|data| {
+                    data.attrs
+                        .iter()
+                        .position(|attr| attr.as_str() == "shader_arg")
+                })
+                .and_then(|index| u32::try_from(index).ok())
+                .unwrap_or(0);
+            out.push(Diag::new(
+                Anchor::ItemAttr(item, attr),
+                DiagnosticCode::KindShaderArgShape,
+                "a `#[shader_arg]` struct needs named fields and no type parameters",
+            ));
+            return;
+        }
+        let Some(variant) = adt.variants.first() else {
+            return;
+        };
+        for (field, (_, ty_ref)) in variant.fields.iter().zip(fields) {
+            let name = field
+                .name
+                .as_ref()
+                .map_or_else(|| "?".to_owned(), ToString::to_string);
+            let message = match self.shader_field(&field.ty) {
+                ShaderField::Ok => continue,
+                ShaderField::Bad => format!(
+                    "field `{name}` has type `{}`, which a shader cannot read",
+                    self.show(&field.ty)
+                ),
+                ShaderField::EmptyArray => format!("field `{name}` is an array of length 0"),
+            };
+            out.push(Diag::new(
+                Anchor::Node(Owner::Signature(item), NodeId::Type(*ty_ref)),
+                DiagnosticCode::KindShaderArgField,
+                message,
+            ));
+        }
+    }
+
+    /// Whether a shader can read a field of type `ty`.
+    fn shader_field(&self, ty: &Ty) -> ShaderField {
+        use crate::ty::IntTy;
+        let std = &self.sigs.std;
+        match ty.kind() {
+            TyKind::Error => ShaderField::Ok,
+            TyKind::Bool | TyKind::Int(IntTy::I32 | IntTy::U32) => ShaderField::Ok,
+            TyKind::Array { elem, len } => {
+                if len.value() == Some(0) {
+                    return ShaderField::EmptyArray;
+                }
+                self.shader_field(elem)
+            }
+            TyKind::Adt { item, .. } => {
+                let item = *item;
+                if Some(item) == std.decimal
+                    || Some(item) == std.rat
+                    || std.shader_arg_std.contains(&item)
+                {
+                    return ShaderField::Ok;
+                }
+                let ok = self.sigs.adt(item).is_some_and(|adt| {
+                    adt.shader_arg
+                        || (adt.is_enum
+                            && !adt.builtin
+                            && adt.generics.params.is_empty()
+                            && !adt.variants.is_empty()
+                            && adt.variants.iter().all(|variant| variant.fields.is_empty()))
+                });
+                if ok {
+                    ShaderField::Ok
+                } else {
+                    ShaderField::Bad
+                }
+            }
+            _ => ShaderField::Bad,
         }
     }
 
@@ -357,4 +462,11 @@ pub(super) fn fn_kind_word(kind: FnKind) -> &'static str {
         FnKind::Const => "const fn",
         FnKind::Pushdown => "pushdown fn",
     }
+}
+
+/// Whether a shader can read a `#[shader_arg]` field type.
+enum ShaderField {
+    Ok,
+    Bad,
+    EmptyArray,
 }

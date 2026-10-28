@@ -3,6 +3,7 @@
 
 pub mod anim;
 pub mod audio;
+pub mod shader;
 
 use crate::narrative::text::{Mark, Text, TextStyle};
 use crate::system::Setting;
@@ -82,6 +83,17 @@ pub const fn degrees(d: Decimal) -> Angle {
     Angle { degrees: d }
 }
 
+/// Where an entity is: its position, scale and rotation.
+pub struct Pose {
+    pub position: Point,
+    pub scale: Decimal,
+    pub rotation: Angle,
+}
+/// The pose at `position` with `scale` and `rotation`.
+pub const fn pose(position: Point, scale: Decimal, rotation: Angle) -> Pose {
+    Pose { position, scale, rotation }
+}
+
 /// An sRGB colour with alpha.
 pub struct Color {
     pub r: u8,
@@ -138,159 +150,201 @@ pub enum VAlign {
     Middle,
     Bottom,
 }
-/// How an entity is composited over what is below it (CSS blend modes).
-pub enum BlendMode {
-    Normal,
-    Add,
-    Multiply,
-    Screen,
-    Overlay,
-    Darken,
-    Lighten,
-    ColorDodge,
-    ColorBurn,
-    HardLight,
-    SoftLight,
-    Difference,
-    Exclusion,
-    Hue,
-    Saturation,
-    Color,
-    Luminosity,
-}
 
 /// The screen a step shows, and the step's timeline.
-#[builtin] pub struct Screen;
+#[builtin]
+pub struct Screen;
 impl Screen {
     /// A screen with only the opaque `BACKGROUND` entity, the default Hud and camera, no filter
     /// (`None`) and silent channels.
-    #[builtin] pub const fn empty() -> Screen;
+    #[builtin]
+    pub const fn empty() -> Screen;
     /// The entity `id`, spawned invisible with default components if it is absent.
-    #[builtin] pub const fn entity(&mut self, id: EntityId) -> &mut Entity;
+    #[builtin]
+    pub const fn entity(&mut self, id: EntityId) -> &mut Entity;
     /// Whether entity `id` is on the logical screen.
-    #[builtin] pub const fn contains(&self, id: EntityId) -> bool;
+    #[builtin]
+    pub const fn contains(&self, id: EntityId) -> bool;
     /// The ids on `plane`, ascending.
-    #[builtin] pub const fn entities(&self, plane: Plane) -> Vec<EntityId>;
+    #[builtin]
+    pub const fn entities(&self, plane: Plane) -> Vec<EntityId>;
     /// Removes entity `id` from the logical screen; it is drawn until its animations end.
-    #[builtin] pub const fn despawn(&mut self, id: EntityId);
+    #[builtin]
+    pub const fn despawn(&mut self, id: EntityId);
     /// The main image of the `BACKGROUND` entity.
     pub const fn background(&mut self) -> &mut ImageLayer {
         self.entity(BACKGROUND).image()
     }
     /// The Hud the game view draws.
-    #[builtin] pub const fn hud(&mut self) -> &mut Hud;
+    #[builtin]
+    pub const fn hud(&mut self) -> &mut Hud;
     /// The choice menu of this step.
-    #[builtin] pub const fn choice_menu(&mut self) -> &mut ChoiceMenu;
+    #[builtin]
+    pub const fn choice_menu(&mut self) -> &mut ChoiceMenu;
     /// The camera over the `Background`, `Stage` and `Front` planes.
-    #[builtin] pub const fn camera(&mut self) -> &mut Camera;
-    /// The shader that post-processes the `Background`, `Stage` and `Front` planes; `None` is no
-    /// filter.
-    #[builtin] pub const fn filter(&mut self) -> &mut Prop<Option<ShaderAsset>>;
+    #[builtin]
+    pub const fn camera(&mut self) -> &mut Camera;
+    /// The colour filter over the `Background`, `Stage` and `Front` planes; `None` is no filter.
+    #[builtin]
+    pub const fn filter(&mut self) -> &mut Prop<Option<shader::Filter>>;
     /// The music channel.
-    #[builtin] pub const fn music(&mut self) -> &mut audio::Channel;
+    #[builtin]
+    pub const fn music(&mut self) -> &mut audio::Channel;
     /// Ambience channel `channel`.
-    #[builtin] pub const fn ambience(&mut self, channel: Int<0, 3>) -> &mut audio::Channel;
+    #[builtin]
+    pub const fn ambience(&mut self, channel: Int<0, 3>) -> &mut audio::Channel;
     /// Plays a one-shot sound at the cursor plus its delay.
-    #[builtin] pub const fn play(&mut self, sound: audio::Sound);
+    #[builtin]
+    pub const fn play(&mut self, sound: audio::Sound);
     /// Fades out every one-shot sound playing at the cursor.
-    #[builtin] pub const fn stop_sounds(&mut self, fade_out: Duration);
+    #[builtin]
+    pub const fn stop_sounds(&mut self, fade_out: Duration);
     /// Restarts the music channel's track from its start at the cursor. Without it, a track that
     /// is already playing carries over to later steps without restarting.
-    #[builtin] pub const fn replay_bgm(&mut self);
+    #[builtin]
+    pub const fn replay_bgm(&mut self);
     /// Advances the cursor by `duration`.
-    #[builtin] pub const fn wait(&mut self, duration: Duration);
+    #[builtin]
+    pub const fn wait(&mut self, duration: Duration);
     /// Moves the cursor to the end of everything scheduled so far.
-    #[builtin] pub const fn barrier(&mut self);
+    #[builtin]
+    pub const fn barrier(&mut self);
     /// Moves the cursor to the time the text reaches `mark`.
-    #[builtin] pub const fn at_mark(&mut self, mark: Mark);
+    #[builtin]
+    pub const fn at_mark(&mut self, mark: Mark);
     /// Moves the cursor back to the step entry.
-    #[builtin] pub const fn at_entry(&mut self);
+    #[builtin]
+    pub const fn at_entry(&mut self);
     /// Starts the text reveal and the voice at the cursor.
-    #[builtin] pub const fn begin_text(&mut self);
+    #[builtin]
+    pub const fn begin_text(&mut self);
 }
 
-/// A thing on the screen: a transform, an opacity, a filter, a shader, a fill and layers.
-#[builtin] pub struct Entity;
+/// A thing on the screen: a transform, an opacity, a colour filter, a mix, a mask, a local motion,
+/// a fill and layers.
+#[builtin]
+pub struct Entity;
 impl Entity {
     /// Where the anchor point sits.
-    #[builtin] pub const fn position(&mut self) -> &mut Prop<Point>;
+    #[builtin]
+    pub const fn position(&mut self) -> &mut Prop<Point>;
     /// The scale around the anchor.
-    #[builtin] pub const fn scale(&mut self) -> &mut Prop<Decimal>;
+    #[builtin]
+    pub const fn scale(&mut self) -> &mut Prop<Decimal>;
     /// The rotation around the anchor.
-    #[builtin] pub const fn rotation(&mut self) -> &mut Prop<Angle>;
+    #[builtin]
+    pub const fn rotation(&mut self) -> &mut Prop<Angle>;
     /// The opacity, 0.0..=1.0; spawned entities start at 0.0.
-    #[builtin] pub const fn opacity(&mut self) -> &mut Prop<Decimal>;
-    /// The shader that post-processes this entity; `None` is no filter.
-    #[builtin] pub const fn filter(&mut self) -> &mut Prop<Option<ShaderAsset>>;
-    /// Content generated by a shader (rain, snow, particles), drawn in the entity's plane and z
-    /// order; `None` draws nothing.
-    #[builtin] pub const fn shader(&mut self) -> &mut Prop<Option<ShaderAsset>>;
+    #[builtin]
+    pub const fn opacity(&mut self) -> &mut Prop<Decimal>;
+    /// The colour filter over this entity; `None` is no filter.
+    #[builtin]
+    pub const fn filter(&mut self) -> &mut Prop<Option<shader::Filter>>;
+    /// How the entity composites over what is below it; `None` is normal source-over.
+    #[builtin]
+    pub const fn mix(&mut self) -> &mut Prop<Option<shader::Mix>>;
+    /// The alpha over the entity's box; `None` is no mask.
+    #[builtin]
+    pub const fn mask(&mut self) -> &mut Prop<Option<shader::Mask>>;
+    /// A motion around the entity's pose that only changes how it is drawn; `None` is no motion.
+    #[builtin]
+    pub const fn local_motion(&mut self) -> &mut Prop<Option<shader::LocalMotion>>;
+    /// Moves the entity to `to` along the path of `motion`; `to` is the logical pose at once.
+    #[builtin]
+    pub const fn travel(&mut self, to: Pose, motion: shader::TransitionalMotion);
     /// A colour drawn below the parts, over the fill size.
-    #[builtin] pub const fn fill(&mut self) -> &mut Prop<Color>;
+    #[builtin]
+    pub const fn fill(&mut self) -> &mut Prop<Color>;
     /// The image layer `part`.
-    #[builtin] pub const fn part(&mut self, part: Part) -> &mut ImageLayer;
+    #[builtin]
+    pub const fn part(&mut self, part: Part) -> &mut ImageLayer;
     /// The `MAIN` image layer.
     pub const fn image(&mut self) -> &mut ImageLayer {
         self.part(MAIN)
     }
     /// The text layer, drawn above the parts and the movie.
-    #[builtin] pub const fn label(&mut self) -> &mut LabelLayer;
+    #[builtin]
+    pub const fn label(&mut self) -> &mut LabelLayer;
     /// The movie layer, drawn above the parts.
-    #[builtin] pub const fn movie(&mut self) -> &mut MovieLayer;
+    #[builtin]
+    pub const fn movie(&mut self) -> &mut MovieLayer;
     /// Moves the entity to `plane`.
-    #[builtin] pub const fn set_plane(&mut self, plane: Plane);
+    #[builtin]
+    pub const fn set_plane(&mut self, plane: Plane);
     /// Sets the order inside the plane; higher draws later.
-    #[builtin] pub const fn set_z(&mut self, z: i32);
+    #[builtin]
+    pub const fn set_z(&mut self, z: i32);
     /// Sets the point of the entity that sits at its position.
-    #[builtin] pub const fn set_anchor(&mut self, anchor: Anchor);
+    #[builtin]
+    pub const fn set_anchor(&mut self, anchor: Anchor);
     /// Mirrors the drawing.
-    #[builtin] pub const fn set_flip(&mut self, flip: Flip);
-    /// Sets how the entity composites over what is below it.
-    #[builtin] pub const fn set_blend(&mut self, blend: BlendMode);
+    #[builtin]
+    pub const fn set_flip(&mut self, flip: Flip);
     /// Sets the fill's size; `None` covers the whole screen.
-    #[builtin] pub const fn set_fill_size(&mut self, size: Option<Size>);
+    #[builtin]
+    pub const fn set_fill_size(&mut self, size: Option<Size>);
     /// Draws the entity only while setting `setting` is true; `None` always draws it.
-    #[builtin] pub const fn gate(&mut self, setting: Option<Setting<bool>>);
+    #[builtin]
+    pub const fn gate(&mut self, setting: Option<Setting<bool>>);
     /// Plays a relative motion that ends where it started.
-    #[builtin] pub const fn apply_animation(&mut self, motion: anim::Motion);
+    #[builtin]
+    pub const fn apply_animation(&mut self, motion: anim::Motion);
 }
 
 /// An interpolated property.
-#[builtin] pub struct Prop<T>;
+#[builtin]
+pub struct Prop<T>;
 impl<T> Prop<T> {
     /// The logical value.
-    #[builtin] pub const fn get(&self) -> T;
+    #[builtin]
+    pub const fn get(&self) -> T;
     /// Sets the logical value at once; the change happens once it is given a tween.
-    #[builtin] pub const fn change(&mut self, value: T) -> &mut Change<T>;
+    #[builtin]
+    pub const fn change(&mut self, value: T) -> &mut Change<T>;
 }
 /// A pending property change; it happens only through `apply_animation`.
-#[must_use] #[builtin] pub struct Change<T>;
+#[must_use]
+#[builtin]
+pub struct Change<T>;
 impl<T> Change<T> {
     /// Interpolates from the value at the cursor plus the delay to the new value.
-    #[builtin] pub const fn apply_animation(&mut self, tween: anim::Tween);
+    #[builtin]
+    pub const fn apply_animation(&mut self, tween: anim::Tween);
 }
 
 /// An image layer of an entity.
-#[builtin] pub struct ImageLayer;
+#[builtin]
+pub struct ImageLayer;
 impl ImageLayer {
-    /// The image shown, if any.
-    #[builtin] pub const fn get(&self) -> Option<ImageAsset>;
+    /// The image shown, if any; `None` also when the layer shows a paint.
+    #[builtin]
+    pub const fn get(&self) -> Option<ImageAsset>;
     /// Swaps the image for `image`.
-    #[builtin] pub const fn change(&mut self, image: ImageAsset) -> &mut Swap;
+    #[builtin]
+    pub const fn change(&mut self, image: ImageAsset) -> &mut Swap;
+    /// Swaps the content for the generated `paint`.
+    #[builtin]
+    pub const fn paint(&mut self, paint: shader::Paint) -> &mut Swap;
     /// Swaps the image for nothing.
-    #[builtin] pub const fn clear(&mut self) -> &mut Swap;
+    #[builtin]
+    pub const fn clear(&mut self) -> &mut Swap;
 }
 /// The text layer of an entity.
-#[builtin] pub struct LabelLayer;
+#[builtin]
+pub struct LabelLayer;
 impl LabelLayer {
     /// Swaps the text for `text`.
-    #[builtin] pub const fn change(&mut self, text: Text) -> &mut Swap;
+    #[builtin]
+    pub const fn change(&mut self, text: Text) -> &mut Swap;
     /// Swaps the text for nothing.
-    #[builtin] pub const fn clear(&mut self) -> &mut Swap;
+    #[builtin]
+    pub const fn clear(&mut self) -> &mut Swap;
     /// Sets the text style.
-    #[builtin] pub const fn set_style(&mut self, style: TextStyle);
+    #[builtin]
+    pub const fn set_style(&mut self, style: TextStyle);
     /// Sets the wrapping width; `None` does not wrap.
-    #[builtin] pub const fn set_width(&mut self, width: Option<u32>);
+    #[builtin]
+    pub const fn set_width(&mut self, width: Option<u32>);
 }
 /// A movie and whether it loops.
 pub struct Movie {
@@ -309,47 +363,65 @@ impl Movie {
     }
 }
 /// The movie layer of an entity.
-#[builtin] pub struct MovieLayer;
+#[builtin]
+pub struct MovieLayer;
 impl MovieLayer {
     /// Swaps the movie for `movie`.
-    #[builtin] pub const fn change(&mut self, movie: Movie) -> &mut Swap;
+    #[builtin]
+    pub const fn change(&mut self, movie: Movie) -> &mut Swap;
     /// Swaps the movie for nothing.
-    #[builtin] pub const fn clear(&mut self) -> &mut Swap;
+    #[builtin]
+    pub const fn clear(&mut self) -> &mut Swap;
 }
 /// A pending layer swap; it happens only through `apply_animation`.
-#[must_use] #[builtin] pub struct Swap;
+#[must_use]
+#[builtin]
+pub struct Swap;
 impl Swap {
     /// Swaps from the old content to the new one with `transition`.
-    #[builtin] pub const fn apply_animation(&mut self, transition: anim::Transition);
+    #[builtin]
+    pub const fn apply_animation(&mut self, transition: anim::Transition);
 }
 
 /// What the story asks of the game view's chrome.
-#[builtin] pub struct Hud;
+#[builtin]
+pub struct Hud;
 impl Hud {
     /// Whether the text window is shown.
-    #[builtin] pub const fn text_window(&mut self) -> &mut Prop<Visibility>;
+    #[builtin]
+    pub const fn text_window(&mut self) -> &mut Prop<Visibility>;
     /// Whether the quick menu is shown.
-    #[builtin] pub const fn quick_menu(&mut self) -> &mut Prop<Visibility>;
+    #[builtin]
+    pub const fn quick_menu(&mut self) -> &mut Prop<Visibility>;
     /// The side image next to the text window.
-    #[builtin] pub const fn side_image(&mut self) -> &mut ImageLayer;
+    #[builtin]
+    pub const fn side_image(&mut self) -> &mut ImageLayer;
 }
 /// The presentation of the choice a step shows.
-#[builtin] pub struct ChoiceMenu;
+#[builtin]
+pub struct ChoiceMenu;
 impl ChoiceMenu {
     /// A display-only arm, shown disabled at position `at` of the shown list (clamped).
-    #[builtin] pub const fn disabled_arm(&mut self, at: u32, text: Text);
+    #[builtin]
+    pub const fn disabled_arm(&mut self, at: u32, text: Text);
     /// Sets where the menu sits.
-    #[builtin] pub const fn set_align(&mut self, align: VAlign);
+    #[builtin]
+    pub const fn set_align(&mut self, align: VAlign);
 }
 /// The camera over the `Background`, `Stage` and `Front` planes.
-#[builtin] pub struct Camera;
+#[builtin]
+pub struct Camera;
 impl Camera {
     /// The translation.
-    #[builtin] pub const fn offset(&mut self) -> &mut Prop<Offset>;
+    #[builtin]
+    pub const fn offset(&mut self) -> &mut Prop<Offset>;
     /// The zoom around the screen centre.
-    #[builtin] pub const fn zoom(&mut self) -> &mut Prop<Decimal>;
+    #[builtin]
+    pub const fn zoom(&mut self) -> &mut Prop<Decimal>;
     /// The rotation around the screen centre.
-    #[builtin] pub const fn rotation(&mut self) -> &mut Prop<Angle>;
+    #[builtin]
+    pub const fn rotation(&mut self) -> &mut Prop<Angle>;
     /// Plays a relative motion that ends where it started.
-    #[builtin] pub const fn apply_animation(&mut self, motion: anim::Motion);
+    #[builtin]
+    pub const fn apply_animation(&mut self, motion: anim::Motion);
 }

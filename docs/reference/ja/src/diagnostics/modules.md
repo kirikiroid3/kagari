@@ -380,7 +380,7 @@ const GOTHIC: FontAsset = system_font("msgothic.ttc");
 
 ## E1032 `reserved-asset-dir` {#e1032}
 
-**エラー。** `asset("...")` のパスが、アセットディレクトリ最上位の `system-fonts` ディレクトリに入っています。この名前はバイトコードとアーカイブがシステムフォントを置く場所なので、アセットには使えません。
+**エラー。** `asset("...")` のパスが、アセットディレクトリ最上位の `system-fonts` または `std` ディレクトリに入っています。これらの名前はバイトコードとアーカイブがシステムフォントと標準ライブラリのアセット（シェーダー）を置く場所なので、アセットには使えません。
 
 ```kis
 const GOTHIC: FontAsset = asset("system-fonts/msgothic.ttc");

@@ -6,6 +6,7 @@ members = [
     "core/kagari-bytecode",
     "core/kagari-lang",
     "core/kagari-std",
+    "core/kagari-shader",
     "core/kagari-syntax",
     "tooling/kagari-cli",
     "tooling/kagari-fmt",
@@ -33,6 +34,7 @@ kagari-bytecode = { path = "core/kagari-bytecode" }
 kagari-lang = { path = "core/kagari-lang" }
 kagari-syntax = { path = "core/kagari-syntax" }
 kagari-std = { path = "core/kagari-std" }
+kagari-shader = { path = "core/kagari-shader" }
 kagari-fmt = { path = "tooling/kagari-fmt" }
 kagari-project = { path = "tooling/kagari-project" }
 kagari-lsp = { path = "tooling/kagari-lsp" }
@@ -75,6 +77,7 @@ unicode-segmentation = "1.13"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 log = "0.4"
 wgpu = "30"
+naga = { version = "30", features = ["wgsl-in"] }
 bytemuck = { version = "1", features = ["derive"] }
 winit = "0.30"
 kira = { version = "0.12", default-features = false, features = ["cpal", "ogg", "vorbis", "flac", "wav", "pcm", "mp3"] }

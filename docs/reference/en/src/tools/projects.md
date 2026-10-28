@@ -96,8 +96,9 @@ When the requirement does not match, every command that loads the project stops 
 | `dir` | string (path) | `"assets"` | The asset directory. `asset("…")` paths are relative to it. |
 | `system-fonts` | bool | `true` | Whether `system_font("…")` may name fonts installed on the build machine. When `false`, every `system_font` call is `E1031`. |
 
-The directory `system-fonts/` directly inside the asset directory is reserved: system fonts are
-stored in the build output under that name.
+The directories `system-fonts/` and `std/` directly inside the asset directory are reserved
+(`E1032`): system fonts and the std library's own assets, such as its shaders, are stored in the
+build output under those names.
 
 `system_font("…")` searches these directories, in order, on the machine that builds the game:
 
@@ -166,6 +167,7 @@ files alone.
 | `characters/character1/image/normal.png` | `characters.kiarchive` (one archive per top-level directory) |
 | `title.png` (directly in the asset directory) | `data.kiarchive` |
 | a system font, e.g. `system-fonts/msgothic.ttc` | `system-fonts.kiarchive` |
+| a std asset, e.g. `std/shaders/color/blur.wgsl` (a shader of `std::shaders`) | `std.kiarchive` |
 
 Inside an archive, an entry's name is its full asset path. The runtime opens each archive the
 first time the game needs one of its assets. A missing archive is not an error at start: the
@@ -187,17 +189,31 @@ The only profile is `native_v0`, the [desktop runtime](./runtime.md):
 | Image | PNG (APNG shows its default image), baseline and progressive JPEG, lossy, lossless and extended (alpha or metadata) WebP |
 | Audio, voice | Ogg Vorbis, FLAC, WAV (PCM or IEEE float), MP3 |
 | Font | TrueType, OpenType (CFF), TrueType/OpenType collections |
-| Video, shader | none |
+| Shader | WGSL source (UTF-8 text) |
+| Video | none |
 
 Everything else is rejected: animated WebP, JPEG with arithmetic, lossless, hierarchical or
 12-bit coding, GIF, BMP, AVIF, JPEG XL, Ogg Opus, Ogg FLAC, Ogg with another codec, compressed
-WAV, AAC/M4A, WOFF and WOFF2. Video and shader assets are rejected whatever their content. Each
-problem prints one line per asset and profile:
+WAV, AAC/M4A, WOFF and WOFF2. Video assets are rejected whatever their content. Each problem
+prints one line per asset and profile:
 
 ```text
 error: asset `bgimage/bad.jxl` (image): JPEG XL is not supported by runtime profile `native_v0`
 error: asset `movie/intro.webm` (video): video assets are not supported by runtime profile `native_v0`
 ```
+
+### Shader check
+
+After the profile check, `kagari build` compiles every referenced shader, the std library's
+included, against the role its constant declares (a `ColorShader<…>` is checked as a colour
+shader, and so on). A file used under two roles is checked once per role. Each invalid shader
+prints one line, with the line number in the `.wgsl` file when the error lies in it:
+
+```text
+error: shader `shader/broken.wgsl` (color): line 4: no definition in scope for identifier: `undefined_name`
+```
+
+The roles are `color`, `mix`, `texture`, `mask`, `local motion` and `transitional motion`.
 
 The build then exits with status 1 without creating the output directory or removing earlier
 outputs. See also [Runtime Profiles](../../../../std/en/src/appendix/profiles.md) in the STD

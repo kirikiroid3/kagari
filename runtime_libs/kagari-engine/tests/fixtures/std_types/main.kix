@@ -1,10 +1,25 @@
 // The story fixture of `core/kagari-lang/tests/bytecode/005__story`, plus a value of every std
-// type the engine builds or reads (`probe`), the UI forms, a voiced line and a screen built
-// through the screen imports (`shot`), so that the program interns every type of
+// type the engine builds or reads (`probe`), the UI forms, a voiced line and screens built
+// through the screen imports (`shot`, `effects`), so that the program interns every type of
 // `values/table.rs`.
 
 use std::narrative::text::text_style;
 use std::screen::size;
+use std::screen::shader::{
+    ColorShader,
+    LocalMotionBehavior,
+    LocalMotionShader,
+    MaskShader,
+    MixShader,
+    TextureShader,
+    TransitionalMotionShader,
+    filter,
+    local_motion,
+    mask,
+    mix,
+    paint,
+    transitional_motion,
+};
 use std::system::default_bindings;
 
 static mut VISITS: Int<0, 3> = 0;
@@ -26,6 +41,31 @@ const A_IMG: ImageAsset = asset("a.png");
 const A_SND: AudioAsset = asset("a.ogg");
 const V: VoiceAsset = asset("v.ogg");
 const M: VideoAsset = asset("m.webm");
+
+#[shader_arg]
+struct Glow {
+    strength: Decimal,
+    tint: Color,
+    spots: [Point; 2],
+    mode: GlowMode,
+}
+
+enum GlowMode {
+    Soft,
+    Hard,
+}
+
+const GLOW: ColorShader<Glow> = asset("glow.wgsl");
+const SEPIA: ColorShader<()> = asset("sepia.wgsl");
+const BLEND: MixShader<()> = asset("blend.wgsl");
+const ROUND: MaskShader<()> = asset("round.wgsl");
+const SPOTS: TextureShader<()> = asset("spots.wgsl");
+const BOB: LocalMotionShader<()> = asset("bob.wgsl");
+const ARC: TransitionalMotionShader<()> = asset("arc.wgsl");
+
+const fn glow(strength: Decimal) -> Glow {
+    Glow { strength, tint: WHITE, spots: [point(1, 2), point(3, 4)], mode: GlowMode::Hard }
+}
 
 #[scene]
 #[entry]
@@ -74,13 +114,55 @@ fn shot() -> Screen {
     screen.entity(HERO).image().change(A_IMG).apply_animation(std::screen::anim::fade(ms(200)));
     screen.entity(HERO).set_z(3);
     screen.wait(ms(50));
-    screen.music().change(std::screen::audio::looped(A_SND)).apply_animation(std::screen::audio::crossfade(ms(300)));
+    screen
+        .music()
+        .change(std::screen::audio::looped(A_SND))
+        .apply_animation(std::screen::audio::crossfade(ms(300)));
     screen.play(std::screen::audio::sound(A_SND).delay(ms(10)));
+    screen
+}
+
+/// A screen with every kind of shader effect, built through the screen imports.
+fn effects() -> Screen {
+    let mut screen = Screen::empty();
+    screen.filter().change(Some(filter(SEPIA, ()))).apply_animation(instant());
+    screen.entity(HERO).opacity().change(1.0).apply_animation(instant());
+    screen.entity(HERO).filter().change(Some(filter(GLOW, glow(0.0)))).apply_animation(instant());
+    screen
+        .entity(HERO)
+        .filter()
+        .change(Some(filter(GLOW, glow(1.0))))
+        .apply_animation(std::screen::anim::tween(ms(1000)));
+    screen.entity(HERO).mix().change(Some(mix(BLEND, ()))).apply_animation(instant());
+    screen.entity(HERO).mask().change(Some(mask(ROUND, ()))).apply_animation(instant());
+    screen
+        .entity(HERO)
+        .local_motion()
+        .change(Some(local_motion(BOB, (), LocalMotionBehavior::Stall { after: ms(500) })))
+        .apply_animation(instant());
+    screen
+        .entity(HERO)
+        .image()
+        .paint(paint(SPOTS, (), size(10, 20)).masked(mask(ROUND, ())))
+        .apply_animation(fade(ms(100)));
+    screen
+        .entity(HERO)
+        .travel(
+            std::screen::pose(point(100, 50), 2.0, std::screen::degrees(90.0)),
+            transitional_motion(ARC, (), ms(1000)),
+        );
+    screen
+        .entity(EntityId(2))
+        .image()
+        .change(A_IMG)
+        .apply_animation(std::screen::anim::masked(mask(ROUND, ()), ms(500)));
     screen
 }
 
 fn probe() {
     keep(shot());
+    keep(effects());
+    keep(LocalMotionBehavior::Periodic { after: ms(0), period: ms(1) });
     let r: Result<i32, bool> = Ok(1);
     keep(r);
     keep(Some(1));
@@ -95,7 +177,7 @@ fn probe() {
     keep(std::screen::Visibility::Hidden);
     keep(std::screen::Flip::Both);
     keep(std::screen::VAlign::Top);
-    keep(std::screen::BlendMode::Add);
+    keep(std::screen::pose(point(0, 0), 1.0, std::screen::degrees(0.0)));
     keep(std::screen::movie(M));
     keep(std::screen::anim::Easing::OutQuad);
     keep(std::screen::anim::Direction::Left);
@@ -132,7 +214,14 @@ fn probe() {
     keep(std::system::Dialog(std::ui::spacer()));
     keep(std::system::saves::SaveSlot::Quick);
     keep(std::system::saves::SaveInfo {
-        time: std::system::saves::Timestamp { year: 2026, month: 1, day: 1, hour: 0, minute: 0, second: 0 },
+        time: std::system::saves::Timestamp {
+            year: 2026,
+            month: 1,
+            day: 1,
+            hour: 0,
+            minute: 0,
+            second: 0,
+        },
         who: None,
         text: None,
     });
@@ -144,13 +233,15 @@ fn probe() {
         thumb: std::ui::style::Paint::Image(A_IMG),
         thumb_size: size(1, 1),
     });
-    keep(std::ui::style::button_style(std::ui::style::Look {
-        background: std::ui::style::Paint::NineSlice {
-            image: A_IMG,
-            insets: std::screen::Insets { top: 1, right: 1, bottom: 1, left: 1 },
-        },
-        text: text_style(20, WHITE),
-    }));
+    keep(
+        std::ui::style::button_style(std::ui::style::Look {
+            background: std::ui::style::Paint::NineSlice {
+                image: A_IMG,
+                insets: std::screen::Insets { top: 1, right: 1, bottom: 1, left: 1 },
+            },
+            text: text_style(20, WHITE),
+        }),
+    );
 }
 
 static TEXT_SPEED: Setting<Duration> = setting(ms(30));
@@ -212,7 +303,10 @@ fn Title() -> RootPage {
         },
         layer![
             image!(fit = std::ui::Fit::Cover, A_IMG).cover(),
-            image!(fit = std::ui::Fit::Natural, A_IMG).at(std::screen::point(0, 0), std::screen::TOP_LEFT),
+            image!(fit = std::ui::Fit::Natural, A_IMG).at(
+                std::screen::point(0, 0),
+                std::screen::TOP_LEFT,
+            ),
         ],
     ])
 }

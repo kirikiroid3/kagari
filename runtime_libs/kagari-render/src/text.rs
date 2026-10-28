@@ -25,7 +25,11 @@ pub(crate) fn reveal_alpha(reveal: Reveal, unit: u32) -> f32 {
             if unit < full {
                 1.0
             } else if unit == full {
-                if partial.is_nan() { 0.0 } else { partial.clamp(0.0, 1.0) }
+                if partial.is_nan() {
+                    0.0
+                } else {
+                    partial.clamp(0.0, 1.0)
+                }
             } else {
                 0.0
             }
@@ -85,7 +89,14 @@ fn union(a: Option<PxRect>, b: PxRect) -> Option<PxRect> {
 }
 
 impl Planner<'_> {
-    pub(crate) fn text(&mut self, ctx: Ctx, origin: [f32; 2], layout: &Layout, reveal: Reveal, opacity: f32) {
+    pub(crate) fn text(
+        &mut self,
+        ctx: Ctx,
+        origin: [f32; 2],
+        layout: &Layout,
+        reveal: Reveal,
+        opacity: f32,
+    ) {
         let alpha = opacity * ctx.alpha;
         if alpha <= 0.0 || layout.glyphs.is_empty() {
             return;
@@ -124,8 +135,15 @@ impl Planner<'_> {
             .glyph(self.gfx, self.assets.fonts(), glyph.key, look.outline_px)?;
         let rect = glyph_rect(origin, glyph.pos, look.offset, &m);
         let verts = self.quad(&ctx.xf, &rect, m.uv, look.color);
-        let base = self.base;
-        self.draw(ctx.target, pipe, BindKey::Atlas(m.page), verts, ctx.scissor, base);
+        let base = self.base_for(ctx.slot);
+        self.draw(
+            ctx.target,
+            pipe,
+            BindKey::Atlas(m.page),
+            verts,
+            ctx.scissor,
+            base,
+        );
         Some(transformed_bounds(&ctx.xf, &rect))
     }
 
@@ -153,19 +171,39 @@ impl Planner<'_> {
                 && let Some((width, color)) = g.outline
                 && width > 0.0
             {
-                self.mask(&ctx, Pipe::Mask, g, origin, MaskLook::new(width, [0.0; 2], scale(color, *a)));
+                self.mask(
+                    &ctx,
+                    Pipe::Mask,
+                    g,
+                    origin,
+                    MaskLook::new(width, [0.0; 2], scale(color, *a)),
+                );
             }
         }
         for (g, a) in layout.glyphs.iter().zip(&alphas) {
             if *a > 0.0 {
-                self.mask(&ctx, Pipe::Mask, g, origin, MaskLook::new(0.0, [0.0; 2], scale(g.color, *a)));
+                self.mask(
+                    &ctx,
+                    Pipe::Mask,
+                    g,
+                    origin,
+                    MaskLook::new(0.0, [0.0; 2], scale(g.color, *a)),
+                );
             }
         }
     }
 
     /// The shadows of one blur bucket: drawn into a layer (per-pixel maximum), blurred, then
     /// composited.
-    fn shadows(&mut self, ctx: Ctx, origin: [f32; 2], layout: &Layout, alphas: &[f32], blur: u32, indices: &[usize]) {
+    fn shadows(
+        &mut self,
+        ctx: Ctx,
+        origin: [f32; 2],
+        layout: &Layout,
+        alphas: &[f32],
+        blur: u32,
+        indices: &[usize],
+    ) {
         let layer = self.acquire();
         self.begin_pass(Target::Layer(layer));
         let inner = Ctx {
@@ -181,12 +219,24 @@ impl Planner<'_> {
                 continue;
             };
             let color = scale(color, *a);
-            if let Some(b) = self.mask(&inner, Pipe::MaskMax, g, origin, MaskLook::new(0.0, offset, color)) {
+            if let Some(b) = self.mask(
+                &inner,
+                Pipe::MaskMax,
+                g,
+                origin,
+                MaskLook::new(0.0, offset, color),
+            ) {
                 bounds = union(bounds, b);
             }
             if let Some((width, _)) = g.outline
                 && width > 0.0
-                && let Some(b) = self.mask(&inner, Pipe::MaskMax, g, origin, MaskLook::new(width, offset, color))
+                && let Some(b) = self.mask(
+                    &inner,
+                    Pipe::MaskMax,
+                    g,
+                    origin,
+                    MaskLook::new(width, offset, color),
+                )
             {
                 bounds = union(bounds, b);
             }
@@ -207,7 +257,12 @@ impl Planner<'_> {
                     w: bounds.w.saturating_add(pad.saturating_mul(2)),
                     h: bounds.h.saturating_add(pad.saturating_mul(2)),
                 };
-                let blur_scissor = grown.intersect(&PxRect::full(self.size));
+                // Inside a motion the glyphs move on the GPU, so their CPU bounds are not known.
+                let blur_scissor = if ctx.free {
+                    ctx.scissor
+                } else {
+                    grown.intersect(&PxRect::full(self.size))
+                };
                 let weights = pack(&gaussian_weights(sigma));
                 let temp = self.acquire();
                 for (src, dst, dir) in [(layer, temp, [1.0, 0.0]), (temp, layer, [0.0, 1.0])] {

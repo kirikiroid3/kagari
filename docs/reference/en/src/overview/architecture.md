@@ -41,11 +41,13 @@ build; warnings do not. The result goes to `<out-dir>/<target>/`, `target/v0/` b
 | Output | Content |
 | ------ | ------- |
 | `game.kagari` | The compiled program: story, renders and game system |
-| `*.kiarchive` | The assets the program references, one archive per top-level directory of the asset directory, `data.kiarchive` for files directly in it, and `system-fonts.kiarchive` for installed fonts the game names |
+| `*.kiarchive` | The assets the program references, one archive per top-level directory of the asset directory, `data.kiarchive` for files directly in it, `system-fonts.kiarchive` for installed fonts the game names, and `std.kiarchive` for the std shaders it uses |
 
 Before it writes anything, the build checks that every runtime profile listed in the manifest can
 decode every referenced asset. `kagari check` reports the same diagnostics without writing output,
 and the language server shows them in the [editor](../tools/editors.md) as you type.
+The build also validates every shader the program uses against its role, and fails on a shader
+that does not validate.
 
 **The runtime.** The [desktop runtime](../tools/runtime.md), `kagari-desktop-runtime`, plays a
 built game on Windows, macOS and Linux. It loads `game.kagari` from the game directory (by
@@ -53,7 +55,7 @@ default, the directory of the executable, so a shipped game puts the executable 
 `game.kagari` and the archives), verifies the program before running any of it, runs `fn main`
 once to get the description of the game system, and shows the start page. Settings, meta and save
 slots go to a data directory outside the game directory. The runtime implements the runtime
-profile `native_v0`: the whole standard library except video and shader assets. A
+profile `native_v0`: the whole standard library except video assets. A
 [headless mode](../tools/headless.md) runs the same game without a window, driven by a script, for
 automated tests.
 

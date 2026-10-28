@@ -380,7 +380,7 @@ Fix: copy the font into the asset directory and use `asset("fonts/msgothic.ttc")
 
 ## E1032 `reserved-asset-dir` {#e1032}
 
-**Error.** An `asset("...")` path enters the top-level `system-fonts` directory of the asset directory. That name is where the bytecode and the archives keep system fonts, so assets may not use it.
+**Error.** An `asset("...")` path enters the top-level `system-fonts` or `std` directory of the asset directory. These names are where the bytecode and the archives keep system fonts and the assets of the standard library (its shaders), so assets may not use them.
 
 ```kis
 const GOTHIC: FontAsset = asset("system-fonts/msgothic.ttc");

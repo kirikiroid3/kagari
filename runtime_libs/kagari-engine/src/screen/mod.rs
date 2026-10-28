@@ -11,15 +11,16 @@ mod tests;
 
 use std::rc::Rc;
 
-use kagari_vm::{HostObj, Ref, Text, Trap, Value, Vm};
+use kagari_vm::{HostObj, Ref, Text, Trap, TypeTable, Value, Vm};
 
 use crate::HostCtx;
 use crate::values::{
     self, StdTy, StdTypes, angle_value, check_anchor, color_value, decode_anchor, decode_angle,
-    decode_asset, decode_blend_mode, decode_color, decode_decimal, decode_duration_ms,
-    decode_entity_id, decode_flip, decode_handle, decode_int, decode_mark, decode_motion,
-    decode_movie, decode_offset, decode_option_asset, decode_part, decode_plane, decode_point,
-    decode_size, decode_sound, decode_transition, decode_tween, decode_valign, decode_visibility,
+    decode_asset, decode_color, decode_decimal, decode_duration_ms, decode_effect,
+    decode_entity_id, decode_flip, decode_handle, decode_int, decode_local_motion, decode_mark,
+    decode_motion, decode_movie, decode_offset, decode_paint, decode_part, decode_plane,
+    decode_point, decode_pose, decode_size, decode_sound, decode_transition,
+    decode_transitional_motion, decode_tween, decode_valign, decode_visibility, effect_value,
     entity_id_value, host_trap, offset_value, option_asset_value, point_value, visibility_value,
 };
 use model::{
@@ -57,7 +58,10 @@ import_table!(
         EntityRotation = "std::screen::Entity::rotation",
         EntityOpacity = "std::screen::Entity::opacity",
         EntityFilter = "std::screen::Entity::filter",
-        EntityShader = "std::screen::Entity::shader",
+        EntityMix = "std::screen::Entity::mix",
+        EntityMask = "std::screen::Entity::mask",
+        EntityLocalMotion = "std::screen::Entity::local_motion",
+        EntityTravel = "std::screen::Entity::travel",
         EntityFill = "std::screen::Entity::fill",
         EntityPart = "std::screen::Entity::part",
         EntityLabel = "std::screen::Entity::label",
@@ -66,7 +70,6 @@ import_table!(
         EntitySetZ = "std::screen::Entity::set_z",
         EntitySetAnchor = "std::screen::Entity::set_anchor",
         EntitySetFlip = "std::screen::Entity::set_flip",
-        EntitySetBlend = "std::screen::Entity::set_blend",
         EntitySetFillSize = "std::screen::Entity::set_fill_size",
         EntityGate = "std::screen::Entity::gate",
         EntityApplyAnimation = "std::screen::Entity::apply_animation",
@@ -76,6 +79,7 @@ import_table!(
         ImageLayerGet = "std::screen::ImageLayer::get",
         ImageLayerChange = "std::screen::ImageLayer::change",
         ImageLayerClear = "std::screen::ImageLayer::clear",
+        ImageLayerPaint = "std::screen::ImageLayer::paint",
         LabelLayerChange = "std::screen::LabelLayer::change",
         LabelLayerClear = "std::screen::LabelLayer::clear",
         LabelLayerSetStyle = "std::screen::LabelLayer::set_style",
@@ -148,21 +152,46 @@ pub(crate) fn read_screen<R>(
     }
 }
 
+/// The std type of an effect property's value.
+fn effect_ty(target: PropTarget) -> StdTy {
+    match target {
+        PropTarget::Entity(_, EntityProp::Mix) => StdTy::Mix,
+        PropTarget::Entity(_, EntityProp::Mask) => StdTy::Mask,
+        PropTarget::Entity(_, EntityProp::LocalMotion) => StdTy::LocalMotion,
+        _ => StdTy::Filter,
+    }
+}
+
 /// The std value of a property.
-pub(crate) fn prop_value(std: &StdTypes, value: PropValue) -> Value {
+pub(crate) fn prop_value(std: &StdTypes, target: PropTarget, value: PropValue) -> Value {
     match value {
         PropValue::Point(p) => point_value(std, p),
         PropValue::Offset(o) => offset_value(std, o),
         PropValue::Decimal(d) => Value::Decimal(d),
         PropValue::Angle(d) => angle_value(std, d),
         PropValue::Color(c) => color_value(std, c),
-        PropValue::Shader(s) => option_asset_value(std, s),
+        PropValue::Effect(Some(e)) => std.some(effect_value(std, effect_ty(target), &e)),
+        PropValue::Effect(None) => std.none(),
         PropValue::Visibility(v) => visibility_value(std, v),
     }
 }
 
-/// A `Prop::change` argument, decoded by the property's type.
-fn decode_prop(std: &StdTypes, target: PropTarget, v: &Value) -> Result<PropValue, Trap> {
+/// A trap while converting an import's argument, prefixed with the import's path.
+fn in_import(path: &str, trap: Trap) -> Trap {
+    match trap.kind {
+        kagari_vm::TrapKind::Host(message) => host_trap(format!("`{path}`: {message}")),
+        _ => trap,
+    }
+}
+
+/// A `Prop::change` argument, decoded by the property's type; effect arguments are converted
+/// for the shader now.
+fn decode_prop(
+    std: &StdTypes,
+    types: &TypeTable,
+    target: PropTarget,
+    v: &Value,
+) -> Result<PropValue, Trap> {
     Ok(match target {
         PropTarget::Entity(_, EntityProp::Position) => PropValue::Point(decode_point(std, v)?),
         PropTarget::Entity(_, EntityProp::Scale | EntityProp::Opacity)
@@ -171,8 +200,17 @@ fn decode_prop(std: &StdTypes, target: PropTarget, v: &Value) -> Result<PropValu
         PropTarget::Entity(_, EntityProp::Rotation) | PropTarget::CameraRotation => {
             PropValue::Angle(decode_angle(std, v)?)
         }
-        PropTarget::Entity(_, EntityProp::Filter | EntityProp::Shader)
-        | PropTarget::ScreenFilter => PropValue::Shader(decode_option_asset(std, v)?),
+        PropTarget::Entity(_, EntityProp::LocalMotion) => PropValue::Effect(
+            std.option(v)?
+                .map(|m| decode_local_motion(std, types, m).map(Rc::new))
+                .transpose()?,
+        ),
+        PropTarget::Entity(_, EntityProp::Filter | EntityProp::Mix | EntityProp::Mask)
+        | PropTarget::ScreenFilter => PropValue::Effect(
+            std.option(v)?
+                .map(|e| decode_effect(std, types, e, effect_ty(target)).map(Rc::new))
+                .transpose()?,
+        ),
         PropTarget::Entity(_, EntityProp::Fill) => PropValue::Color(decode_color(std, v)?),
         PropTarget::HudTextWindow | PropTarget::HudQuickMenu => {
             PropValue::Visibility(decode_visibility(std, v)?)
@@ -237,6 +275,7 @@ impl ScreenImport {
         let program = ctx.state.program.clone();
         let std = &ctx.state.std;
         let a = |i: usize| values::arg(vm, path, &args, i);
+        let types = vm.types();
         let rcv = receiver(vm, path, args.first())?;
         let part = |target: PartTarget| -> Result<Value, Trap> {
             let screen = screen_of_part(&rcv, path)?;
@@ -344,7 +383,9 @@ impl ScreenImport {
             | I::EntityRotation
             | I::EntityOpacity
             | I::EntityFilter
-            | I::EntityShader
+            | I::EntityMix
+            | I::EntityMask
+            | I::EntityLocalMotion
             | I::EntityFill
             | I::EntityPart
             | I::EntityLabel
@@ -362,7 +403,11 @@ impl ScreenImport {
                         PartTarget::Prop(PropTarget::Entity(id, EntityProp::Opacity))
                     }
                     I::EntityFilter => PartTarget::Prop(PropTarget::Entity(id, EntityProp::Filter)),
-                    I::EntityShader => PartTarget::Prop(PropTarget::Entity(id, EntityProp::Shader)),
+                    I::EntityMix => PartTarget::Prop(PropTarget::Entity(id, EntityProp::Mix)),
+                    I::EntityMask => PartTarget::Prop(PropTarget::Entity(id, EntityProp::Mask)),
+                    I::EntityLocalMotion => {
+                        PartTarget::Prop(PropTarget::Entity(id, EntityProp::LocalMotion))
+                    }
                     I::EntityFill => PartTarget::Prop(PropTarget::Entity(id, EntityProp::Fill)),
                     I::EntityPart => {
                         PartTarget::Layer(LayerTarget::Part(id, decode_part(std, &a(1)?)?))
@@ -376,7 +421,6 @@ impl ScreenImport {
             | I::EntitySetZ
             | I::EntitySetAnchor
             | I::EntitySetFlip
-            | I::EntitySetBlend
             | I::EntitySetFillSize
             | I::EntityGate => {
                 let value = a(1)?;
@@ -386,7 +430,6 @@ impl ScreenImport {
                     Z(i32),
                     Anchor([kagari_vm::Decimal; 2]),
                     Flip(values::Flip),
-                    Blend(values::BlendMode),
                     FillSize(Option<[u32; 2]>),
                     Gate(Option<kagari_vm::StaticId>),
                 }
@@ -399,7 +442,6 @@ impl ScreenImport {
                         Set::Anchor(anchor)
                     }
                     I::EntitySetFlip => Set::Flip(decode_flip(std, &value)?),
-                    I::EntitySetBlend => Set::Blend(decode_blend_mode(std, &value)?),
                     I::EntitySetFillSize => Set::FillSize(
                         std.option(&value)?
                             .map(|size| decode_size(std, size))
@@ -414,12 +456,19 @@ impl ScreenImport {
                         Set::Z(z) => entity.z = z,
                         Set::Anchor(anchor) => entity.anchor = anchor,
                         Set::Flip(flip) => entity.flip = flip,
-                        Set::Blend(blend) => entity.blend = blend,
                         Set::FillSize(size) => entity.fill_size = size,
                         Set::Gate(gate) => entity.gate = gate,
                     }
                     Ok(unit())
                 })
+            }
+            I::EntityTravel => {
+                let to = decode_pose(std, &a(1)?)?;
+                let motion = decode_transitional_motion(std, types, &a(2)?)
+                    .map_err(|t| in_import(path, t))?;
+                let (screen, id) = entity_of(vm, rcv, path)?;
+                with_screen(vm, &screen, |s| s.travel(id, to, motion))?;
+                Ok(unit())
             }
             I::EntityApplyAnimation | I::CameraApplyAnimation => {
                 let motion = decode_motion(std, &a(1)?)?;
@@ -438,14 +487,15 @@ impl ScreenImport {
                     return Err(bad_receiver(path));
                 };
                 let value = with_screen(vm, &part.screen, |s| Ok(s.prop(target)))?;
-                Ok(prop_value(std, value))
+                Ok(prop_value(std, target, value))
             }
             I::PropChange => {
                 let part = part_of(rcv, path)?;
                 let PartTarget::Prop(target) = part.target else {
                     return Err(bad_receiver(path));
                 };
-                let value = decode_prop(std, target, &a(1)?)?;
+                let value =
+                    decode_prop(std, types, target, &a(1)?).map_err(|t| in_import(path, t))?;
                 pending(&part.screen, PendingChange::Prop(target, value))
             }
             I::ChangeApplyAnimation => {
@@ -470,6 +520,7 @@ impl ScreenImport {
             }
             I::ImageLayerChange
             | I::ImageLayerClear
+            | I::ImageLayerPaint
             | I::LabelLayerChange
             | I::LabelLayerClear
             | I::MovieLayerChange
@@ -480,6 +531,9 @@ impl ScreenImport {
                 };
                 let content = match self {
                     I::ImageLayerChange => Some(LayerContent::Image(decode_asset(&a(1)?)?)),
+                    I::ImageLayerPaint => Some(LayerContent::Paint(Rc::new(
+                        decode_paint(std, types, &a(1)?).map_err(|t| in_import(path, t))?,
+                    ))),
                     I::LabelLayerChange => {
                         let text = decode_text(&a(1)?)?;
                         check_marks(std, &text)?;
@@ -522,7 +576,8 @@ impl ScreenImport {
                 if !matches!(pending.change, PendingChange::Layer(..)) {
                     return Err(bad_receiver(path));
                 }
-                let transition = decode_transition(std, &a(1)?)?;
+                let transition =
+                    decode_transition(std, types, &a(1)?).map_err(|t| in_import(path, t))?;
                 commit(vm, pending, Animation::Transition(transition))
             }
             I::HudTextWindow | I::HudQuickMenu | I::HudSideImage => {

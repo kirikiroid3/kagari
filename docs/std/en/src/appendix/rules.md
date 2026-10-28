@@ -23,8 +23,8 @@ The story can hold only finite types at runtime
 finite:
 
 - `Text`;
-- the six asset types (`ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset`,
-  `ShaderAsset`);
+- the five file asset types (`ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`,
+  `FontAsset`);
 - `Render` (a `const fn` pointer);
 - `Option`, `Result`, `Range` and other std structs and enums whose fields are all finite, for
   example `Visibility` or `PlayMode`.
@@ -32,7 +32,9 @@ finite:
 These are not finite:
 
 - `String`, `Vec<T>`, `Rat`, `Decimal`;
-- `Screen`, `Narrative`, `Meta`, `Setting` and every other `#[builtin]` handle or state type;
+- `Screen`, `Narrative`, `Meta`, `Setting` and every other `#[builtin]` handle or state type,
+  including `ShaderAsset`, the shader types such as `ColorShader<A>`, and `ShaderArgs`, so the
+  effect values of `std::screen::shader` are not finite either;
 - data that holds a Rust integer or a `Decimal`: `Duration`, `Color`, `EntityId`, `Part`, `Mark`,
   `Point`, `TextEffect`, `TextStyle`, …
 
@@ -78,8 +80,23 @@ result must be finite.
   fields are all `Eq`; for a `#[builtin]` type, only through an `impl Eq` in `std`. Closures are
   never `Eq`. `==` on a non-`Eq` type is
   [`E2017`](../../../../reference/en/src/diagnostics/types.md#e2017).
-- An unsatisfied bound (`A: Asset`, `T: RandChoose`, `T: ToText`, …) is
+- An unsatisfied bound (`A: Asset`, `T: RandChoose`, `T: ToText`, `A: ShaderArg`, …) is
   [`E2026`](../../../../reference/en/src/diagnostics/types.md#e2026).
+- `ShaderArg` holds for `()` and for structs marked `#[shader_arg]`, and for nothing else.
+
+## `#[shader_arg]`
+
+The argument type of a shader is `()` or a struct marked `#[shader_arg]`; see
+[Arguments](../guides/shaders.md#arguments).
+
+- `#[shader_arg]` on anything but a struct is
+  [`E3018`](../../../../reference/en/src/diagnostics/kinds.md#e3018).
+- The struct needs named fields and no type parameters (const parameters are allowed)
+  ([`E3025`](../../../../reference/en/src/diagnostics/kinds.md#e3025)).
+- Each field is `bool`, `i32`, `u32`, `Decimal`, `Rat`, `Color`, `Point`, `Offset`, `Size`,
+  `Anchor`, `Angle`, `Duration`, an enum declared in Kagari with at least one variant and no
+  fields, a `#[shader_arg]` struct, or an array `[T; N]` of one of these with `N` > 0
+  ([`E3026`](../../../../reference/en/src/diagnostics/kinds.md#e3026)).
 
 ## `asset::<A>`
 
@@ -87,10 +104,13 @@ result must be finite.
 - Its argument must be a string literal
   ([`E2028`](../../../../reference/en/src/diagnostics/types.md#e2028)), not empty
   ([`E1028`](../../../../reference/en/src/diagnostics/modules.md#e1028)), inside the asset
-  directory ([`E1029`](../../../../reference/en/src/diagnostics/modules.md#e1029)), and the file
-  must exist ([`E1027`](../../../../reference/en/src/diagnostics/modules.md#e1027)).
+  directory ([`E1029`](../../../../reference/en/src/diagnostics/modules.md#e1029)) but outside its
+  reserved top-level directories `system-fonts` and `std`
+  ([`E1032`](../../../../reference/en/src/diagnostics/modules.md#e1032)), and the file must exist
+  ([`E1027`](../../../../reference/en/src/diagnostics/modules.md#e1027)).
 - `system_font` follows the same literal rule; its own errors are
-  [`E1030`](../../../../reference/en/src/diagnostics/modules.md#e1030)–[`E1032`](../../../../reference/en/src/diagnostics/modules.md#e1032).
+  [`E1030`](../../../../reference/en/src/diagnostics/modules.md#e1030) and
+  [`E1031`](../../../../reference/en/src/diagnostics/modules.md#e1031).
 
 ## `nav::start(entry, args, on_exit)`
 
@@ -137,7 +157,7 @@ When std code runs during const evaluation, these failures are compile errors:
 |`Vec::set` out of range|[`E4005`](../../../../reference/en/src/diagnostics/eval.md#e4005)|
 |A `Setting` or `Meta` handle outside a `static` initializer|[`E4007`](../../../../reference/en/src/diagnostics/eval.md#e4007)|
 |The `Motion` rules: no keys, `at` not strictly increasing or equal to 0, a last key that is not identity, `repeat` = 0|[`E4008`](../../../../reference/en/src/diagnostics/eval.md#e4008)|
-|`CubicBezier` x outside 0–1, and `Steps(0)`|[`E4009`](../../../../reference/en/src/diagnostics/eval.md#e4009)|
+|`CubicBezier` x outside 0–1, and `Steps(0)`, in a tween or a transitional motion|[`E4009`](../../../../reference/en/src/diagnostics/eval.md#e4009)|
 |A duplicate text mark|[`E4010`](../../../../reference/en/src/diagnostics/eval.md#e4010)|
 |`begin_text` while anchored on a mark|[`E4011`](../../../../reference/en/src/diagnostics/eval.md#e4011)|
 |A `Decimal` fraction outside 0.0–1.0 where required: opacity, volume, anchor|[`E4012`](../../../../reference/en/src/diagnostics/eval.md#e4012)|

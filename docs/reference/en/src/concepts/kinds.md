@@ -131,7 +131,7 @@ finite. A type is finite when it has finitely many values that the compiler can 
 | Structs, tuples and arrays `[T; N]` of finite types | First-class closures |
 | `Option<T>` of a finite `T` | Signals, settings and meta values |
 | `Text` (its values are the constant texts of the program) | Types that contain themselves (recursive types) |
-| Asset types `ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset`, `ShaderAsset` (their values are the asset constants of the program) | `EntityId`, `Part`, `Mark`, `Duration`, `Color` (they hold Rust integers) |
+| File asset types `ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset` (their values are the asset constants of the program) | `EntityId`, `Part`, `Mark`, `Duration`, `Color` (they hold Rust integers); shader types such as `ColorShader<A>` |
 | `pushdown fn`, `scene fn` and `const fn` pointers (their values are the named functions of the program) | |
 | `&T`, `&mut T` of a finite `T`, as parameters | |
 

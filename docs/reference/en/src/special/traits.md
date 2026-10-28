@@ -6,7 +6,8 @@ They exist so that `std` signatures type-check without overloading or implicit c
 that the compiler can state its rules ("`==` needs `Eq`", "`rng_choose` draws a `RandChoose`").
 
 A game uses these traits in one way only: as **bounds** on its own generic parameters. Two of
-them, `Eq` and `RandChoose`, also hold automatically for suitable types a game declares.
+them, `Eq` and `RandChoose`, also hold automatically for suitable types a game declares, and
+`ShaderArg` holds for the structs a game marks [`#[shader_arg]`](./attributes.md#shader_arg).
 
 ## Overview
 
@@ -16,8 +17,10 @@ them, `Eq` and `RandChoose`, also hold automatically for suitable types a game d
 | [`Integer`](#integer) | `std` | yes | `Int<lo, hi>` and the Rust integers | `into`, `saturate` |
 | [`ToText`](#totext) | `std::narrative::text` | no | `Text`, `String`, integers, `Rat`, `Decimal` | `{expr}` in `t![…]`, `to_text` |
 | [`RandChoose`](#randchoose) | `std` | yes | `Int<lo, hi>` and every fieldless enum | `rng_choose` |
-| [`Asset`](#asset) | `std` | no | the six asset types | `asset` |
+| [`Asset`](#asset) | `std` | no | the five file asset types and the six shader types | `asset` |
 | [`Step`](#step) | `std::narrative` | no | `Say`, `Choice<A, N>` | `push_step`, `s!`, `choice!` |
+| [`ShaderArg`](#shaderarg) | `std::screen::shader` | no | `()` and `#[shader_arg]` structs | the shader constructors such as `filter` |
+| [`Shader`](#shader) | `std::screen::shader` | no | the six shader types | `std` internals |
 
 A trait outside the prelude is named by its path, for example `std::narrative::text::ToText`, or
 imported with `use`.
@@ -78,7 +81,7 @@ value type.
 | tuples, arrays | when every element type is `Eq` |
 | structs and enums declared in Kagari (yours or `std`'s) | when every field of every variant is `Eq`; two values are equal when they are built the same way |
 | `&T`, `&mut T` | when `T` is `Eq`; they compare the values they point to |
-| `#[builtin]` types | only through an `impl Eq` in `std`: `String`, `Vec<T>` of an `Eq` `T`, `Rat`, `Decimal`, `Text`, `Screen` and the six asset types |
+| `#[builtin]` types | only through an `impl Eq` in `std`: `String`, `Vec<T>` of an `Eq` `T`, `Rat`, `Decimal`, `Text`, `Screen`, the six asset types, the six shader types and `ShaderArgs` |
 | closures | never |
 
 So `Setting<T>`, `Meta<T>`, `Narrative`, `Element`, `Placed`, `Arm`, `Divergence`, the screen parts
@@ -170,9 +173,10 @@ See [Randomness](../concepts/scenes.md#randomness).
 ```
 
 `Asset` marks the types whose values are exactly the asset constants of the program:
-`ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset` and `ShaderAsset`. It is the
-bound of `asset`, which is how an asset constant is declared. See
-[Asset types](./builtin-types.md#asset-types).
+`ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset` and `FontAsset`, and the six shader types
+`ColorShader<A>`, `MixShader<A>`, `TextureShader<A>`, `MaskShader<A>`, `LocalMotionShader<A>`
+and `TransitionalMotionShader<A>`. It is the bound of `asset`, which is how an asset constant is
+declared. See [Asset types](./builtin-types.md#asset-types).
 
 ## `Step`
 
@@ -188,6 +192,27 @@ bound of `asset`, which is how an asset constant is declared. See
 the type of the arms' values. `push_step` runs the step and resumes with its output. It is the only
 trait with an associated type. Only a scene may run a step (`E3002`). See
 [Steps](../concepts/steps.md).
+
+## `ShaderArg`
+
+```kis
+#[builtin] pub trait ShaderArg {}
+```
+
+`ShaderArg` marks the types a shader can take as its arguments: the unit type `()` and every
+struct marked [`#[shader_arg]`](./attributes.md#shader_arg). The constructors of
+`std::screen::shader` bound their argument type with it, as in
+`filter<A: ShaderArg>(shader: ColorShader<A>, args: A)`. See
+[`std::screen::shader`](../../../../std/en/src/screen-shader.md).
+
+## `Shader`
+
+```kis
+#[builtin] pub trait Shader {}
+```
+
+`Shader` marks the six shader types. The standard library uses it to accept a shader of any role;
+a game has no use for it.
 
 ## Closure types are not traits
 

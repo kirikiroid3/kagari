@@ -144,7 +144,7 @@ kagari build [--manifest-path PATH] [--target TARGET]...
 
 1. Load the project; choose targets: every `--target` must parse **and** be listed in
    `build.targets` (else exit 2); without `--target`, all of `build.targets`.
-2. `kagari_lang::build(db, program)` returns `Build { diagnostics, module, bytes, asset_files }`:
+2. `kagari_lang::build(db, program)` returns `Build { diagnostics, module, bytes, asset_files, shader_roles }`:
    the diagnostics of `check` plus emission, the verified `kagari_bytecode::Module` and its
    encoding (both `None` on any error), and the `FilePath` behind each `module.assets` entry.
    Non-empty diagnostics are printed to **stderr**. No module → exit 1.
@@ -161,7 +161,14 @@ kagari build [--manifest-path PATH] [--target TARGET]...
    Any such line → exit 1, and the output directory is neither created nor cleaned. The format
    tables per profile live in `runtime_libs/kagari-compat`; the user-facing list is in the
    Reference's [Runtime profiles](../../../reference/en/src/tools/projects.md#runtime-profiles).
-4. For each target: create `out_dir(target)`, delete the previous `game.kagari` and every
+   `native_v0` accepts shaders whose content sniffs as UTF-8 text (`AssetFormat::Wgsl`).
+4. **Shader check** (`build/shaders.rs`): `shader_roles` is parallel to `asset_files`; for each
+   asset with `Some(role)`, read the whole source (disk, or `kagari_std::file` for
+   `FilePath::Std`) and run `kagari_shader::validate(role, &src)` (feature `validate`, naga). Each
+   error prints `error: shader `{path}` ({role.name()}): {ShaderError}` (`line N: message`, line
+   relative to the user file). Any error → exit 1, nothing written. A file used under two roles
+   has two assets, so it is validated once per role.
+5. For each target: create `out_dir(target)`, delete the previous `game.kagari` and every
    `*.kiarchive` in it (other files are left alone), write `game.kagari`, then the archives.
 
 Archive packing (`build/archives.rs`) groups the referenced assets by
@@ -176,7 +183,11 @@ Consequences:
 - System fonts have bytecode paths `system-fonts/<path under the font dir>`, so they land in
   `system-fonts.kiarchive`. This is why the compiler reserves a top-level `system-fonts`
   directory in the asset directory (`E1032`).
-- Every asset file must be on disk (`FilePath::Disk`); anything else is a `Failure`.
+- Std assets (the `std::shaders` WGSL files) have `FilePath::Std(name)` and bytecode paths
+  `std/<name>`, so they land in `std.kiarchive`; `archives::source` returns `Source::Std(text)`
+  from `kagari_std::file`, added with `ArchiveBuilder::add`. The compiler reserves a top-level
+  `std` asset directory too (`E1032`, `STD_ASSETS_DIR`).
+- Every other asset file must be on disk (`Source::Disk`); a missing std file is a `Failure`.
 
 The archive format itself is described in [Archives and Save Databases](../formats/archive.md),
 the bytecode in [The `.kagari` Format](../formats/kagari.md).
@@ -249,7 +260,7 @@ that.
 | `tooling/kagari-project/src/tests.rs` | Defaults, unknown keys, unknown/duplicate/empty targets and profiles, absolute paths, toolchain check, parent-directory discovery |
 | `tooling/kagari-cli/tests/init.rs` | Template files, refusal to overwrite, name escaping, system-font choice and the no-font fallback |
 | `tooling/kagari-cli/tests/check.rs` | Fresh project has no diagnostics (also from a subdirectory), assets outside the asset dir, `system-fonts = false`, missing manifest (2), toolchain mismatch (2) |
-| `tooling/kagari-cli/tests/build.rs` | Bytecode decodes and verifies, archive names and contents, stale archive removal, unlisted target (2), rejected image/audio/video formats (1, no bytecode written), `disasm` of the result |
+| `tooling/kagari-cli/tests/build.rs` | Bytecode decodes and verifies, archive names and contents, stale archive removal, unlisted target (2), rejected image/audio/video formats (1, no bytecode written), invalid WGSL (1, `error: shader … line`), std shaders packed into `std.kiarchive`, `disasm` of the result |
 | `tooling/kagari-cli/tests/fmt.rs` | Fresh project is formatted, rewriting, syntax errors |
 
 The integration tests run the real binary (`env!("CARGO_BIN_EXE_kagari")`) through

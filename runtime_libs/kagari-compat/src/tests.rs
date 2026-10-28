@@ -2,7 +2,7 @@
 
 use kagari_bytecode::AssetKind;
 
-use crate::{AssetFormat, RuntimeProfile, sniff, supports};
+use crate::{AssetFormat, RuntimeProfile, sniff, supports, supports_kind};
 
 /// A JFIF header followed by a frame header with `sof` and `precision`.
 fn jpeg(sof: u8, precision: u8) -> Vec<u8> {
@@ -125,4 +125,18 @@ fn native_v0_support() {
     assert!(supports(p, AssetKind::Voice, AssetFormat::Mp3));
     assert!(supports(p, AssetKind::Font, AssetFormat::FontCollection));
     assert!(!supports(p, AssetKind::Video, AssetFormat::Unknown));
+    assert!(supports_kind(p, AssetKind::Shader));
+    assert!(!supports_kind(p, AssetKind::Video));
+    assert!(supports(p, AssetKind::Shader, AssetFormat::Wgsl));
+    assert!(!supports(p, AssetKind::Shader, AssetFormat::Unknown));
+}
+
+#[test]
+fn wgsl_sniff() {
+    let src = b"fn effect(uv: vec2<f32>) -> vec4<f32> { return vec4(1.0); }";
+    assert_eq!(sniff(AssetKind::Shader, src), AssetFormat::Wgsl);
+    assert_eq!(
+        sniff(AssetKind::Shader, &[0xFF, 0x00]),
+        AssetFormat::Unknown
+    );
 }

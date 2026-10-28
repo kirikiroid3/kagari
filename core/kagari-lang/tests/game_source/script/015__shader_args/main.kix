@@ -1,0 +1,76 @@
+// `#[shader_arg]` (stage 3): record structs whose fields a shader can read.
+
+use std::screen::shader::ShaderArg;
+use std::screen::{Angle, CENTER, degrees, size};
+
+enum Tone {
+    Warm,
+    Cold,
+}
+
+#[shader_arg]
+struct Spot {
+    position: Point,
+    color: Color,
+    radius: Decimal,
+}
+
+// Fine: std structs, numbers, a fieldless enum, a nested `#[shader_arg]` struct and an array.
+#[shader_arg]
+struct Glow<const N: usize> {
+    on: bool,
+    count: u32,
+    shift: i32,
+    amount: Rat,
+    angle: Angle,
+    anchor: Anchor,
+    offset: Offset,
+    size: Size,
+    period: Duration,
+    tone: Tone,
+    spots: [Spot; N],
+}
+
+const fn args<A: ShaderArg>(args: A) -> A {
+    args
+}
+const fn glow(spot: Spot) -> Glow<2> {
+    args(Glow {
+        on: true,
+        count: 2,
+        shift: -1,
+        amount: Rat::new(1, 3),
+        angle: degrees(0.0),
+        anchor: CENTER,
+        offset: offset(0, 0),
+        size: size(1, 1),
+        period: ms(100),
+        tone: Tone::Warm,
+        spots: [spot, spot],
+    })
+}
+const NO_ARGS: () = args(());
+
+// Error: `#[shader_arg]` applies only to structs.
+#[shader_arg]
+enum NotAStruct {
+    A,
+}
+
+// Error: tuple fields have no names.
+#[shader_arg]
+struct Pair(Decimal, Decimal);
+
+// Error: type parameters.
+#[shader_arg]
+struct Generic<T> {
+    value: T,
+}
+
+#[shader_arg]
+struct Bad {
+    // Error: a shader cannot read a `String`.
+    name: String,
+    // Error: an empty array.
+    weights: [Decimal; 0],
+}

@@ -59,7 +59,10 @@ use sha2::Digest;
 
 pub use assets::{AssetStore, ImageData, Thumbnail};
 pub use audio::{AudioCommand, Bus};
-pub use frame::{Affine, Blend, Dir, Frame, Node, Rect, Reveal, ThumbKey, TransitionDraw};
+pub use frame::{
+    Affine, Dir, Frame, MotionStage, Node, Pose, Rect, Reveal, ShaderEffect, ThumbKey,
+    TransitionDraw,
+};
 pub use input::{InputEvent, Key, MouseButton, PadButton};
 pub use saves::Timestamp;
 

@@ -1,0 +1,138 @@
+//! Mask shaders for `Paint::masked`, `Entity::mask` and `anim::masked`: procedural ramps, so
+//! masks and transitions need no mask image. Every value lies in 0.0..=1.0; in a transition a
+//! pixel switches once its value is at most the sweeping threshold, so low values go first.
+
+use crate::screen::{Anchor, Angle};
+use crate::screen::shader::{Mask, MaskShader, mask};
+
+/// The arguments of `LINEAR`.
+#[shader_arg]
+pub struct LinearMask {
+    /// The direction the ramp rises in: 0° is left to right, 90° top to bottom.
+    pub angle: Angle,
+}
+/// A linear ramp.
+pub const LINEAR: MaskShader<LinearMask> = asset("shaders/mask/linear.wgsl");
+/// 0.0 at the edge the direction `angle` starts from, 1.0 at the opposite edge.
+pub const fn linear(angle: Angle) -> Mask {
+    mask(LINEAR, LinearMask { angle })
+}
+
+/// The arguments of `RADIAL`.
+#[shader_arg]
+pub struct RadialMask {
+    /// The centre, as fractions of the box.
+    pub center: Anchor,
+}
+/// A circular ramp.
+pub const RADIAL: MaskShader<RadialMask> = asset("shaders/mask/radial.wgsl");
+/// 0.0 at `center`, 1.0 at the farthest corner.
+pub const fn radial(center: Anchor) -> Mask {
+    mask(RADIAL, RadialMask { center })
+}
+
+/// The arguments of `DIAMOND`.
+#[shader_arg]
+pub struct DiamondMask {
+    /// The centre, as fractions of the box.
+    pub center: Anchor,
+}
+/// A diamond-shaped ramp.
+pub const DIAMOND: MaskShader<DiamondMask> = asset("shaders/mask/diamond.wgsl");
+/// Like `radial`, measured as `|dx| + |dy|`.
+pub const fn diamond(center: Anchor) -> Mask {
+    mask(DIAMOND, DiamondMask { center })
+}
+
+/// The arguments of `CLOCK`.
+#[shader_arg]
+pub struct ClockMask {
+    /// The centre, as fractions of the box.
+    pub center: Anchor,
+    /// Where the sweep starts: 0° points right, 90° down.
+    pub start: Angle,
+}
+/// A clock sweep.
+pub const CLOCK: MaskShader<ClockMask> = asset("shaders/mask/clock.wgsl");
+/// Rises from 0.0 to 1.0 turning clockwise around `center`, starting at `start`.
+pub const fn clock(center: Anchor, start: Angle) -> Mask {
+    mask(CLOCK, ClockMask { center, start })
+}
+
+/// The arguments of `STRIPES`.
+#[shader_arg]
+pub struct StripesMask {
+    /// As in `linear`.
+    pub angle: Angle,
+    /// The number of stripes; 0 counts as 1.
+    pub count: u32,
+}
+/// Repeated linear ramps.
+pub const STRIPES: MaskShader<StripesMask> = asset("shaders/mask/stripes.wgsl");
+/// `count` stripes, each a `linear` ramp along `angle`.
+pub const fn stripes(angle: Angle, count: u32) -> Mask {
+    mask(STRIPES, StripesMask { angle, count })
+}
+
+/// The arguments of `CHECKER`.
+#[shader_arg]
+pub struct CheckerMask {
+    /// The number of columns; 0 counts as 1.
+    pub columns: u32,
+    /// The number of rows; 0 counts as 1.
+    pub rows: u32,
+}
+/// A checkerboard.
+pub const CHECKER: MaskShader<CheckerMask> = asset("shaders/mask/checker.wgsl");
+/// A checkerboard of `columns` × `rows` cells, each a left-to-right ramp; the cells of one colour
+/// cover 0.0..0.5, the others 0.5..1.0.
+pub const fn checker(columns: u32, rows: u32) -> Mask {
+    mask(CHECKER, CheckerMask { columns, rows })
+}
+
+/// The arguments of `NOISE`.
+#[shader_arg]
+pub struct NoiseMask {
+    /// The cell size, in pixels; at least 1.0.
+    pub scale: Decimal,
+    /// Picks one of many noise patterns.
+    pub seed: u32,
+}
+/// Smooth value noise.
+pub const NOISE: MaskShader<NoiseMask> = asset("shaders/mask/noise.wgsl");
+/// Smooth random values on a grid of `scale`-pixel cells, varied by `seed`: a dissolve.
+pub const fn noise(scale: Decimal, seed: u32) -> Mask {
+    mask(NOISE, NoiseMask { scale, seed })
+}
+
+/// The arguments of `GAUSSIAN`.
+#[shader_arg]
+pub struct GaussianMask {
+    /// The centre, as fractions of the box.
+    pub center: Anchor,
+    /// The standard deviation, in pixels; 0.0 or less gives 0.0 everywhere.
+    pub sigma: Decimal,
+}
+/// A Gaussian spot.
+pub const GAUSSIAN: MaskShader<GaussianMask> = asset("shaders/mask/gaussian.wgsl");
+/// 1.0 at `center`, falling off as a Gaussian of standard deviation `sigma` pixels: a vignette or
+/// spotlight.
+pub const fn gaussian(center: Anchor, sigma: Decimal) -> Mask {
+    mask(GAUSSIAN, GaussianMask { center, sigma })
+}
+
+/// The arguments of `ROUNDED_RECT`.
+#[shader_arg]
+pub struct RoundedRectMask {
+    /// The corner radius, in pixels.
+    pub radius: Decimal,
+    /// The width of the soft edge, in pixels.
+    pub feather: Decimal,
+}
+/// A rounded rectangle.
+pub const ROUNDED_RECT: MaskShader<RoundedRectMask> = asset("shaders/mask/rounded_rect.wgsl");
+/// 1.0 inside the box with corners rounded by `radius` pixels, 0.0 outside, softened over
+/// `feather` pixels.
+pub const fn rounded_rect(radius: Decimal, feather: Decimal) -> Mask {
+    mask(ROUNDED_RECT, RoundedRectMask { radius, feather })
+}

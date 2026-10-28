@@ -4,9 +4,14 @@
 use std::cmp::Ordering;
 use std::rc::Rc;
 
-use kagari_vm::{AssetId, Decimal, Program, StaticId, Trap, TrapKind, Value};
+use kagari_shader::ArgValue;
+use kagari_vm::{AssetId, Decimal, Program, StaticId, Trap, TrapKind, TypeTable, Value, value_eq};
 
+use super::shader_args::arg_value;
 use super::{StdTy, StdTypes, host_trap, tag_name};
+
+/// `kagari_shader::MAX_ARGS_BYTES` as a length.
+pub(crate) const MAX_ARGS_BYTES: usize = kagari_shader::MAX_ARGS_BYTES as usize;
 
 /// Declares a field-less std enum mirrored as a Rust enum, in declaration order.
 macro_rules! unit_enum {
@@ -49,25 +54,6 @@ unit_enum!(VAlign {
     Middle,
     Bottom
 });
-unit_enum!(BlendMode {
-    Normal,
-    Add,
-    Multiply,
-    Screen,
-    Overlay,
-    Darken,
-    Lighten,
-    ColorDodge,
-    ColorBurn,
-    HardLight,
-    SoftLight,
-    Difference,
-    Exclusion,
-    Hue,
-    Saturation,
-    Color,
-    Luminosity,
-});
 unit_enum!(
     /// The 31 named easings of `std::screen::anim::Easing`, in declaration order.
     NamedEasing {
@@ -98,7 +84,7 @@ pub(crate) struct Tween {
     pub delay_ms: u32,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub(crate) enum TransitionKind {
     Cut,
     Crossfade,
@@ -116,9 +102,14 @@ pub(crate) enum TransitionKind {
         color: [u8; 4],
         hold_ms: u32,
     },
+    Masked {
+        mask: EffectSpec,
+        softness: u8,
+        reverse: bool,
+    },
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub(crate) struct Transition {
     pub kind: TransitionKind,
     pub duration_ms: u32,
@@ -177,6 +168,84 @@ pub(crate) struct MovieSpec {
 pub(crate) struct Volume {
     pub level: u8,
     pub muted: bool,
+}
+
+/// How a local motion's time runs (`std::screen::shader::LocalMotionBehavior`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum LocalMotionBehavior {
+    Periodic { after_ms: u32, period_ms: u32 },
+    Stall { after_ms: u32 },
+}
+
+impl LocalMotionBehavior {
+    /// The shader time `elapsed_ms` after the effect's origin: `Stall` holds at `after`;
+    /// `Periodic` runs `after` once, then loops `period` (a zero period holds at `after`).
+    pub fn map_ms(self, elapsed_ms: u64) -> u64 {
+        match self {
+            LocalMotionBehavior::Stall { after_ms } => elapsed_ms.min(u64::from(after_ms)),
+            LocalMotionBehavior::Periodic {
+                after_ms,
+                period_ms,
+            } => {
+                let after = u64::from(after_ms);
+                match elapsed_ms.checked_sub(after) {
+                    None => elapsed_ms,
+                    Some(rest) => {
+                        after.saturating_add(rest.checked_rem(u64::from(period_ms)).unwrap_or(0))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// A shader with its arguments: a `Filter`, `Mix`, `Mask` or `LocalMotion` value, or the shader
+/// part of a `Paint` or `TransitionalMotion`. Equality compares the shader, the behaviour and
+/// the argument value, as the compiler's screen model does.
+#[derive(Clone, Debug)]
+pub(crate) struct EffectSpec {
+    pub shader: AssetId,
+    /// The argument value as the program built it.
+    pub args: Value,
+    /// `args` converted for the shader.
+    pub arg_value: Rc<ArgValue>,
+    /// `arg_value` in WGSL storage layout; longer than `MAX_ARGS_BYTES` means not drawn.
+    pub packed: Rc<[u8]>,
+    /// `Some` exactly for a `LocalMotion`.
+    pub behavior: Option<LocalMotionBehavior>,
+}
+
+impl PartialEq for EffectSpec {
+    fn eq(&self, other: &EffectSpec) -> bool {
+        self.shader == other.shader
+            && self.behavior == other.behavior
+            && value_eq(&self.args, &other.args).unwrap_or(false)
+    }
+}
+
+/// `std::screen::shader::Paint`: generated content of `size` px.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct PaintSpec {
+    pub texture: EffectSpec,
+    pub size: [u32; 2],
+    pub mask: Option<EffectSpec>,
+}
+
+/// `std::screen::shader::TransitionalMotion`.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct TransitionalMotionSpec {
+    pub effect: EffectSpec,
+    pub duration_ms: u32,
+    pub easing: Easing,
+    pub delay_ms: u32,
+}
+
+/// `std::screen::Pose`; `rotation` in degrees.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct PoseSpec {
+    pub position: [i32; 2],
+    pub scale: Decimal,
+    pub rotation: Decimal,
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -374,10 +443,6 @@ pub(crate) fn decode_valign(std: &StdTypes, v: &Value) -> Result<VAlign, Trap> {
     unit_variant(std, v, StdTy::VAlign, VAlign::from_index)
 }
 
-pub(crate) fn decode_blend_mode(std: &StdTypes, v: &Value) -> Result<BlendMode, Trap> {
-    unit_variant(std, v, StdTy::BlendMode, BlendMode::from_index)
-}
-
 pub(crate) fn decode_easing(std: &StdTypes, v: &Value) -> Result<Easing, Trap> {
     let (variant, fields) = std.variant(v, StdTy::Easing)?;
     match (variant, fields) {
@@ -404,7 +469,11 @@ pub(crate) fn decode_tween(std: &StdTypes, v: &Value) -> Result<Tween, Trap> {
     })
 }
 
-fn decode_transition_kind(std: &StdTypes, v: &Value) -> Result<TransitionKind, Trap> {
+fn decode_transition_kind(
+    std: &StdTypes,
+    types: &TypeTable,
+    v: &Value,
+) -> Result<TransitionKind, Trap> {
     let (variant, f) = std.variant(v, StdTy::TransitionKind)?;
     let ty = "TransitionKind";
     Ok(match (variant, f) {
@@ -424,17 +493,135 @@ fn decode_transition_kind(std: &StdTypes, v: &Value) -> Result<TransitionKind, T
             color: decode_color(std, color)?,
             hold_ms: decode_duration_ms(std, hold)?,
         },
+        (6, [mask, softness, reverse]) => TransitionKind::Masked {
+            mask: decode_effect(std, types, mask, StdTy::Mask)?,
+            softness: int_as(softness, ty, "softness")?,
+            reverse: decode_bool(reverse)?,
+        },
         _ => return Err(host_trap(format!("malformed `{ty}`: variant {variant}"))),
     })
 }
 
-pub(crate) fn decode_transition(std: &StdTypes, v: &Value) -> Result<Transition, Trap> {
+pub(crate) fn decode_transition(
+    std: &StdTypes,
+    types: &TypeTable,
+    v: &Value,
+) -> Result<Transition, Trap> {
     let f = std.fields(v, StdTy::Transition)?;
     Ok(Transition {
-        kind: decode_transition_kind(std, field(f, 0, "Transition")?)?,
+        kind: decode_transition_kind(std, types, field(f, 0, "Transition")?)?,
         duration_ms: decode_duration_ms(std, field(f, 1, "Transition")?)?,
         easing: decode_easing(std, field(f, 2, "Transition")?)?,
         delay_ms: decode_duration_ms(std, field(f, 3, "Transition")?)?,
+    })
+}
+
+/// A shader and its arguments (`shader`, `args` of an effect value), converted and packed.
+fn effect(
+    std: &StdTypes,
+    types: &TypeTable,
+    shader: &Value,
+    args: &Value,
+    behavior: Option<LocalMotionBehavior>,
+) -> Result<EffectSpec, Trap> {
+    let arg_value = arg_value(std, types, args)?;
+    let packed: Rc<[u8]> = Rc::from(kagari_shader::pack(&arg_value));
+    if packed.len() > MAX_ARGS_BYTES {
+        log::warn!(
+            "shader arguments of {} bytes exceed the limit of {MAX_ARGS_BYTES}; the effect is not drawn",
+            packed.len()
+        );
+    }
+    Ok(EffectSpec {
+        shader: decode_asset(shader)?,
+        args: args.clone(),
+        arg_value: Rc::new(arg_value),
+        packed,
+        behavior,
+    })
+}
+
+/// A `Filter`, `Mix` or `Mask` (`t`).
+pub(crate) fn decode_effect(
+    std: &StdTypes,
+    types: &TypeTable,
+    v: &Value,
+    t: StdTy,
+) -> Result<EffectSpec, Trap> {
+    let f = std.fields(v, t)?;
+    let ty = super::STD_ADTS[t as usize].path;
+    effect(std, types, field(f, 0, ty)?, field(f, 1, ty)?, None)
+}
+
+fn decode_behavior(std: &StdTypes, v: &Value) -> Result<LocalMotionBehavior, Trap> {
+    match std.variant(v, StdTy::LocalMotionBehavior)? {
+        (0, [after, period]) => Ok(LocalMotionBehavior::Periodic {
+            after_ms: decode_duration_ms(std, after)?,
+            period_ms: decode_duration_ms(std, period)?,
+        }),
+        (1, [after]) => Ok(LocalMotionBehavior::Stall {
+            after_ms: decode_duration_ms(std, after)?,
+        }),
+        (variant, _) => Err(host_trap(format!(
+            "malformed `LocalMotionBehavior`: variant {variant}"
+        ))),
+    }
+}
+
+pub(crate) fn decode_local_motion(
+    std: &StdTypes,
+    types: &TypeTable,
+    v: &Value,
+) -> Result<EffectSpec, Trap> {
+    let f = std.fields(v, StdTy::LocalMotion)?;
+    let ty = "LocalMotion";
+    let behavior = decode_behavior(std, field(f, 2, ty)?)?;
+    effect(
+        std,
+        types,
+        field(f, 0, ty)?,
+        field(f, 1, ty)?,
+        Some(behavior),
+    )
+}
+
+pub(crate) fn decode_paint(
+    std: &StdTypes,
+    types: &TypeTable,
+    v: &Value,
+) -> Result<PaintSpec, Trap> {
+    let f = std.fields(v, StdTy::ShaderPaint)?;
+    let ty = "Paint";
+    Ok(PaintSpec {
+        texture: effect(std, types, field(f, 0, ty)?, field(f, 1, ty)?, None)?,
+        size: decode_size(std, field(f, 2, ty)?)?,
+        mask: option_with(std, field(f, 3, ty)?, |m| {
+            decode_effect(std, types, m, StdTy::Mask)
+        })?,
+    })
+}
+
+pub(crate) fn decode_transitional_motion(
+    std: &StdTypes,
+    types: &TypeTable,
+    v: &Value,
+) -> Result<TransitionalMotionSpec, Trap> {
+    let f = std.fields(v, StdTy::TransitionalMotion)?;
+    let ty = "TransitionalMotion";
+    Ok(TransitionalMotionSpec {
+        effect: effect(std, types, field(f, 0, ty)?, field(f, 1, ty)?, None)?,
+        duration_ms: decode_duration_ms(std, field(f, 2, ty)?)?,
+        easing: decode_easing(std, field(f, 3, ty)?)?,
+        delay_ms: decode_duration_ms(std, field(f, 4, ty)?)?,
+    })
+}
+
+pub(crate) fn decode_pose(std: &StdTypes, v: &Value) -> Result<PoseSpec, Trap> {
+    let f = std.fields(v, StdTy::Pose)?;
+    Ok(PoseSpec {
+        position: decode_point(std, field(f, 0, "Pose")?)?,
+        scale: decode_decimal(field(f, 1, "Pose")?)?,
+        rotation: decode_angle(std, field(f, 2, "Pose")?)?,
     })
 }
 
@@ -527,11 +714,6 @@ pub(crate) fn decode_volume(std: &StdTypes, v: &Value) -> Result<Volume, Trap> {
     })
 }
 
-/// An `Option<Asset>`.
-pub(crate) fn decode_option_asset(std: &StdTypes, v: &Value) -> Result<Option<AssetId>, Trap> {
-    option_with(std, v, decode_asset)
-}
-
 // ---------------------------------------------------------------------------------------------
 // Constructors
 
@@ -581,6 +763,40 @@ pub(crate) fn loop_value(std: &StdTypes, l: &LoopSpec) -> Value {
             end,
         ],
     )
+}
+
+/// The std value of an effect: `Filter`, `Mix` or `Mask` (`t`), or a `LocalMotion` when the
+/// effect has a behaviour.
+pub(crate) fn effect_value(std: &StdTypes, t: StdTy, e: &EffectSpec) -> Value {
+    let mut fields = vec![Value::Asset(e.shader), e.args.clone()];
+    match e.behavior {
+        Some(behavior) => {
+            fields.push(behavior_value(std, behavior));
+            std.make(StdTy::LocalMotion, 0, fields)
+        }
+        None => std.make(t, 0, fields),
+    }
+}
+
+fn behavior_value(std: &StdTypes, b: LocalMotionBehavior) -> Value {
+    match b {
+        LocalMotionBehavior::Periodic {
+            after_ms,
+            period_ms,
+        } => std.make(
+            StdTy::LocalMotionBehavior,
+            0,
+            vec![
+                duration_value(std, after_ms),
+                duration_value(std, period_ms),
+            ],
+        ),
+        LocalMotionBehavior::Stall { after_ms } => std.make(
+            StdTy::LocalMotionBehavior,
+            1,
+            vec![duration_value(std, after_ms)],
+        ),
+    }
 }
 
 pub(crate) fn option_asset_value(std: &StdTypes, a: Option<AssetId>) -> Value {

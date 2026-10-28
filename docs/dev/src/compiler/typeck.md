@@ -15,7 +15,7 @@ instant-recursion check, which reads MIR edges (see
 | `core/kagari-lang/src/signatures/collect.rs` | Computes every item signature; finds std items by role |
 | `core/kagari-lang/src/signatures/lower.rs` | `TyLowerer`: HIR `TypeRef` → `Ty` (aliases, `Int<lo, hi>`, generic arguments) |
 | `core/kagari-lang/src/signatures/consts.rs` | The type-level constant folder (array lengths, `Int` bounds, const arguments) |
-| `core/kagari-lang/src/signatures/traits.rs` | `TraitSolver`: explicit std impls, bounds, structural `Eq`, `RandChoose`; projections |
+| `core/kagari-lang/src/signatures/traits.rs` | `TraitSolver`: explicit std impls, bounds, structural `Eq`, `RandChoose`, `ShaderArg`; projections |
 | `core/kagari-lang/src/signatures/subst.rs`, `display.rs` | Substitution and matching; the diagnostic text of types |
 | `core/kagari-lang/src/infer/` | `infer` query: `ctx.rs` (context, coercion, joins, instantiation), `table.rs` (unification), `expr.rs`, `ops.rs`, `call.rs`, `path.rs`, `pat.rs`, `finish.rs`, `walk.rs` |
 | `core/kagari-lang/src/callee.rs` | `CalleeKind`: what kind of function a call calls |
@@ -54,7 +54,8 @@ blocks, const parameters and `const` items; anything else is `E2002`, overflow `
 
 **Std items by role.** `StdItems` finds the std items the checker refers to (`Text`, `Decimal`,
 `Rat`, `Vec`, `Range`, `Option`, `Screen`, `Setting`, `Meta`, `Say`, `Choice`, the asset types,
-the traits `Eq`, `Integer`, `Asset`, `Step`, `RandChoose`, `ToText`, and the functions
+the traits `Eq`, `Integer`, `Asset`, `Step`, `RandChoose`, `ShaderArg`, `ToText`, the std structs a
+`#[shader_arg]` field may have (`shader_arg_std`), and the functions
 `push_step`, `rng_choose`, `asset`, `system_font`, `concat`, `ruby`, `mono_ruby`, `effect`,
 `nav::start`, `signal`, `Integer::into`, `Integer::saturate`). This is the compiler's half of the
 std–checker contract; see [The std–Checker Contract](../std/contract.md).
@@ -150,7 +151,8 @@ agree with the first arm.
   bounds hold), a bound in scope, or a built-in rule: `Eq` is **structural** (booleans, integers,
   `Int`, pointers and named functions; tuples, arrays, references and non-builtin ADTs whose
   fields are `Eq`; never closures or builtin types without an impl), and `RandChoose` holds for
-  every non-builtin, non-empty fieldless enum (`Int<lo, hi>` has an explicit impl).
+  every non-builtin, non-empty fieldless enum (`Int<lo, hi>` has an explicit impl). `ShaderArg`
+  holds for `()` and for structs with `#[shader_arg]` (`AdtDef::shader_arg`).
 - **Closures** get the kind of the expected pointer or closure type, else the kind of the
   enclosing function; `ClosureInfo` records the kind and the captured locals in order of first
   use.
@@ -243,7 +245,9 @@ std methods. `E3002` from a desugared form says to mark the function `#[scene]`.
 | Closures in the story are second-class: passed or called, never stored, returned or captured | `E3015` | `check_value`, `check_local`, `closure` |
 | A place passed as `&mut` is not passed as another argument of the same call | `E3016` | `places.rs::check_exclusive` |
 | Assignment and `&mut` need a mutable place (all code) | `E3017` | `places.rs::check_mut_place` |
-| `#[scene]` on `pushdown fn`, `#[entry]` with `#[scene]`, `#[must_use]` on structs and enums | `E3018` | `kinds.rs::check_attributes` |
+| `#[scene]` on `pushdown fn`, `#[entry]` with `#[scene]`, `#[must_use]` on structs and enums, `#[shader_arg]` on structs | `E3018` | `kinds.rs::check_attributes` |
+| A `#[shader_arg]` struct is a record struct with named fields and no type parameters (const parameters allowed); anchored at the attribute | `E3025` | `kinds.rs::check_shader_arg` |
+| Each `#[shader_arg]` field is `bool`, `i32`, `u32`, `Decimal`, `Rat`, a `shader_arg_std` struct (`Color`, `Point`, `Offset`, `Size`, `Anchor`, `Angle`, `Duration`), a non-builtin non-generic fieldless enum, a `#[shader_arg]` struct, or `[T; N]` of these with `N` not 0 (a const parameter `N` is accepted); anchored at the field type | `E3026` | `kinds.rs::shader_field` |
 
 **Finite types** (`kinds/finite.rs`): `bool`, `()`, `!`, `Int<lo, hi>`, enums and structs whose
 fields are finite (generic arguments substituted), tuples and arrays of finite types, `Text` and

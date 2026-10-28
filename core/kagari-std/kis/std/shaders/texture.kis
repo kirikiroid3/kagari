@@ -1,0 +1,132 @@
+//! Texture shaders for `ImageLayer::paint`: generated image content such as gradients, Gaussian
+//! spots and weather.
+
+use crate::screen::{Anchor, Angle, Color, Point, Size};
+use crate::screen::shader::{Paint, TextureShader, paint};
+
+/// The arguments of `SOLID`.
+#[shader_arg]
+pub struct Solid {
+    /// The colour.
+    pub color: Color,
+}
+/// One colour.
+pub const SOLID: TextureShader<Solid> = asset("shaders/texture/solid.wgsl");
+/// `size` pixels of `color`.
+pub const fn solid(color: Color, size: Size) -> Paint {
+    paint(SOLID, Solid { color }, size)
+}
+
+/// The arguments of `LINEAR_GRADIENT`.
+#[shader_arg]
+pub struct LinearGradient {
+    /// The direction: 0° is left to right, 90° top to bottom.
+    pub angle: Angle,
+    /// The colour at the start edge.
+    pub from: Color,
+    /// The colour at the end edge.
+    pub to: Color,
+}
+/// A linear gradient.
+pub const LINEAR_GRADIENT: TextureShader<LinearGradient> = asset(
+    "shaders/texture/linear_gradient.wgsl",
+);
+/// `size` pixels going from `from` to `to` along `angle`.
+pub const fn linear_gradient(angle: Angle, from: Color, to: Color, size: Size) -> Paint {
+    paint(LINEAR_GRADIENT, LinearGradient { angle, from, to }, size)
+}
+
+/// The arguments of `RADIAL_GRADIENT`.
+#[shader_arg]
+pub struct RadialGradient {
+    /// The centre, as fractions of the paint.
+    pub center: Anchor,
+    /// The colour at the centre.
+    pub inner: Color,
+    /// The colour at the farthest corner.
+    pub outer: Color,
+}
+/// A radial gradient.
+pub const RADIAL_GRADIENT: TextureShader<RadialGradient> = asset(
+    "shaders/texture/radial_gradient.wgsl",
+);
+/// `size` pixels going from `inner` at `center` to `outer` at the farthest corner.
+pub const fn radial_gradient(center: Anchor, inner: Color, outer: Color, size: Size) -> Paint {
+    paint(RADIAL_GRADIENT, RadialGradient { center, inner, outer }, size)
+}
+
+/// A soft round spot of light.
+#[shader_arg]
+pub struct GaussianSpot {
+    /// The centre, in pixels from the paint's top-left corner.
+    pub position: Point,
+    /// The colour at the centre.
+    pub color: Color,
+    /// The standard deviation, in pixels; 0.0 or less draws nothing.
+    pub radius: Decimal,
+}
+/// The arguments of `gaussian_spots`.
+#[shader_arg]
+pub struct GaussianSpots<const N: usize> {
+    /// The number of spots, `N`.
+    pub count: u32,
+    /// The spots.
+    pub spots: [GaussianSpot; N],
+}
+/// The Gaussian spots shader for `N` spots.
+const fn gaussian_spots_shader<const N: usize>() -> TextureShader<GaussianSpots<N>> {
+    asset("shaders/texture/gaussian_spots.wgsl")
+}
+/// `size` pixels with the sum of `spots`; where the summed alpha exceeds 1.0 the sum is scaled
+/// down to alpha 1.0. At most 64 spots are drawn.
+pub const fn gaussian_spots<const N: usize>(spots: [GaussianSpot; N], size: Size) -> Paint {
+    paint(gaussian_spots_shader::<N>(), GaussianSpots { count: N.saturate(), spots }, size)
+}
+
+/// The arguments of `RAIN`.
+#[shader_arg]
+pub struct Rain {
+    /// The colour of a streak.
+    pub color: Color,
+    /// The share of 8-pixel columns holding a drop, in percent.
+    pub density: u32,
+    /// The falling speed, in pixels per second.
+    pub speed: Decimal,
+    /// The tilt from straight down.
+    pub angle: Angle,
+    /// The length of a streak, in pixels.
+    pub length: Decimal,
+}
+/// Falling rain.
+pub const RAIN: TextureShader<Rain> = asset("shaders/texture/rain.wgsl");
+/// `size` pixels of rain streaks 24 pixels long: `density` percent of the columns hold a drop
+/// falling at `speed` pixels per second, tilted by `angle`.
+pub const fn rain(color: Color, density: u32, speed: Decimal, angle: Angle, size: Size) -> Paint {
+    paint(RAIN, Rain { color, density, speed, angle, length: 24.0 }, size)
+}
+
+/// The arguments of `SNOW`.
+#[shader_arg]
+pub struct Snow {
+    /// The colour of a flake.
+    pub color: Color,
+    /// The share of grid cells holding a flake, in percent.
+    pub density: u32,
+    /// The falling speed of the nearest layer, in pixels per second.
+    pub speed: Decimal,
+    /// The radius of a flake in the nearest layer, in pixels.
+    pub radius: Decimal,
+}
+/// Falling snow.
+pub const SNOW: TextureShader<Snow> = asset("shaders/texture/snow.wgsl");
+/// `size` pixels of swaying snowflakes in three layers of depth: `density` percent of the cells
+/// of a 48-pixel grid hold a flake of `radius` pixels falling at `speed` pixels per second.
+pub const fn snow(
+    color: Color,
+    density: u32,
+    speed: Decimal,
+    radius: Decimal,
+    size: Size,
+) -> Paint {
+    paint(SNOW, Snow { color, density, speed, radius }, size)
+}

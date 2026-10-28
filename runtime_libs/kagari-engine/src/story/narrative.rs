@@ -287,7 +287,11 @@ impl NarrativeImport {
                 let game = game_of(ctx, obj)?;
                 let hidden = game.hide_window;
                 let (window, quick) = game.hud_shown;
-                let side = game.screen.logical().hud.side_image;
+                // A paint is not an image: `HudState::side_image` is `None` then.
+                let side = match &game.screen.logical().hud.side_image {
+                    Some(crate::screen::model::PartContent::Image(image)) => Some(*image),
+                    _ => None,
+                };
                 Ok(std.make(
                     StdTy::HudState,
                     0,

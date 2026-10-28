@@ -231,7 +231,7 @@ Fix: declare the binding mutable, as in `let mut b = Point { x: 1, y: 2 };`.
 
 ## E3018 `misplaced-attribute` {#e3018}
 
-**Error.** An attribute is used on an item it does not apply to. For example, `#[scene]` on a `fn`, `#[entry]` without `#[scene]`, or `#[must_use]` on a function.
+**Error.** An attribute is used on an item it does not apply to. For example, `#[scene]` on a `fn`, `#[entry]` without `#[scene]`, `#[must_use]` on a function, or `#[shader_arg]` on anything but a struct.
 
 ```kis
 #[scene] fn not_a_story() {}
@@ -326,3 +326,27 @@ pushdown fn flip() -> Coin {
 ```
 
 Fix: mark the function `#[scene]`, or draw the value in a scene and pass it in.
+
+## E3025 `shader-arg-shape` {#e3025}
+
+**Error.** A `#[shader_arg]` struct is not a record struct with at least one named field, or it has type parameters. A shader reads its arguments as a WGSL struct with named members of fixed types; const parameters, such as an array length, are allowed.
+
+```kis
+#[shader_arg]
+struct Pair(Decimal, Decimal);
+```
+
+Fix: name the fields and drop type parameters: `#[shader_arg] struct Pair { a: Decimal, b: Decimal }`.
+
+## E3026 `shader-arg-field` {#e3026}
+
+**Error.** A field of a `#[shader_arg]` struct has a type a shader cannot read, or is an array of length 0. Allowed field types are `bool`, `i32`, `u32`, `Decimal`, `Rat`, `Color`, `Point`, `Offset`, `Size`, `Anchor`, `Angle`, `Duration`, fieldless enums, other `#[shader_arg]` structs, and non-empty arrays of these.
+
+```kis
+#[shader_arg]
+struct Caption {
+    text: String,
+}
+```
+
+Fix: pass only numeric data to the shader, e.g. `#[shader_arg] struct Caption { strength: Decimal }`.

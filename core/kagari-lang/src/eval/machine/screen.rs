@@ -3,7 +3,7 @@
 //! step-only state (timeline cursor, scheduled animations, one-shot sounds, choice menu,
 //! text start, despawning entities).
 //!
-//! Component values are std values ([`ConstValue`]s of `Point`, `Decimal`, `ShaderAsset`, …).
+//! Component values are std values ([`ConstValue`]s of `Point`, `Decimal`, `Filter`, …).
 //! Visible changes go through [`PendingChange`]s that only [`Screen::commit`] applies,
 //! which is what `apply_animation` does.
 
@@ -17,6 +17,7 @@ use kagari_num::Decimal;
 use super::super::Fault;
 use super::super::std_items::StdTable;
 use super::super::value::ConstValue;
+use super::ErrorKind;
 use super::anim;
 
 /// A screen. Equality and hashing compare the logical screen only: the step-only parts are
@@ -48,7 +49,7 @@ pub struct LogicalScreen {
     pub entities: OrdMap<u32, Entity>,
     pub hud: Hud,
     pub camera: Camera,
-    /// The screen filter, an `Option<ShaderAsset>`.
+    /// The screen filter, an `Option<Filter>`.
     pub filter: ConstValue,
     pub music: Channel,
     pub ambience: [Channel; 4],
@@ -70,15 +71,19 @@ pub struct Entity {
     pub rotation: ConstValue,
     /// A `Decimal` in `0.0..=1.0`.
     pub opacity: ConstValue,
-    /// The filter, an `Option<ShaderAsset>`.
+    /// The colour filter, an `Option<Filter>`.
     pub filter: ConstValue,
-    /// The generated content, an `Option<ShaderAsset>`.
-    pub shader: ConstValue,
+    /// How the entity composites, an `Option<Mix>`.
+    pub mix: ConstValue,
+    /// The alpha mask over the entity's box, an `Option<Mask>`.
+    pub mask: ConstValue,
+    /// The local motion, an `Option<LocalMotion>`.
+    pub local_motion: ConstValue,
     /// A `Color`.
     pub fill: ConstValue,
     /// An `Option<Size>`.
     pub fill_size: ConstValue,
-    /// Image layers by `Part`: `ImageAsset`s.
+    /// Image layers by `Part`: `ImageAsset`s or `Paint`s.
     pub parts: OrdMap<u8, ConstValue>,
     /// The label's `Text`.
     pub label: Option<ConstValue>,
@@ -90,8 +95,6 @@ pub struct Entity {
     pub movie: Option<ConstValue>,
     /// A `Flip`.
     pub flip: ConstValue,
-    /// A `BlendMode`.
-    pub blend: ConstValue,
     /// An `Option<Setting<bool>>`.
     pub gate: ConstValue,
 }
@@ -101,7 +104,7 @@ pub struct Hud {
     /// `Visibility` values.
     pub text_window: ConstValue,
     pub quick_menu: ConstValue,
-    /// An `ImageAsset`.
+    /// An `ImageAsset` or a `Paint`.
     pub side_image: Option<ConstValue>,
 }
 
@@ -186,6 +189,12 @@ pub enum ScheduledKind {
     StopSounds { fade_out_ms: u32 },
     /// `replay_bgm()`: the music channel's track restarts.
     ReplayMusic,
+    /// `Entity::travel`: a `TransitionalMotion` from the `Pose` `from` to the `Pose` `to`.
+    Travel {
+        motion: ConstValue,
+        from: ConstValue,
+        to: ConstValue,
+    },
 }
 
 /// What an animation applies to.
@@ -195,6 +204,8 @@ pub enum Target {
     Layer(LayerTarget),
     Channel(ChannelId),
     Entity(u32),
+    /// The path of an entity's `travel`.
+    Travel(u32),
     Camera,
 }
 
@@ -218,7 +229,9 @@ pub enum EntityProp {
     Rotation,
     Opacity,
     Filter,
-    Shader,
+    Mix,
+    Mask,
+    LocalMotion,
     Fill,
 }
 
@@ -283,7 +296,9 @@ impl Entity {
             rotation: zero_angle(std),
             opacity: decimal(Decimal::ZERO),
             filter: std.none(),
-            shader: std.none(),
+            mix: std.none(),
+            mask: std.none(),
+            local_motion: std.none(),
             fill: std.color.make(vec![
                 ConstValue::Int(0),
                 ConstValue::Int(0),
@@ -297,7 +312,6 @@ impl Entity {
             label_width: std.none(),
             movie: None,
             flip: std.flip.unit("None"),
-            blend: std.blend_mode.unit("Normal"),
             gate: std.none(),
         }
     }
@@ -309,7 +323,9 @@ impl Entity {
             EntityProp::Rotation => &mut self.rotation,
             EntityProp::Opacity => &mut self.opacity,
             EntityProp::Filter => &mut self.filter,
-            EntityProp::Shader => &mut self.shader,
+            EntityProp::Mix => &mut self.mix,
+            EntityProp::Mask => &mut self.mask,
+            EntityProp::LocalMotion => &mut self.local_motion,
             EntityProp::Fill => &mut self.fill,
         }
     }
@@ -552,6 +568,59 @@ impl Screen {
             self.entity(id, std);
         }
         self.schedule(Some(target), ScheduledKind::Motion(motion), delay)
+    }
+
+    /// `travel(to, motion)` on entity `id`: the logical pose becomes `to` at once through
+    /// three tweens with the motion's timing, and the path is scheduled as a `Travel`.
+    pub fn travel(
+        &mut self,
+        id: u32,
+        to: ConstValue,
+        motion: ConstValue,
+        std: &StdTable,
+    ) -> Result<(), ErrorKind> {
+        let entity = self.entity(id, std);
+        let from = std.pose.make(vec![
+            entity.position.clone(),
+            entity.scale.clone(),
+            entity.rotation.clone(),
+        ]);
+        let info = &std.transitional_motion;
+        let part = |name: &str| {
+            info.field(name)
+                .and_then(|index| motion.field(index))
+                .cloned()
+                .ok_or(ErrorKind::Abort)
+        };
+        let easing = part("easing")?;
+        anim::check_easing(&easing, std)?;
+        let tween = std
+            .tween
+            .make(vec![part("duration")?, easing, part("delay")?]);
+        let delay = anim::delay_ms(&motion, info, std);
+        for (prop, name) in [
+            (EntityProp::Position, "position"),
+            (EntityProp::Scale, "scale"),
+            (EntityProp::Rotation, "rotation"),
+        ] {
+            let value = std
+                .pose
+                .field(name)
+                .and_then(|index| to.field(index))
+                .cloned()
+                .ok_or(ErrorKind::Abort)?;
+            self.commit(
+                PendingChange::Prop(PropTarget::Entity(id, prop), value),
+                tween.clone(),
+                std,
+            )?;
+        }
+        self.schedule(
+            Some(Target::Travel(id)),
+            ScheduledKind::Travel { motion, from, to },
+            delay,
+        )?;
+        Ok(())
     }
 
     /// Schedules at the cursor plus `delay_ms`.

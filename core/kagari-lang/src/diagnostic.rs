@@ -402,6 +402,8 @@ codes! {
     KindEffectNotConstant = "E3022";
     KindUnusedMustUse = "W3023", warning;
     KindRngOutsideScene = "E3024";
+    KindShaderArgShape = "E3025";
+    KindShaderArgField = "E3026";
 
     // E4: const evaluation.
     EvalOverflow = "E4001";

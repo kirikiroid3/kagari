@@ -1,15 +1,21 @@
 //! The first phase of a frame: one walk over the node tree that produces the vertices, the
-//! uniform slots and the ordered list of passes and copies.
+//! uniform slots, the shader arguments, the motion compute dispatches and the ordered list of
+//! passes and copies.
 
+use std::collections::HashMap;
 use std::ops::Range;
 
 use kagari_bytecode::AssetId;
-use kagari_engine::{Affine, AssetStore, Blend, Dir, Node, Rect, ThumbKey, TransitionDraw};
+use kagari_engine::{
+    Affine, AssetStore, Dir, MotionStage, Node, Pose, Rect, ShaderEffect, ThumbKey, TransitionDraw,
+};
+use kagari_shader::{MOTION_SLOTS, ShaderRole};
 
 use crate::Gfx;
 use crate::atlas::GlyphAtlas;
 use crate::layers::{LayerId, LayerPool};
-use crate::pipelines::{Pipe, Uniforms, Vertex};
+use crate::pipelines::{MotionUniform, Pipe, Uniforms, Vertex};
+use crate::shaders::ShaderCache;
 use crate::textures::TextureCache;
 
 /// A pixel rectangle of a target.
@@ -71,6 +77,17 @@ pub(crate) enum Target {
     Layer(LayerId),
 }
 
+/// The third texture of a transition.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum TransitionMask {
+    /// The white texture (no mask).
+    None,
+    /// A rule mask image.
+    Image(AssetId),
+    /// A layer a mask shader was drawn into.
+    Layer(LayerId),
+}
+
 /// The group-1 bind group of a draw.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum BindKey {
@@ -79,26 +96,68 @@ pub(crate) enum BindKey {
     Still,
     Atlas(u16),
     Layer(LayerId),
-    Blend { src: LayerId, backdrop: LayerId },
-    Blur { src: LayerId },
-    Transition { from: LayerId, to: LayerId, mask: Option<AssetId> },
+    /// Two layers (mix source and backdrop; masked content and mask).
+    Pair {
+        a: LayerId,
+        b: LayerId,
+    },
+    Blur {
+        src: LayerId,
+    },
+    Transition {
+        from: LayerId,
+        to: LayerId,
+        mask: TransitionMask,
+    },
+    /// The empty group of mask shaders.
+    Empty,
+    /// The white texture (an unmasked paint).
+    White,
+}
+
+/// The pipeline of a draw: a built-in one or a user shader.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum DrawPipe {
+    Fixed(Pipe),
+    User(AssetId, ShaderRole),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Draw {
-    pub pipe: Pipe,
+    pub pipe: DrawPipe,
     pub bind: BindKey,
     pub verts: Range<u32>,
     pub scissor: PxRect,
     /// Byte offset of the uniform slot.
     pub uniform: u32,
+    /// Byte offset of the shader arguments (user shaders only).
+    pub args: Option<u32>,
+}
+
+/// One motion stage dispatch of the frame's compute pass.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ComputeOp {
+    pub shader: AssetId,
+    pub role: ShaderRole,
+    /// Byte offset of the `MotionUniform`.
+    pub uniform: u32,
+    /// Byte offset of the shader arguments.
+    pub args: u32,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Op {
-    Pass { target: Target, clear: bool, draws: Vec<Draw> },
+    Pass {
+        target: Target,
+        clear: bool,
+        draws: Vec<Draw>,
+    },
     /// `rect` of `from` into the same pixels of `to`.
-    Copy { from: Target, to: LayerId, rect: PxRect },
+    Copy {
+        from: Target,
+        to: LayerId,
+        rect: PxRect,
+    },
 }
 
 /// The output of the planning phase.
@@ -106,6 +165,10 @@ pub(crate) enum Op {
 pub(crate) struct Plan {
     pub verts: Vec<Vertex>,
     pub uniforms: Vec<u8>,
+    /// Packed shader arguments, each at a storage-offset-aligned position.
+    pub args: Vec<u8>,
+    /// Motion stages, dispatched in order before the first pass.
+    pub compute: Vec<ComputeOp>,
     pub ops: Vec<Op>,
 }
 
@@ -116,6 +179,11 @@ pub(crate) struct Ctx {
     pub alpha: f32,
     pub scissor: PxRect,
     pub target: Target,
+    /// The motion displacement slot of geometry (0 = identity).
+    pub slot: u32,
+    /// Inside a `Motion`: geometry moves on the GPU, so clips and transition bounds computed on
+    /// the CPU no longer narrow the scissor.
+    pub free: bool,
 }
 
 /// `p ∘ g`: apply `g` first, then `p`.
@@ -161,27 +229,57 @@ fn scale(c: [f32; 4], k: f32) -> [f32; 4] {
     [c[0] * k, c[1] * k, c[2] * k, c[3] * k]
 }
 
-fn blend_index(b: Blend) -> f32 {
-    let i: u8 = match b {
-        Blend::Normal => 0,
-        Blend::Add => 1,
-        Blend::Multiply => 2,
-        Blend::Screen => 3,
-        Blend::Overlay => 4,
-        Blend::Darken => 5,
-        Blend::Lighten => 6,
-        Blend::ColorDodge => 7,
-        Blend::ColorBurn => 8,
-        Blend::HardLight => 9,
-        Blend::SoftLight => 10,
-        Blend::Difference => 11,
-        Blend::Exclusion => 12,
-        Blend::Hue => 13,
-        Blend::Saturation => 14,
-        Blend::Color => 15,
-        Blend::Luminosity => 16,
+/// `len` rounded up to a multiple of `align` (≥ 1).
+pub(crate) fn align_up(len: usize, align: usize) -> usize {
+    let align = align.max(1);
+    len.div_ceil(align).saturating_mul(align)
+}
+
+/// `(x, y, scale, rotation)`.
+fn pose_vec(p: &Pose) -> [f32; 4] {
+    [p.position[0], p.position[1], p.scale, p.rotation]
+}
+
+/// The uniform of one motion stage in slot `slot` under the parent transform `xf`.
+pub(crate) fn motion_uniform(
+    xf: &Affine,
+    pose: &Pose,
+    stage: &MotionStage,
+    slot: u32,
+    chained: bool,
+) -> MotionUniform {
+    let [a, b, c, d, e, f] = xf.0;
+    let (from, to, timing) = match stage {
+        MotionStage::Local { effect } => ([0.0; 4], [0.0; 4], [effect.time, 0.0, 0.0, 0.0]),
+        MotionStage::Transitional {
+            effect,
+            from,
+            to,
+            progress,
+        } => (
+            pose_vec(from),
+            pose_vec(to),
+            [effect.time, *progress, 0.0, 0.0],
+        ),
     };
-    f32::from(i)
+    MotionUniform {
+        parent0: [a, c, e, 0.0],
+        parent1: [b, d, f, 0.0],
+        pose: pose_vec(pose),
+        from,
+        to,
+        timing,
+        slot,
+        chained: u32::from(chained),
+        pad: [0; 2],
+    }
+}
+
+fn stage_effect(stage: &MotionStage) -> (&ShaderEffect, ShaderRole) {
+    match stage {
+        MotionStage::Local { effect } => (effect, ShaderRole::LocalMotion),
+        MotionStage::Transitional { effect, .. } => (effect, ShaderRole::TransitionalMotion),
+    }
 }
 
 fn dir_index(d: Dir) -> f32 {
@@ -199,16 +297,24 @@ pub(crate) struct Planner<'a> {
     pub textures: &'a mut TextureCache,
     pub atlas: &'a mut GlyphAtlas,
     pub layers: &'a mut LayerPool,
+    pub shaders: &'a mut ShaderCache,
     pub assets: &'a AssetStore,
     /// The design target size; every layer has it.
     pub size: (u32, u32),
     /// The uniform slot stride.
     pub slot: usize,
+    /// The storage buffer offset alignment of shader arguments.
+    pub args_align: usize,
     pub max_dim: u32,
     pub has_still: bool,
     pub plan: Plan,
-    /// The slot holding only the target size.
+    /// The slot holding only the target size (motion slot 0).
     pub base: u32,
+    /// The uniform slots holding only the target size and a motion slot, by motion slot.
+    bases: HashMap<u32, u32>,
+    /// The next free motion slot.
+    next_motion: u32,
+    motion_warned: bool,
 }
 
 impl<'a> Planner<'a> {
@@ -218,26 +324,35 @@ impl<'a> Planner<'a> {
         textures: &'a mut TextureCache,
         atlas: &'a mut GlyphAtlas,
         layers: &'a mut LayerPool,
+        shaders: &'a mut ShaderCache,
         assets: &'a AssetStore,
         size: (u32, u32),
         slot: usize,
         has_still: bool,
     ) -> Planner<'a> {
-        let max_dim = gfx.device.limits().max_texture_dimension_2d;
+        let limits = gfx.device.limits();
         let mut planner = Planner {
             gfx,
             textures,
             atlas,
             layers,
+            shaders,
             assets,
             size,
             slot,
-            max_dim,
+            args_align: usize::try_from(limits.min_storage_buffer_offset_alignment)
+                .unwrap_or(256)
+                .max(4),
+            max_dim: limits.max_texture_dimension_2d,
             has_still,
             plan: Plan::default(),
             base: 0,
+            bases: HashMap::new(),
+            next_motion: 1,
+            motion_warned: false,
         };
         planner.base = planner.uniform(Uniforms::new(size));
+        planner.bases.insert(0, planner.base);
         planner
     }
 
@@ -249,6 +364,8 @@ impl<'a> Planner<'a> {
             alpha: 1.0,
             scissor: PxRect::full(self.size),
             target: Target::Design,
+            slot: 0,
+            free: false,
         };
         for node in nodes {
             self.node(node, ctx);
@@ -256,21 +373,51 @@ impl<'a> Planner<'a> {
         self.plan
     }
 
-    /// Appends a uniform slot; returns its byte offset.
-    pub fn uniform(&mut self, u: Uniforms) -> u32 {
+    /// Appends a uniform slot holding `bytes`; returns its byte offset.
+    pub fn uniform_bytes(&mut self, bytes: &[u8]) -> u32 {
         let offset = self.plan.uniforms.len();
-        self.plan.uniforms.extend_from_slice(bytemuck::bytes_of(&u));
-        self.plan.uniforms.resize(offset.saturating_add(self.slot), 0);
+        self.plan.uniforms.extend_from_slice(bytes);
+        self.plan
+            .uniforms
+            .resize(offset.saturating_add(self.slot), 0);
         u32::try_from(offset).unwrap_or(u32::MAX)
     }
 
-    /// Uniforms with the target size and the given parameters.
-    pub fn params(&mut self, a: [f32; 4], b: [f32; 4], c: [f32; 4]) -> u32 {
+    /// Appends a uniform slot; returns its byte offset.
+    pub fn uniform(&mut self, u: Uniforms) -> u32 {
+        self.uniform_bytes(bytemuck::bytes_of(&u))
+    }
+
+    /// The uniform slot of plain geometry in motion slot `slot`.
+    pub fn base_for(&mut self, slot: u32) -> u32 {
+        if let Some(&offset) = self.bases.get(&slot) {
+            return offset;
+        }
         let mut u = Uniforms::new(self.size);
+        u.xf_slot = slot;
+        let offset = self.uniform(u);
+        self.bases.insert(slot, offset);
+        offset
+    }
+
+    /// Uniforms with the target size, motion slot `slot` and the given parameters.
+    pub fn params(&mut self, slot: u32, a: [f32; 4], b: [f32; 4], c: [f32; 4]) -> u32 {
+        let mut u = Uniforms::new(self.size);
+        u.xf_slot = slot;
         u.a = a;
         u.b = b;
         u.c = c;
         self.uniform(u)
+    }
+
+    /// Appends packed shader arguments at an aligned offset; returns the offset.
+    pub fn args(&mut self, bytes: &[u8]) -> u32 {
+        let offset = align_up(self.plan.args.len(), self.args_align);
+        self.plan.args.resize(offset, 0);
+        self.plan.args.extend_from_slice(bytes);
+        let end = align_up(self.plan.args.len(), 4);
+        self.plan.args.resize(end, 0);
+        u32::try_from(offset).unwrap_or(u32::MAX)
     }
 
     /// Opens a pass that clears `target`.
@@ -292,19 +439,37 @@ impl<'a> Planner<'a> {
         self.layers.acquire(&self.gfx.device, self.size)
     }
 
+    /// Records a draw with a built-in pipeline.
+    pub fn draw(
+        &mut self,
+        target: Target,
+        pipe: Pipe,
+        bind: BindKey,
+        verts: Range<u32>,
+        scissor: PxRect,
+        uniform: u32,
+    ) {
+        self.push(
+            target,
+            Draw {
+                pipe: DrawPipe::Fixed(pipe),
+                bind,
+                verts,
+                scissor,
+                uniform,
+                args: None,
+            },
+        );
+    }
+
     /// Records a draw into `target`, merging it into the previous draw when possible.
-    pub fn draw(&mut self, target: Target, pipe: Pipe, bind: BindKey, verts: Range<u32>, scissor: PxRect, uniform: u32) {
-        if scissor.is_empty() || verts.is_empty() {
+    pub fn push(&mut self, target: Target, draw: Draw) {
+        if draw.scissor.is_empty() || draw.verts.is_empty() {
             return;
         }
-        let draw = Draw {
-            pipe,
-            bind,
-            verts,
-            scissor,
-            uniform,
-        };
-        if let Some(Op::Pass { target: t, draws, .. }) = self.plan.ops.last_mut()
+        if let Some(Op::Pass {
+            target: t, draws, ..
+        }) = self.plan.ops.last_mut()
             && *t == target
         {
             if let Some(last) = draws.last_mut()
@@ -312,6 +477,7 @@ impl<'a> Planner<'a> {
                 && last.bind == draw.bind
                 && last.scissor == draw.scissor
                 && last.uniform == draw.uniform
+                && last.args == draw.args
                 && last.verts.end == draw.verts.start
             {
                 last.verts.end = draw.verts.end;
@@ -351,31 +517,153 @@ impl<'a> Planner<'a> {
 
     /// `rect` transformed by `xf`.
     pub fn quad(&mut self, xf: &Affine, rect: &Rect, uv: [f32; 4], color: [f32; 4]) -> Range<u32> {
+        self.quad_flipped(xf, rect, false, false, uv, color)
+    }
+
+    /// `rect` transformed by `xf`, its corners mirrored horizontally / vertically (so `uv` and
+    /// the local coordinates flip with them).
+    fn quad_flipped(
+        &mut self,
+        xf: &Affine,
+        rect: &Rect,
+        flip_x: bool,
+        flip_y: bool,
+        uv: [f32; 4],
+        color: [f32; 4],
+    ) -> Range<u32> {
+        let (mut x0, mut x1) = (rect.x, rect.x + rect.w);
+        let (mut y0, mut y1) = (rect.y, rect.y + rect.h);
+        if flip_x {
+            std::mem::swap(&mut x0, &mut x1);
+        }
+        if flip_y {
+            std::mem::swap(&mut y0, &mut y1);
+        }
         let p = [
-            apply(xf, rect.x, rect.y),
-            apply(xf, rect.x + rect.w, rect.y),
-            apply(xf, rect.x, rect.y + rect.h),
-            apply(xf, rect.x + rect.w, rect.y + rect.h),
+            apply(xf, x0, y0),
+            apply(xf, x1, y0),
+            apply(xf, x0, y1),
+            apply(xf, x1, y1),
         ];
         self.quad_points(p, uv, color)
     }
 
     /// The whole target, uv 0..1 (layer composites).
     pub fn full_quad(&mut self, color: [f32; 4]) -> Range<u32> {
-        let rect = Rect {
+        let rect = self.full_rect();
+        self.quad(&Affine::IDENTITY, &rect, [0.0, 0.0, 1.0, 1.0], color)
+    }
+
+    fn full_rect(&self) -> Rect {
+        Rect {
             x: 0.0,
             y: 0.0,
             w: self.size.0 as f32,
             h: self.size.1 as f32,
-        };
-        self.quad(&Affine::IDENTITY, &rect, [0.0, 0.0, 1.0, 1.0], color)
+        }
     }
 
     /// Composites layer `src` onto `target` with `color` (premultiplied multiplier).
-    pub fn composite(&mut self, src: LayerId, target: Target, pipe: Pipe, color: [f32; 4], scissor: PxRect) {
+    pub fn composite(
+        &mut self,
+        src: LayerId,
+        target: Target,
+        pipe: Pipe,
+        color: [f32; 4],
+        scissor: PxRect,
+    ) {
         let verts = self.full_quad(color);
         let base = self.base;
         self.draw(target, pipe, BindKey::Layer(src), verts, scissor, base);
+    }
+
+    /// Prepares the pipeline of `effect` under `role`; whether it can be drawn.
+    fn available(&mut self, effect: &ShaderEffect, role: ShaderRole) -> bool {
+        self.shaders
+            .prepare(self.gfx, self.assets, effect.shader, role)
+    }
+
+    /// Records a user shader draw of `effect`.
+    #[allow(clippy::too_many_arguments)]
+    fn shader_draw(
+        &mut self,
+        target: Target,
+        effect: &ShaderEffect,
+        role: ShaderRole,
+        bind: BindKey,
+        verts: Range<u32>,
+        scissor: PxRect,
+        uniform: u32,
+    ) {
+        let args = self.args(&effect.args);
+        self.push(
+            target,
+            Draw {
+                pipe: DrawPipe::User(effect.shader, role),
+                bind,
+                verts,
+                scissor,
+                uniform,
+                args: Some(args),
+            },
+        );
+    }
+
+    /// Draws mask shader `effect` over `rect` (under `ctx.xf`, in `ctx.slot`) into a new cleared
+    /// layer, or `None` when the shader is unavailable.
+    fn mask_layer(
+        &mut self,
+        ctx: &Ctx,
+        effect: &ShaderEffect,
+        rect: &Rect,
+        flip: (bool, bool),
+    ) -> Option<LayerId> {
+        if !self.available(effect, ShaderRole::Mask) {
+            return None;
+        }
+        let layer = self.acquire();
+        self.begin_pass(Target::Layer(layer));
+        let uniform = self.params(
+            ctx.slot,
+            [effect.time, 0.0, 0.0, 0.0],
+            [0.0, 0.0, rect.w, rect.h],
+            [0.0; 4],
+        );
+        let verts = self.quad_flipped(
+            &ctx.xf,
+            rect,
+            flip.0,
+            flip.1,
+            [0.0, 0.0, 1.0, 1.0],
+            [1.0; 4],
+        );
+        self.shader_draw(
+            Target::Layer(layer),
+            effect,
+            ShaderRole::Mask,
+            BindKey::Empty,
+            verts,
+            ctx.scissor,
+            uniform,
+        );
+        Some(layer)
+    }
+
+    /// Plans `children` into a new cleared layer at alpha 1 (same transform, slot and scissor).
+    fn isolate(&mut self, ctx: &Ctx, scissor: PxRect, xf: Affine, children: &[Node]) -> LayerId {
+        let layer = self.acquire();
+        self.begin_pass(Target::Layer(layer));
+        let inner = Ctx {
+            xf,
+            alpha: 1.0,
+            scissor,
+            target: Target::Layer(layer),
+            ..*ctx
+        };
+        for child in children {
+            self.node(child, inner);
+        }
+        layer
     }
 
     pub fn node(&mut self, node: &Node, ctx: Ctx) {
@@ -383,10 +671,32 @@ impl<'a> Planner<'a> {
             Node::Group {
                 transform,
                 opacity,
-                blend,
                 clip,
                 children,
-            } => self.group(ctx, transform, *opacity, *blend, clip.as_ref(), children),
+            } => self.group(ctx, transform, *opacity, clip.as_ref(), children),
+            Node::Filter { effect, children } => self.filter(ctx, effect, children),
+            Node::Mix {
+                effect,
+                opacity,
+                children,
+            } => self.mix(ctx, effect, *opacity, children),
+            Node::Masked {
+                effect,
+                rect,
+                children,
+            } => self.masked(ctx, effect, rect, children),
+            Node::Motion {
+                stages,
+                pose,
+                children,
+            } => self.motion(ctx, stages, pose, children),
+            Node::Paint {
+                rect,
+                texture,
+                mask,
+                flip_x,
+                flip_y,
+            } => self.paint(ctx, rect, texture, mask.as_ref(), (*flip_x, *flip_y)),
             Node::Image {
                 rect,
                 image,
@@ -414,15 +724,29 @@ impl<'a> Planner<'a> {
                     std::mem::swap(&mut v0, &mut v1);
                 }
                 let verts = self.quad(&ctx.xf, rect, [u0, v0, u1, v1], color);
-                let base = self.base;
-                self.draw(ctx.target, Pipe::Image, BindKey::Image(*image), verts, ctx.scissor, base);
+                let base = self.base_for(ctx.slot);
+                self.draw(
+                    ctx.target,
+                    Pipe::Image,
+                    BindKey::Image(*image),
+                    verts,
+                    ctx.scissor,
+                    base,
+                );
             }
             Node::Fill { rect, color } => {
                 let color = scale(*color, ctx.alpha);
                 let [u, v] = self.atlas.white_uv();
                 let verts = self.quad(&ctx.xf, rect, [u, v, u, v], color);
-                let base = self.base;
-                self.draw(ctx.target, Pipe::Mask, BindKey::Atlas(0), verts, ctx.scissor, base);
+                let base = self.base_for(ctx.slot);
+                self.draw(
+                    ctx.target,
+                    Pipe::Mask,
+                    BindKey::Atlas(0),
+                    verts,
+                    ctx.scissor,
+                    base,
+                );
             }
             Node::NineSlice {
                 rect,
@@ -448,8 +772,15 @@ impl<'a> Planner<'a> {
                     return;
                 }
                 let verts = self.quad(&ctx.xf, rect, [0.0, 0.0, 1.0, 1.0], [ctx.alpha; 4]);
-                let base = self.base;
-                self.draw(ctx.target, Pipe::Linear, BindKey::Still, verts, ctx.scissor, base);
+                let base = self.base_for(ctx.slot);
+                self.draw(
+                    ctx.target,
+                    Pipe::Linear,
+                    BindKey::Still,
+                    verts,
+                    ctx.scissor,
+                    base,
+                );
             }
             Node::Thumbnail {
                 rect,
@@ -460,8 +791,15 @@ impl<'a> Planner<'a> {
                     return;
                 }
                 let verts = self.quad(&ctx.xf, rect, [0.0, 0.0, 1.0, 1.0], [ctx.alpha; 4]);
-                let base = self.base;
-                self.draw(ctx.target, Pipe::Image, BindKey::Thumb(*slot), verts, ctx.scissor, base);
+                let base = self.base_for(ctx.slot);
+                self.draw(
+                    ctx.target,
+                    Pipe::Image,
+                    BindKey::Thumb(*slot),
+                    verts,
+                    ctx.scissor,
+                    base,
+                );
             }
         }
     }
@@ -471,7 +809,6 @@ impl<'a> Planner<'a> {
         ctx: Ctx,
         transform: &Affine,
         opacity: f32,
-        blend: Blend,
         clip: Option<&Rect>,
         children: &[Node],
     ) {
@@ -480,63 +817,235 @@ impl<'a> Planner<'a> {
             return;
         }
         let scissor = match clip {
-            Some(rect) => ctx.scissor.intersect(&transformed_bounds(&ctx.xf, rect)),
-            None => ctx.scissor,
+            Some(rect) if !ctx.free => ctx.scissor.intersect(&transformed_bounds(&ctx.xf, rect)),
+            _ => ctx.scissor,
         };
         if scissor.is_empty() {
             return;
         }
         let xf = compose(&ctx.xf, transform);
-        if blend == Blend::Normal && children.len() <= 1 {
+        if children.len() <= 1 {
             let inner = Ctx {
                 xf,
                 alpha,
                 scissor,
-                target: ctx.target,
+                ..ctx
             };
             for child in children {
                 self.node(child, inner);
             }
             return;
         }
-        let layer = self.acquire();
-        self.begin_pass(Target::Layer(layer));
-        let inner = Ctx {
-            xf,
-            alpha: 1.0,
-            scissor,
-            target: Target::Layer(layer),
-        };
-        for child in children {
-            self.node(child, inner);
+        let layer = self.isolate(&ctx, scissor, xf, children);
+        self.composite(layer, ctx.target, Pipe::Linear, [alpha; 4], scissor);
+        self.layers.release(layer);
+    }
+
+    /// `Node::Filter`: the children in a layer, then the colour shader over the whole target.
+    fn filter(&mut self, ctx: Ctx, effect: &ShaderEffect, children: &[Node]) {
+        if ctx.alpha <= 0.0 || ctx.scissor.is_empty() {
+            return;
         }
-        match blend {
-            Blend::Normal => self.composite(layer, ctx.target, Pipe::Linear, [alpha; 4], scissor),
-            Blend::Add => self.composite(layer, ctx.target, Pipe::LinearAdd, [alpha; 4], scissor),
-            mode => {
-                let backdrop = self.acquire();
-                self.copy(ctx.target, backdrop, scissor);
-                let uniform = self.params([blend_index(mode), alpha, 0.0, 0.0], [0.0; 4], [0.0; 4]);
-                let verts = self.full_quad([1.0; 4]);
-                self.draw(
-                    ctx.target,
-                    Pipe::Blend,
-                    BindKey::Blend {
-                        src: layer,
-                        backdrop,
-                    },
-                    verts,
-                    scissor,
-                    uniform,
-                );
-                self.layers.release(backdrop);
-            }
+        let layer = self.isolate(&ctx, ctx.scissor, ctx.xf, children);
+        if self.available(effect, ShaderRole::Color) {
+            let (w, h) = (self.size.0 as f32, self.size.1 as f32);
+            let uniform = self.params(0, [effect.time, 0.0, 0.0, 0.0], [0.0, 0.0, w, h], [0.0; 4]);
+            let verts = self.full_quad([ctx.alpha; 4]);
+            self.shader_draw(
+                ctx.target,
+                effect,
+                ShaderRole::Color,
+                BindKey::Layer(layer),
+                verts,
+                ctx.scissor,
+                uniform,
+            );
+        } else {
+            self.composite(layer, ctx.target, Pipe::Linear, [ctx.alpha; 4], ctx.scissor);
         }
         self.layers.release(layer);
     }
 
-    fn nine_slice(&mut self, ctx: Ctx, rect: &Rect, image: AssetId, insets: &[f32; 4], color: [f32; 4]) {
-        let Some(entry) = self.textures.image(self.gfx, self.assets, image, self.max_dim) else {
+    /// `Node::Mix`: the children in a layer, a copy of the backdrop, then the mix shader, which
+    /// replaces the target's pixels.
+    fn mix(&mut self, ctx: Ctx, effect: &ShaderEffect, opacity: f32, children: &[Node]) {
+        let alpha = ctx.alpha * opacity;
+        if alpha <= 0.0 || ctx.scissor.is_empty() {
+            return;
+        }
+        let layer = self.isolate(&ctx, ctx.scissor, ctx.xf, children);
+        if self.available(effect, ShaderRole::Mix) {
+            let backdrop = self.acquire();
+            self.copy(ctx.target, backdrop, ctx.scissor);
+            let (w, h) = (self.size.0 as f32, self.size.1 as f32);
+            let uniform = self.params(
+                0,
+                [effect.time, 0.0, alpha, 0.0],
+                [0.0, 0.0, w, h],
+                [0.0; 4],
+            );
+            let verts = self.full_quad([1.0; 4]);
+            self.shader_draw(
+                ctx.target,
+                effect,
+                ShaderRole::Mix,
+                BindKey::Pair {
+                    a: layer,
+                    b: backdrop,
+                },
+                verts,
+                ctx.scissor,
+                uniform,
+            );
+            self.layers.release(backdrop);
+        } else {
+            self.composite(layer, ctx.target, Pipe::Linear, [alpha; 4], ctx.scissor);
+        }
+        self.layers.release(layer);
+    }
+
+    /// `Node::Masked`: the children in a layer, the mask shader over `rect` in another, then the
+    /// first times the second's red channel.
+    fn masked(&mut self, ctx: Ctx, effect: &ShaderEffect, rect: &Rect, children: &[Node]) {
+        if ctx.alpha <= 0.0 || ctx.scissor.is_empty() {
+            return;
+        }
+        let content = self.isolate(&ctx, ctx.scissor, ctx.xf, children);
+        match self.mask_layer(&ctx, effect, rect, (false, false)) {
+            Some(mask) => {
+                let verts = self.full_quad([ctx.alpha; 4]);
+                let base = self.base;
+                self.draw(
+                    ctx.target,
+                    Pipe::MaskComposite,
+                    BindKey::Pair {
+                        a: content,
+                        b: mask,
+                    },
+                    verts,
+                    ctx.scissor,
+                    base,
+                );
+                self.layers.release(mask);
+            }
+            None => self.composite(
+                content,
+                ctx.target,
+                Pipe::Linear,
+                [ctx.alpha; 4],
+                ctx.scissor,
+            ),
+        }
+        self.layers.release(content);
+    }
+
+    /// `Node::Paint`: the texture shader over `rect`, times its mask shader when it has one.
+    fn paint(
+        &mut self,
+        ctx: Ctx,
+        rect: &Rect,
+        texture: &ShaderEffect,
+        mask: Option<&ShaderEffect>,
+        flip: (bool, bool),
+    ) {
+        if ctx.alpha <= 0.0
+            || ctx.scissor.is_empty()
+            || !self.available(texture, ShaderRole::Texture)
+        {
+            return;
+        }
+        let mask = mask.and_then(|m| self.mask_layer(&ctx, m, rect, flip));
+        let uniform = self.params(
+            ctx.slot,
+            [texture.time, 0.0, 0.0, 0.0],
+            [0.0, 0.0, rect.w, rect.h],
+            [0.0; 4],
+        );
+        let verts = self.quad_flipped(
+            &ctx.xf,
+            rect,
+            flip.0,
+            flip.1,
+            [0.0, 0.0, 1.0, 1.0],
+            [ctx.alpha; 4],
+        );
+        let bind = match mask {
+            Some(layer) => BindKey::Layer(layer),
+            None => BindKey::White,
+        };
+        self.shader_draw(
+            ctx.target,
+            texture,
+            ShaderRole::Texture,
+            bind,
+            verts,
+            ctx.scissor,
+            uniform,
+        );
+        if let Some(layer) = mask {
+            self.layers.release(layer);
+        }
+    }
+
+    /// `Node::Motion`: one compute dispatch per available stage writes the displacement of a new
+    /// motion slot, which the children are drawn in.
+    fn motion(&mut self, ctx: Ctx, stages: &[MotionStage], pose: &Pose, children: &[Node]) {
+        let mut available = Vec::with_capacity(stages.len());
+        for stage in stages {
+            let (effect, role) = stage_effect(stage);
+            if self.available(effect, role) {
+                available.push(stage);
+            }
+        }
+        if available.is_empty() || self.next_motion >= MOTION_SLOTS {
+            if !available.is_empty() && !self.motion_warned {
+                self.motion_warned = true;
+                log::warn!(
+                    "more than {} motion shaders in one frame; the rest are not moved",
+                    MOTION_SLOTS.saturating_sub(1)
+                );
+            }
+            for child in children {
+                self.node(child, ctx);
+            }
+            return;
+        }
+        let slot = self.next_motion;
+        self.next_motion = slot.saturating_add(1);
+        for (i, stage) in available.into_iter().enumerate() {
+            let (effect, role) = stage_effect(stage);
+            let u = motion_uniform(&ctx.xf, pose, stage, slot, i > 0);
+            let uniform = self.uniform_bytes(bytemuck::bytes_of(&u));
+            let args = self.args(&effect.args);
+            self.plan.compute.push(ComputeOp {
+                shader: effect.shader,
+                role,
+                uniform,
+                args,
+            });
+        }
+        let inner = Ctx {
+            slot,
+            free: true,
+            ..ctx
+        };
+        for child in children {
+            self.node(child, inner);
+        }
+    }
+
+    fn nine_slice(
+        &mut self,
+        ctx: Ctx,
+        rect: &Rect,
+        image: AssetId,
+        insets: &[f32; 4],
+        color: [f32; 4],
+    ) {
+        let Some(entry) = self
+            .textures
+            .image(self.gfx, self.assets, image, self.max_dim)
+        else {
             return;
         };
         let (iw, ih) = (entry.width as f32, entry.height as f32);
@@ -556,7 +1065,7 @@ impl<'a> Planner<'a> {
         let ys = [rect.y, rect.y + dt, rect.y + rect.h - db, rect.y + rect.h];
         let us = [0.0, l / iw, 1.0 - r / iw, 1.0];
         let vs = [0.0, t / ih, 1.0 - b / ih, 1.0];
-        let base = self.base;
+        let base = self.base_for(ctx.slot);
         for row in 0..3 {
             for col in 0..3 {
                 let cell = |a: &[f32; 4], i: usize| {
@@ -579,7 +1088,14 @@ impl<'a> Planner<'a> {
                     h: y1 - y0,
                 };
                 let verts = self.quad(&ctx.xf, &cell_rect, [u0, v0, u1, v1], color);
-                self.draw(ctx.target, Pipe::Image, BindKey::Image(image), verts, ctx.scissor, base);
+                self.draw(
+                    ctx.target,
+                    Pipe::Image,
+                    BindKey::Image(image),
+                    verts,
+                    ctx.scissor,
+                    base,
+                );
             }
         }
     }
@@ -596,45 +1112,49 @@ impl<'a> Planner<'a> {
         if ctx.alpha <= 0.0 {
             return;
         }
-        let scissor = ctx.scissor.intersect(&transformed_bounds(&ctx.xf, bounds));
+        let scissor = if ctx.free {
+            ctx.scissor
+        } else {
+            ctx.scissor.intersect(&transformed_bounds(&ctx.xf, bounds))
+        };
         if scissor.is_empty() {
             return;
         }
-        let a = self.acquire();
-        let b = self.acquire();
-        for (layer, nodes) in [(a, from), (b, to)] {
-            self.begin_pass(Target::Layer(layer));
-            let inner = Ctx {
-                xf: ctx.xf,
-                alpha: 1.0,
-                scissor,
-                target: Target::Layer(layer),
-            };
-            for node in nodes {
-                self.node(node, inner);
-            }
-        }
-        let p = if progress.is_nan() { 0.0 } else { progress.clamp(0.0, 1.0) };
-        let mut mask = None;
-        let (pa, pb, pc) = match *kind {
-            TransitionDraw::Crossfade => ([0.0, p, 0.0, 0.0], [0.0; 4], [0.0; 4]),
+        let a = self.isolate(&ctx, scissor, ctx.xf, from);
+        let b = self.isolate(&ctx, scissor, ctx.xf, to);
+        let p = if progress.is_nan() {
+            0.0
+        } else {
+            progress.clamp(0.0, 1.0)
+        };
+        let mut mask = TransitionMask::None;
+        let crossfade = ([0.0, p, 0.0, 0.0], [0.0; 4], [0.0; 4]);
+        let (pa, pb, pc) = match kind {
+            TransitionDraw::Crossfade => crossfade,
             TransitionDraw::Rule {
                 mask: id,
                 softness,
                 reverse,
             } => {
-                if self.textures.rule_mask(self.gfx, self.assets, id, self.max_dim) {
-                    mask = Some(id);
-                    let rev = if reverse { 1.0 } else { 0.0 };
-                    ([1.0, p, f32::from(softness), rev], [0.0; 4], [0.0; 4])
+                if self
+                    .textures
+                    .rule_mask(self.gfx, self.assets, *id, self.max_dim)
+                {
+                    mask = TransitionMask::Image(*id);
+                    let rev = if *reverse { 1.0 } else { 0.0 };
+                    ([1.0, p, f32::from(*softness), rev], [0.0; 4], [0.0; 4])
                 } else {
-                    ([0.0, p, 0.0, 0.0], [0.0; 4], [0.0; 4])
+                    crossfade
                 }
             }
-            TransitionDraw::Wipe { dir } => ([2.0, p, 0.0, 0.0], [dir_index(dir), 0.0, 0.0, 0.0], [0.0; 4]),
+            TransitionDraw::Wipe { dir } => (
+                [2.0, p, 0.0, 0.0],
+                [dir_index(*dir), 0.0, 0.0, 0.0],
+                [0.0; 4],
+            ),
             TransitionDraw::Blinds { dir, count } => (
                 [3.0, p, 0.0, 0.0],
-                [dir_index(dir), count.max(1) as f32, 0.0, 0.0],
+                [dir_index(*dir), (*count).max(1) as f32, 0.0, 0.0],
                 [0.0; 4],
             ),
             TransitionDraw::ThroughColor {
@@ -643,19 +1163,38 @@ impl<'a> Planner<'a> {
             } => (
                 [4.0, p, 0.0, 0.0],
                 [0.0, 0.0, hold_fraction.clamp(0.0, 1.0), 0.0],
-                color,
+                *color,
             ),
+            TransitionDraw::Masked {
+                mask: effect,
+                softness,
+                reverse,
+            } => match self.mask_layer(&ctx, effect, bounds, (false, false)) {
+                Some(layer) => {
+                    mask = TransitionMask::Layer(layer);
+                    let rev = if *reverse { 1.0 } else { 0.0 };
+                    ([5.0, p, f32::from(*softness), rev], [0.0; 4], [0.0; 4])
+                }
+                None => crossfade,
+            },
         };
-        let uniform = self.params(pa, pb, pc);
+        let uniform = self.params(ctx.slot, pa, pb, pc);
         let verts = self.quad(&ctx.xf, bounds, [0.0, 0.0, 1.0, 1.0], [ctx.alpha; 4]);
         self.draw(
             ctx.target,
             Pipe::Transition,
-            BindKey::Transition { from: a, to: b, mask },
+            BindKey::Transition {
+                from: a,
+                to: b,
+                mask,
+            },
             verts,
             scissor,
             uniform,
         );
+        if let TransitionMask::Layer(layer) = mask {
+            self.layers.release(layer);
+        }
         self.layers.release(a);
         self.layers.release(b);
     }

@@ -17,6 +17,8 @@ kagari-fmt = { workspace = true }
 kagari-lang = { workspace = true }
 kagari-lsp = { workspace = true }
 kagari-project = { workspace = true }
+kagari-shader = { workspace = true, features = ["validate"] }
+kagari-std = { workspace = true }
 kagari-syntax = { workspace = true }
 clap = { workspace = true }
 

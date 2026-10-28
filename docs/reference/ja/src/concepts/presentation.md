@@ -85,8 +85,8 @@ azusa.opacity().change(1.0).apply_animation(tween(ms(300)));
 | 部分 | 定義場所 | 役割 |
 | ---- | -------- | ---- |
 | エンティティ | レンダー関数 | レンダーがスポーン・変更・デスポーンする。`EntityId` 定数で識別する |
-| コンポーネント | `std::screen`（固定） | エンティティに付くデータ：プレーン、z、位置、アンカー、拡大率、回転、不透明度、フィルターシェーダー、生成コンテンツのシェーダー、塗り、画像パーツ、ラベル、動画、反転、ブレンド、ゲート |
-| リソース | `std::screen`（固定） | 画面そのもののデータ：Hud、選択肢メニュー、カメラ、画面フィルターシェーダー、オーディオチャンネル |
+| コンポーネント | `std::screen`（固定） | エンティティに付くデータ：プレーン、z、位置、アンカー、拡大率、回転、不透明度、色フィルター、ミックス、マスク、ローカルモーション、塗り、画像パーツ、ラベル、動画、反転、ゲート |
+| リソース | `std::screen`（固定） | 画面そのもののデータ：Hud、選択肢メニュー、カメラ、画面フィルター、オーディオチャンネル |
 | システム | エンジン | 実行時にエンティティを処理する。例えばアニメーションをフレームごとに進める |
 
 `EntityId(0)` は背景エンティティ `BACKGROUND` 用に予約されています。スタジオの id は 1 から
@@ -111,15 +111,19 @@ azusa.opacity().change(1.0).apply_animation(tween(ms(300)));
 
 | 対象 | 変更方法 | アニメーション型 |
 | ---- | -------- | ---------------- |
-| プロパティ `Prop<T>`：位置、拡大率、回転、不透明度、フィルターとシェーダー（`Option<ShaderAsset>`）、塗り。Hud の表示状態。カメラのオフセット・ズーム・回転。チャンネル音量 | `.change(v)` で `Change<T>` を得る | `Tween`：長さ、イージング、遅延 |
-| レイヤー：`ImageLayer`（背景とサイド画像を含む）、`LabelLayer`、`MovieLayer` | `.change(x)` または `.clear()` で `Swap` を得る | `Transition`：カット、クロスフェード、ルール、ワイプ、ブラインド、色を経由 |
+| プロパティ `Prop<T>`：位置、拡大率、回転、不透明度、フィルター・ミックス・マスク・ローカルモーション（シェーダー効果）、塗り。Hud の表示状態。カメラのオフセット・ズーム・回転。チャンネル音量 | `.change(v)` で `Change<T>` を得る | `Tween`：長さ、イージング、遅延 |
+| レイヤー：`ImageLayer`（背景とサイド画像を含む）、`LabelLayer`、`MovieLayer` | `.change(x)`、`.paint(p)` または `.clear()` で `Swap` を得る | `Transition`：カット、クロスフェード、ルール、マスク、ワイプ、ブラインド、色を経由 |
 | エンティティまたはカメラ全体 | 直接 `.apply_animation(m)` | `Motion`：出発点に戻る相対的な経路 |
+| シェーダーの経路に沿ったエンティティのポーズ | 直接 `.travel(to, motion)` | `TransitionalMotion`：長さ、イージング、遅延 |
 | 音楽または環境音のチャンネル | `.change(track)` または `.stop()` で `ChannelChange` を得る | `AudioFade` |
 
-フィルター、天候、パーティクルはシェーダーです。画面と各エンティティは `filter()` を持ちます。
-これは描画内容を後処理する `Option<ShaderAsset>` で、`None` はフィルターなしです。天候や
-パーティクルは `shader()` が設定されたエンティティで、シェーダーがその内容を生成します。内容は
-エンティティのプレーンに描かれ、CSS の `z-index` に相当する `z` で順序が決まります。
+フィルター、ブレンドモード、マスク、グラデーションや天候などの生成コンテンツ、シェーダーによる
+モーションは**シェーダー**です。GPU で実行される WGSL ファイルで、画面はシェーダーと引数を組にした
+効果値として持ちます。画面と各エンティティは `filter()` を持ち、エンティティはさらに `mix()`
+（下にあるものへの合成方法）、`mask()`、`local_motion()` を持ちます。画像レイヤーは生成された
+`paint` を表示できます。効果を同じシェーダーの別の引数へトゥイーンすると、引数が補間されます。
+標準ライブラリは既製のシェーダーを `std::shaders` に同梱しています。
+[`std::screen::shader`](../../../../std/ja/src/screen-shader.md) を参照してください。
 
 音楽はステップをまたいで続きます。レンダーが音楽チャンネルをすでに再生中の曲のままにしておけば、
 曲は最初からやり直しません。レンダーで曲を頭から再生し直すには `screen.replay_bgm()` を使います。
@@ -139,7 +143,7 @@ const fn mio_enters(mut screen: Screen) -> Screen {
 `Change<T>`、`Swap`、`ChannelChange` は `#[must_use]` なので、
 `screen.background().change(BG::ROOF);` のように変更が保留のまま終わる文は警告になります。
 補間できないレイアウト設定だけは直接設定します：`set_plane`、`set_z`、`set_anchor`、
-`set_flip`、`set_blend`、`set_fill_size`、`gate`。
+`set_flip`、`set_fill_size`、`gate`。
 
 ### アニメーションは論理画面を変えない {#animations-never-change-the-logical-screen}
 
@@ -359,7 +363,10 @@ s!(render = |mut screen| { screen.hud().text_window().change(Visibility::Hidden)
 
 - [`std::screen`](../../../../std/ja/src/screen.md)：座標と色、プレーンと描画順、スポーン時の
   既定値とデスポーンを含むエンティティ、プロパティとレイヤー、Hud、選択肢メニュー、カメラ、
-  フィルターと生成コンテンツのシェーダー、ブレンドモード、ステップのタイムライン。
+  シェーダー効果のスロット、ステップのタイムライン。
+- [`std::screen::shader`](../../../../std/ja/src/screen-shader.md) と
+  [`std::shaders`](../../../../std/ja/src/shaders.md)：シェーダーのロール、効果値、std の
+  シェーダーライブラリ。
 - [`std::screen::anim`](../../../../std/ja/src/screen-anim.md)：イージング、トゥイーン、
   トランジション、モーションとそのプリセット。
 - [`std::screen::audio`](../../../../std/ja/src/screen-audio.md)：チャンネル、ループ、

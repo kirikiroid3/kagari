@@ -160,7 +160,13 @@ impl GlyphAtlas {
 
     /// The mask of `key` (its outline ring when `outline_px > 0`), rasterized and uploaded on
     /// first use. `None` for an empty mask or a full atlas.
-    pub fn glyph(&mut self, gfx: &Gfx, fonts: &Fonts, key: GlyphKey, outline_px: f32) -> Option<AtlasGlyph> {
+    pub fn glyph(
+        &mut self,
+        gfx: &Gfx,
+        fonts: &Fonts,
+        key: GlyphKey,
+        outline_px: f32,
+    ) -> Option<AtlasGlyph> {
         let outline_q = (outline_px.max(0.0) * 64.0).round() as u32;
         if let Some(entry) = self.entries.get(&(key, outline_q)) {
             return *entry;
@@ -205,7 +211,10 @@ impl GlyphAtlas {
         let mut padded = vec![0u8; (pad_w as usize).saturating_mul(pad_h as usize)];
         let row = mask.width as usize;
         for (r, src) in mask.alpha.chunks_exact(row).enumerate() {
-            let start = r.saturating_add(1).saturating_mul(pad_w as usize).saturating_add(1);
+            let start = r
+                .saturating_add(1)
+                .saturating_mul(pad_w as usize)
+                .saturating_add(1);
             if let Some(dst) = padded.get_mut(start..start.saturating_add(row)) {
                 dst.copy_from_slice(src);
             }
@@ -217,7 +226,12 @@ impl GlyphAtlas {
         let y0 = y.saturating_add(1) as f32;
         let glyph = AtlasGlyph {
             page: u16::try_from(index).unwrap_or(u16::MAX),
-            uv: [x0 / s, y0 / s, (x0 + mask.width as f32) / s, (y0 + mask.height as f32) / s],
+            uv: [
+                x0 / s,
+                y0 / s,
+                (x0 + mask.width as f32) / s,
+                (y0 + mask.height as f32) / s,
+            ],
             width: mask.width,
             height: mask.height,
             left: mask.left,

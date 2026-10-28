@@ -51,6 +51,8 @@ Terms of the standard library link to the *Kagari STD Reference*.
 - **Divergence.** The reason a save no longer fits a changed program, such as a choice ID that no
   longer resolves; loading returns it as an error. [Saves, Replay and Determinism](../concepts/saves.md)
 - **Easing.** The curve along which a tween interpolates. [`std::screen::anim`](../../../../std/en/src/screen-anim.md)
+- **Effect value.** A shader paired with its arguments, such as a `Filter` or a `Mix`, as the
+  screen holds it. [`std::screen::shader`](../../../../std/en/src/screen-shader.md)
 - **Ending.** The value an entry scene returns when the story is over; the exit handler receives
   it. [Entry Scenes and Endings](../concepts/entry.md)
 - **Entity.** An object on the screen, identified by an `EntityId` constant; renders spawn, change
@@ -148,6 +150,10 @@ Terms of the standard library link to the *Kagari STD Reference*.
   [Values, References and Closures](../syntax/values.md)
 - **Setting.** A persistent, global player preference, declared as a `Setting<T>` handle; it never
   reaches the story. [The Game System](../concepts/system.md)
+- **Shader.** A WGSL file (`.wgsl`) that the renderer runs on the GPU, with one of six roles: colour
+  filter, mix, texture, mask, local motion or transitional motion. Its asset type, such as
+  `ColorShader<A>`, states the role and the argument type `A`.
+  [`std::screen::shader`](../../../../std/en/src/screen-shader.md)
 - **σ (sigma).** The narrative state: the position, the call stack with its locals, and the story
   variables. [The Story Machine](../concepts/story.md)
 - **Signal.** A reactive value in `fn` code, created by `signal(init)` as a getter and a setter.

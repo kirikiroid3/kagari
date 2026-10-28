@@ -16,7 +16,7 @@ stage 5 reuses in *story mode*.
 | `core/kagari-lang/src/eval/tabulate.rs` | Tabulated `const fn` calls |
 | `core/kagari-lang/src/eval/domain.rs` | `DomainCtx`: the values of finite types; `product` |
 | `core/kagari-lang/src/eval/renders.rs` | The renders of steps: keyframe detection and render errors |
-| `core/kagari-lang/src/eval/value.rs` | `ConstValue` (plain data), `Text`, `AssetKind`, `HandleKind`, `display_value` |
+| `core/kagari-lang/src/eval/value.rs` | `ConstValue` (plain data), `Text`, `AssetKind` (five file kinds and `Shader(ShaderRole)`), `HandleKind`, `display_value` |
 | `core/kagari-lang/src/eval/std_items.rs` | `StdTable`: the std items evaluation builds and inspects; the `Builtin` table |
 | `core/kagari-lang/src/eval/machine/mod.rs` | `Machine`: heap, places, operators, `freeze`/`thaw`, `MAX_CALL_DEPTH`, `EvalError`/`ErrorKind` |
 | `core/kagari-lang/src/eval/machine/exec.rs` | The MIR executor: frames, statements, terminators, calls |
@@ -250,6 +250,19 @@ step.
   snapshots and the consistency check do.
 - `StepState`: what belongs to one step only: the timeline cursor and text start, scheduled
   animations and sounds, the choice menu's disabled arms and alignment, and despawning entities.
+
+Effects are std values: the screen filter and an entity's `filter`, `mix`, `mask` and
+`local_motion` hold `Option<Filter | Mix | Mask | LocalMotion>` (`EntityProp::{Filter, Mix, Mask,
+LocalMotion}`), and an image part or the side image holds an `ImageAsset` or a `Paint`
+(`ImageLayer::get` is `None` for a paint). `Entity::travel(to, motion)` (`Screen::travel`) reads
+the current pose as `from`, checks the motion's easing, commits the three pose props with a
+`Tween` built from the motion's duration, easing and delay, and schedules
+`ScheduledKind::Travel { motion, from, to }` on `Target::Travel(id)`.
+
+`asset("…")` evaluated in a std body names `FilePath::Std(path)` (the std shader library);
+elsewhere the path is joined to the asset root. `erase_shader`/`erase_args` return their
+argument: a role-typed shader is an `Asset { kind: Shader(role), .. }` whether typed
+`ColorShader<A>` or erased to `ShaderAsset`.
 
 Visible changes are `PendingChange`s that only `apply_animation` commits (`Screen::commit`),
 which is how "every visible change states its animation" is enforced. At run time the engine

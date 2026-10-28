@@ -153,6 +153,8 @@ pub struct AdtDef {
     pub is_enum: bool,
     pub builtin: bool,
     pub must_use: bool,
+    /// Whether the item carries `#[shader_arg]`.
+    pub shader_arg: bool,
     /// The variants of an enum, in order; a struct has exactly one, named like the struct.
     pub variants: Vec<VariantDef>,
 }
@@ -192,14 +194,18 @@ pub struct StdItems {
     pub choice: Option<ItemId>,
     pub choice_arm: Option<ItemId>,
     pub element: Option<ItemId>,
-    /// `ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset`, `ShaderAsset`.
+    /// `ImageAsset`, `AudioAsset`, `VoiceAsset`, `VideoAsset`, `FontAsset`.
     pub assets: Vec<ItemId>,
+    /// The std structs a `#[shader_arg]` field may have: `Color`, `Point`, `Offset`, `Size`,
+    /// `Anchor`, `Angle`, `Duration`.
+    pub shader_arg_std: Vec<ItemId>,
     // Traits.
     pub eq: Option<ItemId>,
     pub integer: Option<ItemId>,
     pub asset: Option<ItemId>,
     pub step: Option<ItemId>,
     pub rand_choose: Option<ItemId>,
+    pub shader_arg: Option<ItemId>,
     pub to_text: Option<ItemId>,
     // Functions.
     pub push_step: Option<ItemId>,

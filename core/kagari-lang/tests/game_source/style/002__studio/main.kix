@@ -5,7 +5,8 @@
 
 use std::narrative::Mark;
 use std::narrative::text::{speed, text_style};
-use std::screen::{BOTTOM_CENTER, BlendMode};
+use std::screen::BOTTOM_CENTER;
+use std::screen::shader::{ColorShader, filter};
 use std::stage::{hide_all, side_face};
 
 // Characters and slots.
@@ -46,7 +47,12 @@ const BLINDS_RULE: ImageAsset = asset("rule_blinds.png");
 const KEY_ITEM: ImageAsset = asset("item_key.png");
 const THEME: AudioAsset = asset("bgm_theme.ogg");
 const KNOCK: AudioAsset = asset("se_knock.ogg");
-const MEMORY: ShaderAsset = asset("memory.wgsl");
+/// The arguments of the flashback filter.
+#[shader_arg]
+struct Memory {
+    strength: Decimal,
+}
+const MEMORY: ColorShader<Memory> = asset("memory.wgsl");
 
 // Recipes.
 
@@ -61,13 +67,16 @@ const fn dip_to_black(screen: &mut Screen, next: ImageAsset) {
     screen.despawn(CURTAIN);
 }
 
-/// Tints the stage with a colour blend and a shader filter, for a memory.
+/// Tints the stage with a colour mix and a shader filter, for a memory.
 const fn flashback(mut screen: Screen) -> Screen {
     screen.entity(TINT).set_plane(Plane::Front);
-    screen.entity(TINT).set_blend(BlendMode::Color);
+    screen.entity(TINT).mix().change(Some(std::shaders::mix::color())).apply_animation(instant());
     screen.entity(TINT).fill().change(hex(0x382000)).apply_animation(instant());
     screen.entity(TINT).opacity().change(0.6).apply_animation(tween(ms(800)));
-    screen.filter().change(Some(MEMORY)).apply_animation(tween(ms(800)));
+    screen
+        .filter()
+        .change(Some(filter(MEMORY, Memory { strength: 0.8 })))
+        .apply_animation(tween(ms(800)));
     screen
 }
 
@@ -139,7 +148,10 @@ const fn surprised_at_mark(mut screen: Screen) -> Screen {
 
 const fn opening(mut screen: Screen) -> Screen {
     screen.background().change(BG::CLASSROOM).apply_animation(rule(BLINDS_RULE, ms(1000)));
-    screen.music().change(looped(THEME).region(secs(16), Some(secs(80)))).apply_animation(crossfade(ms(1000)));
+    screen
+        .music()
+        .change(looped(THEME).region(secs(16), Some(secs(80))))
+        .apply_animation(crossfade(ms(1000)));
     screen.barrier();
     HANAKO.show(&mut screen, HANAKO::NORMAL, CENTER, tween(ms(300)));
     side_face(&mut screen, Some(HANAKO::NORMAL), fade(ms(300)));
@@ -188,7 +200,10 @@ const fn locked_arm(mut screen: Screen) -> Screen {
 
 static mut DAY: Int<1, 7> = 1;
 
-enum Plan { Stay, Leave }
+enum Plan {
+    Stay,
+    Leave,
+}
 
 #[scene]
 #[entry]
@@ -197,7 +212,11 @@ pushdown fn Studio() {
     s!(who = "Hanako", render = opening, t!["Good morning."]);
     s!(who = "Hanako", render = hanako_smiles, t!["Did you sleep well?"]);
     s!(t!["Day " {DAY}]);
-    s!(who = "Hanako", render = surprised_at_mark, t!["Wait" ![""](pause(ms(500)).and(mark(1))) "—what?"]);
+    s!(
+        who = "Hanako",
+        render = surprised_at_mark,
+        t!["Wait" ![""](pause(ms(500)).and(mark(1))) "—what?"],
+    );
     s!(render = knocking, t![!["Someone is at the door."](speed(ms(50)))]);
     s!(render = hanako_moves_left, t!["This is " !["important"](dots()) "."]);
     s!(t!["Listen." ![""](click_wait()) " Did you hear that?"]);

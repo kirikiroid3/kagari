@@ -1,0 +1,181 @@
+//! Motion shaders: local motions for `Entity::local_motion` (loops and settling moves around the
+//! entity's pose) and transitional motions for `Entity::travel` (paths between two poses).
+
+use crate::screen::{Angle, Offset};
+use crate::screen::shader::{
+    LocalMotion,
+    LocalMotionBehavior,
+    LocalMotionShader,
+    TransitionalMotion,
+    TransitionalMotionShader,
+    local_motion,
+    transitional_motion,
+};
+use crate::time::{Duration, ZERO};
+
+/// A loop of `period` that starts at once.
+const fn periodic(period: Duration) -> LocalMotionBehavior {
+    LocalMotionBehavior::Periodic { after: ZERO, period }
+}
+
+/// The arguments of `BOB`.
+#[shader_arg]
+pub struct Bob {
+    /// How far the entity rises, in pixels.
+    pub height: Decimal,
+    /// The length of one bob.
+    pub period: Duration,
+}
+/// Bobbing up and down.
+pub const BOB: LocalMotionShader<Bob> = asset("shaders/local_motion/bob.wgsl");
+/// Rises by `height` pixels and comes back once per `period`, forever.
+pub const fn bob(height: Decimal, period: Duration) -> LocalMotion {
+    local_motion(BOB, Bob { height, period }, periodic(period))
+}
+
+/// The arguments of `SWAY`.
+#[shader_arg]
+pub struct Sway {
+    /// The largest rotation either way.
+    pub angle: Angle,
+    /// The length of one swing back and forth.
+    pub period: Duration,
+}
+/// Rocking around the anchor.
+pub const SWAY: LocalMotionShader<Sway> = asset("shaders/local_motion/sway.wgsl");
+/// Rocks by `angle` either way once per `period`, forever.
+pub const fn sway(angle: Angle, period: Duration) -> LocalMotion {
+    local_motion(SWAY, Sway { angle, period }, periodic(period))
+}
+
+/// The arguments of `PULSE`.
+#[shader_arg]
+pub struct Pulse {
+    /// The largest scale factor.
+    pub scale: Decimal,
+    /// The length of one pulse.
+    pub period: Duration,
+}
+/// Growing and shrinking around the anchor.
+pub const PULSE: LocalMotionShader<Pulse> = asset("shaders/local_motion/pulse.wgsl");
+/// Grows to `scale` times its size and back once per `period`, forever.
+pub const fn pulse(scale: Decimal, period: Duration) -> LocalMotion {
+    local_motion(PULSE, Pulse { scale, period }, periodic(period))
+}
+
+/// The arguments of `SPIN`.
+#[shader_arg]
+pub struct Spin {
+    /// The length of one turn.
+    pub period: Duration,
+}
+/// Turning around the anchor.
+pub const SPIN: LocalMotionShader<Spin> = asset("shaders/local_motion/spin.wgsl");
+/// Turns clockwise once per `period`, forever.
+pub const fn spin(period: Duration) -> LocalMotion {
+    local_motion(SPIN, Spin { period }, periodic(period))
+}
+
+/// The arguments of `ORBIT`.
+#[shader_arg]
+pub struct Orbit {
+    /// The radius of the circle, in pixels.
+    pub radius: Decimal,
+    /// The length of one round.
+    pub period: Duration,
+}
+/// Circling through the pose.
+pub const ORBIT: LocalMotionShader<Orbit> = asset("shaders/local_motion/orbit.wgsl");
+/// Circles clockwise on a circle of `radius` pixels that passes through the pose, once per
+/// `period`, forever.
+pub const fn orbit(radius: Decimal, period: Duration) -> LocalMotion {
+    local_motion(ORBIT, Orbit { radius, period }, periodic(period))
+}
+
+/// The arguments of `DECAYING_QUAKE`.
+#[shader_arg]
+pub struct DecayingQuake {
+    /// The horizontal amplitude at the start, in pixels.
+    pub horizontal: i32,
+    /// The vertical amplitude at the start, in pixels.
+    pub vertical: i32,
+    /// How long the quake lasts.
+    pub duration: Duration,
+}
+/// A shake that fades out (TyranoScript `[quake2]`).
+pub const DECAYING_QUAKE: LocalMotionShader<DecayingQuake> = asset(
+    "shaders/local_motion/decaying_quake.wgsl",
+);
+/// Shakes by `horizontal` and `vertical` pixels, alternating every frame at 60 fps, and fades out
+/// quadratically over `duration`; then holds still.
+pub const fn decaying_quake(horizontal: i32, vertical: i32, duration: Duration) -> LocalMotion {
+    local_motion(
+        DECAYING_QUAKE,
+        DecayingQuake { horizontal, vertical, duration },
+        LocalMotionBehavior::Stall { after: duration },
+    )
+}
+
+/// The arguments of `SINE_INTEGRAL`.
+#[shader_arg]
+pub struct SineIntegral {
+    /// The displacement the motion settles at.
+    pub amplitude: Offset,
+    /// How fast it oscillates, in radians per second.
+    pub rate: Decimal,
+}
+/// An overshooting approach, the solution of an ODE.
+pub const SINE_INTEGRAL: LocalMotionShader<SineIntegral> = asset(
+    "shaders/local_motion/sine_integral.wgsl",
+);
+/// Moves by `amplitude`·(2/π)·Si(`rate`·t), the solution of dx/dt = `amplitude`·(2/π)·sin(`rate`·t)/t:
+/// it overshoots `amplitude` and settles at it in ringing swings. Holds after `settle`.
+pub const fn sine_integral(amplitude: Offset, rate: Decimal, settle: Duration) -> LocalMotion {
+    local_motion(SINE_INTEGRAL, SineIntegral { amplitude, rate }, LocalMotionBehavior::Stall {
+        after: settle,
+    })
+}
+
+/// The arguments of `ARC`.
+#[shader_arg]
+pub struct Arc {
+    /// How far the path rises above the straight line halfway, in pixels.
+    pub height: Decimal,
+}
+/// A parabolic arc.
+pub const ARC: TransitionalMotionShader<Arc> = asset("shaders/transitional_motion/arc.wgsl");
+/// Moves along a parabola that peaks `height` pixels above the straight line, over `duration`.
+pub const fn arc(height: Decimal, duration: Duration) -> TransitionalMotion {
+    transitional_motion(ARC, Arc { height }, duration)
+}
+
+/// The arguments of `BOUNCE`.
+#[shader_arg]
+pub struct Bounce {
+    /// How far the first overshoot goes past the end, in pixels.
+    pub overshoot: Decimal,
+}
+/// An overshooting arrival (animate.css `bounceIn*`).
+pub const BOUNCE: TransitionalMotionShader<Bounce> = asset(
+    "shaders/transitional_motion/bounce.wgsl",
+);
+/// Moves straight, overshoots the end by `overshoot` pixels, then by less on the way back, and
+/// settles, over `duration`.
+pub const fn bounce(overshoot: Decimal, duration: Duration) -> TransitionalMotion {
+    transitional_motion(BOUNCE, Bounce { overshoot }, duration)
+}
+
+/// The arguments of `SPIRAL`.
+#[shader_arg]
+pub struct Spiral {
+    /// How many clockwise turns the path makes.
+    pub turns: Decimal,
+}
+/// A spiral into the end.
+pub const SPIRAL: TransitionalMotionShader<Spiral> = asset(
+    "shaders/transitional_motion/spiral.wgsl",
+);
+/// Spirals into the end, turning `turns` times clockwise, over `duration`.
+pub const fn spiral(turns: Decimal, duration: Duration) -> TransitionalMotion {
+    transitional_motion(SPIRAL, Spiral { turns }, duration)
+}

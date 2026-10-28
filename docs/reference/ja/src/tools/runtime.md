@@ -64,7 +64,7 @@ kagari-desktop-runtime [OPTIONS] [GAME_DIR]
 
 ## ランタイムプロファイル `native_v0` {#runtime-profile-native_v0}
 
-デスクトップランタイムはランタイムプロファイル `native_v0` を実装しています。動画とシェーダーを除く std 全体です。対応するアセット形式は[ランタイムプロファイル](./projects.md#runtime-profiles)にあります。`kagari build` はデコードできないアセットを拒否するので、`runtime-compatibility = ["native_v0"]` でビルドできたゲームには実行時に非対応のアセットはありません。STD リファレンスの[ランタイムプロファイル](../../../../std/ja/src/appendix/profiles.md)も参照してください。
+デスクトップランタイムはランタイムプロファイル `native_v0` を実装しています。動画を除く std 全体です。対応するアセット形式は[ランタイムプロファイル](./projects.md#runtime-profiles)にあります。`kagari build` はデコードできないアセットと検証に通らないシェーダーを拒否するので、`runtime-compatibility = ["native_v0"]` でビルドできたゲームには実行時に非対応のアセットはありません。シェーダーにはストレージバッファを持つ GPU が必要で、モーションのシェーダーにはさらにコンピュートシェーダーが必要です。これらのない GPU では、ランタイムは警告をログに出し、その効果を設定されていないものとして描きます。STD リファレンスの[ランタイムプロファイル](../../../../std/ja/src/appendix/profiles.md)も参照してください。
 
 デバイスがなくてもランタイムは動作を続けます。
 

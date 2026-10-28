@@ -1,20 +1,21 @@
 //! A step's screen at run time: the screen its render returned, the logical screen at step
-//! entry, and the timeline of its scheduled items with their resolved start times.
+//! entry, the timeline of its scheduled items with their resolved start times, and the effect
+//! clocks of its shader effects.
 
 use std::collections::HashMap;
 
-use kagari_vm::{HostObj, Trap, Value};
+use kagari_vm::{AssetId, HostObj, Trap, Value};
 
 use super::expect_screen;
 use super::model::{
-    CursorAnchor, LayerContent, LogicalScreen, PropTarget, PropValue, ScheduledKind, ScreenObj,
-    StepState, Target,
+    CursorAnchor, EntityProp, LayerContent, LayerTarget, LogicalScreen, PartContent, PropTarget,
+    PropValue, ScheduledKind, ScreenObj, StepState, Target,
 };
 use crate::Platform;
 use crate::anim::decimal_f32;
 use crate::assets::AssetStore;
 use crate::audio::AudioModel;
-use crate::values::TransitionKind;
+use crate::values::{EffectSpec, LocalMotionBehavior, PaintSpec, TransitionKind};
 
 /// Records every image on the logical screen as seen; a new one invalidates `SeenImage`.
 pub(crate) fn mark_seen_images(
@@ -22,13 +23,68 @@ pub(crate) fn mark_seen_images(
     system: &mut crate::system::SystemState,
     ui: &mut crate::ui::UiState,
 ) {
-    let parts = logical
-        .entities
-        .values()
-        .flat_map(|e| e.parts.values().copied());
-    for id in parts.chain(logical.hud.side_image) {
+    for id in images_of(logical) {
         if system.mark_seen_image(id) {
             ui.invalidate(crate::ui::SourceKey::SeenImage(id));
+        }
+    }
+}
+
+/// What an effect clock belongs to: the screen filter, an entity's filter, mix, mask or local
+/// motion, or the paint of an image layer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum EffectSlot {
+    ScreenFilter,
+    Entity(u32, EntityProp),
+    Layer(LayerTarget),
+}
+
+impl EffectSlot {
+    fn target(self) -> Target {
+        match self {
+            EffectSlot::ScreenFilter => Target::Prop(PropTarget::ScreenFilter),
+            EffectSlot::Entity(id, prop) => Target::Prop(PropTarget::Entity(id, prop)),
+            EffectSlot::Layer(layer) => Target::Layer(layer),
+        }
+    }
+}
+
+/// What keeps an effect clock running: changing only the arguments keeps it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct EffectKey {
+    pub shader: AssetId,
+    pub mask: Option<AssetId>,
+    pub behavior: Option<LocalMotionBehavior>,
+}
+
+impl EffectKey {
+    pub fn of_effect(e: &EffectSpec) -> EffectKey {
+        EffectKey {
+            shader: e.shader,
+            mask: None,
+            behavior: e.behavior,
+        }
+    }
+
+    pub fn of_paint(p: &PaintSpec) -> EffectKey {
+        EffectKey {
+            shader: p.texture.shader,
+            mask: p.mask.as_ref().map(|m| m.shader),
+            behavior: None,
+        }
+    }
+
+    fn of_prop(value: &PropValue) -> Option<EffectKey> {
+        match value {
+            PropValue::Effect(Some(e)) => Some(EffectKey::of_effect(e)),
+            _ => None,
+        }
+    }
+
+    fn of_layer(content: Option<&LayerContent>) -> Option<EffectKey> {
+        match content {
+            Some(LayerContent::Paint(p)) => Some(EffectKey::of_paint(p)),
+            _ => None,
         }
     }
 }
@@ -73,6 +129,8 @@ pub(crate) struct ScreenRuntime {
     pub(super) items: Vec<ItemState>,
     /// Item indices per target, in commit order.
     pub(super) by_target: HashMap<Target, Vec<usize>>,
+    /// The effect clocks of the previous step at its end: slot → (key, origin).
+    carried: HashMap<EffectSlot, (EffectKey, u64)>,
 }
 
 pub(super) struct ItemState {
@@ -129,6 +187,13 @@ fn item_length(kind: &ScheduledKind, animations: bool) -> u32 {
         ScheduledKind::Sound { length_ms, .. } => *length_ms,
         ScheduledKind::StopSounds { fade_out_ms } => *fade_out_ms,
         ScheduledKind::ReplayMusic => 0,
+        ScheduledKind::Travel { motion, .. } => {
+            if animations {
+                motion.duration_ms
+            } else {
+                0
+            }
+        }
     }
 }
 
@@ -144,6 +209,7 @@ impl ScreenRuntime {
             text_start_ms: 0,
             items: Vec::new(),
             by_target: HashMap::new(),
+            carried: HashMap::new(),
         }
     }
 
@@ -179,6 +245,7 @@ impl ScreenRuntime {
             items,
             by_target,
             screen,
+            carried: HashMap::new(),
         };
         runtime.text_start_ms = runtime.compute_text_start();
         runtime.store_starts(&Unresolved);
@@ -201,23 +268,143 @@ impl ScreenRuntime {
             for image in images_of(&obj.logical).chain(images_of(&base)) {
                 assets.ensure_image(image, platform)?;
             }
+            for shader in shaders_of(&obj.logical).chain(shaders_of(&base)) {
+                assets.ensure_shader(shader, platform)?;
+            }
             for item in &obj.step.scheduled {
-                if let ScheduledKind::Transition {
-                    transition,
-                    content,
-                } = &item.kind
-                {
-                    if let Some(LayerContent::Image(image)) = content {
-                        assets.ensure_image(*image, platform)?;
+                match &item.kind {
+                    ScheduledKind::Transition {
+                        transition,
+                        content,
+                    } => {
+                        match content {
+                            Some(LayerContent::Image(image)) => {
+                                assets.ensure_image(*image, platform)?;
+                            }
+                            Some(LayerContent::Paint(paint)) => {
+                                for shader in paint_shaders(paint) {
+                                    assets.ensure_shader(shader, platform)?;
+                                }
+                            }
+                            _ => {}
+                        }
+                        match &transition.kind {
+                            TransitionKind::Rule { mask, .. } => {
+                                assets.ensure_image(*mask, platform)?;
+                            }
+                            TransitionKind::Masked { mask, .. } => {
+                                assets.ensure_shader(mask.shader, platform)?;
+                            }
+                            _ => {}
+                        }
                     }
-                    if let TransitionKind::Rule { mask, .. } = transition.kind {
-                        assets.ensure_image(mask, platform)?;
+                    ScheduledKind::Tween {
+                        value: PropValue::Effect(Some(effect)),
+                        ..
+                    } => assets.ensure_shader(effect.shader, platform)?,
+                    ScheduledKind::Travel { motion, .. } => {
+                        assets.ensure_shader(motion.effect.shader, platform)?;
                     }
+                    _ => {}
                 }
             }
         }
+        let carried = self.final_origins();
         *self = ScreenRuntime::from_step(base, screen, entry_ms, animations);
+        self.carried = carried;
         Ok(())
+    }
+
+    /// The key of item `index`'s effect value, if it sets one.
+    fn item_key(&self, index: usize) -> Option<EffectKey> {
+        match &self.screen.step.scheduled.get(index)?.kind {
+            ScheduledKind::Tween { value, .. } => EffectKey::of_prop(value),
+            ScheduledKind::Transition { content, .. } => EffectKey::of_layer(content.as_ref()),
+            _ => None,
+        }
+    }
+
+    /// The key of a slot's effect on the base screen.
+    fn base_key(&self, slot: EffectSlot) -> Option<EffectKey> {
+        match slot {
+            EffectSlot::ScreenFilter => {
+                EffectKey::of_prop(&self.base.read_prop(PropTarget::ScreenFilter))
+            }
+            EffectSlot::Entity(id, prop) => {
+                EffectKey::of_prop(&self.base.read_prop(PropTarget::Entity(id, prop)))
+            }
+            EffectSlot::Layer(layer) => EffectKey::of_layer(self.base.read_layer(layer).as_ref()),
+        }
+    }
+
+    /// The origin (absolute story ms) of the clock of the effect `key` in `slot` at `t`: the
+    /// earliest start of the trailing run of started items carrying `key`; when that run is
+    /// every started item and the base carries `key` too, the origin carried over from the
+    /// previous step; else the step entry.
+    pub(super) fn effect_origin(&self, slot: EffectSlot, key: EffectKey, t: u64) -> u64 {
+        let mut earliest: Option<u64> = None;
+        let mut whole = true;
+        for &index in self
+            .by_target
+            .get(&slot.target())
+            .into_iter()
+            .flatten()
+            .rev()
+        {
+            let Some(start) = self.items.get(index).and_then(|i| i.start) else {
+                continue;
+            };
+            if start > t {
+                continue;
+            }
+            if self.item_key(index) != Some(key) {
+                whole = false;
+                break;
+            }
+            earliest = Some(earliest.map_or(start, |e| e.min(start)));
+        }
+        if whole && self.base_key(slot) == Some(key) {
+            return match self.carried.get(&slot) {
+                Some((carried, origin)) if *carried == key => *origin,
+                _ => self.entry_ms,
+            };
+        }
+        earliest.unwrap_or(self.entry_ms)
+    }
+
+    /// The final origin of every effect on the logical screen, carried into the next step.
+    fn final_origins(&self) -> HashMap<EffectSlot, (EffectKey, u64)> {
+        let logical = self.logical();
+        let mut slots: Vec<(EffectSlot, EffectKey)> = Vec::new();
+        if let Some(filter) = &logical.filter {
+            slots.push((EffectSlot::ScreenFilter, EffectKey::of_effect(filter)));
+        }
+        for (id, entity) in &logical.entities {
+            for (prop, effect) in [
+                (EntityProp::Filter, &entity.filter),
+                (EntityProp::Mix, &entity.mix),
+                (EntityProp::Mask, &entity.mask),
+                (EntityProp::LocalMotion, &entity.local_motion),
+            ] {
+                if let Some(effect) = effect {
+                    slots.push((EffectSlot::Entity(*id, prop), EffectKey::of_effect(effect)));
+                }
+            }
+            for (part, content) in &entity.parts {
+                if let PartContent::Paint(paint) = content {
+                    let slot = EffectSlot::Layer(LayerTarget::Part(*id, *part));
+                    slots.push((slot, EffectKey::of_paint(paint)));
+                }
+            }
+        }
+        if let Some(PartContent::Paint(paint)) = &logical.hud.side_image {
+            let slot = EffectSlot::Layer(LayerTarget::SideImage);
+            slots.push((slot, EffectKey::of_paint(paint)));
+        }
+        slots
+            .into_iter()
+            .map(|(slot, key)| (slot, (key, self.effect_origin(slot, key, u64::MAX))))
+            .collect()
     }
 
     /// The screen the next step's render receives.
@@ -386,11 +573,43 @@ impl ScreenRuntime {
     }
 }
 
-/// Every image a logical screen shows.
-fn images_of(logical: &LogicalScreen) -> impl Iterator<Item = kagari_vm::AssetId> + '_ {
+/// The image and paint contents of a logical screen's image layers.
+fn contents_of(logical: &LogicalScreen) -> impl Iterator<Item = &PartContent> + '_ {
     logical
         .entities
         .values()
-        .flat_map(|entity| entity.parts.values().copied())
-        .chain(logical.hud.side_image)
+        .flat_map(|entity| entity.parts.values())
+        .chain(&logical.hud.side_image)
+}
+
+/// Every image a logical screen shows.
+fn images_of(logical: &LogicalScreen) -> impl Iterator<Item = AssetId> + '_ {
+    contents_of(logical).filter_map(|content| match content {
+        PartContent::Image(image) => Some(*image),
+        PartContent::Paint(_) => None,
+    })
+}
+
+/// The texture and mask shader of a paint.
+fn paint_shaders(paint: &PaintSpec) -> impl Iterator<Item = AssetId> + '_ {
+    std::iter::once(paint.texture.shader).chain(paint.mask.as_ref().map(|m| m.shader))
+}
+
+/// Every shader a logical screen uses: filters, mixes, masks, local motions and paints.
+fn shaders_of(logical: &LogicalScreen) -> impl Iterator<Item = AssetId> + '_ {
+    let effects = logical
+        .filter
+        .iter()
+        .chain(logical.entities.values().flat_map(|e| {
+            e.filter
+                .iter()
+                .chain(&e.mix)
+                .chain(&e.mask)
+                .chain(&e.local_motion)
+        }));
+    let paints = contents_of(logical).flat_map(|content| match content {
+        PartContent::Paint(paint) => Some(paint_shaders(paint)),
+        PartContent::Image(_) => None,
+    });
+    effects.map(|effect| effect.shader).chain(paints.flatten())
 }

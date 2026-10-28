@@ -67,6 +67,7 @@ fn adt_def(
         is_enum,
         builtin,
         must_use: false,
+        shader_arg: false,
         variants: variants
             .into_iter()
             .map(|(name, shape, fields)| VariantDef {

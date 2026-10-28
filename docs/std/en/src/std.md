@@ -18,6 +18,7 @@ pub mod stage;
 pub mod narrative;
 pub mod ui;
 pub mod system;
+pub mod shaders;
 ```
 
 `Int<lo, hi>`, the Rust primitive integers (`u8` … `u128`, `i8` … `i128`, `usize`, `isize`) and
@@ -348,11 +349,11 @@ impl Asset for AudioAsset {}
 impl Asset for VoiceAsset {}
 impl Asset for VideoAsset {}
 impl Asset for FontAsset {}
-impl Asset for ShaderAsset {}
 ```
 
 Types whose values are exactly the asset constants of the program; the bound of
-[`asset`](#function-assetpath).
+[`asset`](#function-assetpath). The five file types below implement it, and so do the six shader
+types of [`std::screen::shader`](./screen-shader.md) (`ColorShader<A>` and the others).
 
 - Kind: — · Builtin: yes
 
@@ -371,8 +372,8 @@ or an `impl Trait for T` in a game is an error; see
 #[builtin] pub struct ShaderAsset;
 ```
 
-One opaque type per kind of asset file. All six are `Eq` and `Asset`, and all are finite: the
-values of an asset type are exactly its constants.
+One opaque type per kind of asset file. All six are `Eq`. The first five are `Asset` and finite:
+the values of an asset type are exactly its constants.
 
 - Kind: — · Builtin: yes
 
@@ -383,12 +384,14 @@ values of an asset type are exactly its constants.
 |`VoiceAsset`|A voice file, bound to a line|`Say::voice`, `Narrative::replay_voice`|
 |`VideoAsset`|A movie file|movie layers|
 |`FontAsset`|A font file|`System::font`, `TextEffect::font`, `TextStyle::font`|
-|`ShaderAsset`|A WGSL shader file (`.wgsl`): a filter, or generated content such as weather or particles|`Screen::filter`, `Entity::filter`, `Entity::shader`|
+|`ShaderAsset`|The identity of a shader file of any role; effect values hold it|the effect values of [`std::screen::shader`](./screen-shader.md)|
+
+`ShaderAsset` is not `Asset` and not in the prelude: a game declares a shader with the type of its
+role, such as `ColorShader<A>`, and never names `ShaderAsset`.
 
 Which file formats a runtime decodes is listed in [Runtime Profiles](./appendix/profiles.md).
 
 - `VideoAsset` — Profile: not in `native_v0`.
-- `ShaderAsset` — Profile: not in `native_v0`.
 
 ## Function: `asset(path)`
 
@@ -415,12 +418,18 @@ const THEME: AudioAsset = asset("bgm/theme.ogg");
   ([`E1028`](../../../reference/en/src/diagnostics/modules.md#e1028)).
 - The path is relative to the asset directory (`[assets] dir` in `kagari.toml`, by default
   `assets`; without a manifest, the root file's directory) and must not leave it
-  ([`E1029`](../../../reference/en/src/diagnostics/modules.md#e1029)).
+  ([`E1029`](../../../reference/en/src/diagnostics/modules.md#e1029)). Inside `std`, the path is
+  relative to `std` itself, which ships the files of [`std::shaders`](./shaders.md).
 - A missing file is a compile error
   ([`E1027`](../../../reference/en/src/diagnostics/modules.md#e1027)). Because faces, tracks and
   voices are constants, a misspelled name is a resolve error, not a runtime failure.
+- The top-level directories `system-fonts` and `std` of the asset directory are reserved for
+  system fonts and std assets
+  ([`E1032`](../../../reference/en/src/diagnostics/modules.md#e1032)).
 - `kagari build` checks the format of every asset the program uses against the project's runtime
-  profiles; see [Runtime Profiles](./appendix/profiles.md).
+  profiles, and checks every shader against its role; see
+  [Runtime Profiles](./appendix/profiles.md) and
+  [Checking shaders](./guides/shaders.md#checking-shaders).
 
 ## Function: `system_font(path)`
 

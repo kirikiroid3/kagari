@@ -13,14 +13,14 @@
 物語が実行時に保持できるのは有限型だけです（[`E3008`](../../../../reference/ja/src/diagnostics/kinds.md#e3008)）。std の型のうち、次は有限型です。
 
 - `Text`
-- 6 つのアセット型（`ImageAsset`、`AudioAsset`、`VoiceAsset`、`VideoAsset`、`FontAsset`、`ShaderAsset`）
+- 5 つのファイルのアセット型（`ImageAsset`、`AudioAsset`、`VoiceAsset`、`VideoAsset`、`FontAsset`）
 - `Render`（`const fn` ポインタ）
 - `Option`、`Result`、`Range` など、フィールドがすべて有限型の std の構造体と列挙型。例：`Visibility`、`PlayMode`
 
 次は有限型ではありません。
 
 - `String`、`Vec<T>`、`Rat`、`Decimal`
-- `Screen`、`Narrative`、`Meta`、`Setting` など、すべての `#[builtin]` のハンドル型・状態型
+- `Screen`、`Narrative`、`Meta`、`Setting` など、すべての `#[builtin]` のハンドル型・状態型。`ShaderAsset`、`ColorShader<A>` などのシェーダー型、`ShaderArgs` も含むので、`std::screen::shader` の効果値も有限型ではありません
 - Rust の整数や `Decimal` を保持するデータ：`Duration`、`Color`、`EntityId`、`Part`、`Mark`、`Point`、`TextEffect`、`TextStyle` など
 
 物語のコードでも、畳み込まれる定数式の中では有限型でない値を書けます：ステップ内の `ms(300)` や `Mark(1)` は問題ありません。実行時引数を持つ `const fn` 呼び出しは表化され、その結果は有限型でなければなりません。
@@ -45,13 +45,22 @@
 
 - トレイトを宣言するのは `std` だけで、どれも `#[builtin]` です。ゲーム内の `trait` アイテムや `impl Trait for T` はエラーです（[`E1012`](../../../../reference/ja/src/diagnostics/modules.md#e1012)、[`E1023`](../../../../reference/ja/src/diagnostics/modules.md#e1023)）。
 - `Eq` は、プリミティブ型、`Int`、関数ポインタ、そしてフィールドがすべて `Eq` の構造体・列挙型・タプル・配列に成り立ちます。`#[builtin]` 型では、`std` 内の `impl Eq` があるときだけ成り立ちます。クロージャは決して `Eq` ではありません。`Eq` でない型への `==` は [`E2017`](../../../../reference/ja/src/diagnostics/types.md#e2017) です。
-- 満たされない境界（`A: Asset`、`T: RandChoose`、`T: ToText` など）は [`E2026`](../../../../reference/ja/src/diagnostics/types.md#e2026) です。
+- 満たされない境界（`A: Asset`、`T: RandChoose`、`T: ToText`、`A: ShaderArg` など）は [`E2026`](../../../../reference/ja/src/diagnostics/types.md#e2026) です。
+- `ShaderArg` は `()` と `#[shader_arg]` を付けた構造体に成り立ち、それ以外には成り立ちません。
+
+## `#[shader_arg]` {#shader_arg}
+
+シェーダーの引数型は `()` か、`#[shader_arg]` を付けた構造体です。[引数](../guides/shaders.md#arguments) を参照してください。
+
+- 構造体以外への `#[shader_arg]` は [`E3018`](../../../../reference/ja/src/diagnostics/kinds.md#e3018) です。
+- 構造体は名前付きフィールドを持ち、型パラメータを持ってはなりません（const パラメータは使えます）（[`E3025`](../../../../reference/ja/src/diagnostics/kinds.md#e3025)）。
+- 各フィールドは `bool`、`i32`、`u32`、`Decimal`、`Rat`、`Color`、`Point`、`Offset`、`Size`、`Anchor`、`Angle`、`Duration`、Kagari で宣言されたバリアントが 1 つ以上でフィールドのない列挙型、`#[shader_arg]` 構造体、またはこれらの配列 `[T; N]`（`N` > 0）のいずれかです（[`E3026`](../../../../reference/ja/src/diagnostics/kinds.md#e3026)）。
 
 ## `asset::<A>` {#asseta}
 
 - `A: Asset` が必要です（[`E2026`](../../../../reference/ja/src/diagnostics/types.md#e2026)）。
-- 引数は文字列リテラルで（[`E2028`](../../../../reference/ja/src/diagnostics/types.md#e2028)）、空ではなく（[`E1028`](../../../../reference/ja/src/diagnostics/modules.md#e1028)）、アセットディレクトリの中を指し（[`E1029`](../../../../reference/ja/src/diagnostics/modules.md#e1029)）、ファイルが存在しなければなりません（[`E1027`](../../../../reference/ja/src/diagnostics/modules.md#e1027)）。
-- `system_font` も同じリテラルの規則に従います。固有のエラーは [`E1030`](../../../../reference/ja/src/diagnostics/modules.md#e1030)–[`E1032`](../../../../reference/ja/src/diagnostics/modules.md#e1032) です。
+- 引数は文字列リテラルで（[`E2028`](../../../../reference/ja/src/diagnostics/types.md#e2028)）、空ではなく（[`E1028`](../../../../reference/ja/src/diagnostics/modules.md#e1028)）、アセットディレクトリの中で（[`E1029`](../../../../reference/ja/src/diagnostics/modules.md#e1029)）その予約されたディレクトリ `system-fonts` と `std` の外を指し（[`E1032`](../../../../reference/ja/src/diagnostics/modules.md#e1032)）、ファイルが存在しなければなりません（[`E1027`](../../../../reference/ja/src/diagnostics/modules.md#e1027)）。
+- `system_font` も同じリテラルの規則に従います。固有のエラーは [`E1030`](../../../../reference/ja/src/diagnostics/modules.md#e1030) と [`E1031`](../../../../reference/ja/src/diagnostics/modules.md#e1031) です。
 
 ## `nav::start(entry, args, on_exit)` {#navstartentry-args-on_exit}
 
@@ -87,7 +96,7 @@ std のコードが定数評価で実行されるとき、次の失敗はコン�
 |範囲外の `Vec::set`|[`E4005`](../../../../reference/ja/src/diagnostics/eval.md#e4005)|
 |`static` の初期化子以外での `Setting` や `Meta` のハンドル|[`E4007`](../../../../reference/ja/src/diagnostics/eval.md#e4007)|
 |`Motion` の規則違反：キーがない、`at` が狭義単調増加でないか 0 に等しい、最後のキーが恒等でない、`repeat` = 0|[`E4008`](../../../../reference/ja/src/diagnostics/eval.md#e4008)|
-|0–1 の外にある `CubicBezier` の x、および `Steps(0)`|[`E4009`](../../../../reference/ja/src/diagnostics/eval.md#e4009)|
+|トゥイーンまたは遷移モーションでの、0–1 の外にある `CubicBezier` の x、および `Steps(0)`|[`E4009`](../../../../reference/ja/src/diagnostics/eval.md#e4009)|
 |テキストマークの重複|[`E4010`](../../../../reference/ja/src/diagnostics/eval.md#e4010)|
 |マークに合わせている間の `begin_text`|[`E4011`](../../../../reference/ja/src/diagnostics/eval.md#e4011)|
 |0.0–1.0 が必要な箇所（不透明度、音量、アンカー）での範囲外の `Decimal`|[`E4012`](../../../../reference/ja/src/diagnostics/eval.md#e4012)|

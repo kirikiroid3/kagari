@@ -1,17 +1,16 @@
 //! A sampled screen as `Frame` nodes: the camera group over the Background, Stage and Front
-//! planes, and the OverWindow plane outside the camera.
+//! planes (under the screen filter), and the OverWindow plane outside the camera.
 
 use std::rc::Rc;
 
-use kagari_vm::{AssetId, Text, Value};
+use kagari_vm::{Text, Value};
 
-use super::sample::{VisualCamera, VisualEntity, VisualLayer, VisualScreen};
-use crate::anim::color_premul_linear;
+use super::sample::{VisualCamera, VisualContent, VisualEntity, VisualLayer, VisualScreen};
 use crate::assets::AssetStore;
-use crate::frame::{Affine, Blend, Dir, Node, Rect, TransitionDraw};
+use crate::frame::{Affine, Node, Pose, Rect, TransitionDraw};
 use crate::system::SystemState;
 use crate::ui::text::TextSystem;
-use crate::values::{BlendMode, Direction, Flip, Plane, TransitionKind};
+use crate::values::{Flip, Plane};
 
 #[cfg(test)]
 #[path = "draw_tests.rs"]
@@ -19,7 +18,7 @@ mod tests;
 
 /// The screen's nodes, split around the text window.
 pub(crate) struct ScreenPlanes {
-    /// The camera group over Background, Stage and Front.
+    /// The camera group over Background, Stage and Front, inside the screen filter.
     pub world: Node,
     /// OverWindow entities, not under the camera.
     pub over_window: Vec<Node>,
@@ -46,25 +45,41 @@ pub(crate) fn draw_screen(
             world.push(node);
         }
     }
-    ScreenPlanes {
-        world: Node::Group {
-            transform: camera_transform(&v.camera, size),
-            opacity: 1.0,
-            blend: Blend::Normal,
-            clip: None,
-            children: world,
-        },
-        over_window,
+    let mut world = Node::Group {
+        transform: camera_transform(&v.camera, size),
+        opacity: 1.0,
+        clip: None,
+        children: world,
+    };
+    if let Some(effect) = &v.filter {
+        world = Node::Filter {
+            effect: effect.clone(),
+            children: vec![world],
+        };
+    }
+    ScreenPlanes { world, over_window }
+}
+
+/// The natural size of an image layer's content: the image's, or the paint's.
+pub(crate) fn content_size(content: &VisualContent, assets: &AssetStore) -> Option<(u32, u32)> {
+    match content {
+        VisualContent::Image(id) => assets.image_size(*id),
+        VisualContent::Paint(paint) => Some((paint.size[0], paint.size[1])),
     }
 }
 
 /// One image layer at its natural size with its top-left corner at `origin`.
 pub(crate) fn image_layer_node(
-    layer: &VisualLayer<AssetId>,
+    layer: &VisualLayer<VisualContent>,
     origin: [f32; 2],
     assets: &AssetStore,
 ) -> Option<Node> {
-    layer_node(layer, |id| natural_rect(assets, id, origin), false, false)
+    layer_node(
+        layer,
+        |content| natural_rect(assets, content, origin),
+        false,
+        false,
+    )
 }
 
 /// `T(c)·S(zoom)·R(−rot)·T(−c)·T(−offset)`, with `c` the screen centre.
@@ -109,9 +124,11 @@ fn rotate(degrees: f32) -> Affine {
     Affine([cos, sin, -sin, cos, 0.0, 0.0])
 }
 
-fn natural_rect(assets: &AssetStore, id: AssetId, origin: [f32; 2]) -> Option<Rect> {
-    let Some((w, h)) = assets.image_size(id) else {
-        log::debug!("image `{}` not loaded; skipped", assets.path(id));
+fn natural_rect(assets: &AssetStore, content: &VisualContent, origin: [f32; 2]) -> Option<Rect> {
+    let Some((w, h)) = content_size(content, assets) else {
+        if let VisualContent::Image(id) = content {
+            log::debug!("image `{}` not loaded; skipped", assets.path(*id));
+        }
         return None;
     };
     Some(Rect {
@@ -122,83 +139,66 @@ fn natural_rect(assets: &AssetStore, id: AssetId, origin: [f32; 2]) -> Option<Re
     })
 }
 
-fn image_node(id: AssetId, rect: Rect, flip_x: bool, flip_y: bool) -> Node {
-    Node::Image {
-        rect,
-        image: id,
-        uv: Rect {
-            x: 0.0,
-            y: 0.0,
-            w: 1.0,
-            h: 1.0,
+fn content_node(content: &VisualContent, rect: Rect, flip_x: bool, flip_y: bool) -> Node {
+    match content {
+        VisualContent::Image(id) => Node::Image {
+            rect,
+            image: *id,
+            uv: Rect {
+                x: 0.0,
+                y: 0.0,
+                w: 1.0,
+                h: 1.0,
+            },
+            flip_x,
+            flip_y,
+            tint: [1.0; 4],
         },
-        flip_x,
-        flip_y,
-        tint: [1.0; 4],
+        VisualContent::Paint(paint) => Node::Paint {
+            rect,
+            texture: paint.texture.clone(),
+            mask: paint.mask.clone(),
+            flip_x,
+            flip_y,
+        },
     }
 }
 
-/// An image layer whose image `id` is drawn at `rect(id)`.
+/// An image layer whose content is drawn at `rect(content)`.
 fn layer_node(
-    layer: &VisualLayer<AssetId>,
-    rect: impl Fn(AssetId) -> Option<Rect>,
+    layer: &VisualLayer<VisualContent>,
+    rect: impl Fn(&VisualContent) -> Option<Rect>,
     flip_x: bool,
     flip_y: bool,
 ) -> Option<Node> {
-    let image = |id: &Option<AssetId>| -> Option<(Rect, Node)> {
-        let id = (*id)?;
-        let r = rect(id)?;
-        Some((r, image_node(id, r, flip_x, flip_y)))
+    let node = |content: &VisualContent| -> Option<(Rect, Node)> {
+        let r = rect(content)?;
+        Some((r, content_node(content, r, flip_x, flip_y)))
     };
     match layer {
         VisualLayer::Empty => None,
-        VisualLayer::Shown(id) => image(&Some(*id)).map(|(_, node)| node),
+        VisualLayer::Shown(content) => node(content).map(|(_, node)| node),
         VisualLayer::Transition {
             from,
             to,
             kind,
             progress,
-            hold_fraction,
-        } => {
-            let from = image(from);
-            let to = image(to);
-            transition_node(from, to, *kind, *progress, *hold_fraction)
-        }
+        } => transition_node(
+            from.as_ref().and_then(node),
+            to.as_ref().and_then(node),
+            kind,
+            *progress,
+        ),
     }
 }
 
-/// A `Node::Transition` over the union of both sides' rects; a `Cut` shows `to`.
+/// A `Node::Transition` over the union of both sides' rects.
 fn transition_node(
     from: Option<(Rect, Node)>,
     to: Option<(Rect, Node)>,
-    kind: TransitionKind,
+    kind: &TransitionDraw,
     progress: f32,
-    hold_fraction: f32,
 ) -> Option<Node> {
-    let kind = match kind {
-        TransitionKind::Cut => return to.map(|(_, node)| node),
-        TransitionKind::Crossfade => TransitionDraw::Crossfade,
-        TransitionKind::Rule {
-            mask,
-            softness,
-            reverse,
-        } => TransitionDraw::Rule {
-            mask,
-            softness,
-            reverse,
-        },
-        TransitionKind::Wipe(direction) => TransitionDraw::Wipe {
-            dir: dir(direction),
-        },
-        TransitionKind::Blinds { direction, count } => TransitionDraw::Blinds {
-            dir: dir(direction),
-            count,
-        },
-        TransitionKind::ThroughColor { color, .. } => TransitionDraw::ThroughColor {
-            color: color_premul_linear(color),
-            hold_fraction,
-        },
-    };
     let bounds = match (&from, &to) {
         (Some((a, _)), Some((b, _))) => union(*a, *b),
         (Some((r, _)), None) | (None, Some((r, _))) => *r,
@@ -206,20 +206,11 @@ fn transition_node(
     };
     Some(Node::Transition {
         bounds,
-        kind,
+        kind: kind.clone(),
         progress,
         from: from.map(|(_, node)| node).into_iter().collect(),
         to: to.map(|(_, node)| node).into_iter().collect(),
     })
-}
-
-fn dir(d: Direction) -> Dir {
-    match d {
-        Direction::Left => Dir::Left,
-        Direction::Right => Dir::Right,
-        Direction::Up => Dir::Up,
-        Direction::Down => Dir::Down,
-    }
 }
 
 fn union(a: Rect, b: Rect) -> Rect {
@@ -232,28 +223,6 @@ fn union(a: Rect, b: Rect) -> Rect {
         y,
         w: right - x,
         h: bottom - y,
-    }
-}
-
-fn blend(mode: BlendMode) -> Blend {
-    match mode {
-        BlendMode::Normal => Blend::Normal,
-        BlendMode::Add => Blend::Add,
-        BlendMode::Multiply => Blend::Multiply,
-        BlendMode::Screen => Blend::Screen,
-        BlendMode::Overlay => Blend::Overlay,
-        BlendMode::Darken => Blend::Darken,
-        BlendMode::Lighten => Blend::Lighten,
-        BlendMode::ColorDodge => Blend::ColorDodge,
-        BlendMode::ColorBurn => Blend::ColorBurn,
-        BlendMode::HardLight => Blend::HardLight,
-        BlendMode::SoftLight => Blend::SoftLight,
-        BlendMode::Difference => Blend::Difference,
-        BlendMode::Exclusion => Blend::Exclusion,
-        BlendMode::Hue => Blend::Hue,
-        BlendMode::Saturation => Blend::Saturation,
-        BlendMode::Color => Blend::Color,
-        BlendMode::Luminosity => Blend::Luminosity,
     }
 }
 
@@ -290,18 +259,23 @@ fn text_node(layout: Rc<kagari_text::Layout>) -> (Rect, Node) {
     (rect, node)
 }
 
-/// The size of the MAIN layer's image: `to` during a transition, else `from`.
+/// The size of the MAIN layer's content: `to` during a transition, else `from`.
 fn main_size(e: &VisualEntity, assets: &AssetStore) -> Option<(u32, u32)> {
     let (_, layer) = e.parts.iter().find(|(part, _)| *part == 0)?;
+    let size = |content: &Option<VisualContent>| {
+        content
+            .as_ref()
+            .and_then(|content| content_size(content, assets))
+    };
     match layer {
         VisualLayer::Empty => None,
-        VisualLayer::Shown(id) => assets.image_size(*id),
-        VisualLayer::Transition { from, to, .. } => to
-            .and_then(|id| assets.image_size(id))
-            .or_else(|| from.and_then(|id| assets.image_size(id))),
+        VisualLayer::Shown(content) => content_size(content, assets),
+        VisualLayer::Transition { from, to, .. } => size(to).or_else(|| size(from)),
     }
 }
 
+/// An entity: `Mix | Group(opacity) > Filter? > [screen fill?, Motion? > Group(M) > Masked? >
+/// local]`, where M places the entity's box (`T(pos)·R(rot)·S(scale)·T(−anchor·box)`).
 fn entity_node(
     e: &VisualEntity,
     screen: [f32; 2],
@@ -344,12 +318,12 @@ fn entity_node(
             color: e.fill,
         });
     }
-    let mut parts: Vec<&(u8, VisualLayer<AssetId>)> = e.parts.iter().collect();
+    let mut parts: Vec<&(u8, VisualLayer<VisualContent>)> = e.parts.iter().collect();
     parts.sort_by_key(|(part, _)| *part);
     for (part, layer) in parts {
         let is_main = *part == 0;
-        let rect = |id: AssetId| -> Option<Rect> {
-            let (w, h) = assets.image_size(id)?;
+        let rect = |content: &VisualContent| -> Option<Rect> {
+            let (w, h) = content_size(content, assets)?;
             let (w, h) = (w as f32, h as f32);
             let (mut x, mut y) = if is_main {
                 (e.anchor[0] * (bw - w), e.anchor[1] * (bh - h))
@@ -371,28 +345,57 @@ fn entity_node(
     match &e.label {
         VisualLayer::Empty => {}
         VisualLayer::Shown(_) => local.extend(label_to.map(|l| text_node(l).1)),
-        VisualLayer::Transition {
-            kind,
-            progress,
-            hold_fraction,
-            ..
-        } => local.extend(transition_node(
+        VisualLayer::Transition { kind, progress, .. } => local.extend(transition_node(
             label_from.map(text_node),
             label_to.map(text_node),
-            *kind,
+            kind,
             *progress,
-            *hold_fraction,
         )),
     }
+    if let Some(effect) = &e.mask {
+        local = vec![Node::Masked {
+            effect: effect.clone(),
+            rect: Rect {
+                x: 0.0,
+                y: 0.0,
+                w: bw,
+                h: bh,
+            },
+            children: local,
+        }];
+    }
 
+    // GPU motion needs an invertible pose: a zero scale is drawn at 1 and left to the stages.
+    let entity_scale = if !e.stages.is_empty() && e.scale == 0.0 {
+        1.0
+    } else {
+        e.scale
+    };
     let m = [
         translate(e.position),
         rotate(e.rotation_deg),
-        scale(e.scale),
+        scale(entity_scale),
         translate([-e.anchor[0] * bw, -e.anchor[1] * bh]),
     ]
     .into_iter()
     .fold(Affine::IDENTITY, mul);
+    let mut placed = Node::Group {
+        transform: m,
+        opacity: 1.0,
+        clip: None,
+        children: local,
+    };
+    if !e.stages.is_empty() {
+        placed = Node::Motion {
+            stages: e.stages.clone(),
+            pose: Pose {
+                position: e.position,
+                scale: entity_scale,
+                rotation: e.rotation_deg.to_radians(),
+            },
+            children: vec![placed],
+        };
+    }
     let mut children = Vec::new();
     if e.fill_size.is_none() && e.fill[3] > 0.0 {
         children.push(Node::Fill {
@@ -405,18 +408,24 @@ fn entity_node(
             color: e.fill,
         });
     }
-    children.push(Node::Group {
-        transform: m,
-        opacity: 1.0,
-        blend: Blend::Normal,
-        clip: None,
-        children: local,
-    });
-    Some(Node::Group {
-        transform: Affine::IDENTITY,
-        opacity: e.opacity,
-        blend: blend(e.blend),
-        clip: None,
-        children,
+    children.push(placed);
+    if let Some(effect) = &e.filter {
+        children = vec![Node::Filter {
+            effect: effect.clone(),
+            children,
+        }];
+    }
+    Some(match &e.mix {
+        Some(effect) => Node::Mix {
+            effect: effect.clone(),
+            opacity: e.opacity,
+            children,
+        },
+        None => Node::Group {
+            transform: Affine::IDENTITY,
+            opacity: e.opacity,
+            clip: None,
+            children,
+        },
     })
 }

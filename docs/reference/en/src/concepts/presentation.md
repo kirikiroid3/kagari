@@ -84,8 +84,8 @@ azusa.opacity().change(1.0).apply_animation(tween(ms(300)));
 | Part | Defined in | Role |
 | ---- | ---------- | ---- |
 | Entities | render functions | Spawned, changed and despawned by renders; identified by an `EntityId` constant |
-| Components | `std::screen`, a fixed set | Data attached to entities: plane, z, position, anchor, scale, rotation, opacity, filter shader, generated-content shader, fill, image parts, label, movie, flip, blend, gate |
-| Resources | `std::screen`, a fixed set | Data of the screen itself: the Hud, the choice menu, the camera, the screen filter shader, the audio channels |
+| Components | `std::screen`, a fixed set | Data attached to entities: plane, z, position, anchor, scale, rotation, opacity, colour filter, mix, mask, local motion, fill, image parts, label, movie, flip, gate |
+| Resources | `std::screen`, a fixed set | Data of the screen itself: the Hud, the choice menu, the camera, the screen filter, the audio channels |
 | Systems | the engine | Process entities at runtime, for example advancing animations frame by frame |
 
 `EntityId(0)` is reserved for `BACKGROUND`, the background entity; studio ids start at 1.
@@ -110,15 +110,19 @@ passing a `Transition` to a position change:
 
 | Target | Changed with | Animation type |
 | ------ | ------------ | -------------- |
-| A property `Prop<T>`: position, scale, rotation, opacity, filter and shader (`Option<ShaderAsset>`), fill; Hud visibilities; camera offset, zoom and rotation; channel volume | `.change(v)`, giving a `Change<T>` | `Tween`: duration, easing, delay |
-| A layer: `ImageLayer` (including the background and the side image), `LabelLayer`, `MovieLayer` | `.change(x)` or `.clear()`, giving a `Swap` | `Transition`: cut, crossfade, rule, wipe, blinds, through a colour |
+| A property `Prop<T>`: position, scale, rotation, opacity, filter, mix, mask and local motion (shader effects), fill; Hud visibilities; camera offset, zoom and rotation; channel volume | `.change(v)`, giving a `Change<T>` | `Tween`: duration, easing, delay |
+| A layer: `ImageLayer` (including the background and the side image), `LabelLayer`, `MovieLayer` | `.change(x)`, `.paint(p)` or `.clear()`, giving a `Swap` | `Transition`: cut, crossfade, rule, masked, wipe, blinds, through a colour |
 | An entity or the camera as a whole | `.apply_animation(m)` directly | `Motion`: a relative path that returns to where it started |
+| An entity's pose along a shader path | `.travel(to, motion)` directly | `TransitionalMotion`: duration, easing, delay |
 | A music or ambience channel | `.change(track)` or `.stop()`, giving a `ChannelChange` | `AudioFade` |
 
-Filters, weather and particles are shaders. The screen and each entity have a `filter()`, an
-`Option<ShaderAsset>` that post-processes what they draw (`None` is no filter). Weather and
-particles are entities whose `shader()` is set: the shader generates their content, drawn in the
-entity's plane and ordered by its `z`, the analog of CSS `z-index`.
+Filters, blend modes, masks, generated content such as gradients or weather, and shader-driven
+motion are **shaders**: WGSL files that run on the GPU, held by the screen as effect values that
+pair a shader with its arguments. The screen and each entity have a `filter()`; an entity also
+has a `mix()` (how it composites over what is below it), a `mask()` and a `local_motion()`, and an
+image layer can show a generated `paint`. Tweening an effect to the same shader with other
+arguments interpolates the arguments. The standard library ships ready-made shaders in
+`std::shaders`; see [`std::screen::shader`](../../../../std/en/src/screen-shader.md).
 
 Music carries over between steps: a step whose render leaves the music channel on the track that
 is already playing does not restart it. A render restarts the track from its start with
@@ -138,7 +142,7 @@ A spawned entity starts invisible, with opacity 0.0, so every appearance states 
 `Change<T>`, `Swap` and `ChannelChange` are `#[must_use]`, so a statement that ends with a change
 still pending, such as `screen.background().change(BG::ROOF);`, is a warning. Only layout
 settings that cannot be interpolated are set directly: `set_plane`, `set_z`, `set_anchor`,
-`set_flip`, `set_blend`, `set_fill_size` and `gate`.
+`set_flip`, `set_fill_size` and `gate`.
 
 ### Animations never change the logical screen
 
@@ -368,8 +372,10 @@ The STD Reference defines the screen API:
 
 - [`std::screen`](../../../../std/en/src/screen.md): geometry and colours, planes and drawing
   order, entities with their spawn defaults and despawning, properties and layers, the Hud, the
-  choice menu, the camera, filter and generated-content shaders, blend modes, and the step's
-  timeline.
+  choice menu, the camera, the shader effect slots, and the step's timeline.
+- [`std::screen::shader`](../../../../std/en/src/screen-shader.md) and
+  [`std::shaders`](../../../../std/en/src/shaders.md): shader roles, effect values and the std
+  shader library.
 - [`std::screen::anim`](../../../../std/en/src/screen-anim.md): easings, tweens, transitions and
   motions with their presets.
 - [`std::screen::audio`](../../../../std/en/src/screen-audio.md): channels, loops and one-shot
