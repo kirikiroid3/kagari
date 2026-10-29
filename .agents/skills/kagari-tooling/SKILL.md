@@ -1,6 +1,6 @@
 ---
 name: kagari-tooling
-description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fmt, kagari-lsp, tree-sitter-kagari, zed-kagari) or core/kagari-lang/src/ide, or when adding CLI subcommands/flags, kagari.toml keys, formatter rules, LSP features, or grammar rules.
+description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fmt, kagari-lsp, tree-sitter-kagari, zed-kagari, mdbook-kagari) or core/kagari-lang/src/ide, or when adding CLI subcommands/flags, kagari.toml keys, formatter rules, LSP features, or grammar rules.
 ---
 
 # Kagari tooling
@@ -16,6 +16,7 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
 | `core/kagari-lang/src/ide` | Go to definition, hover, file symbols over salsa queries |
 | `tooling/tree-sitter-kagari` | Editor grammar; `src/parser.c`, `src/grammar.json`, `src/node-types.json` are generated |
 | `tooling/zed-kagari` | Zed extension; excluded from the Cargo workspace |
+| `tooling/mdbook-kagari` | mdBook preprocessor: highlights `kis`/`kix` book blocks with the grammar's `parser.c` and Zed's `highlights.scm` (`docs/dev/src/process/docs.md#code-highlighting`) |
 
 ## Read first
 
@@ -81,7 +82,9 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
 1. Edit `tooling/tree-sitter-kagari/grammar.js` (and `PREC`/`KEYWORDS`).
 2. `cd tooling/tree-sitter-kagari && tree-sitter generate && tree-sitter test` (CLI emitting ABI
    15; not in the Nix shell). Add/adjust `test/corpus/*.txt`.
-3. Update `tooling/zed-kagari/languages/kagari/*.scm` if node names/fields changed.
+3. Update `tooling/zed-kagari/languages/kagari/*.scm` if node names/fields changed. The books
+   use the same `highlights.scm`: a new capture name needs a class in `class_of`
+   (`tooling/mdbook-kagari/src/highlight.rs`).
 4. Commit grammar + generated `src/` together; then set `rev` in
    `tooling/zed-kagari/extension.toml` to that commit.
 

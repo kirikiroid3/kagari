@@ -1,0 +1,18 @@
+[package]
+name = "mdbook-kagari"
+description = "mdBook preprocessor that highlights Kagari code blocks with the tree-sitter grammar"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+mdbook-preprocessor = { workspace = true }
+mdbook-markdown = { workspace = true }
+serde_json = { workspace = true }
+tree-sitter = { workspace = true }
+tree-sitter-language = { workspace = true }
+
+[build-dependencies]
+cc = { workspace = true }

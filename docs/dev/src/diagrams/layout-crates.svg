@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1020 440" width="100%" style="max-width:1020px" role="img" aria-label="Crate dependency graph of the Kagari workspace: the kagari CLI depends on kagari-lsp and kagari-archive; kagari-lsp on kagari-project and kagari-fmt; kagari-project on kagari-compat and kagari-lang; kagari-lang on kagari-syntax, kagari-std, kagari-num and kagari-bytecode; the desktop runtime on kagari-render, which depends on kagari-engine, which depends on kagari-vm, kagari-text and kagari-archive; kagari-vm on kagari-bytecode and kagari-num. The Zed extension uses the tree-sitter grammar and runs kagari lsp.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1020 440" width="100%" style="max-width:1020px" role="img" aria-label="Crate dependency graph of the Kagari workspace: the kagari CLI depends on kagari-lsp and kagari-archive; kagari-lsp on kagari-project and kagari-fmt; kagari-project on kagari-compat and kagari-lang; kagari-lang on kagari-syntax, kagari-std, kagari-num and kagari-bytecode; the desktop runtime on kagari-render, which depends on kagari-engine, which depends on kagari-vm, kagari-text and kagari-archive; kagari-vm on kagari-bytecode and kagari-num. The Zed extension uses the tree-sitter grammar and runs kagari lsp. The mdbook-kagari book preprocessor compiles the tree-sitter parser and reads the Zed extension's highlights.scm.">
 <style>
 .kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
 .kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}
@@ -24,6 +24,8 @@
 <text x="90" y="122" class="kg-t kg-m kg-c">tree-sitter-kagari</text>
 <rect x="352" y="100" width="136" height="34" rx="4" class="kg-box"/>
 <text x="420" y="122" class="kg-t kg-m kg-c">kagari-lsp</text>
+<rect x="205" y="100" width="136" height="34" rx="4" class="kg-hl"/>
+<text x="273" y="122" class="kg-t kg-m kg-c">mdbook-kagari</text>
 <rect x="772" y="100" width="136" height="34" rx="4" class="kg-box"/>
 <text x="840" y="122" class="kg-t kg-m kg-c">kagari-render</text>
 <!-- row 3 -->
@@ -78,6 +80,10 @@
 <text x="98" y="80" class="kg-s">grammar (git rev)</text>
 <path d="M158,33H350" class="kg-dot" marker-end="url(#kg-arrow-layout)"/>
 <text x="254" y="27" class="kg-s kg-c">runs kagari lsp</text>
+<path d="M205,117H167" class="kg-dot" marker-end="url(#kg-arrow-layout)"/>
+<text x="186" y="150" class="kg-s kg-c">parser.c</text>
+<path d="M260,100L160,46" class="kg-dot" marker-end="url(#kg-arrow-layout)"/>
+<text x="234" y="66" class="kg-s">highlights.scm</text>
 <!-- legend -->
 <path d="M22,420H62" class="kg-ln" marker-end="url(#kg-arrow-layout)"/>
 <text x="70" y="424" class="kg-s">depends on (edges implied by other edges omitted)</text>

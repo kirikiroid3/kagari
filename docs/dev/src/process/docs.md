@@ -7,6 +7,8 @@
 - Built site: `docs/_site/` (ignored by git).
 - Agent skills: `.agents/skills/<name>/SKILL.md`; the documentation skill is `kagari-docs`.
 - Tests that read the docs: `core/kagari-lang/tests/diagnostics_book.rs`.
+- Code highlighting: `tooling/mdbook-kagari`, an mdBook preprocessor registered in every
+  `book.toml` (see [Code highlighting](#code-highlighting)).
 
 ## The rule
 
@@ -39,7 +41,8 @@ reference page. Reference and STD pages link to the Develop Guide only from thei
 - Plain, precise, reference-style English. Present tense. Short sentences. Tables for enumerable
   facts. No marketing tone, no emoji.
 - Code blocks are tagged `kis` (plain Kagari), `kix` (uses forms), `wgsl`, `rust`, `sh`, `toml` or
-  `text`.
+  `text`. `kis` and `kix` blocks are highlighted at build time by the Kagari grammar
+  ([Code highlighting](#code-highlighting)), so an untagged Kagari block stays plain.
 - Every Kagari example must be valid against the current code and std: names, signatures, forms.
   Prefer examples that also appear in a test fixture (for instance
   `core/kagari-lang/tests/game_source/script/001__book_examples`).
@@ -231,6 +234,9 @@ mdbook build docs/std/ja
 mdbook build docs/dev
 ```
 
+Every build runs the `mdbook-kagari` preprocessor through Cargo, so it needs the Rust toolchain
+and a C compiler (the normal dev shell); the first build compiles the preprocessor.
+
 Output goes to `docs/_site/<book>/…/src/`, mirroring the sources, so relative links between books
 work in the built site. `mdbook build` fails on a missing `\{{#include}}` file and reports
 `SUMMARY.md` entries without a file, but it does not check links.
@@ -249,8 +255,62 @@ tree mirrors its `en` tree (same files, same heading ids, byte-identical code bl
 `{#id}` on every `ja` heading); and that every included diagram exists and has its mermaid-ish
 comment. It exits with status 1 and lists the problems otherwise.
 
+## Code highlighting
+
+mdBook's bundled highlight.js knows no Kagari, so every `book.toml` registers a preprocessor:
+
+```toml
+[preprocessor.kagari]
+command = "cargo run --quiet --package mdbook-kagari --"
+after = ["links"]
+```
+
+It runs after `links`, so code pulled in with `\{{#include}}` is highlighted too, and only for the
+HTML renderer (`mdbook-kagari supports html`). Each fenced block whose info string starts with
+`kis` or `kix` becomes highlighted HTML; every other block, and all other text, is left byte for
+byte for highlight.js (`tooling/mdbook-kagari/src/chapter.rs`).
+
+- **One grammar, one query file.** `build.rs` compiles `tooling/tree-sitter-kagari/src/parser.c`
+  into the binary, and `src/highlight.rs` embeds the Zed extension's `highlights.scm` with
+  `include_str!`. The books and Zed therefore color the same nodes, and neither has a second
+  set of rules.
+- **Zed's precedence.** When captures overlap, the innermost node wins; for the same node the
+  later pattern (or the later capture of one pattern) wins. The `tree-sitter-highlight` crate
+  lets the first pattern win, so the preprocessor resolves captures itself with a `QueryCursor`.
+- **Snippets.** Book code is often a bare statement, an expression or a bodyless std signature.
+  A block that has syntax errors on its own is parsed again inside
+  `fn __kagari_snippet() { … }`; a byte inside an `ERROR` node of the first parse but not of the
+  second takes its class from the second. Blocks mixing statements and items are thus colored
+  throughout; text that parses neither way stays partly plain.
+- **Output.** The block becomes `<pre><code class="hljs nohighlight">` with `<span class="hljs-…">`
+  runs, written on one line with newlines as `&#10;`: a raw HTML block inside a list item or
+  block quote would otherwise need the container's indentation or `>` on every line.
+  `nohighlight`, without a `language-` class, makes highlight.js skip the block, and the
+  `hljs-*` classes are the ones mdBook's themes already color. The Coal and Navy themes
+  (`tomorrow-night`) have no color for `hljs-type` and `hljs-meta`.
+
+Capture names map to classes the way highlight.js classes Rust (`class_of`); captures without a
+class (operators, punctuation) keep the color of the enclosing capture:
+
+| Capture | Class |
+| ------- | ----- |
+| `keyword`, `variable.special` (`self`) | `hljs-keyword` |
+| `type` | `hljs-type` |
+| `type.builtin`, `function.special` (form names) | `hljs-built_in` |
+| `function`, `module` | `hljs-title` |
+| `constant`, `boolean` | `hljs-literal` |
+| `property` | `hljs-attr` |
+| `variant`, `label` | `hljs-symbol` |
+| `attribute` | `hljs-meta` |
+| `comment`, `comment.doc` | `hljs-comment` |
+| `string`, `string.escape` | `hljs-string` |
+| `number` | `hljs-number` |
+
 **When you change this**
 
-- A new book or a moved book: `book.toml` (`build-dir` must mirror the source tree), the
-  [introduction](../introduction.md), the root `README.md`, and the `kagari-docs` skill.
+- A new book or a moved book: `book.toml` (`build-dir` must mirror the source tree, and the
+  `[preprocessor.kagari]` table), the [introduction](../introduction.md), the root `README.md`,
+  and the `kagari-docs` skill.
 - A change to these rules: the `kagari-docs` skill in the same change.
+- A new capture name in `highlights.scm` that the books should color: an arm in `class_of`
+  (`tooling/mdbook-kagari/src/highlight.rs`) and a row in the table above.

@@ -7,6 +7,7 @@ Editor support has three parts with different jobs:
 | `kagari-lsp` (run by `kagari lsp`) | Semantic features over LSP: diagnostics, formatting, go to definition, hover, document symbols | Meaning (it runs the real compiler) |
 | `tree-sitter-kagari` | An approximate, error-tolerant grammar for highlighting, brackets, indentation and outlines | Nothing; it follows `kagari-syntax` |
 | `zed-kagari` | Zed extension: wires the grammar, query files and `kagari lsp` together | Zed integration only |
+| `mdbook-kagari` (run by `mdbook build`) | Highlights the books' Kagari code with the grammar and `highlights.scm` | Nothing; it reuses the grammar and the queries |
 
 Other editors can use `kagari lsp` with any generic LSP client, plus the tree-sitter grammar if
 they support it. The user-facing setup is in the Reference's
@@ -35,6 +36,7 @@ they support it. The user-facing setup is in the Reference's
 | `tooling/zed-kagari/extension.toml` | Extension manifest: grammar repository/rev/path, language server id |
 | `tooling/zed-kagari/src/lib.rs` | Finds and launches `kagari lsp` |
 | `tooling/zed-kagari/languages/kagari/*.scm`, `config.toml` | Highlight, outline, indent and bracket queries; language config |
+| `tooling/mdbook-kagari/` | Book highlighting with the same grammar and `highlights.scm`; see [Documentation](../process/docs.md#code-highlighting) |
 | `.gitattributes` | Hides the generated parser from diffs and language statistics |
 
 ## The language server
@@ -241,7 +243,9 @@ dependency does not enter the workspace lock file.
   `highlights.scm`, `outline.scm`, `indents.scm`, `brackets.scm`. They name grammar nodes and
   fields (`function_item name:`, `form_expression`, `form_attribute`, `doc_comment`…), so renaming
   a node in `grammar.js` requires updating them. In `highlights.scm` the last matching pattern
-  wins, so general patterns come first.
+  wins, so general patterns come first. The books are highlighted with the same `highlights.scm`
+  ([Documentation](../process/docs.md#code-highlighting)); a capture name the books should color
+  needs a class in `class_of` in `tooling/mdbook-kagari/src/highlight.rs`.
 - **Language server.** `[language_servers.kagari]` declares the server for language `Kagari`.
   `src/lib.rs` implements `language_server_command`: the binary is `lsp.kagari.binary.path` from
   the user's Zed settings, else `kagari` found on the worktree's `PATH`; arguments default to

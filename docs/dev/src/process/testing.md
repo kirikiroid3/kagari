@@ -84,6 +84,7 @@ explain is a bug. Delete the snapshot of a fixture you delete or rename; insta d
 | `kagari-render` | `src/tests.rs`: viewport letterboxing, blur weights, thumbnail limits; no GPU | — |
 | `kagari-cli` | `tests/{init,check,build,fmt}.rs` run the `kagari` binary in a temp dir with `HOME` and the XDG directories pointed at `tests/font_home`, whose only system font is `TestSans.ttf` | `tests/common/mod.rs`, `tests/font_home/` |
 | `kagari-lsp` | `tests/lsp.rs` drives the real server loop over an in-memory connection | Temp dirs |
+| `mdbook-kagari` | `src/tests.rs`: Kagari blocks become one-line `<pre>` blocks that stay inside list items and block quotes and show exactly the code; other blocks and text are untouched; Zed's capture precedence; snippets mixing statements and items | Inline Markdown |
 | `kagari-desktop-runtime` | `src/tests.rs`: key mapping, headless script parsing and exit codes, store names | — |
 
 ## Adding tests

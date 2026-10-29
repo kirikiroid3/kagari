@@ -92,3 +92,7 @@ mdbook build docs/dev
 python3 docs/check-books.py                         # links, anchors, en/ja mirror, diagrams
 cargo test -p kagari-lang --test diagnostics_book
 ```
+
+Each `mdbook build` runs the `mdbook-kagari` preprocessor via `cargo run` (first build compiles
+it); it highlights `kis`/`kix` blocks, so tag every Kagari block with one of them. Details:
+`docs/dev/src/process/docs.md#code-highlighting`.

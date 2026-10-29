@@ -6,3 +6,8 @@ language = "ja"
 [build]
 # Output mirrors the source tree so relative links between books work in the built site.
 build-dir = "../../_site/reference/ja/src"
+
+[preprocessor.kagari]
+# Highlights `kis`/`kix` code blocks with the tree-sitter grammar (tooling/mdbook-kagari).
+command = "cargo run --quiet --package mdbook-kagari --"
+after = ["links"]

@@ -12,7 +12,7 @@ two editor packages that are not workspace members. Crates live in four director
 | Directory | Holds |
 | --------- | ----- |
 | `core/` | Everything the compiler needs and nothing platform-specific: syntax, compiler, std sources, numbers, bytecode, archives |
-| `tooling/` | What studios run on their machines: the `kagari` CLI, project manifests, formatter, language server, editor support |
+| `tooling/` | What studios run on their machines: the `kagari` CLI, project manifests, formatter, language server, editor support; plus the books' code highlighter |
 | `runtime_libs/` | The platform-independent runtime: VM, engine, text, renderer, runtime profiles |
 | `runtime/` | Runtime binaries for a platform: today the desktop runtime |
 
@@ -46,6 +46,8 @@ flowchart TD
   vm ==> num
   zed["zed-kagari (outside workspace)"] -.->|grammar, git rev| ts["tree-sitter-kagari (not Cargo)"]
   zed -.->|runs kagari lsp| cli
+  mdbook["mdbook-kagari (bin)"] -.->|compiles parser.c| ts
+  mdbook -.->|reads highlights.scm| zed
   %% edges implied by other edges are omitted; the table below lists every direct dependency
 -->
 {{#include ../diagrams/layout-crates.svg}}
@@ -65,6 +67,7 @@ The graph omits edges that other edges imply (for example `kagari-cli` also depe
 | `kagari-project` | `kagari-compat`, `kagari-lang` | `toml`, `serde`, `semver` |
 | `kagari-lsp` | `kagari-lang`, `kagari-syntax`, `kagari-std`, `kagari-fmt`, `kagari-project` | `lsp-server`, `lsp-types`, `salsa` |
 | `kagari-cli` | `kagari-archive`, `kagari-bytecode`, `kagari-compat`, `kagari-fmt`, `kagari-lang`, `kagari-lsp`, `kagari-project`, `kagari-syntax` | `clap` |
+| `mdbook-kagari` | — | `mdbook-preprocessor`, `mdbook-markdown`, `tree-sitter`, `cc` (build) |
 | `kagari-compat` | `kagari-bytecode` | — |
 | `kagari-vm` | `kagari-bytecode`, `kagari-num` (dev: `kagari-lang`) | — |
 | `kagari-text` | — | `harfrust`, `skrifa`, `zeno`, `unicode-linebreak`, `unicode-segmentation` |
@@ -138,10 +141,16 @@ not configurable). It refuses files with syntax errors. Backs `kagari fmt` and L
 hover and document symbols, on top of the compiler's salsa database. `kagari lsp` runs it. See
 [Language Server and Editors](../tooling/lsp.md).
 
+**`mdbook-kagari`** — The mdBook preprocessor that every book runs (`[preprocessor.kagari]` in
+`book.toml`). It replaces `kis`/`kix` code blocks with HTML highlighted by the tree-sitter
+grammar, whose `src/parser.c` its build script compiles, and the Zed extension's
+`highlights.scm`. Studios never run it. See [Documentation](../process/docs.md#code-highlighting).
+
 **`tooling/tree-sitter-kagari`** — Not a Cargo crate. A tree-sitter grammar (`grammar.js`,
-derived from tree-sitter-rust) used only for highlighting, brackets, indentation and outlines, so
-it is more permissive than `kagari-syntax`. `test/corpus/*.txt` are its tests. Its bindings are
-all disabled in `tree-sitter.json`.
+derived from tree-sitter-rust) used only for highlighting (in editors and in the books),
+brackets, indentation and outlines, so it is more permissive than `kagari-syntax`.
+`test/corpus/*.txt` are its tests. Its bindings are all disabled in `tree-sitter.json`;
+`mdbook-kagari` compiles `src/parser.c` itself.
 
 **`tooling/zed-kagari`** — The Zed extension, excluded from the workspace (`exclude` in
 `Cargo.toml`): it builds to WebAssembly (`wasm32-wasip2`) with its own `Cargo.lock` against
@@ -211,4 +220,5 @@ mode driven by an input script. See [The Desktop Runtime](../runtime/desktop.md)
 - A new dependency between crates: check the two rules above, update the table and, unless an
   existing edge already implies it, the SVG.
 - A grammar change: regenerate the tree-sitter sources and bump the `rev` in
-  `tooling/zed-kagari/extension.toml` once the grammar commit exists.
+  `tooling/zed-kagari/extension.toml` once the grammar commit exists. `mdbook-kagari` recompiles
+  the regenerated parser on the next book build.
