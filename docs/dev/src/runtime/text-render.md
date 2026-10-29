@@ -340,7 +340,7 @@ output happens only at the end:
 - Text styles, effects, ruby or reveal: the std declarations in
   `core/kagari-std/kis/std/narrative/text.kis`, the decoders in `ui/text.rs` and
   `story/reveal.rs`, `values/table.rs` when field order changes, the STD page
-  [`std::narrative::text`](../../../std/en/src/narrative-text.md) (en and ja), and
+  [`std::narrative::text`](https://kagari.suitsu31.club/en/std/narrative-text/) (en and ja), and
   `kagari-text` tests (they use the bundled test font `tests/fonts/kagari-test-cjk.otf`).
 - Transitions or a new `Node`: `frame.rs`, `screen/draw.rs` or `ui/draw.rs`, the planner, the
   shaders, `kagari-render` tests, and the STD pages `screen.md` / `screen-anim.md`.
@@ -349,6 +349,6 @@ output happens only at the end:
   `motion_uniform_matches_the_prelude`) together.
 - A new drawable (movies, shaders, filters): the compositor, the profile table in
   `kagari-compat` (a new profile if `native_v0`'s promise changes), and the STD appendix
-  [Runtime Profiles](../../../std/en/src/appendix/profiles.md).
+  [Runtime Profiles](https://kagari.suitsu31.club/en/std/appendix/profiles/).
 - Check visual changes with headless captures before and after
   ([The Desktop Runtime](./desktop.md#headless-mode)).

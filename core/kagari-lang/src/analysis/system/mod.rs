@@ -1,5 +1,5 @@
 //! The mode-graph checks of the game system
-//! (`docs/reference/en/src/concepts/system.md#system-checks`).
+//! (`docs/site/src/content/docs/en/reference/concepts/system.md#system-checks`).
 //!
 //! The graph is built from the program description returned by `fn main` (`System::start`,
 //! `System::game`, the bindings it builds) and the mode components: every non-generic game

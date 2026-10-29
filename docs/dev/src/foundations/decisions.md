@@ -70,7 +70,7 @@ once per call site.
 - Holding a non-finite value in story code is `E3008`. Finite types are `bool`, `()`,
   `Int<lo, hi>`, enums, structs, tuples and arrays of finite types, `Option` of one, `Text`, asset
   types, function pointers, and `&T`/`&mut T` parameters; see
-  [Finite types](../../../reference/en/src/concepts/kinds.md).
+  [Finite types](https://kagari.suitsu31.club/en/reference/concepts/kinds/).
 - Generics are monomorphized, so a generic story is still a finite program.
 - Scenes (`#[scene]`) are the components of the recursive state machine the analyzer explores.
   Instant procedures (a `pushdown fn` without `#[scene]`) never step, never recurse (`E3005`) and
@@ -130,7 +130,7 @@ can start.
 **Consequences.**
 
 - `nav::start` has a special signature checked by the compiler (`E2027`); see the STD Reference,
-  [Compiler Rules for std Items](../../../std/en/src/appendix/rules.md).
+  [Compiler Rules for std Items](https://kagari.suitsu31.club/en/std/appendix/rules/).
 - The system sees a running story only through the opaque `Narrative` handle.
 - Story variables used outside story code are `E3007`.
 - The menus, saves and settings code is ordinary Turing-complete code with first-class closures,

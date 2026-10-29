@@ -1,5 +1,5 @@
-//! Layout: measures and arranges every mounted tree in design px (`docs/std/en/src/ui.md`
-//! §Layout).
+//! Layout: measures and arranges every mounted tree in design px
+//! (`docs/site/src/content/docs/en/std/ui.md` §Layout).
 
 use super::UiState;
 use super::element::{Align, Arena, ElemId, Fit, Kind, Mods};

@@ -74,7 +74,7 @@ explain is a bug. Delete the snapshot of a fixture you delete or rename; insta d
 | `kagari-lang` | `tests/game_source.rs`: per fixture, the rendered diagnostics, the resolution dump and the render dump; every fixture without errors must also build to verified bytecode (or fail only with `E7001`, no `main`) | `tests/game_source/<area>/NNN__name/main.{kis,kix}`, areas `script`, `analysis`, `style`, `ui`; a fixture may have more modules and asset files next to `main` |
 | | `tests/bytecode.rs`: each fixture builds without errors, `decode(encode(module)) == module`, and the snapshot is the warnings plus the disassembly of the game's functions. `tests/mir.rs`: the MIR of every game item of the same fixtures | `tests/bytecode/NNN__name/main.{kis,kix}` (with the assets they use) |
 | | `tests/incremental.rs`: editing one scene re-runs only that scene's queries (salsa events). `tests/asset_root.rs`: asset and system font path resolution, in a `MemoryFileSystem` | Inline sources |
-| | `tests/diagnostics_book.rs`: every `DiagnosticCode` has exactly one `## E…`/`## W…` heading in `docs/reference/en/src/diagnostics/*.md` and in `docs/reference/ja/src/diagnostics/*.md` | The Reference itself |
+| | `tests/diagnostics_book.rs`: every `DiagnosticCode` has exactly one `## E…`/`## W…` heading in `docs/site/src/content/docs/en/diagnostics/*.md` and in `docs/site/src/content/docs/ja/diagnostics/*.md` | The site's Diagnostics pages themselves |
 | | Unit tests in `src/eval/tests.rs`, `src/emit/tests.rs`, `src/ide/tests.rs` | Inline sources |
 | `kagari-fmt` | `tests/format.rs`: each fixture's formatted output (snapshot) and idempotence; `corpus_is_stable`: every parseable `.kis`/`.kix` under `core/kagari-std/kis`, `core/kagari-lang/tests/{bytecode,game_source}` and `core/kagari-syntax/tests/parse` formats idempotently; syntax errors are refused | `tests/fixtures/NNN__name.{kis,kix}` |
 | `kagari-bytecode`, `kagari-num`, `kagari-archive`, `kagari-compat`, `kagari-project` | Unit tests (`src/tests.rs`, `src/archive/tests.rs`, `src/save/tests.rs`): round trips, verifier rejections, corruption, arithmetic edge cases, manifest parsing | Built in the tests (`tempfile` for file systems) |
@@ -93,8 +93,8 @@ explain is a bug. Delete the snapshot of a fixture you delete or rename; insta d
   with the next free number; the prefix test covers it automatically. Mirror the change in the
   tree-sitter corpus.
 - **A new diagnostic or check** (`kagari-lang`): add a fixture under `tests/game_source/<area>/`
-  that triggers it (errors and warnings both), add the code's entry to the diagnostics appendix of
-  the Reference in en and ja (the `diagnostics_book` test fails otherwise), and accept the new
+  that triggers it (errors and warnings both), add the code's entry to the site's Diagnostics
+  pages in en and ja (the `diagnostics_book` test fails otherwise), and accept the new
   snapshot.
 - **Codegen or a new instruction**: add or extend a fixture under `tests/bytecode/`; it yields a
   bytecode snapshot and a MIR snapshot. Add a VM test in `runtime_libs/kagari-vm/tests/vm.rs` for
@@ -115,7 +115,7 @@ explain is a bug. Delete the snapshot of a fixture you delete or rename; insta d
 ## Runtime smoke test
 
 The desktop runtime has a headless mode for end-to-end checks without a window, audio device or
-gamepad (user documentation: [Headless Mode](../../../reference/en/src/tools/headless.md)). Use it
+gamepad (user documentation: [Headless Mode](https://kagari.suitsu31.club/en/reference/tools/headless/)). Use it
 after changes to the engine, the renderer, the runtime or the std host imports:
 
 ```sh

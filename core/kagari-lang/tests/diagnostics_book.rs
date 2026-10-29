@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-//! Every diagnostic code has exactly one entry in each language of the diagnostics appendix of
-//! The Kagari Reference.
+//! Every diagnostic code has exactly one entry in each language of the Diagnostics section of
+//! the documentation site (`docs/site/src/content/docs/{en,ja}/diagnostics`).
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -47,9 +47,13 @@ fn every_code_has_one_entry() {
 
     for lang in ["en", "ja"] {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../docs/reference")
+            .join("../../docs/site/src/content/docs")
             .join(lang)
-            .join("src/diagnostics");
-        assert_eq!(documented_codes(&dir), expected, "diagnostics appendix ({lang})");
+            .join("diagnostics");
+        assert_eq!(
+            documented_codes(&dir),
+            expected,
+            "diagnostics section ({lang})"
+        );
     }
 }

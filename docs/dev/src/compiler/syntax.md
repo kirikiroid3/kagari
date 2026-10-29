@@ -226,8 +226,8 @@ Desugaring details shared by all forms:
   … })` is checked the same way. See [Type Inference and Checks](./typeck.md#form-rules).
 
 The user-facing desugaring tables are in the Reference
-([Forms](../../../reference/en/src/syntax/forms.md)) and the STD Reference
-([`std::narrative::text`](../../../std/en/src/narrative-text.md), [`std::ui`](../../../std/en/src/ui.md)).
+([Forms](https://kagari.suitsu31.club/en/reference/syntax/forms/)) and the STD Reference
+([`std::narrative::text`](https://kagari.suitsu31.club/en/std/narrative-text/), [`std::ui`](https://kagari.suitsu31.club/en/std/ui/)).
 
 ## Tests
 
@@ -253,7 +253,7 @@ snapshots (see [Testing](../process/testing.md)) and review the diff.
    keyword (re-kinded with `bump_remap`) when the word is a valid identifier today, so existing
    programs keep compiling.
 3. Update `tooling/tree-sitter-kagari/grammar.js` (and the Zed `highlights.scm` if it should be
-   highlighted) and the Reference [Lexical Structure](../../../reference/en/src/syntax/lexical.md)
+   highlighted) and the Reference [Lexical Structure](https://kagari.suitsu31.club/en/reference/syntax/lexical/)
    page in en and ja.
 
 ### Add a syntax node
@@ -284,7 +284,7 @@ snapshots (see [Testing](../process/testing.md)) and review the diff.
 4. Add kind checks in `typeck/kinds/forms.rs` if the form has rules that need types.
 5. Fixtures: a parse fixture (`kix_NNN__…`), a `game_source` fixture in `kagari-lang` for the
    desugared behaviour and its diagnostics, a formatter fixture (`rules/forms.rs` formats forms).
-6. Docs: Reference [Forms](../../../reference/en/src/syntax/forms.md) (en and ja), the STD page of
+6. Docs: Reference [Forms](https://kagari.suitsu31.club/en/reference/syntax/forms/) (en and ja), the STD page of
    the target module (en and ja), and the desugaring table above.
 
 ## Invariants
@@ -309,10 +309,10 @@ snapshots (see [Testing](../process/testing.md)) and review the diff.
   See [Language Server and Editors](../tooling/lsp.md).
 - `tooling/kagari-fmt`: a rule for each new node kind, fixtures and snapshots
   ([Formatter](../tooling/fmt.md)).
-- Reference syntax chapters in en and ja (`docs/reference/{en,ja}/src/syntax/*.md`), and
-  [Differences from Rust](../../../reference/en/src/syntax/rust-differences.md) when the change
+- Reference syntax chapters in en and ja (`docs/site/src/content/docs/{en,ja}/reference/syntax/*.md`), and
+  [Differences from Rust](https://kagari.suitsu31.club/en/reference/syntax/rust-differences/) when the change
   moves Kagari closer to or further from Rust.
 - New messages are still `E0001`; no diagnostics page change is needed unless the Reference
-  [Syntax diagnostics](../../../reference/en/src/diagnostics/syntax.md) page lists the case.
+  [Syntax diagnostics](https://kagari.suitsu31.club/en/diagnostics/syntax/) page lists the case.
 - Run `cargo test -p kagari-syntax`, `cargo test -p kagari-lang` (fixtures re-parse everything)
   and `cargo test -p kagari-fmt`.

@@ -6,8 +6,8 @@ advanced after the last one. Loading replays that trace on the current program. 
 describes the save model, the file contents, replay, and what the design requires of the rest of
 the engine. The byte format of `.kisave` files is in
 [Archives and Save Databases](../formats/archive.md); the user-facing description is in the
-Reference ([Saves, Replay and Determinism](../../../reference/en/src/concepts/saves.md)) and the
-STD page [`std::system::saves`](../../../std/en/src/system-saves.md).
+Reference ([Saves, Replay and Determinism](https://kagari.suitsu31.club/en/reference/concepts/saves/)) and the
+STD page [`std::system::saves`](https://kagari.suitsu31.club/en/std/system-saves/).
 
 ## Where in the code
 
@@ -275,7 +275,7 @@ this as follows.
 
 - The save layout or choice-ID format: bump the `version` field (and keep reading version 1 or
   add a `Divergence` for it), update [Archives and Save Databases](../formats/archive.md), the
-  Reference [Saves, Replay and Determinism](../../../reference/en/src/concepts/saves.md) and the
+  Reference [Saves, Replay and Determinism](https://kagari.suitsu31.club/en/reference/concepts/saves/) and the
   STD page `system-saves.md` (en and ja), and `tests/saves.rs`.
 - Anything that adds a source of nondeterminism to story code (a new import usable from
   `pushdown fn` or `const fn`): check it against [Determinism](#determinism) and the

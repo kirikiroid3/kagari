@@ -163,7 +163,7 @@ End-to-end checklist. Not every step applies to every item; skip the ones that d
    `kagari-compat` (`RuntimeProfile` support) and the STD Reference appendix on runtime
    profiles.
 8. **Documentation.** Update the module page of the STD Reference in **both**
-   `docs/std/en/src/` and `docs/std/ja/src/` (same headings and ids, identical code blocks,
+   `docs/site/src/content/docs/en/std/` and `docs/site/src/content/docs/ja/std/` (same headings and ids, identical code blocks,
    Stability line), the `appendix/rules.md` page if a compiler rule changed, and the
    Reference's diagnostics pages for new codes.
 9. **Tooling.** New keywords or attributes are out of scope for std; a new prelude name or

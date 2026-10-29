@@ -208,7 +208,7 @@ requested namespace, earlier segments the types namespace:
    Names of enclosing *named* modules are not visible (Rust's rule).
 5. **`std`** (types namespace), the std crate root. A user item named `std` shadows it.
 6. **The prelude**: the scope of `std::prelude`. Its contents are whatever `prelude.kis` re-exports;
-   the STD Reference page [`std::prelude`](../../../std/en/src/prelude.md) lists them.
+   the STD Reference page [`std::prelude`](https://kagari.suitsu31.club/en/std/prelude/) lists them.
 7. **Primitive types** (`bool`, the Rust integers, `Int`), types namespace.
 
 `crate::`, `self::` and `super::` paths start at the crate root or the named module (`E1016` for
@@ -287,12 +287,12 @@ and system fonts with temporary directories; `assets.rs` has unit tests for the 
 
 - **New attribute.** Add it to `KNOWN_ATTRIBUTES` in `item_tree.rs`, give it placement rules
   (`typeck/kinds.rs::check_attributes`), and document it in the Reference
-  [Attributes](../../../reference/en/src/special/attributes.md) page (en and ja).
+  [Attributes](https://kagari.suitsu31.club/en/reference/special/attributes/) page (en and ja).
 - **Module or `use` rules.** Update `module_files.rs`/`def_map.rs`, the
   `002__modules`/`003__module_errors` fixtures, and the Reference
-  [Source Files and Modules](../../../reference/en/src/syntax/modules.md) page (en and ja).
+  [Source Files and Modules](https://kagari.suitsu31.club/en/reference/syntax/modules/) page (en and ja).
 - **Prelude.** Edit `core/kagari-std/kis/std/prelude.kis`; update the STD Reference
-  [`std::prelude`](../../../std/en/src/prelude.md) page (en and ja).
+  [`std::prelude`](https://kagari.suitsu31.club/en/std/prelude/) page (en and ja).
 - **New std file.** Add it to the `match` in `core/kagari-std/src/lib.rs`, or the `mod` lookup
   cannot find it.
 - **New `LangItem`.** Add the variant and its `std_path`; the std item must exist at that path.

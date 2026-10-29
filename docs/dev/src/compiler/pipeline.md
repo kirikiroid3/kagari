@@ -260,10 +260,10 @@ std produces none, and `kagari-lang`'s fixtures would show them if it did.
   the `analysis` query for stage 5). Consider whether an edit inside one body must re-run it; if
   not, extend `tests/incremental.rs`.
 - **New input or option.** `CompileOptions` fields need a manifest key in `tooling/kagari-project`
-  (`manifest.rs`), the Reference [Projects](../../../reference/en/src/tools/projects.md) page (en
+  (`manifest.rs`), the Reference [Projects](https://kagari.suitsu31.club/en/reference/tools/projects/) page (en
   and ja), and the table above.
 - **New stage-level rule** (what runs before or after the gate): update the Reference
-  [Architecture](../../../reference/en/src/overview/architecture.md) page in en and ja, which
+  [Architecture](https://kagari.suitsu31.club/en/reference/overview/architecture/) page in en and ja, which
   describes the stages to studios, and this chapter.
 - Run `cargo test -p kagari-lang` (fixtures, `incremental`, `mir`, `bytecode`) and, when the LSP
   path changes, `cargo test -p kagari-lsp`.

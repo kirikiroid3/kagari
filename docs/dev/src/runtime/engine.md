@@ -8,8 +8,8 @@ produces a platform-neutral draw list. It has no platform dependencies: a runtim
 `Platform` trait, draws the `Frame` with `kagari-render` and plays the `AudioCommand`s.
 
 This chapter describes how the engine works. The user-visible behaviour is specified in the
-Reference ([The Story Machine](../../../reference/en/src/concepts/story.md),
-[The Game System](../../../reference/en/src/concepts/system.md)) and the STD Reference; the ABI
+Reference ([The Story Machine](https://kagari.suitsu31.club/en/reference/concepts/story/),
+[The Game System](https://kagari.suitsu31.club/en/reference/concepts/system/)) and the STD Reference; the ABI
 between std declarations and these imports is in [Builtins and the Host ABI](../std/builtins.md).
 
 ## Where in the code
@@ -615,16 +615,13 @@ There are three kinds of failure:
   [Constant Evaluation](../compiler/eval.md); the STD pages `screen.md`, `screen-anim.md`,
   `screen-audio.md`.
 - Mode, navigation, play-mode or binding behaviour: the Reference
-  [The Game System](../../../reference/en/src/concepts/system.md) (en and ja), the STD pages
+  [The Game System](https://kagari.suitsu31.club/en/reference/concepts/system/) (en and ja), the STD pages
   `system.md`, `system-nav.md`, `narrative.md`, and the system checks in the compiler when the mode
   graph changes.
 - A new runtime profile or format: `kagari-compat` (`profile.rs`, `format.rs`, `sniff.rs`, tests),
   the decoder features in the workspace `Cargo.toml`, the STD appendix
-  [Runtime Profiles](../../../std/en/src/appendix/profiles.md), the Reference
-  [Projects](../../../reference/en/src/tools/projects.md) (en and ja).
+  [Runtime Profiles](https://kagari.suitsu31.club/en/std/appendix/profiles/), the Reference
+  [Projects](https://kagari.suitsu31.club/en/reference/tools/projects/) (en and ja).
 - Engine tests live in `src/tests/` and next to each module; they compile fixtures with
   `kagari-lang` (`test_support::compile`). Run `cargo test -p kagari-engine`, then a headless smoke
   run ([The Desktop Runtime](./desktop.md#headless-mode)).
-- Engine source comments still cite the old books (`docs/syntax/src/system.md`,
-  `docs/std/src/text.md`, `ui.md`, `checks.md`); point them at the new chapters when touching those
-  files.

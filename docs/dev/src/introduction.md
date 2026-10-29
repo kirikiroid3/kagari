@@ -5,17 +5,19 @@ library, the bytecode, the VM, the engine, the runtimes and the tooling. It reco
 is built the way it is and how its parts fit together. It assumes you know Rust and the usual
 compiler vocabulary (CST, HIR, MIR, salsa queries, decision trees).
 
-## The three books
+## The documentation
 
-| Book | Audience | Holds | Languages |
+| Part | Audience | Holds | Languages |
 | ---- | -------- | ----- | --------- |
-| [The Kagari Reference](../../reference/en/src/introduction.md) | Studios writing games | Concepts, the language, special types and attributes, projects, CLI, runtime, diagnostics | en, ja |
-| [Kagari STD Reference](../../std/en/src/about.md) | Studios writing games | Every public item of `std`, recipes, compiler rules for std items, runtime profiles | en, ja |
+| [Tutorial](https://kagari.suitsu31.club/en/tutorial/) (site) | People new to Kagari | Installation and a first game | ja, en |
+| [Language Reference](https://kagari.suitsu31.club/en/reference/) (site) | Studios writing games | Concepts, the language, special types and attributes, projects, CLI, runtime | ja, en |
+| [STD Reference](https://kagari.suitsu31.club/en/std/) (site) | Studios writing games | Every public item of `std`, recipes, compiler rules for std items, runtime profiles | ja, en |
+| [Diagnostics](https://kagari.suitsu31.club/en/diagnostics/) (site) | Studios writing games | Every diagnostic code of the compiler | ja, en |
 | Kagari Develop Guide (this book) | Maintainers and contributors | Design decisions, proposal mapping, crate layout, compiler internals, the std/host ABI, file formats, VM, engine, tooling internals, process | en |
 
-The two reference books describe *what* a studio can rely on. This guide describes *why* and
-*how*. It never repeats the user-facing rules; it links to them. When this guide and the code
-disagree, the code is right and this guide has a bug.
+The site (`https://kagari.suitsu31.club`, sources in `docs/site`) describes *what* a studio can
+rely on. This guide describes *why* and *how*. It never repeats the user-facing rules; it links
+to them. When this guide and the code disagree, the code is right and this guide has a bug.
 
 ## How to read this guide
 
@@ -38,23 +40,24 @@ must change with it).
 
 A change to the compiler, a format, the VM, the engine or the tooling updates the chapter that
 describes it, in the same commit. A change a studio can observe (syntax, a diagnostic, a std item,
-a CLI flag, a runtime option, a file format a studio touches) also updates the Reference or the
-STD Reference, in English **and** Japanese, in the same commit. [Documentation](./process/docs.md)
-has the details.
+a CLI flag, a runtime option, a file format a studio touches) also updates the site (Language
+Reference, STD Reference or Diagnostics), in English **and** Japanese, in the same commit.
+[Documentation](./process/docs.md) has the details.
 
-## Building the books
+## Building the documentation
 
-Each book is a standalone [mdBook](https://rust-lang.github.io/mdBook/):
+This guide is an [mdBook](https://rust-lang.github.io/mdBook/):
 
 ```sh
-mdbook build docs/reference/en
-mdbook build docs/reference/ja
-mdbook build docs/std/en
-mdbook build docs/std/ja
-mdbook build docs/dev
+mdbook build docs/dev       # into docs/_site/dev/src/ (ignored by git)
+mdbook serve docs/dev       # live reload
 ```
 
-Every `book.toml` sets `build-dir` so that the output mirrors the source tree under
-`docs/_site/` (for example `docs/_site/dev/src/` for this book). Links between books are relative
-paths between source files, and they work both on GitHub and in the built site. `docs/_site/` is
-ignored by git. `mdbook serve docs/dev` serves one book with live reload.
+The site is an Astro project in `docs/site` and needs only Node.js:
+
+```sh
+cd docs/site && npm ci && npm run dev
+```
+
+[Building and checking](./process/docs.md#building-and-checking) has the details and the checks
+to run before committing.

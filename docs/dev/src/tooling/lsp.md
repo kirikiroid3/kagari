@@ -7,11 +7,12 @@ Editor support has three parts with different jobs:
 | `kagari-lsp` (run by `kagari lsp`) | Semantic features over LSP: diagnostics, formatting, go to definition, hover, document symbols | Meaning (it runs the real compiler) |
 | `tree-sitter-kagari` | An approximate, error-tolerant grammar for highlighting, brackets, indentation and outlines | Nothing; it follows `kagari-syntax` |
 | `zed-kagari` | Zed extension: wires the grammar, query files and `kagari lsp` together | Zed integration only |
-| `mdbook-kagari` (run by `mdbook build`) | Highlights the books' Kagari code with the grammar and `highlights.scm` | Nothing; it reuses the grammar and the queries |
+| `mdbook-kagari` (run by `mdbook build`) | Highlights the Develop Guide's Kagari code with the grammar and `highlights.scm` | Nothing; it reuses the grammar and the queries |
+| `textmate-kagari` | A TextMate grammar for Shiki: highlights the documentation site's Kagari code | Nothing; it follows the tree-sitter grammar and `highlights.scm` |
 
 Other editors can use `kagari lsp` with any generic LSP client, plus the tree-sitter grammar if
 they support it. The user-facing setup is in the Reference's
-[Editor Support](../../../reference/en/src/tools/editors.md).
+[Editor Support](https://kagari.suitsu31.club/en/reference/tools/editors/).
 
 ## Where in the code
 
@@ -275,12 +276,14 @@ To try local changes, use Zed's "Install Dev Extension" on `tooling/zed-kagari`.
 
 - **New syntax in `kagari-syntax`**: update `grammar.js` (and `PREC`/`KEYWORDS` if relevant),
   regenerate, add a corpus case, update the Zed queries if new node kinds should be highlighted or
-  outlined, and update the formatter ([Formatter](./fmt.md)). Commit, then bump `rev` in
+  outlined, update the TextMate grammar `tooling/textmate-kagari/kagari.tmLanguage.json` that
+  highlights the documentation site ([Code highlighting](../process/docs.md#code-highlighting)),
+  and update the formatter ([Formatter](./fmt.md)). Commit, then bump `rev` in
   `tooling/zed-kagari/extension.toml` to the grammar commit.
 - **New LSP feature**: add the query in `kagari-lang/src/ide` ([IDE Layer](../compiler/ide.md)),
   the handler in `server/requests.rs` (or `notifications.rs`), the capability in
   `server/mod.rs`, a step in `tests/lsp.rs`, and the feature list in the Reference's
-  [Editor Support](../../../reference/en/src/tools/editors.md) (en and ja).
+  [Editor Support](https://kagari.suitsu31.club/en/reference/tools/editors/) (en and ja).
 - **New watched file kind** (a new manifest-like file): extend `register_watchers` and
   `did_change_watched_files`.
 - **Changing how the Zed extension finds or starts the server**: update the Reference editor page

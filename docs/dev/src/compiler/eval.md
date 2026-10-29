@@ -295,8 +295,8 @@ overflow.
 | `E4013` | `duration-overflow` | `Duration` beyond `u32` milliseconds, cursor arithmetic |
 
 The same faults found while the story analysis runs story code or renders on real screens are
-reported by stage 5 with these codes. The user-facing descriptions live in the Reference's
-diagnostics appendix.
+reported by stage 5 with these codes. The user-facing descriptions live in the site's Diagnostics
+pages.
 
 ## Limits
 
@@ -333,7 +333,7 @@ settings, and are not `CompileOptions` yet ([Open Questions](../process/open-que
   engine, and document it in the STD Reference (en and ja). See
   [Builtins and the Host ABI](../std/builtins.md).
 - **A new `E4xxx` code.** Add it to `DiagnosticCode`, raise it as a `Fault`, add a unit test in
-  `eval/tests.rs`, and add one entry in each language of the Reference's diagnostics appendix
+  `eval/tests.rs`, and add one entry in each language of the site's Diagnostics pages
   (`tests/diagnostics_book.rs` enforces exactly one).
 - **A change of what is constant.** `const_exprs.rs` decides promotion, tabulation and renders at
   once; update the Reference's constant-expression rules (en and ja) and check the MIR snapshots.

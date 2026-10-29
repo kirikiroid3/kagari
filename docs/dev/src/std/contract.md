@@ -6,7 +6,7 @@ checker (type inference, the kind checker, const evaluation) applies to specific
 std change that breaks a rule here needs a compiler change, and the reverse.
 
 The user-visible subset of these rules is documented for studios in the STD Reference's
-appendix *Compiler Rules for std Items* (`docs/std/{en,ja}/src/appendix/rules.md`). Keep both
+appendix *Compiler Rules for std Items* (`docs/site/src/content/docs/{en,ja}/std/appendix/rules.md`). Keep both
 in sync.
 
 Where in the code:

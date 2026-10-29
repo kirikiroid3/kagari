@@ -304,4 +304,4 @@ fn crate::count [instant] params=0 regs=3
   restoration ([Saves, Traces and Snapshots](../runtime/saves.md)); review the bytecode snapshots
   (`cargo test -p kagari-lang --test bytecode`, then `cargo insta review`).
 - **A new `E7xxx` code.** `DiagnosticCode`, a test in `emit/tests.rs`, one entry per language in the
-  Reference's diagnostics appendix.
+  site's Diagnostics pages.

@@ -59,7 +59,7 @@ Develop Guide (`docs/dev/src/`):
 2. Add the `DiagnosticCode` in `src/diagnostic.rs`.
 3. Add a fixture `tests/game_source/analysis/NNN__name/main.kix` (copy a sibling for the required
    `System`/settings boilerplate).
-4. Add exactly one `## CODE name` entry to `docs/reference/{en,ja}/src/diagnostics/*.md`
+4. Add exactly one `## CODE name` entry to `docs/site/src/content/docs/{en,ja}/diagnostics/*.md`
    (`tests/diagnostics_book.rs` fails otherwise).
 5. Document the algorithm in `docs/dev/src/compiler/analysis.md`.
 
@@ -103,7 +103,7 @@ Unit tests: `eval/tests.rs`, `analysis/story/tests.rs`, `emit/tests.rs`. Runtime
 
 - Develop Guide: the matching `docs/dev/src/compiler/*.md` chapter; `formats/kagari.md` for bytecode;
   `process/open-questions.md` when a tentative limit changes.
-- Reference (en + ja): diagnostics appendix for any code change; user-visible rules (termination,
-  consistency, keyframes, constant expressions, compiler options).
+- Site, en + ja: Diagnostics pages for any code change; Language Reference pages for user-visible
+  rules (termination, consistency, keyframes, constant expressions, compiler options).
 - STD Reference (en + ja) for builtin or std-rule changes (`appendix/rules.md`).
 - Module doc comments in `src/eval`, `src/analysis`, `src/mir`, `src/emit` that cite doc paths.

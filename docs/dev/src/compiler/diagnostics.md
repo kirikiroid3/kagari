@@ -13,9 +13,9 @@ how to add a diagnostic end to end.
 | `core/kagari-lang/src/pipeline.rs` | `check`: resolves every `Diag`, maps syntax errors to `E0001`, sorts and deduplicates |
 | `core/kagari-lang/src/emit/mod.rs` | `build`: appends emit diagnostics (`E7xxx`) |
 | `core/kagari-syntax/src/parse.rs` | `SyntaxError { message, range }` (no code) |
-| `core/kagari-lang/tests/diagnostics_book.rs` | Every code has exactly one entry in the Reference diagnostics pages, in `en` and in `ja` |
+| `core/kagari-lang/tests/diagnostics_book.rs` | Every code has exactly one entry in the site's Diagnostics pages, in `en` and in `ja` |
 | `core/kagari-lang/tests/game_source/` | Fixture programs whose snapshots hold rendered diagnostics |
-| `docs/reference/{en,ja}/src/diagnostics/*.md` | The user documentation of every code |
+| `docs/site/src/content/docs/{en,ja}/diagnostics/*.md` | The user documentation of every code |
 | `tooling/kagari-lsp/src/diagnostics.rs` | Conversion to LSP diagnostics (see [IDE Layer](./ide.md#diagnostics)) |
 
 ## Types
@@ -191,9 +191,9 @@ Each still has a Reference entry with an illustrative snippet and says so:
    `tests/snapshots/game_source__game_source@<area>__NNN__topic__main.kix.snap`, and accept it (see
    [Testing](../process/testing.md)). A fixture without errors must also build: the test runs
    `build` on it.
-5. **Document it in the Reference, in English and Japanese.** Add an entry to the group's page,
-   `docs/reference/en/src/diagnostics/<group>.md` and the mirrored
-   `docs/reference/ja/src/diagnostics/<group>.md`, in numeric order:
+5. **Document it on the site, in English and Japanese.** Add an entry to the group's page,
+   `docs/site/src/content/docs/en/diagnostics/<group>.md` and the mirrored
+   `docs/site/src/content/docs/ja/diagnostics/<group>.md`, in numeric order:
 
    ````markdown
    ## E3025 `foo-bar` {#e3025}
@@ -211,11 +211,11 @@ Each still has a Reference entry with an illustrative snippet and says so:
    `ja`; the code block is byte-identical in both files; the Japanese prose follows the glossary of
    the Reference. If no source program can trigger it, say so after the snippet ("This snippet is
    illustrative: …").
-6. **Run the book test**: `cargo test -p kagari-lang --test diagnostics_book`. For each language
-   (`docs/reference/en/src/diagnostics` and `docs/reference/ja/src/diagnostics`) it collects every
-   heading line `## <E|W>dddd ` of every `.md` file and asserts that each `DiagnosticCode::ALL`
-   entry appears exactly once and no other code appears. Any other `## ` heading in those pages
-   must therefore not start with a code.
+6. **Run the docs test**: `cargo test -p kagari-lang --test diagnostics_book`. For each language
+   (`docs/site/src/content/docs/{en,ja}/diagnostics`) it collects every heading line
+   `## <E|W>dddd ` of every `.md` file and asserts that each `DiagnosticCode::ALL` entry appears
+   exactly once and no other code appears. Any other `## ` heading in those pages must therefore
+   not start with a code.
 7. **Link the rule** from the Reference or STD Reference page that states it (a sentence and a
    link to `diagnostics/<group>.md#e3025`), in both languages, and mention the code in the Develop
    Guide chapter that implements it.
@@ -239,5 +239,5 @@ Changing a message needs a snapshot update only. Removing a rule retires its cod
 - New `Anchor` kind: `resolve_anchor`, `Anchor::file`, and every source map that must record the
   range.
 - Output format of `render_diagnostics`: every `game_source` snapshot, the Reference
-  [diagnostics index](../../../reference/en/src/diagnostics/index.md) (en and ja), which shows the
+  [diagnostics index](https://kagari.suitsu31.club/en/diagnostics/) (en and ja), which shows the
   format, and the LSP conversion if fields change.

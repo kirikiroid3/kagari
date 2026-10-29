@@ -1,0 +1,150 @@
+---
+// The landing page, shared by `/` (Japanese, the root locale) and `/en/`.
+import { CodeBlock } from '@prosefly/astro-theme-lotus/components';
+import kagariGrammar from '../../../../tooling/textmate-kagari/kagari.tmLanguage.json';
+import { BaseLayout, SiteFooter, SiteHeader } from '@prosefly/astro-theme-lotus/layouts';
+import { FeatureCard, FeatureGrid, Hero, PageSection } from '@prosefly/astro-theme-lotus/blocks';
+
+interface Props {
+  lang: 'ja' | 'en';
+}
+
+const { lang } = Astro.props;
+const prefix = lang === 'ja' ? '' : '/en';
+
+const text = {
+  ja: {
+    description:
+      'Kagari はビジュアルノベルエンジンです。Rust に近い言語で物語を書くと、コンパイラが物語を解析します。',
+    eyebrow: 'ビジュアルノベルエンジン',
+    title: '解析できる物語を、Rust に近い言語で。',
+    lead:
+      'Kagari の物語は有限のデータの上の pushdown fn として書きます。そのためコンパイラは、汎用のスクリプトでは答えられない問いに答えられます。',
+    start: 'チュートリアル',
+    reference: '言語リファレンス',
+    whyTitle: 'Kagari の特徴',
+    why: [
+      {
+        icon: 'lucide:scan-search',
+        title: '解析できる物語',
+        description:
+          'すべてのステップが終了するか、選択肢が行き詰まらないか、到達できないシーンはないか、各ステップの画面が一貫しているかをコンパイラが検査します。',
+      },
+      {
+        icon: 'lucide:braces',
+        title: 'Rust に近い言語',
+        description:
+          '物語も演出もゲームシステムも一つの言語で書きます。演出（const fn）とゲームシステム（fn）は自由に計算できます。',
+      },
+      {
+        icon: 'lucide:wrench',
+        title: '揃ったツール',
+        description:
+          'kagari コマンドで検査、ビルド、整形を行い、言語サーバーと Zed 拡張で編集し、Windows、macOS、Linux のランタイムで実行します。',
+      },
+    ],
+    docsTitle: 'ドキュメント',
+    docs: [
+      { icon: 'lucide:graduation-cap', href: '/tutorial/', title: 'チュートリアル', description: 'Kagari を導入して、最初のゲームを作ります。' },
+      { icon: 'lucide:book-open', href: '/reference/', title: '言語リファレンス', description: '概念、言語、プロジェクト、CLI、ランタイム。' },
+      { icon: 'lucide:library', href: '/std/', title: 'STD リファレンス', description: '標準ライブラリ std のすべてのアイテムとレシピ。' },
+      { icon: 'lucide:circle-alert', href: '/diagnostics/', title: '診断', description: 'コンパイラが報告するすべての診断コード。' },
+    ],
+  },
+  en: {
+    description:
+      'Kagari is a visual novel engine. Write the story in a Rust-like language, and the compiler analyzes it.',
+    eyebrow: 'Visual novel engine',
+    title: 'Analyzable stories, in a Rust-like language.',
+    lead:
+      'A Kagari story is written as pushdown fn code over finite data, so the compiler can answer questions a general-purpose script cannot.',
+    start: 'Tutorial',
+    reference: 'Language Reference',
+    whyTitle: 'Why Kagari',
+    why: [
+      {
+        icon: 'lucide:scan-search',
+        title: 'Analyzable stories',
+        description:
+          'The compiler checks whether every step terminates, whether a choice can get stuck, which scenes are unreachable, and whether the screen at each step is consistent.',
+      },
+      {
+        icon: 'lucide:braces',
+        title: 'A Rust-like language',
+        description:
+          'The story, its presentation and the game system are written in one language. Presentation (const fn) and the game system (fn) stay free to compute.',
+      },
+      {
+        icon: 'lucide:wrench',
+        title: 'Complete tooling',
+        description:
+          'Check, build and format with the kagari command, edit with the language server and the Zed extension, and play on the runtime for Windows, macOS and Linux.',
+      },
+    ],
+    docsTitle: 'Documentation',
+    docs: [
+      { icon: 'lucide:graduation-cap', href: '/tutorial/', title: 'Tutorial', description: 'Install Kagari and make your first game.' },
+      { icon: 'lucide:book-open', href: '/reference/', title: 'Language Reference', description: 'Concepts, the language, projects, the CLI and the runtime.' },
+      { icon: 'lucide:library', href: '/std/', title: 'STD Reference', description: 'Every item of the standard library std, and recipes.' },
+      { icon: 'lucide:circle-alert', href: '/diagnostics/', title: 'Diagnostics', description: 'Every diagnostic code the compiler reports.' },
+    ],
+  },
+}[lang];
+
+// The first example of the Language Reference introduction (`reference/index.md`).
+const example = `#[scene]
+#[entry]
+pushdown fn Day1() -> Ending {
+    s!(t!["The school festival starts today."]);
+    StallA();
+    StallA();
+    Ending::Normal
+}
+
+#[scene]
+pushdown fn StallA() {
+    if VISITED_A {
+        s!(t!["The stall is already packing up."]);
+        return;
+    }
+    VISITED_A = true;
+    s!(who = "Hanako", render = at_stall_a, t!["Welcome to stall A!"]);
+}`;
+---
+
+<BaseLayout description={text.description} locale={Astro.locals.t.locale()}>
+  <SiteHeader currentPath={`${prefix}/`} />
+  <main>
+    <PageSection size="lg">
+      <Hero
+        variant="split"
+        eyebrow={text.eyebrow}
+        title={text.title}
+        description={text.lead}
+        actions={[
+          { label: text.start, href: `${prefix}/tutorial/`, trailingIcon: 'lucide:arrow-right' },
+          { label: text.reference, href: `${prefix}/reference/`, variant: 'outline' },
+        ]}
+      >
+        <div slot="visual" class="min-w-0">
+          <CodeBlock code={example} lang={kagariGrammar as never} title="day1.kix" />
+        </div>
+      </Hero>
+    </PageSection>
+
+    <PageSection padding="md" size="lg">
+      <h2 class="mb-6 text-2xl font-semibold text-(--lotus-text-strong)">{text.whyTitle}</h2>
+      <FeatureGrid>
+        {text.why.map((item) => <FeatureCard {...item} />)}
+      </FeatureGrid>
+    </PageSection>
+
+    <PageSection padding="md" size="lg">
+      <h2 class="mb-6 text-2xl font-semibold text-(--lotus-text-strong)">{text.docsTitle}</h2>
+      <FeatureGrid columns={4}>
+        {text.docs.map((item) => <FeatureCard {...item} href={`${prefix}${item.href}`} />)}
+      </FeatureGrid>
+    </PageSection>
+  </main>
+  <SiteFooter />
+</BaseLayout>

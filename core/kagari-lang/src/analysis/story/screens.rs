@@ -1,5 +1,6 @@
-//! The screens that reach each step (`docs/reference/en/src/concepts/presentation.md#consistency`
-//! and `#unbounded-screens`).
+//! The screens that reach each step
+//! (`docs/site/src/content/docs/en/reference/concepts/presentation.md#consistency` and
+//! `#unbounded-screens`).
 //!
 //! Renders never influence the story, so screens are propagated over the explored states
 //! afterwards. Each context is instantiated per entry screen; a step applies its render to

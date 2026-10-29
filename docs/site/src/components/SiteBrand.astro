@@ -1,0 +1,39 @@
+---
+// Lotus's brand link always points at `/`; on English pages it should stay in English (`/en/`).
+// Same markup as Lotus's mark-variant `SiteBrand`, with a single logo file.
+import rawThemeConfig from 'virtual:prosefly/lotus/config';
+
+interface Props {
+  class?: string;
+  fetchPriority?: 'high' | 'low' | 'auto';
+  markIdPrefix?: string;
+  textClass?: string;
+}
+
+const {
+  class: className,
+  fetchPriority,
+  textClass = 'truncate text-sm font-semibold sm:text-base',
+} = Astro.props;
+const { name, logo } = rawThemeConfig as { name: string; logo: string };
+const prefix = Astro.locals.t.locale().pathPrefix;
+const home = prefix ? `/${prefix}/` : '/';
+---
+
+<a
+  aria-label={name}
+  class:list={['lotus-focus-ring flex min-w-0 items-center gap-3 text-(--lotus-text-strong)', className]}
+  href={home}
+>
+  <span class="relative h-8 w-8 shrink-0">
+    <img
+      alt=""
+      class="block h-8 w-8 rounded-(--lotus-radius-md)"
+      fetchpriority={fetchPriority}
+      height={32}
+      src={logo}
+      width={32}
+    />
+  </span>
+  <span class={textClass}>{name}</span>
+</a>

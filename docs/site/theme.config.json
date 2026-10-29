@@ -1,0 +1,271 @@
+{
+  "$schema": "https://prosefly.dev/schema/lotus.json",
+  "name": "Kagari",
+  "description": "Kagari はビジュアルノベルエンジンです。物語を解析できる言語、コンパイラ、ランタイムから成ります。",
+  "logo": "/logo.svg",
+  "favicon": "/logo.svg",
+  "head": [
+    {
+      "tag": "style",
+      "src": "./src/styles/site.css"
+    }
+  ],
+  "components": {
+    "SiteBrand": "./src/components/SiteBrand.astro"
+  },
+  "docsBase": "/",
+  "defaultLocale": "root",
+  "locales": {
+    "root": {
+      "label": "日本語",
+      "lang": "ja",
+      "directory": "ja"
+    },
+    "en": {
+      "label": "English",
+      "lang": "en",
+      "directory": "en"
+    }
+  },
+  "appearance": {
+    "accent": "orange",
+    "gray": "stone",
+    "defaultMode": "system",
+    "radius": "medium"
+  },
+  "siteNav": [
+    {
+      "label": "チュートリアル",
+      "translations": {
+        "en": "Tutorial"
+      },
+      "href": "/tutorial/"
+    },
+    {
+      "label": "言語",
+      "translations": {
+        "en": "Language"
+      },
+      "href": "/reference/"
+    },
+    {
+      "label": "STD",
+      "href": "/std/"
+    },
+    {
+      "label": "診断",
+      "translations": {
+        "en": "Diagnostics"
+      },
+      "href": "/diagnostics/"
+    }
+  ],
+  "socials": [
+    {
+      "label": "GitHub",
+      "href": "https://github.com/kirikiroid3/kagari",
+      "external": true,
+      "icon": "github"
+    }
+  ],
+  "search": {
+    "provider": "local"
+  },
+  "source": {
+    "github": "kirikiroid3/kagari",
+    "branch": "main"
+  },
+  "editLink": {
+    "pattern": "https://github.com/kirikiroid3/kagari/edit/{branch}/docs/site/{path}"
+  },
+  "docsNav": [
+    {
+      "slug": "tutorial",
+      "label": "チュートリアル",
+      "translations": {
+        "en": "Tutorial"
+      },
+      "icon": "lucide:graduation-cap",
+      "items": [
+        "tutorial"
+      ]
+    },
+    {
+      "slug": "reference",
+      "label": "言語リファレンス",
+      "translations": {
+        "en": "Language Reference"
+      },
+      "icon": "lucide:book-open",
+      "items": [
+        "reference",
+        {
+          "label": "概要",
+          "translations": {
+            "en": "Overview"
+          },
+          "items": [
+            "reference/overview/architecture",
+            "reference/overview/philosophy"
+          ]
+        },
+        {
+          "label": "中核概念",
+          "translations": {
+            "en": "Core Concepts"
+          },
+          "items": [
+            "reference/concepts/kinds",
+            "reference/concepts/story",
+            "reference/concepts/steps",
+            "reference/concepts/scenes",
+            "reference/concepts/entry",
+            "reference/concepts/presentation",
+            "reference/concepts/system",
+            "reference/concepts/saves"
+          ]
+        },
+        {
+          "label": "構文",
+          "translations": {
+            "en": "Syntax"
+          },
+          "items": [
+            "reference/syntax/lexical",
+            "reference/syntax/modules",
+            "reference/syntax/items",
+            "reference/syntax/types",
+            "reference/syntax/numbers",
+            "reference/syntax/values",
+            "reference/syntax/functions",
+            "reference/syntax/expressions",
+            "reference/syntax/patterns",
+            "reference/syntax/control-flow",
+            "reference/syntax/forms",
+            "reference/syntax/constants",
+            "reference/syntax/rust-differences"
+          ]
+        },
+        {
+          "label": "特殊な型、トレイト、属性",
+          "translations": {
+            "en": "Special Types, Traits and Attributes"
+          },
+          "items": [
+            "reference/special/builtin-types",
+            "reference/special/traits",
+            "reference/special/attributes"
+          ]
+        },
+        {
+          "label": "ビルドと実行",
+          "translations": {
+            "en": "Building and Running"
+          },
+          "items": [
+            "reference/tools/projects",
+            "reference/tools/cli",
+            "reference/tools/editors",
+            "reference/tools/runtime",
+            "reference/tools/headless"
+          ]
+        },
+        {
+          "label": "付録",
+          "translations": {
+            "en": "Appendices"
+          },
+          "items": [
+            "reference/appendix/quick-reference",
+            "reference/appendix/glossary"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "std",
+      "label": "STD リファレンス",
+      "translations": {
+        "en": "STD Reference"
+      },
+      "icon": "lucide:library",
+      "items": [
+        "std",
+        "std/usage",
+        {
+          "label": "モジュール",
+          "translations": {
+            "en": "Modules"
+          },
+          "items": [
+            "std/std",
+            "std/prelude",
+            "std/time",
+            "std/narrative",
+            "std/narrative-text",
+            "std/screen",
+            "std/screen-anim",
+            "std/screen-audio",
+            "std/screen-shader",
+            "std/shaders",
+            "std/shaders-color",
+            "std/shaders-mix",
+            "std/shaders-mask",
+            "std/shaders-texture",
+            "std/shaders-motion",
+            "std/stage",
+            "std/system",
+            "std/system-nav",
+            "std/system-saves",
+            "std/ui",
+            "std/ui-style"
+          ]
+        },
+        {
+          "label": "ガイド",
+          "translations": {
+            "en": "Guides"
+          },
+          "items": [
+            "std/guides/staging",
+            "std/guides/system",
+            "std/guides/shaders"
+          ]
+        },
+        {
+          "label": "付録",
+          "translations": {
+            "en": "Appendices"
+          },
+          "items": [
+            "std/appendix/rules",
+            "std/appendix/profiles"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "diagnostics",
+      "label": "診断",
+      "translations": {
+        "en": "Diagnostics"
+      },
+      "icon": "lucide:circle-alert",
+      "items": [
+        "diagnostics",
+        "diagnostics/syntax",
+        "diagnostics/modules",
+        "diagnostics/types",
+        "diagnostics/kinds",
+        "diagnostics/eval",
+        "diagnostics/analysis",
+        "diagnostics/system",
+        "diagnostics/emit"
+      ]
+    }
+  ],
+  "footer": {
+    "copyright": "Copyright © 2026 Nikaidou Haruki.",
+    "sections": []
+  }
+}

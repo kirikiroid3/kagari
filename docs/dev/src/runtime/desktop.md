@@ -7,8 +7,8 @@ time, draws `Frame`s with `kagari-render`, and plays `AudioCommand`s with kira. 
 the same engine runs without a window, driven by a script, writing PNG captures; this is the
 project's end-to-end test harness.
 
-The user-facing documentation is the Reference: [The Runtime](../../../reference/en/src/tools/runtime.md)
-and [Headless Mode](../../../reference/en/src/tools/headless.md).
+The user-facing documentation is the Reference: [The Runtime](https://kagari.suitsu31.club/en/reference/tools/runtime/)
+and [Headless Mode](https://kagari.suitsu31.club/en/reference/tools/headless/).
 
 ## Where in the code
 
@@ -244,9 +244,9 @@ when reading headless runs: `kagari::system` (`modes: [...]` whenever the mode s
 ## When you change this
 
 - Command-line options, exit statuses, data directories, platform requirements: the Reference
-  [The Runtime](../../../reference/en/src/tools/runtime.md) (en and ja).
+  [The Runtime](https://kagari.suitsu31.club/en/reference/tools/runtime/) (en and ja).
 - Script commands or headless behaviour: the Reference
-  [Headless Mode](../../../reference/en/src/tools/headless.md) (en and ja), `headless/script.rs`
+  [Headless Mode](https://kagari.suitsu31.club/en/reference/tools/headless/) (en and ja), `headless/script.rs`
   tests in `tests.rs`.
 - A new key, mouse or pad button: `kagari_engine::Key`/`PadButton` and `std::system` in
   `core/kagari-std`, `input.rs` (`map_key` and the test inverse `key_code`, which is exhaustive so

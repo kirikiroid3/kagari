@@ -18,14 +18,14 @@ description: Load when adding, removing, renaming or changing anything in core/k
 | `runtime_libs/kagari-engine/src/*/` | `import_table!` per module (screen, audio, story/narrative, system, system/nav, saves, ui) |
 | `runtime_libs/kagari-engine/src/host/mod.rs` | `StdImport`, `Bindings` (boot fails on an unknown import path) |
 | `runtime_libs/kagari-engine/src/values/table.rs` | `STD_ADTS`: std types the engine reads/builds, field order |
-| `docs/std/{en,ja}/src/` | STD Reference, one page per module |
+| `docs/site/src/content/docs/{en,ja}/std/` | STD Reference, one page per module |
 
 ## Read first
 
 - `docs/dev/src/std/builtins.md` — identification by name, lowering, engine imports, the full
   add/change checklist.
 - `docs/dev/src/std/contract.md` — design rules and every checker special case.
-- `docs/std/en/src/about.md` and an existing module page — the STD page template.
+- `docs/site/src/content/docs/en/std/index.md` and an existing module page — the STD page template.
 
 ## Invariants
 
@@ -63,7 +63,7 @@ description: Load when adding, removing, renaming or changing anything in core/k
    (`analysis/story/explore`) and influence analysis (`analysis/influence.rs`).
 7. New asset kind → `AssetKind` (bytecode), `kagari-compat` profiles, STD appendix
    `profiles.md`.
-8. Docs: STD Reference module page in **en and ja** (`docs/std/{en,ja}/src/<module>.md`, same
+8. Docs: STD Reference module page in **en and ja** (`docs/site/src/content/docs/{en,ja}/std/<module>.md`, same
    headings with `{#id}` in ja, byte-identical code blocks, Stability line, every public item in
    declaration order); `appendix/rules.md` (en + ja) for compiler rules; Reference
    `diagnostics/*.md` (en + ja) for new codes; `docs/dev/src/std/contract.md` for special cases.
@@ -82,6 +82,6 @@ Then `target/debug/kagari check` / `build` in `example/test_game1` and run it wi
 
 ## Docs to update
 
-- `docs/std/en/src/*.md` **and** `docs/std/ja/src/*.md` (mirrored).
+- `docs/site/src/content/docs/en/std/*.md` **and** `docs/site/src/content/docs/ja/std/*.md` (mirrored).
 - `docs/dev/src/std/builtins.md`, `docs/dev/src/std/contract.md`.
 - Reference (en + ja) when a language-level rule or diagnostic changes.

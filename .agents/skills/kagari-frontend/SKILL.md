@@ -69,7 +69,7 @@ description: Load when changing core/kagari-syntax (lexer, parser, AST, form val
 3. Add a case to `core/kagari-lang/tests/game_source/<area>/NNN__topic/main.kix` (e.g.
    `script/010__type_errors`, `script/011__kind_errors`) and accept the snapshot.
 4. Add the entry ``## E3025 `name` {#e3025}`` (Error/Warning line, minimal program, Fix) to
-   `docs/reference/en/src/diagnostics/<group>.md` **and** `docs/reference/ja/src/diagnostics/<group>.md`
+   `docs/site/src/content/docs/en/diagnostics/<group>.md` **and** `docs/site/src/content/docs/ja/diagnostics/<group>.md`
    (same heading and id, byte-identical code block).
 5. `cargo test -p kagari-lang --test diagnostics_book`.
 
@@ -89,8 +89,8 @@ description: Load when changing core/kagari-syntax (lexer, parser, AST, form val
 ## Docs to update in the same change
 
 - Develop Guide chapter(s) above for any internal change.
-- User-visible syntax: `docs/reference/{en,ja}/src/syntax/*.md` (both languages).
+- User-visible syntax: `docs/site/src/content/docs/{en,ja}/reference/syntax/*.md` (both languages).
 - New/changed rule or code: Reference diagnostics pages (en + ja) and the page stating the rule;
-  std-item rules: `docs/std/{en,ja}/src/appendix/rules.md`; std–checker contract:
+  std-item rules: `docs/site/src/content/docs/{en,ja}/std/appendix/rules.md`; std–checker contract:
   `docs/dev/src/std/contract.md`.
 - Prelude/std module changes: STD Reference pages (en + ja).

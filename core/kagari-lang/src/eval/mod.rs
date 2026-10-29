@@ -2,8 +2,8 @@
 //! story bodies, tabulated `const fn` calls from the story, and the renders steps use.
 //!
 //! See `docs/dev/src/compiler/eval.md`, `docs/dev/src/std/contract.md#const-evaluation-errors`
-//! and, in The Kagari Reference, `docs/reference/en/src/concepts/kinds.md` and
-//! `concepts/presentation.md`.
+//! and, in the Language Reference, `docs/site/src/content/docs/en/reference/concepts/kinds.md`
+//! and `concepts/presentation.md`.
 
 pub(crate) mod const_exprs;
 pub(crate) mod ctx;

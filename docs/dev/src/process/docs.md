@@ -2,41 +2,55 @@
 
 **Where in the code**
 
-- Books: `docs/reference/{en,ja}`, `docs/std/{en,ja}`, `docs/dev`, each a standalone mdBook
-  (`book.toml` + `src/SUMMARY.md`).
-- Built site: `docs/_site/` (ignored by git).
+- The documentation site (`docs/site`, an Astro project with the [Lotus](https://astro-theme-lotus.prosefly.dev/)
+  theme), published at `https://kagari.suitsu31.club`:
+  - Pages: `src/content/docs/{ja,en}/` with four sections, `tutorial/`, `reference/` (the
+    Language Reference), `std/` (the STD Reference) and `diagnostics/`. Japanese is the root
+    locale (`/reference/…`), English is under `/en/` (`/en/reference/…`).
+  - `theme.config.json`: site identity, locales, header links and the sidebar (`docsNav`), which
+    lists every page in order.
+  - `astro.config.ts` (Kagari code highlighting), `src/markdown.ts` (remark plugins for links,
+    heading ids and diagrams), `src/components/Home.astro` (the landing page, used by
+    `src/pages/index.astro` and `src/pages/en/index.astro`), `src/components/SiteBrand.astro`
+    (Lotus override: the header logo links to the current locale's home), `src/styles/site.css`.
+  - Hosting: Vercel, configured by the root `vercel.json` (see [Building and checking](#building-and-checking)).
+- The Develop Guide (`docs/dev`): a standalone mdBook (`book.toml` + `src/SUMMARY.md`), built to
+  `docs/_site/` (ignored by git) and not published with the site.
 - Agent skills: `.agents/skills/<name>/SKILL.md`; the documentation skill is `kagari-docs`.
 - Tests that read the docs: `core/kagari-lang/tests/diagnostics_book.rs`.
-- Code highlighting: `tooling/mdbook-kagari`, an mdBook preprocessor registered in every
-  `book.toml` (see [Code highlighting](#code-highlighting)).
+- Code highlighting: `tooling/textmate-kagari` for the site, `tooling/mdbook-kagari` for the
+  Develop Guide (see [Code highlighting](#code-highlighting)).
 
 ## The rule
 
 > Every change updates the documentation that describes it, in the same change.
 
 - A change a studio can observe (syntax, a diagnostic, a std item, an attribute, a CLI flag, a
-  manifest key, a runtime option, headless commands, an asset format) updates the **Reference** or
-  the **STD Reference** in **English and Japanese** in the same commit.
+  manifest key, a runtime option, headless commands, an asset format) updates the **Language
+  Reference**, the **STD Reference** or **Diagnostics** on the site in **English and Japanese** in
+  the same commit.
 - A change to how Kagari works inside (compiler, IRs, formats, VM, engine, tooling, process)
   updates the **Develop Guide** in the same commit.
 - A design decision, or a change to one, updates
   [Design Decisions](../foundations/decisions.md) (status included). A question that gets answered
   leaves [Open Questions](./open-questions.md).
 
-## Which book holds what
+## Which part holds what
 
-| Book | Audience | Holds | Never holds |
+| Part | Audience | Holds | Never holds |
 | ---- | -------- | ----- | ----------- |
-| The Kagari Reference (en, ja) | Studios writing and shipping games | Concepts, the language, special types, traits and attributes, projects, the CLI, editors, the runtime and headless mode, the diagnostics index | Crate names, internal module paths, IR names (HIR, THIR, MIR), opcodes and byte layouts. Bytecode is only "the `.kagari` file" |
-| Kagari STD Reference (en, ja) | Studios | Every public item of `std` in the page template below, recipes, the user-visible compiler rules for std items (`appendix/rules.md`), runtime profiles | Host implementation details |
+| Tutorial (site, ja, en) | People new to Kagari | A guided path from installation to a first game | Rules not stated in the references |
+| Language Reference (site, ja, en) | Studios writing and shipping games | Concepts, the language, special types, traits and attributes, projects, the CLI, editors, the runtime and headless mode | Crate names, internal module paths, IR names (HIR, THIR, MIR), opcodes and byte layouts. Bytecode is only "the `.kagari` file" |
+| STD Reference (site, ja, en) | Studios | Every public item of `std` in the page template below, recipes, the user-visible compiler rules for std items (`appendix/rules.md`), runtime profiles | Host implementation details |
+| Diagnostics (site, ja, en) | Studios | Every diagnostic code, one heading per code, grouped by stage | Compiler internals |
 | Kagari Develop Guide (en) | Maintainers and contributors | Why and how: design decisions with rationale, the proposal mapping, the first design's history, crate layout, compiler internals, the std/host ABI, the std–checker contract, the `.kagari` byte layout, archive and save formats, VM, engine, tooling internals, testing, this policy, open questions | User-facing rules restated; link to them instead |
 
-When a fact has a user-facing side and an implementation side, the user-facing fact goes into the
-Reference or STD Reference and the implementation detail into this guide, which links to the
-reference page. Reference and STD pages link to the Develop Guide only from their Introduction
-("for internals see …").
+When a fact has a user-facing side and an implementation side, the user-facing fact goes onto the
+site and the implementation detail into this guide, which links to the site page. Site pages link
+to the Develop Guide only from the introductions ("for internals see …"), with a GitHub URL,
+because the guide is not published with the site.
 
-## Writing style (all books)
+## Writing style (site and guide)
 
 - Plain, precise, reference-style English. Present tense. Short sentences. Tables for enumerable
   facts. No marketing tone, no emoji.
@@ -48,35 +62,51 @@ reference page. Reference and STD pages link to the Develop Guide only from thei
   `core/kagari-lang/tests/game_source/script/001__book_examples`).
 - The Reference marks unsettled design as *Tentative*. The STD Reference uses the stability index
   instead (Stable, Tentative, Planned).
-- Links within a book are relative (`../concepts/scenes.md#entry-scenes`). Link to an anchor only
-  when the heading exists. Links to another book are relative paths between **source** files, for
-  example from `docs/reference/en/src/concepts/x.md` to `../../../../std/en/src/screen.md`; they
-  work on GitHub and in the built site because every `build-dir` mirrors the source tree under
-  `docs/_site/`. The language switch works the same way (`../../ja/src/introduction.md` from
-  `docs/reference/en/src/introduction.md`). Use cross-book links sparingly.
+- Links between site pages are relative paths between **source** files, in any section of the
+  same language (`../concepts/scenes.md#entry-scenes`, `../../std/screen.md`). They work in
+  editors and on GitHub; at build time `remarkBookLinks` (`docs/site/src/markdown.ts`) turns them
+  into routes (`/reference/concepts/scenes/#entry-scenes`) and fails the build on a missing page.
+  Link to an anchor only when the heading exists. There are no language-switch links: the site
+  header has a language selector.
+- The Develop Guide links to the site with absolute URLs of the English pages
+  (`https://kagari.suitsu31.club/en/reference/concepts/scenes/#termination`);
+  `docs/check-books.py` maps each one back to its source file and checks the page and anchor.
 
-## Bilingual rules (Reference and STD Reference)
+## Site pages and bilingual rules
 
-- **Mirror.** `ja/src` mirrors `en/src` exactly: the same files, the same `SUMMARY.md` order, the
-  same heading structure, the same code blocks. A change to an English page changes its Japanese
-  page in the same commit, and the reverse.
+- **Page shape.** Pages are plain Markdown (`.md`, not MDX). The title is the frontmatter `title`
+  (a page has no `#` heading); a `sidebar.label` overrides the sidebar text when it should be
+  shorter. Sections start at `##`.
+  ```markdown
+  ---
+  title: "std::screen"
+  ---
+  ```
+- **Navigation.** A new page gets an entry in `docsNav` of `docs/site/theme.config.json`, which
+  orders the sidebar of each section. Entries are paths without the locale and `.md`
+  (`reference/concepts/scenes`; `reference/index.md` is `reference`), shared by both languages.
+  Labels of sections and groups are Japanese with an `en` translation.
+- **Mirror.** `ja/` mirrors `en/` exactly: the same files, the same heading structure, the same
+  code blocks. A change to an English page changes its Japanese page in the same commit, and the
+  reverse.
 - **Shared anchors.** Every heading of a `ja` file carries an explicit id equal to the English
-  file's anchor: `## エントリーシーン {#entry-scenes}`. mdBook's automatic anchor is the heading
-  text in lowercase, spaces replaced by `-`, punctuation such as backticks, `:`, `.` and `(`
-  removed: ``## `std::screen` `` → `stdscreen`, ``## Rust integers, `Rat` and `Decimal` `` →
-  `rust-integers-rat-and-decimal`. When the automatic English anchor would be ugly or ambiguous,
-  give the English heading an explicit id too, and use the same id in `ja`. Links are then
-  identical in both languages.
+  file's anchor: `## エントリーシーン {#entry-scenes}`. The automatic anchor is mdBook's: the
+  heading text in lowercase, spaces replaced by `-`, punctuation such as backticks, `:`, `.` and
+  `(` removed: ``## `std::screen` `` → `stdscreen`, ``## Rust integers, `Rat` and `Decimal` `` →
+  `rust-integers-rat-and-decimal`. `remarkBookHeadingIds` (`docs/site/src/markdown.ts`) gives the
+  built pages exactly these ids, overriding Lotus's own slugs, which drop inline code. When the
+  automatic English anchor would be ugly or ambiguous, give the English heading an explicit id
+  too, and use the same id in `ja`. Links are then identical in both languages.
 - **Identical code blocks.** Code blocks are byte-identical between `en` and `ja`, including
   comments and string contents.
 - **Japanese style.** です・ます調; full-width `、。`; a half-width space between Japanese text and
   inline code or ASCII words (`` `Screen` 型 ``, `Rust の`). Identifiers, keywords, attribute names
   and diagnostic codes stay in ASCII code spans. Write natural Japanese, not a word-for-word
   translation.
-- **Diagnostics appendix.** Every diagnostic code has exactly one `## E1234 …` (or `## W…`)
-  heading in `docs/reference/en/src/diagnostics/*.md` and one in the `ja` mirror. The
+- **Diagnostics.** Every diagnostic code has exactly one `## E1234 …` (or `## W…`) heading in
+  `docs/site/src/content/docs/en/diagnostics/*.md` and one in the `ja` mirror. The
   `diagnostics_book` test in `kagari-lang` enforces it, so adding, removing or renumbering a code
-  without updating both appendices fails `cargo test`.
+  without updating both languages fails `cargo test`.
 
 ### Glossary
 
@@ -120,17 +150,22 @@ A new term that recurs gets a row here and in the Reference's glossary appendix 
 
 ## Diagrams
 
-- Draw diagrams as standalone SVG files in the book's `src/diagrams/`, named after the chapter
-  (`architecture-overview.svg`). In the Reference and STD Reference each language has its own
-  diagrams directory; `ja` diagrams carry Japanese labels.
-- Include them inline with `\{{#include ../diagrams/NAME.svg}}` (the path is relative to the
-  including file).
+- Draw diagrams as standalone SVG files, named after the chapter (`architecture-overview.svg`):
+  in the Develop Guide in `docs/dev/src/diagrams/`, on the site in a `diagrams/` directory of the
+  section and language (`docs/site/src/content/docs/{en,ja}/reference/diagrams/`,
+  `…/std/diagrams/`). `ja` diagrams carry Japanese labels.
+- Include them inline with `\{{#include ../diagrams/NAME.svg}}` on a line of its own (the path is
+  relative to the including file). mdBook expands it for the guide; on the site
+  `remarkIncludeSvg` (`docs/site/src/markdown.ts`) inlines the file in a `<figure
+  class="kg-diagram">` and fails the build on a missing file.
 - Style: a `viewBox`, `width="100%"`, `style="max-width:…px"`, `role="img"` and an `aria-label`
   that states what the picture says. An embedded `<style>` uses only mdBook theme variables with
   fallbacks (`var(--fg,#333)`, `var(--quote-bg,#f6f7f6)`, `var(--links,#2f5d8a)`), and every class
-  has the `kg-` prefix. Marker and `<defs>` ids are unique per diagram (`kg-arrow-<name>`), because
-  all inline SVGs of a page share one id namespace. No scripts, no external references, no raster
-  images. [`layout-crates.svg`](../diagrams/layout-crates.svg) is an example.
+  has the `kg-` prefix; on the site `.kg-diagram` (`docs/site/src/styles/site.css`) maps the
+  three variables to the Lotus theme, so diagrams follow light and dark mode. Marker and `<defs>`
+  ids are unique per diagram (`kg-arrow-<name>`), because all inline SVGs of a page share one id
+  namespace. No scripts, no external references, no raster images.
+  [`layout-crates.svg`](../diagrams/layout-crates.svg) is an example.
 - Immediately before every `\{{#include …svg}}`, add a hidden *mermaid-ish* comment so that readers
   of the Markdown source (people and AI agents) get the picture's content:
 
@@ -152,7 +187,9 @@ A new term that recurs gets a row here and in the Reference's glossary appendix 
 Each module page follows a Node.js-API-reference shape:
 
 ````markdown
-# `std::screen`
+---
+title: "std::screen"
+---
 
 > **Stability:** Stable — one line summary of the module.
 
@@ -197,7 +234,7 @@ example.
 - English only.
 - Each chapter starts with **Where in the code** (crate and file paths) and ends, where useful,
   with **Invariants** (what a change must preserve) and **When you change this** (what else must
-  change: tests, Reference/STD en+ja, diagnostics appendix, tree-sitter grammar, formatter,
+  change: tests, site pages en+ja, Diagnostics pages, tree-sitter and TextMate grammars, formatter,
   bytecode version, …).
 - Design decisions are short records: **Decision**, **Why**, **Consequences** (including the
   alternatives rejected), with a status (Implemented, Partly implemented, Planned).
@@ -226,20 +263,25 @@ them. A change to a chapter that a skill summarizes updates the skill too.
 
 ## Building and checking
 
+The site needs Node.js 22.23.4 or later (Astro's minimum; `engines` in `docs/site/package.json`)
+and nothing else: no Rust toolchain, no C compiler.
+
 ```sh
-mdbook build docs/reference/en
-mdbook build docs/reference/ja
-mdbook build docs/std/en
-mdbook build docs/std/ja
-mdbook build docs/dev
+cd docs/site
+npm ci              # once, and after package-lock.json changes
+npm run dev         # live preview at http://localhost:4321
+npm run build       # static site in docs/site/dist
 ```
 
-Every build runs the `mdbook-kagari` preprocessor through Cargo, so it needs the Rust toolchain
-and a C compiler (the normal dev shell); the first build compiles the preprocessor.
+The build fails on a link to a missing page or a missing diagram. Astro caches rendered pages in
+`docs/site/node_modules/.astro`; after changing `astro.config.ts`, `src/markdown.ts` or the
+Kagari grammar, delete that directory (and `docs/site/.astro`) so every page is rendered again.
 
-Output goes to `docs/_site/<book>/…/src/`, mirroring the sources, so relative links between books
-work in the built site. `mdbook build` fails on a missing `\{{#include}}` file and reports
-`SUMMARY.md` entries without a file, but it does not check links.
+The Develop Guide is built with `mdbook build docs/dev` into `docs/_site/dev/src/`. The build runs
+the `mdbook-kagari` preprocessor through Cargo, so it needs the Rust toolchain and a C compiler
+(the normal dev shell); the first build compiles the preprocessor. `mdbook build` fails on a
+missing `\{{#include}}` file and reports `SUMMARY.md` entries without a file, but it does not
+check links.
 
 Before committing a docs change, run:
 
@@ -248,16 +290,58 @@ python3 docs/check-books.py                         # links, anchors, en/ja mirr
 cargo test -p kagari-lang --test diagnostics_book   # every diagnostic code once per language
 ```
 
-`docs/check-books.py` needs only Python 3. It checks that every `SUMMARY.md` entry exists and
-every page is listed; that relative links and `#anchors` resolve, across books too (anchors are
-computed the way mdBook computes them, plus explicit `{#id}` and inline `<a id>`); that each `ja`
-tree mirrors its `en` tree (same files, same heading ids, byte-identical code blocks, an explicit
-`{#id}` on every `ja` heading); and that every included diagram exists and has its mermaid-ish
-comment. It exits with status 1 and lists the problems otherwise.
+`docs/check-books.py` needs only Python 3. On the site it checks that every page has a `title`
+and is listed in `docsNav`, and every `docsNav` entry exists in both languages; that relative
+links and `#anchors` resolve (anchors computed the way mdBook computes them, plus explicit
+`{#id}` and inline `<a id>`); that `ja` mirrors `en` (same files, same heading ids,
+byte-identical code blocks, an explicit `{#id}` on every `ja` heading); and that every included
+diagram exists and has its mermaid-ish comment. In the Develop Guide it checks `SUMMARY.md`,
+relative links and diagrams the same way, and that every link to `https://kagari.suitsu31.club`
+names an existing page and anchor. It exits with status 1 and lists the problems otherwise.
+
+**Deployment.** Vercel builds the site from the repository root with the root `vercel.json`:
+`npm ci --prefix docs/site`, then `npm run build --prefix docs/site`, publishing
+`docs/site/dist`. The Vercel project needs no framework preset and no root-directory setting; its
+Node.js version must satisfy `engines`. The domain is `kagari.suitsu31.club` (`site` in
+`astro.config.ts`, used for canonical URLs).
 
 ## Code highlighting
 
-mdBook's bundled highlight.js knows no Kagari, so every `book.toml` registers a preprocessor:
+Kagari code (`kis` and `kix` blocks) is colored by two highlighters that follow the same capture
+list, Zed's `tooling/zed-kagari/languages/kagari/highlights.scm`.
+
+### The site: a TextMate grammar
+
+The site renders code with Expressive Code, which uses Shiki, which reads TextMate grammars.
+`tooling/textmate-kagari/kagari.tmLanguage.json` (`name` `kis`, alias `kix`, scope
+`source.kagari`) is registered in `docs/site/astro.config.ts` (`expressiveCode.shiki.langs`)
+and passed to the landing page's code block directly. One grammar covers both file kinds:
+`.kix` adds forms, which are built from ordinary tokens.
+
+The grammar is regular expressions, not a parser, so it approximates the tree-sitter grammar:
+
+| `highlights.scm` capture | TextMate scope |
+| ------------------------ | -------------- |
+| `keyword` | `keyword.control` (control flow), `keyword.other.*` (`let`, `use`, `as`, `impl`, `crate`, `super`), `storage.type.*` (`fn`, `struct`, `enum`, `trait`, `type`, `mod`), `storage.modifier.*` (`pub`, `mut`, `const`, `static`, `pushdown` before `fn`) |
+| `type`, `type.builtin` | `entity.name.type` (capitalized names), `support.type.primitive` (integers, `bool`), `support.type.self` |
+| `variable.special` (`self`) | `variable.language.self` |
+| `constant`, `boolean` | `constant.other.caps` (`ALL_CAPS`), `constant.language.boolean` |
+| `function`, `function.special` (form names) | `entity.name.function`, `entity.name.function.macro` |
+| `module` | `entity.name.namespace` |
+| `property`, `variant`, `label` | `variable.other.property`, `variable.other.enummember`, `entity.name.label` |
+| `attribute` | `meta.attribute` with `entity.other.attribute-name` |
+| `comment`, `comment.doc` | `comment.line.double-slash`, `comment.block`, `comment.line.documentation` |
+| `string`, `string.escape` | `string.quoted.double`, `constant.character.escape` |
+| `number` | `constant.numeric.*` |
+
+Known approximations: a capitalized name followed by `{` is taken for a struct literal; a
+capitalized call (`Some(x)`) is colored as a function, as in Zed; `<` and `>` are generic brackets
+when unspaced and comparisons when spaced. Inside `t![…]` (`meta.form.text`) the grammar also
+marks text-effect `!`, ruby bases and `{…}` interpolation.
+
+### The Develop Guide: `mdbook-kagari`
+
+mdBook's bundled highlight.js knows no Kagari, so `docs/dev/book.toml` registers a preprocessor:
 
 ```toml
 [preprocessor.kagari]
@@ -272,12 +356,11 @@ byte for highlight.js (`tooling/mdbook-kagari/src/chapter.rs`).
 
 - **One grammar, one query file.** `build.rs` compiles `tooling/tree-sitter-kagari/src/parser.c`
   into the binary, and `src/highlight.rs` embeds the Zed extension's `highlights.scm` with
-  `include_str!`. The books and Zed therefore color the same nodes, and neither has a second
-  set of rules.
+  `include_str!`. The guide and Zed therefore color the same nodes.
 - **Zed's precedence.** When captures overlap, the innermost node wins; for the same node the
   later pattern (or the later capture of one pattern) wins. The `tree-sitter-highlight` crate
   lets the first pattern win, so the preprocessor resolves captures itself with a `QueryCursor`.
-- **Snippets.** Book code is often a bare statement, an expression or a bodyless std signature.
+- **Snippets.** Guide code is often a bare statement, an expression or a bodyless std signature.
   A block that has syntax errors on its own is parsed again inside
   `fn __kagari_snippet() { … }`; a byte inside an `ERROR` node of the first parse but not of the
   second takes its class from the second. Blocks mixing statements and items are thus colored
@@ -308,9 +391,13 @@ class (operators, punctuation) keep the color of the enclosing capture:
 
 **When you change this**
 
-- A new book or a moved book: `book.toml` (`build-dir` must mirror the source tree, and the
-  `[preprocessor.kagari]` table), the [introduction](../introduction.md), the root `README.md`,
-  and the `kagari-docs` skill.
-- A change to these rules: the `kagari-docs` skill in the same change.
-- A new capture name in `highlights.scm` that the books should color: an arm in `class_of`
-  (`tooling/mdbook-kagari/src/highlight.rs`) and a row in the table above.
+- A new site section or page: `docsNav` in `docs/site/theme.config.json` (and the header links
+  in `siteNav` for a section), both languages; a new book-like part also updates the
+  [introduction](../introduction.md), the root `README.md` and the `kagari-docs` skill.
+- A change to these rules: the `kagari-docs` skill in the same change, and `docs/check-books.py`
+  when a rule it enforces changes.
+- A new token or syntax: the TextMate grammar (`tooling/textmate-kagari`) together with the
+  tree-sitter grammar.
+- A new capture name in `highlights.scm`: an arm in `class_of`
+  (`tooling/mdbook-kagari/src/highlight.rs`) and a row in the class table above, and a scope in
+  the TextMate grammar with a row in its table.

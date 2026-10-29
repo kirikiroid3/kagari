@@ -296,22 +296,22 @@ change); see `unused_message`.
   where the type is written.
 - Std items are found by role through `StdItems`; never compare item names in checks.
 - Every user-visible rule here is documented for studios: kind rules in the Reference
-  ([Function Kinds](../../../reference/en/src/concepts/kinds.md),
-  [Values, References and Closures](../../../reference/en/src/syntax/values.md),
-  [Numbers](../../../reference/en/src/syntax/numbers.md)), rules for std items in the STD
-  Reference ([Compiler Rules for std Items](../../../std/en/src/appendix/rules.md)).
+  ([Function Kinds](https://kagari.suitsu31.club/en/reference/concepts/kinds/),
+  [Values, References and Closures](https://kagari.suitsu31.club/en/reference/syntax/values/),
+  [Numbers](https://kagari.suitsu31.club/en/reference/syntax/numbers/)), rules for std items in the STD
+  Reference ([Compiler Rules for std Items](https://kagari.suitsu31.club/en/std/appendix/rules/)).
 
 ## When you change this
 
 - **New type rule or coercion**: `infer/`, then THIR building if the coercion must be lowered
   (`thir/build/expr.rs` reads `coercions`), and the Reference
-  [Types](../../../reference/en/src/syntax/types.md) or [Numbers](../../../reference/en/src/syntax/numbers.md)
+  [Types](https://kagari.suitsu31.club/en/reference/syntax/types/) or [Numbers](https://kagari.suitsu31.club/en/reference/syntax/numbers/)
   page (en and ja).
 - **New std item the checker relies on**: a field in `StdItems` (`signatures/collect.rs::std_items`),
   the [std–checker contract](../std/contract.md), and the STD Reference
-  [Compiler Rules](../../../std/en/src/appendix/rules.md) page (en and ja).
+  [Compiler Rules](https://kagari.suitsu31.club/en/std/appendix/rules/) page (en and ja).
 - **New kind or story rule**: `typeck/kinds/`, a case in `tests/game_source/script/011__kind_errors`
-  (or a new fixture), the Reference [Function Kinds](../../../reference/en/src/concepts/kinds.md)
+  (or a new fixture), the Reference [Function Kinds](https://kagari.suitsu31.club/en/reference/concepts/kinds/)
   page, and a diagnostic ([Diagnostics](./diagnostics.md#adding-a-diagnostic)).
 - **Pattern changes**: `typeck/exhaustive.rs` with unit tests in `exhaustive/tests.rs`, fixture
   `013__exhaustiveness`, and the decision-tree lowering in `mir/build/matches.rs`.

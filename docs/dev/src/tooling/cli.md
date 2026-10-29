@@ -25,8 +25,8 @@ the outcome to output and an exit code. No compiler logic lives in the CLI.
 | `tooling/kagari-cli/template/` | The new-project template (`_gitignore` becomes `.gitignore`) |
 | `tooling/kagari-cli/tests/` | Integration tests running the built binary |
 
-Users see this as the Reference chapters [Projects](../../../reference/en/src/tools/projects.md)
-and [The `kagari` CLI](../../../reference/en/src/tools/cli.md).
+Users see this as the Reference chapters [Projects](https://kagari.suitsu31.club/en/reference/tools/projects/)
+and [The `kagari` CLI](https://kagari.suitsu31.club/en/reference/tools/cli/).
 
 ## `kagari-project`
 
@@ -160,7 +160,7 @@ kagari build [--manifest-path PATH] [--target TARGET]...
 
    Any such line → exit 1, and the output directory is neither created nor cleaned. The format
    tables per profile live in `runtime_libs/kagari-compat`; the user-facing list is in the
-   Reference's [Runtime profiles](../../../reference/en/src/tools/projects.md#runtime-profiles).
+   Reference's [Runtime profiles](https://kagari.suitsu31.club/en/reference/tools/projects/#runtime-profiles).
    `native_v0` accepts shaders whose content sniffs as UTF-8 text (`AssetFormat::Wgsl`).
 4. **Shader check** (`build/shaders.rs`): `shader_roles` is parallel to `asset_files`; for each
    asset with `Some(role)`, read the whole source (disk, or `kagari_std::file` for
@@ -292,8 +292,8 @@ The integration tests run the real binary (`env!("CARGO_BIN_EXE_kagari")`) throu
    in `core/kagari-lang/src/input.rs`).
 3. Add unit tests in `kagari-project/src/tests.rs` for the default and for each rejection.
 4. If new projects should set it, add it to `tooling/kagari-cli/template/kagari.toml`.
-5. Document it in the Reference: `docs/reference/en/src/tools/projects.md` **and**
-   `docs/reference/ja/src/tools/projects.md` (same table rows, same code blocks).
+5. Document it in the Reference: `docs/site/src/content/docs/en/reference/tools/projects.md` **and**
+   `docs/site/src/content/docs/ja/reference/tools/projects.md` (same table rows, same code blocks).
 
 ### Adding a subcommand or flag
 
@@ -305,7 +305,7 @@ The integration tests run the real binary (`env!("CARGO_BIN_EXE_kagari")`) throu
 3. Use `workspace::load` if it needs a project, `failure::io` for I/O errors, and `exit(failed)`
    for problem-found results. Print user-facing paths with `workspace::shown`.
 4. Add an integration test in `tooling/kagari-cli/tests/<name>.rs` using `tests/common`.
-5. Document it in `docs/reference/en/src/tools/cli.md` and `docs/reference/ja/src/tools/cli.md`
+5. Document it in `docs/site/src/content/docs/en/reference/tools/cli.md` and `docs/site/src/content/docs/ja/reference/tools/cli.md`
    (synopsis, flags, exit codes), and update the command list in this chapter.
 
 ### Other changes
@@ -314,6 +314,6 @@ The integration tests run the real binary (`env!("CARGO_BIN_EXE_kagari")`) throu
   `supports*` tables in `kagari-compat`. Update the Reference project page (en+ja).
 - Changing the output layout (`game.kagari`, archive naming): the desktop runtime reads it; update
   `runtime/kagari-desktop-runtime`, [The Desktop Runtime](../runtime/desktop.md), and the
-  Reference [The Runtime](../../../reference/en/src/tools/runtime.md) page (en+ja).
+  Reference [The Runtime](https://kagari.suitsu31.club/en/reference/tools/runtime/) page (en+ja).
 - Changing the template: run `kagari init` in a temp dir and make sure `check`, `build` and
   `fmt --check` exit 0 (the integration tests do this).

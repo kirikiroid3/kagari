@@ -1,5 +1,5 @@
-//! Termination (`docs/reference/en/src/concepts/scenes.md#termination`): every `loop` and
-//! `while` of a scene, and every cycle of scene calls, passes through a step.
+//! Termination (`docs/site/src/content/docs/en/reference/concepts/scenes.md#termination`):
+//! every `loop` and `while` of a scene, and every cycle of scene calls, passes through a step.
 //!
 //! A scene *may return without a step* when a path from its entry to a return passes no
 //! step and calls only such scenes; the least fixpoint over all scenes is computed first.

@@ -1,5 +1,6 @@
 //! The kind and story rules of compilation stage 3 (`docs/dev/src/compiler/typeck.md`; for
-//! users, `docs/reference/en/src/concepts/*.md` and `syntax/values.md`), on top of inference:
+//! users, `docs/site/src/content/docs/en/reference/concepts/*.md` and `syntax/values.md`), on
+//! top of inference:
 //!
 //! - the call rules between `fn`, `pushdown fn` and `const fn`, for direct calls, methods
 //!   (std builtins included) and calls through pointers and closures, whose types carry the

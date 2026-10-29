@@ -1,6 +1,6 @@
 ---
 name: kagari-tooling
-description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fmt, kagari-lsp, tree-sitter-kagari, zed-kagari, mdbook-kagari) or core/kagari-lang/src/ide, or when adding CLI subcommands/flags, kagari.toml keys, formatter rules, LSP features, or grammar rules.
+description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fmt, kagari-lsp, tree-sitter-kagari, textmate-kagari, zed-kagari, mdbook-kagari) or core/kagari-lang/src/ide, or when adding CLI subcommands/flags, kagari.toml keys, formatter rules, LSP features, or grammar rules.
 ---
 
 # Kagari tooling
@@ -16,7 +16,8 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
 | `core/kagari-lang/src/ide` | Go to definition, hover, file symbols over salsa queries |
 | `tooling/tree-sitter-kagari` | Editor grammar; `src/parser.c`, `src/grammar.json`, `src/node-types.json` are generated |
 | `tooling/zed-kagari` | Zed extension; excluded from the Cargo workspace |
-| `tooling/mdbook-kagari` | mdBook preprocessor: highlights `kis`/`kix` book blocks with the grammar's `parser.c` and Zed's `highlights.scm` (`docs/dev/src/process/docs.md#code-highlighting`) |
+| `tooling/mdbook-kagari` | mdBook preprocessor: highlights the Develop Guide's `kis`/`kix` blocks with the grammar's `parser.c` and Zed's `highlights.scm` (`docs/dev/src/process/docs.md#code-highlighting`) |
+| `tooling/textmate-kagari` | `kagari.tmLanguage.json`, the TextMate grammar (Shiki) that highlights `kis`/`kix` on the documentation site; regex approximation of the tree-sitter grammar |
 
 ## Read first
 
@@ -52,14 +53,14 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
    `CompileOptions` (`core/kagari-lang/src/input.rs`, with a default constant).
 3. Tests in `tooling/kagari-project/src/tests.rs` (default + each rejection).
 4. Template `tooling/kagari-cli/template/kagari.toml` if new projects should set it.
-5. Docs: `docs/reference/{en,ja}/src/tools/projects.md` and the table in `docs/dev/src/tooling/cli.md`.
+5. Docs: `docs/site/src/content/docs/{en,ja}/reference/tools/projects.md` and the table in `docs/dev/src/tooling/cli.md`.
 
 ### Add a subcommand or flag
 1. `Command` variant/field in `tooling/kagari-cli/src/cli.rs` (doc comment = `--help` text).
 2. `command/<name>.rs` with `pub fn run(…) -> Result<ExitCode, Failure>`; register in
    `command/mod.rs`; dispatch in `main.rs`. Use `workspace::load`, `failure::io`, `exit(failed)`.
 3. Integration test `tooling/kagari-cli/tests/<name>.rs` using `tests/common`.
-4. Docs: `docs/reference/{en,ja}/src/tools/cli.md` (synopsis, flags, exit codes) and
+4. Docs: `docs/site/src/content/docs/{en,ja}/reference/tools/cli.md` (synopsis, flags, exit codes) and
    `docs/dev/src/tooling/cli.md`.
 
 ### Change formatter layout / support new syntax
@@ -75,17 +76,20 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
 2. Handler in `tooling/kagari-lsp/src/server/requests.rs`, capability in `server/mod.rs`,
    conversions in `convert.rs`/`line_index`.
 3. Step in `tooling/kagari-lsp/tests/lsp.rs`.
-4. Docs: `docs/reference/{en,ja}/src/tools/editors.md`, `docs/dev/src/tooling/lsp.md`,
+4. Docs: `docs/site/src/content/docs/{en,ja}/reference/tools/editors.md`, `docs/dev/src/tooling/lsp.md`,
    `docs/dev/src/compiler/ide.md`.
 
 ### Change the grammar (after any `kagari-syntax` change)
 1. Edit `tooling/tree-sitter-kagari/grammar.js` (and `PREC`/`KEYWORDS`).
 2. `cd tooling/tree-sitter-kagari && tree-sitter generate && tree-sitter test` (CLI emitting ABI
    15; not in the Nix shell). Add/adjust `test/corpus/*.txt`.
-3. Update `tooling/zed-kagari/languages/kagari/*.scm` if node names/fields changed. The books
-   use the same `highlights.scm`: a new capture name needs a class in `class_of`
+3. Update `tooling/zed-kagari/languages/kagari/*.scm` if node names/fields changed. The Develop
+   Guide uses the same `highlights.scm`: a new capture name needs a class in `class_of`
    (`tooling/mdbook-kagari/src/highlight.rs`).
-4. Commit grammar + generated `src/` together; then set `rev` in
+4. Update `tooling/textmate-kagari/kagari.tmLanguage.json` for new tokens, keywords or forms, then
+   rebuild the site (`rm -rf docs/site/node_modules/.astro && npm --prefix docs/site run build`)
+   and look at an affected page.
+5. Commit grammar + generated `src/` together; then set `rev` in
    `tooling/zed-kagari/extension.toml` to that commit.
 
 ## Tests
@@ -103,6 +107,6 @@ The `ide` fixture must check without diagnostics (`fixture_program_checks_cleanl
 
 ## Docs to update
 
-- User-facing CLI/manifest/editor behaviour: `docs/reference/en/src/tools/{cli,projects,editors}.md`
+- User-facing CLI/manifest/editor behaviour: `docs/site/src/content/docs/en/reference/tools/{cli,projects,editors}.md`
   **and** the `ja` mirrors (same headings with `{#id}`, identical code blocks).
 - Internals: `docs/dev/src/tooling/{cli,fmt,lsp}.md`, `docs/dev/src/compiler/ide.md`.

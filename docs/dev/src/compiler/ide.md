@@ -199,5 +199,5 @@ End-to-end behaviour through the protocol is covered by `tooling/kagari-lsp/test
 - New request (references, rename, completion): add a function here that returns compiler types,
   a handler in `kagari-lsp/src/server/requests.rs`, the capability in `server/mod.rs`, a unit test
   in `ide/tests.rs` and a step in `kagari-lsp/tests/lsp.rs`. Update the feature list in the
-  Reference's [Editor Support](../../../reference/en/src/tools/editors.md) page (en and ja).
+  Reference's [Editor Support](https://kagari.suitsu31.club/en/reference/tools/editors/) page (en and ja).
 - Run `cargo test -p kagari-lang ide::` and `cargo test -p kagari-lsp`.

@@ -1,5 +1,5 @@
 //! Focus, input and controls: the focus order, keyboard and mouse handling of the top mount,
-//! activation, sliders, selects and scrolling (`docs/std/en/src/ui.md` §Focus).
+//! activation, sliders, selects and scrolling (`docs/site/src/content/docs/en/std/ui.md` §Focus).
 
 use kagari_vm::{Trap, Value, Vm, value_eq};
 

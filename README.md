@@ -8,14 +8,19 @@ game system (`fn`) stay free to compute.
 
 ## Documentation
 
-| Book | For | English | 日本語 |
+The documentation site is [kagari.suitsu31.club](https://kagari.suitsu31.club) (日本語) /
+[kagari.suitsu31.club/en](https://kagari.suitsu31.club/en/) (English):
+
+| Part | For | English | 日本語 |
 | ---- | --- | ------- | ------ |
-| The Kagari Reference | Studios: concepts, language, CLI, runtime, diagnostics | [en](docs/reference/en/src/introduction.md) | [ja](docs/reference/ja/src/introduction.md) |
-| Kagari STD Reference | Studios: the standard library `std` | [en](docs/std/en/src/about.md) | [ja](docs/std/ja/src/about.md) |
+| Tutorial | Newcomers: install Kagari, make a first game | [en](https://kagari.suitsu31.club/en/tutorial/) | [ja](https://kagari.suitsu31.club/tutorial/) |
+| Language Reference | Studios: concepts, language, CLI, runtime | [en](https://kagari.suitsu31.club/en/reference/) | [ja](https://kagari.suitsu31.club/reference/) |
+| STD Reference | Studios: the standard library `std` | [en](https://kagari.suitsu31.club/en/std/) | [ja](https://kagari.suitsu31.club/std/) |
+| Diagnostics | Studios: every compiler diagnostic | [en](https://kagari.suitsu31.club/en/diagnostics/) | [ja](https://kagari.suitsu31.club/diagnostics/) |
 | Kagari Develop Guide | Contributors: design decisions, compiler, formats, runtime | [en](docs/dev/src/introduction.md) | — |
 
-Build a book with `mdbook build docs/reference/en` (likewise `docs/reference/ja`, `docs/std/en`,
-`docs/std/ja`, `docs/dev`); the output goes to `docs/_site/`.
+The site's sources are in [`docs/site`](docs/site) (Astro; `npm ci && npm run dev` there). The
+Develop Guide is an mdBook: `mdbook build docs/dev` writes it to `docs/_site/`.
 
 ## Status
 
@@ -35,14 +40,15 @@ cargo run --release -p kagari-desktop-runtime -- example/test_game1/target/v0
 ```
 
 On NixOS, `direnv allow` (or `nix develop`) enters the dev shell; other platforms need the
-packages listed in [The Runtime](docs/reference/en/src/tools/runtime.md). Runtime options and the
-headless test mode are described there and in [Headless Mode](docs/reference/en/src/tools/headless.md).
+packages listed in [The Runtime](https://kagari.suitsu31.club/en/reference/tools/runtime/). Runtime
+options and the headless test mode are described there and in
+[Headless Mode](https://kagari.suitsu31.club/en/reference/tools/headless/).
 
 ## Contributing
 
 Read [`AGENTS.md`](AGENTS.md) and the [Develop Guide](docs/dev/src/introduction.md). Code changes
-update the Develop Guide in the same change; user-visible changes also update the Reference or STD
-Reference in both English and Japanese.
+update the Develop Guide in the same change; user-visible changes also update the documentation
+site in both English and Japanese.
 
 ## License
 

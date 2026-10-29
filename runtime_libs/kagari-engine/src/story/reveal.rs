@@ -1,5 +1,6 @@
 //! Reveal timing of a line: units, per-unit durations, time pauses, click pauses and marks
-//! (`docs/std/en/src/narrative-text.md` §Reveal, §Pauses, §Marks, §Clicks and the backlog).
+//! (`docs/site/src/content/docs/en/std/narrative-text.md` §Reveal, §Pauses, §Marks, §Clicks and
+//! the backlog).
 
 use std::rc::Rc;
 

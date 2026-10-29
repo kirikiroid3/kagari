@@ -1,0 +1,13 @@
+/* Diagrams are shared with the Develop Guide (mdBook) and color themselves with mdBook's
+   variables; map them to the Lotus tokens so they follow light and dark mode. */
+.kg-diagram {
+  --fg: var(--lotus-text);
+  --quote-bg: var(--lotus-surface);
+  --links: var(--lotus-accent);
+  margin: 1.5rem 0;
+}
+
+.kg-diagram svg {
+  height: auto;
+  margin-inline: auto;
+}

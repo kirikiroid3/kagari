@@ -6,9 +6,10 @@
 //! - [`influence`]: story variables that never influence the story.
 //! - [`system`]: the mode-graph checks of the game system.
 //!
-//! See `docs/dev/src/compiler/analysis.md`, and in The Kagari Reference
-//! `docs/reference/en/src/concepts/scenes.md#termination`, `concepts/presentation.md`
-//! (consistency, unbounded screens) and `concepts/system.md#system-checks`.
+//! See `docs/dev/src/compiler/analysis.md`, and in the Language Reference
+//! (`docs/site/src/content/docs/en/reference/`) `concepts/scenes.md#termination`,
+//! `concepts/presentation.md` (consistency, unbounded screens) and
+//! `concepts/system.md#system-checks`.
 
 mod influence;
 mod story;

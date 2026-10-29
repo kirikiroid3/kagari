@@ -1,4 +1,4 @@
-//! Finite types (`docs/reference/en/src/concepts/kinds.md#finite-types`,
+//! Finite types (`docs/site/src/content/docs/en/reference/concepts/kinds.md#finite-types`,
 //! `docs/dev/src/std/contract.md#finite-types`): the types the story may hold at runtime.
 
 use crate::hir::FnPtrKind;

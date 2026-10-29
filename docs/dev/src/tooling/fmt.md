@@ -271,5 +271,5 @@ inspect `git diff tests/snapshots`).
 - **New fixture**: name it `NNN__topic.kis` or `.kix` with the next number; the snapshot name
   follows from it.
 - User-facing behaviour of `kagari fmt` (flags, messages, exit codes) is documented in the
-  Reference [The `kagari` CLI](../../../reference/en/src/tools/cli.md) (en and ja); the
-  editor integration in [Editor Support](../../../reference/en/src/tools/editors.md).
+  Reference [The `kagari` CLI](https://kagari.suitsu31.club/en/reference/tools/cli/) (en and ja); the
+  editor integration in [Editor Support](https://kagari.suitsu31.club/en/reference/tools/editors/).
