@@ -30,7 +30,7 @@ cargo test --workspace                   # all tests; no GPU, window, audio or n
 cargo clippy --workspace --all-targets   # must stay clean
 cargo fmt --all                          # rustfmt defaults
 mdbook build docs/dev                    # the Develop Guide (needs the Rust toolchain)
-npm --prefix docs/site ci && npm --prefix docs/site run build   # the documentation site (Node.js)
+pnpm --dir docs/site install && pnpm --dir docs/site run build   # the documentation site (Node.js)
 python3 docs/check-books.py              # links, anchors, en/ja mirroring, diagram comments
 ```
 
@@ -56,5 +56,6 @@ python3 docs/check-books.py              # links, anchors, en/ja mirroring, diag
 - Runtime crates never depend on `kagari-lang` (dev-dependency only).
 - Syntax changes also update `tooling/tree-sitter-kagari` (regenerate; never hand-edit its
   generated `src/` files), the Zed grammar `rev`, the TextMate grammar
-  `tooling/textmate-kagari` (the site's highlighting), and `kagari-fmt`.
+  `tooling/textmate-kagari` (copied to `docs/site/grammars/` once the site documents the syntax),
+  and `kagari-fmt`.
 - CLI exit codes are a contract: 0 success, 1 problems found, 2 cannot run.

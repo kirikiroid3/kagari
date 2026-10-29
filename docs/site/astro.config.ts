@@ -1,7 +1,7 @@
 import { unified } from '@astrojs/markdown-remark';
 import { defineConfig } from 'astro/config';
 import lotus from '@prosefly/astro-theme-lotus';
-import kagariGrammar from '../../tooling/textmate-kagari/kagari.tmLanguage.json' with { type: 'json' };
+import kagariGrammar from './grammars/kagari.tmLanguage.json' with { type: 'json' };
 import { remarkBookHeadingIds, remarkBookLinks, remarkIncludeSvg } from './src/markdown';
 
 // Site identity, locales, navigation and search live in `theme.config.json`.

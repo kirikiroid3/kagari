@@ -53,10 +53,10 @@ mdbook build docs/dev       # into docs/_site/dev/src/ (ignored by git)
 mdbook serve docs/dev       # live reload
 ```
 
-The site is an Astro project in `docs/site` and needs only Node.js:
+The site is an Astro project in `docs/site` and needs only Node.js and pnpm:
 
 ```sh
-cd docs/site && npm ci && npm run dev
+cd docs/site && pnpm install && pnpm run dev
 ```
 
 [Building and checking](./process/docs.md#building-and-checking) has the details and the checks

@@ -98,12 +98,15 @@ order. User-visible compiler rules for std items go in `std/appendix/rules.md`.
 ```sh
 python3 docs/check-books.py                         # links, anchors, docsNav, en/ja mirror, diagrams
 cargo test -p kagari-lang --test diagnostics_book
-(cd docs/site && npm ci && npm run build)           # Node.js >= 22.23.4; fails on broken links
+(cd docs/site && pnpm install && pnpm run build)    # Node.js >= 22.23.4; fails on broken links
 mdbook build docs/dev                               # runs mdbook-kagari via cargo
 ```
 
-Tag every Kagari block `kis` or `kix`: the site highlights them with the TextMate grammar
-`tooling/textmate-kagari`, the Develop Guide with `mdbook-kagari`. After changing
+Tag every Kagari block `kis` or `kix`: the site highlights them with its copy of the TextMate
+grammar, `docs/site/grammars/kagari.tmLanguage.json` (copied from `tooling/textmate-kagari` when
+the site starts documenting new syntax; it may lag), the Develop Guide with `mdbook-kagari`.
+Everything the site builds from stays inside `docs/site`: Vercel builds from that root and skips
+deployments without changes there. After changing
 `docs/site/astro.config.ts`, `docs/site/src/markdown.ts` or the grammar, delete
 `docs/site/node_modules/.astro` before building (Astro caches rendered pages). Details:
 `docs/dev/src/process/docs.md#building-and-checking` and `#code-highlighting`.

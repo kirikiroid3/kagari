@@ -8,7 +8,7 @@ Editor support has three parts with different jobs:
 | `tree-sitter-kagari` | An approximate, error-tolerant grammar for highlighting, brackets, indentation and outlines | Nothing; it follows `kagari-syntax` |
 | `zed-kagari` | Zed extension: wires the grammar, query files and `kagari lsp` together | Zed integration only |
 | `mdbook-kagari` (run by `mdbook build`) | Highlights the Develop Guide's Kagari code with the grammar and `highlights.scm` | Nothing; it reuses the grammar and the queries |
-| `textmate-kagari` | A TextMate grammar for Shiki: highlights the documentation site's Kagari code | Nothing; it follows the tree-sitter grammar and `highlights.scm` |
+| `textmate-kagari` | The canonical TextMate grammar (Shiki); the documentation site highlights with a copy of it | Nothing; it follows the tree-sitter grammar and `highlights.scm` |
 
 Other editors can use `kagari lsp` with any generic LSP client, plus the tree-sitter grammar if
 they support it. The user-facing setup is in the Reference's
@@ -276,8 +276,9 @@ To try local changes, use Zed's "Install Dev Extension" on `tooling/zed-kagari`.
 
 - **New syntax in `kagari-syntax`**: update `grammar.js` (and `PREC`/`KEYWORDS` if relevant),
   regenerate, add a corpus case, update the Zed queries if new node kinds should be highlighted or
-  outlined, update the TextMate grammar `tooling/textmate-kagari/kagari.tmLanguage.json` that
-  highlights the documentation site ([Code highlighting](../process/docs.md#code-highlighting)),
+  outlined, update the TextMate grammar `tooling/textmate-kagari/kagari.tmLanguage.json` (and its
+  copy in `docs/site/grammars/` once the site documents the syntax;
+  [Code highlighting](../process/docs.md#code-highlighting)),
   and update the formatter ([Formatter](./fmt.md)). Commit, then bump `rev` in
   `tooling/zed-kagari/extension.toml` to the grammar commit.
 - **New LSP feature**: add the query in `kagari-lang/src/ide` ([IDE Layer](../compiler/ide.md)),

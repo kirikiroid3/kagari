@@ -13,7 +13,10 @@
     heading ids and diagrams), `src/components/Home.astro` (the landing page, used by
     `src/pages/index.astro` and `src/pages/en/index.astro`), `src/components/SiteBrand.astro`
     (Lotus override: the header logo links to the current locale's home), `src/styles/site.css`.
-  - Hosting: Vercel, configured by the root `vercel.json` (see [Building and checking](#building-and-checking)).
+  - `grammars/kagari.tmLanguage.json`: the site's copy of the Kagari TextMate grammar (see
+    [Code highlighting](#code-highlighting)).
+  - Hosting: Vercel, with Root Directory `docs/site` and `docs/site/vercel.json` (see
+    [Building and checking](#building-and-checking)).
 - The Develop Guide (`docs/dev`): a standalone mdBook (`book.toml` + `src/SUMMARY.md`), built to
   `docs/_site/` (ignored by git) and not published with the site.
 - Agent skills: `.agents/skills/<name>/SKILL.md`; the documentation skill is `kagari-docs`.
@@ -264,13 +267,14 @@ them. A change to a chapter that a skill summarizes updates the skill too.
 ## Building and checking
 
 The site needs Node.js 22.23.4 or later (Astro's minimum; `engines` in `docs/site/package.json`)
-and nothing else: no Rust toolchain, no C compiler.
+and pnpm, nothing else: no Rust toolchain, no C compiler. Everything the build reads is inside
+`docs/site`.
 
 ```sh
 cd docs/site
-npm ci              # once, and after package-lock.json changes
-npm run dev         # live preview at http://localhost:4321
-npm run build       # static site in docs/site/dist
+pnpm install        # once, and after pnpm-lock.yaml changes
+pnpm run dev        # live preview at http://localhost:4321
+pnpm run build      # static site in docs/site/dist
 ```
 
 The build fails on a link to a missing page or a missing diagram. Astro caches rendered pages in
@@ -299,10 +303,15 @@ diagram exists and has its mermaid-ish comment. In the Develop Guide it checks `
 relative links and diagrams the same way, and that every link to `https://kagari.suitsu31.club`
 names an existing page and anchor. It exits with status 1 and lists the problems otherwise.
 
-**Deployment.** Vercel builds the site from the repository root with the root `vercel.json`:
-`npm ci --prefix docs/site`, then `npm run build --prefix docs/site`, publishing
-`docs/site/dist`. The Vercel project needs no framework preset and no root-directory setting; its
-Node.js version must satisfy `engines`. The domain is `kagari.suitsu31.club` (`site` in
+**Deployment.** The Vercel project has Root Directory `docs/site` and the Astro framework
+preset; `docs/site/vercel.json` pins the commands (`pnpm install --frozen-lockfile`,
+`pnpm run build`, output `dist`). Vercel picks the pnpm version from `pnpm-lock.yaml`
+(`lockfileVersion: '9.0'`, pnpm 10). Its `ignoreCommand` skips a deployment when nothing under
+`docs/site` changed since the last successful deployment of the branch
+(`git diff --quiet "$VERCEL_GIT_PREVIOUS_SHA" HEAD -- .`, run in the root directory); the first
+deployment of a branch, and a previous commit outside Vercel's shallow clone, always build. This
+is why the site imports nothing from outside `docs/site`. The Node.js version in the project
+settings must satisfy `engines`. The domain is `kagari.suitsu31.club` (`site` in
 `astro.config.ts`, used for canonical URLs).
 
 ## Code highlighting
@@ -313,10 +322,14 @@ list, Zed's `tooling/zed-kagari/languages/kagari/highlights.scm`.
 ### The site: a TextMate grammar
 
 The site renders code with Expressive Code, which uses Shiki, which reads TextMate grammars.
-`tooling/textmate-kagari/kagari.tmLanguage.json` (`name` `kis`, alias `kix`, scope
-`source.kagari`) is registered in `docs/site/astro.config.ts` (`expressiveCode.shiki.langs`)
-and passed to the landing page's code block directly. One grammar covers both file kinds:
-`.kix` adds forms, which are built from ordinary tokens.
+The canonical grammar is `tooling/textmate-kagari/kagari.tmLanguage.json` (`name` `kis`, alias
+`kix`, scope `source.kagari`); it follows the language and changes with the tree-sitter grammar.
+The site uses its own copy, `docs/site/grammars/kagari.tmLanguage.json`, registered in
+`docs/site/astro.config.ts` (`expressiveCode.shiki.langs`) and passed to the landing page's code
+block directly. The copy may lag behind the canonical grammar, because the site may document an
+older version of the language; copy the grammar over when the site's pages start using new
+syntax. One grammar covers both file kinds: `.kix` adds forms, which are built from ordinary
+tokens.
 
 The grammar is regular expressions, not a parser, so it approximates the tree-sitter grammar:
 
@@ -396,8 +409,8 @@ class (operators, punctuation) keep the color of the enclosing capture:
   [introduction](../introduction.md), the root `README.md` and the `kagari-docs` skill.
 - A change to these rules: the `kagari-docs` skill in the same change, and `docs/check-books.py`
   when a rule it enforces changes.
-- A new token or syntax: the TextMate grammar (`tooling/textmate-kagari`) together with the
-  tree-sitter grammar.
+- A new token or syntax: the canonical TextMate grammar (`tooling/textmate-kagari`) together with
+  the tree-sitter grammar; the site's copy (`docs/site/grammars/`) when the site documents it.
 - A new capture name in `highlights.scm`: an arm in `class_of`
   (`tooling/mdbook-kagari/src/highlight.rs`) and a row in the class table above, and a scope in
   the TextMate grammar with a row in its table.

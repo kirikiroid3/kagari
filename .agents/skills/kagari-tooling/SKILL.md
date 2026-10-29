@@ -17,7 +17,7 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
 | `tooling/tree-sitter-kagari` | Editor grammar; `src/parser.c`, `src/grammar.json`, `src/node-types.json` are generated |
 | `tooling/zed-kagari` | Zed extension; excluded from the Cargo workspace |
 | `tooling/mdbook-kagari` | mdBook preprocessor: highlights the Develop Guide's `kis`/`kix` blocks with the grammar's `parser.c` and Zed's `highlights.scm` (`docs/dev/src/process/docs.md#code-highlighting`) |
-| `tooling/textmate-kagari` | `kagari.tmLanguage.json`, the TextMate grammar (Shiki) that highlights `kis`/`kix` on the documentation site; regex approximation of the tree-sitter grammar |
+| `tooling/textmate-kagari` | `kagari.tmLanguage.json`, the canonical TextMate grammar (Shiki); regex approximation of the tree-sitter grammar. The documentation site uses a copy in `docs/site/grammars/` that may lag |
 
 ## Read first
 
@@ -86,8 +86,9 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
 3. Update `tooling/zed-kagari/languages/kagari/*.scm` if node names/fields changed. The Develop
    Guide uses the same `highlights.scm`: a new capture name needs a class in `class_of`
    (`tooling/mdbook-kagari/src/highlight.rs`).
-4. Update `tooling/textmate-kagari/kagari.tmLanguage.json` for new tokens, keywords or forms, then
-   rebuild the site (`rm -rf docs/site/node_modules/.astro && npm --prefix docs/site run build`)
+4. Update `tooling/textmate-kagari/kagari.tmLanguage.json` for new tokens, keywords or forms.
+   When the documentation site starts documenting the new syntax, copy it to
+   `docs/site/grammars/`, rebuild (`cd docs/site && rm -rf node_modules/.astro && pnpm run build`)
    and look at an affected page.
 5. Commit grammar + generated `src/` together; then set `rev` in
    `tooling/zed-kagari/extension.toml` to that commit.

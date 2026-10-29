@@ -1,0 +1,1177 @@
+{
+  "name": "kis",
+  "displayName": "Kagari",
+  "scopeName": "source.kagari",
+  "fileTypes": [
+    "kis",
+    "kix"
+  ],
+  "aliases": [
+    "kix",
+    "kagari"
+  ],
+  "patterns": [
+    {
+      "include": "#tokens"
+    }
+  ],
+  "repository": {
+    "tokens": {
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#attribute"
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#labels"
+        },
+        {
+          "include": "#forms"
+        },
+        {
+          "include": "#struct-declaration"
+        },
+        {
+          "include": "#enum-declaration"
+        },
+        {
+          "include": "#declarations"
+        },
+        {
+          "include": "#struct-literal"
+        },
+        {
+          "include": "#keywords"
+        },
+        {
+          "include": "#types-builtin"
+        },
+        {
+          "include": "#numbers"
+        },
+        {
+          "include": "#member-access"
+        },
+        {
+          "include": "#calls"
+        },
+        {
+          "include": "#constants"
+        },
+        {
+          "include": "#paths"
+        },
+        {
+          "include": "#types"
+        },
+        {
+          "include": "#operators"
+        },
+        {
+          "include": "#punctuation"
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.documentation.kagari",
+          "match": "(///)(?!/).*$",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.comment.kagari"
+            }
+          }
+        },
+        {
+          "name": "comment.line.documentation.kagari",
+          "match": "(//!).*$",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.comment.kagari"
+            }
+          }
+        },
+        {
+          "name": "comment.line.double-slash.kagari",
+          "match": "(//).*$",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.comment.kagari"
+            }
+          }
+        },
+        {
+          "include": "#block-comment"
+        }
+      ]
+    },
+    "block-comment": {
+      "name": "comment.block.kagari",
+      "begin": "/\\*",
+      "end": "\\*/",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.comment.kagari"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.comment.kagari"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#block-comment"
+        }
+      ]
+    },
+    "attribute": {
+      "name": "meta.attribute.kagari",
+      "begin": "(#)\\s*(\\[)",
+      "end": "\\]",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.attribute.kagari"
+        },
+        "2": {
+          "name": "punctuation.brackets.attribute.kagari"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.brackets.attribute.kagari"
+        }
+      },
+      "patterns": [
+        {
+          "match": "\\G\\s*([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*(?:\\s*::\\s*[_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)*)",
+          "captures": {
+            "1": {
+              "name": "entity.other.attribute-name.kagari"
+            }
+          }
+        },
+        {
+          "include": "#group-paren"
+        },
+        {
+          "include": "#group-bracket"
+        },
+        {
+          "include": "#group-brace"
+        },
+        {
+          "include": "#tokens"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.kagari",
+      "begin": "\"",
+      "end": "\"",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin.kagari"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.kagari"
+        }
+      },
+      "patterns": [
+        {
+          "name": "constant.character.escape.kagari",
+          "match": "\\\\(?:[nrt\\\\\"0]|u\\{[0-9a-fA-F_]+\\})"
+        },
+        {
+          "name": "invalid.illegal.character.escape.kagari",
+          "match": "\\\\(?:u\\{[^}\"]*\\}?|.)?"
+        }
+      ]
+    },
+    "labels": {
+      "patterns": [
+        {
+          "match": "(')([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.label.kagari"
+            },
+            "2": {
+              "name": "entity.name.label.kagari"
+            }
+          }
+        },
+        {
+          "name": "invalid.illegal.character.kagari",
+          "match": "'"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "comment": "Tuple index: `pair.0.1` is two field accesses, `0..1.5` a range.",
+          "match": "(?<!\\.)(\\.)(\\d[\\d_]*)",
+          "captures": {
+            "1": {
+              "name": "punctuation.accessor.dot.kagari"
+            },
+            "2": {
+              "name": "constant.numeric.integer.decimal.kagari"
+            }
+          }
+        },
+        {
+          "name": "constant.numeric.decimal.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])\\d[\\d_]*\\.\\d[\\d_]*(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "match": "(?<![_\\p{L}\\p{N}])(0x[0-9a-fA-F_]+)((?:[iu](?:8|16|32|64|128|size)))?(?![_\\p{L}\\p{N}])",
+          "captures": {
+            "1": {
+              "name": "constant.numeric.integer.hexadecimal.kagari"
+            },
+            "2": {
+              "name": "entity.name.type.numeric.kagari"
+            }
+          }
+        },
+        {
+          "match": "(?<![_\\p{L}\\p{N}])(0o[0-7_]+)((?:[iu](?:8|16|32|64|128|size)))?(?![_\\p{L}\\p{N}])",
+          "captures": {
+            "1": {
+              "name": "constant.numeric.integer.octal.kagari"
+            },
+            "2": {
+              "name": "entity.name.type.numeric.kagari"
+            }
+          }
+        },
+        {
+          "match": "(?<![_\\p{L}\\p{N}])(0b[01_]+)((?:[iu](?:8|16|32|64|128|size)))?(?![_\\p{L}\\p{N}])",
+          "captures": {
+            "1": {
+              "name": "constant.numeric.integer.binary.kagari"
+            },
+            "2": {
+              "name": "entity.name.type.numeric.kagari"
+            }
+          }
+        },
+        {
+          "match": "(?<![_\\p{L}\\p{N}])(\\d[\\d_]*)((?:[iu](?:8|16|32|64|128|size)))?(?![_\\p{L}\\p{N}])",
+          "captures": {
+            "1": {
+              "name": "constant.numeric.integer.decimal.kagari"
+            },
+            "2": {
+              "name": "entity.name.type.numeric.kagari"
+            }
+          }
+        },
+        {
+          "name": "invalid.illegal.numeric.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])\\d[\\d\\p{L}_]*"
+        }
+      ]
+    },
+    "forms": {
+      "patterns": [
+        {
+          "include": "#text-form"
+        },
+        {
+          "name": "meta.form.kagari",
+          "begin": "(?<![_\\p{L}\\p{N}])([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)(!)(\\()",
+          "end": "\\)",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.name.function.macro.kagari"
+            },
+            "2": {
+              "name": "punctuation.definition.form.kagari"
+            },
+            "3": {
+              "name": "punctuation.brackets.round.kagari"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.brackets.round.kagari"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#form-attribute"
+            },
+            {
+              "include": "#group-paren"
+            },
+            {
+              "include": "#group-bracket"
+            },
+            {
+              "include": "#group-brace"
+            },
+            {
+              "include": "#tokens"
+            }
+          ]
+        },
+        {
+          "name": "meta.form.kagari",
+          "begin": "(?<![_\\p{L}\\p{N}])([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)(!)(\\[)",
+          "end": "\\]",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.name.function.macro.kagari"
+            },
+            "2": {
+              "name": "punctuation.definition.form.kagari"
+            },
+            "3": {
+              "name": "punctuation.brackets.square.kagari"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.brackets.square.kagari"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#form-attribute"
+            },
+            {
+              "include": "#group-paren"
+            },
+            {
+              "include": "#group-bracket"
+            },
+            {
+              "include": "#group-brace"
+            },
+            {
+              "include": "#tokens"
+            }
+          ]
+        },
+        {
+          "name": "meta.form.kagari",
+          "begin": "(?<![_\\p{L}\\p{N}])([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)(!)(\\{)",
+          "end": "\\}",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.name.function.macro.kagari"
+            },
+            "2": {
+              "name": "punctuation.definition.form.kagari"
+            },
+            "3": {
+              "name": "punctuation.brackets.curly.kagari"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.brackets.curly.kagari"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#form-attribute"
+            },
+            {
+              "include": "#group-paren"
+            },
+            {
+              "include": "#group-bracket"
+            },
+            {
+              "include": "#group-brace"
+            },
+            {
+              "include": "#tokens"
+            }
+          ]
+        }
+      ]
+    },
+    "form-attribute": {
+      "comment": "`key = value` directly inside a form.",
+      "match": "(?:(?<=[(\\[{,])|^)\\s*([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)\\s*(=)(?![=>])",
+      "captures": {
+        "1": {
+          "name": "variable.other.property.kagari"
+        },
+        "2": {
+          "name": "keyword.operator.assignment.equal.kagari"
+        }
+      }
+    },
+    "text-form": {
+      "name": "meta.form.text.kagari",
+      "begin": "(?<![_\\p{L}\\p{N}])(t)(!)(\\[)",
+      "end": "\\]",
+      "beginCaptures": {
+        "1": {
+          "name": "entity.name.function.macro.kagari"
+        },
+        "2": {
+          "name": "punctuation.definition.form.kagari"
+        },
+        "3": {
+          "name": "punctuation.brackets.square.kagari"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.brackets.square.kagari"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#text-items"
+        }
+      ]
+    },
+    "text-items": {
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "comment": "The `!` of a text effect `![base](effect)`.",
+          "name": "keyword.operator.effect.kagari",
+          "match": "!(?=\\s*\\[)"
+        },
+        {
+          "comment": "The base of a ruby or text effect.",
+          "name": "meta.text.base.kagari",
+          "begin": "\\[",
+          "end": "\\]",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.brackets.square.kagari"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.brackets.square.kagari"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#text-items"
+            }
+          ]
+        },
+        {
+          "comment": "Ruby readings `(\"か\"|\"ん\")` or an effect expression.",
+          "begin": "\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.brackets.round.kagari"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.brackets.round.kagari"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#group-paren"
+            },
+            {
+              "include": "#group-bracket"
+            },
+            {
+              "include": "#group-brace"
+            },
+            {
+              "include": "#tokens"
+            }
+          ]
+        },
+        {
+          "name": "meta.interpolation.kagari",
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.section.interpolation.begin.kagari"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.section.interpolation.end.kagari"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#group-paren"
+            },
+            {
+              "include": "#group-bracket"
+            },
+            {
+              "include": "#group-brace"
+            },
+            {
+              "include": "#tokens"
+            }
+          ]
+        },
+        {
+          "include": "#tokens"
+        }
+      ]
+    },
+    "group-paren": {
+      "begin": "\\(",
+      "end": "\\)",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.brackets.round.kagari"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.brackets.round.kagari"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#group-paren"
+        },
+        {
+          "include": "#group-bracket"
+        },
+        {
+          "include": "#group-brace"
+        },
+        {
+          "include": "#tokens"
+        }
+      ]
+    },
+    "group-bracket": {
+      "begin": "\\[",
+      "end": "\\]",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.brackets.square.kagari"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.brackets.square.kagari"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#group-paren"
+        },
+        {
+          "include": "#group-bracket"
+        },
+        {
+          "include": "#group-brace"
+        },
+        {
+          "include": "#tokens"
+        }
+      ]
+    },
+    "group-brace": {
+      "begin": "\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.brackets.curly.kagari"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.brackets.curly.kagari"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#group-paren"
+        },
+        {
+          "include": "#group-bracket"
+        },
+        {
+          "include": "#group-brace"
+        },
+        {
+          "include": "#tokens"
+        }
+      ]
+    },
+    "struct-declaration": {
+      "name": "meta.struct.kagari",
+      "begin": "(?<![_\\p{L}\\p{N}])(struct)\\s+([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)",
+      "end": "(?<=\\})|(?=;)",
+      "beginCaptures": {
+        "1": {
+          "name": "storage.type.struct.kagari"
+        },
+        "2": {
+          "name": "entity.name.type.struct.kagari"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#field-declarations"
+        },
+        {
+          "begin": "\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.brackets.round.kagari"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.brackets.round.kagari"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#group-paren"
+            },
+            {
+              "include": "#group-bracket"
+            },
+            {
+              "include": "#group-brace"
+            },
+            {
+              "include": "#tokens"
+            }
+          ]
+        },
+        {
+          "include": "#tokens"
+        }
+      ]
+    },
+    "field-declarations": {
+      "begin": "\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.brackets.curly.kagari"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.brackets.curly.kagari"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#attribute"
+        },
+        {
+          "match": "(?:(?<=[{,])|^)\\s*(?:(pub)\\s+)?([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)\\s*(:)(?!:)",
+          "captures": {
+            "1": {
+              "name": "storage.modifier.visibility.kagari"
+            },
+            "2": {
+              "name": "variable.other.property.kagari"
+            },
+            "3": {
+              "name": "punctuation.separator.colon.kagari"
+            }
+          }
+        },
+        {
+          "include": "#group-paren"
+        },
+        {
+          "include": "#group-bracket"
+        },
+        {
+          "include": "#group-brace"
+        },
+        {
+          "include": "#tokens"
+        }
+      ]
+    },
+    "enum-declaration": {
+      "name": "meta.enum.kagari",
+      "begin": "(?<![_\\p{L}\\p{N}])(enum)\\s+([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)",
+      "end": "(?<=\\})|(?=;)",
+      "beginCaptures": {
+        "1": {
+          "name": "storage.type.enum.kagari"
+        },
+        "2": {
+          "name": "entity.name.type.enum.kagari"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.brackets.curly.kagari"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.brackets.curly.kagari"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#comments"
+            },
+            {
+              "include": "#attribute"
+            },
+            {
+              "include": "#field-declarations"
+            },
+            {
+              "begin": "\\(",
+              "end": "\\)",
+              "beginCaptures": {
+                "0": {
+                  "name": "punctuation.brackets.round.kagari"
+                }
+              },
+              "endCaptures": {
+                "0": {
+                  "name": "punctuation.brackets.round.kagari"
+                }
+              },
+              "patterns": [
+                {
+                  "include": "#group-paren"
+                },
+                {
+                  "include": "#group-bracket"
+                },
+                {
+                  "include": "#group-brace"
+                },
+                {
+                  "include": "#tokens"
+                }
+              ]
+            },
+            {
+              "name": "variable.other.enummember.kagari",
+              "match": "(?<![_\\p{L}\\p{N}])[_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*(?![_\\p{L}\\p{N}])"
+            },
+            {
+              "include": "#punctuation"
+            }
+          ]
+        },
+        {
+          "include": "#tokens"
+        }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "(?<![_\\p{L}\\p{N}])(fn)\\s+([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.function.kagari"
+            },
+            "2": {
+              "name": "entity.name.function.kagari"
+            }
+          }
+        },
+        {
+          "match": "(?<![_\\p{L}\\p{N}])(mod)\\s+([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.module.kagari"
+            },
+            "2": {
+              "name": "entity.name.namespace.kagari"
+            }
+          }
+        },
+        {
+          "match": "(?<![_\\p{L}\\p{N}])(trait)\\s+([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.trait.kagari"
+            },
+            "2": {
+              "name": "entity.name.type.trait.kagari"
+            }
+          }
+        },
+        {
+          "match": "(?<![_\\p{L}\\p{N}])(type)\\s+([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.type.kagari"
+            },
+            "2": {
+              "name": "entity.name.type.kagari"
+            }
+          }
+        }
+      ]
+    },
+    "struct-literal": {
+      "comment": "A struct expression or pattern `Name { field: value, shorthand }`.",
+      "name": "meta.struct.literal.kagari",
+      "begin": "(?<![_\\p{L}\\p{N}])(?<!->\\s)(?<!->\\s&)(?<!&mut\\s)(?<!impl\\s)(?<!for\\s)(?![A-Z][A-Z0-9_]+(?![_\\p{L}\\p{N}]))(\\p{Lu}[_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)\\s*(\\{)(?=\\s*(?:\\}|[_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*\\s*(?::(?!:)|[,}])|$))",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": {
+          "name": "entity.name.type.kagari"
+        },
+        "2": {
+          "name": "punctuation.brackets.curly.kagari"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.brackets.curly.kagari"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "match": "(?:(?<=[{,])|^)\\s*(?:(mut)\\s+)?([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)\\s*(:)(?!:)",
+          "captures": {
+            "1": {
+              "name": "storage.modifier.mut.kagari"
+            },
+            "2": {
+              "name": "variable.other.property.kagari"
+            },
+            "3": {
+              "name": "punctuation.separator.colon.kagari"
+            }
+          }
+        },
+        {
+          "match": "(?:(?<=[{,])|^)\\s*(?:(mut)\\s+)?([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)(?=\\s*[,}])",
+          "captures": {
+            "1": {
+              "name": "storage.modifier.mut.kagari"
+            },
+            "2": {
+              "name": "variable.other.property.kagari"
+            }
+          }
+        },
+        {
+          "include": "#group-paren"
+        },
+        {
+          "include": "#group-bracket"
+        },
+        {
+          "include": "#group-brace"
+        },
+        {
+          "include": "#tokens"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:if|else|match|loop|while|for|in|break|continue|return)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "keyword.other.let.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:let)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "keyword.other.use.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:use)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "keyword.other.as.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:as)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "keyword.other.impl.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:impl)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "keyword.other.crate.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:crate)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "keyword.other.super.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:super)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "storage.type.function.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:fn)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "storage.type.struct.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:struct)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "storage.type.enum.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:enum)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "storage.type.trait.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:trait)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "storage.type.type.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:type)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "storage.type.module.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:mod)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "storage.modifier.visibility.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:pub)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "storage.modifier.mut.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:mut)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "storage.modifier.const.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:const)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "storage.modifier.static.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:static)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "comment": "`pushdown` is a keyword only before `fn` or `Fn(`.",
+          "name": "storage.modifier.pushdown.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])pushdown(?=\\s+(?:fn(?![_\\p{L}\\p{N}])|Fn\\s*\\())"
+        },
+        {
+          "comment": "`scene` is a keyword only before `fn`.",
+          "name": "storage.modifier.scene.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])scene(?=\\s+fn(?![_\\p{L}\\p{N}]))"
+        },
+        {
+          "name": "constant.language.boolean.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:true|false)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "variable.language.self.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:self)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "name": "support.type.self.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?:Self)(?![_\\p{L}\\p{N}])"
+        },
+        {
+          "comment": "`Fn` before `(` is a closure type.",
+          "name": "entity.name.type.closure.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])Fn(?=\\s*\\()"
+        }
+      ]
+    },
+    "types-builtin": {
+      "name": "support.type.primitive.kagari",
+      "match": "(?<![_\\p{L}\\p{N}])(?:u8|u16|u32|u64|u128|i8|i16|i32|i64|i128|usize|isize|bool)(?![_\\p{L}\\p{N}])"
+    },
+    "member-access": {
+      "patterns": [
+        {
+          "comment": "Method call `.name(` or `.name::<…>(`.",
+          "match": "(?<!\\.)(\\.)\\s*([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)(?=\\s*(?:\\(|::\\s*<))",
+          "captures": {
+            "1": {
+              "name": "punctuation.accessor.dot.kagari"
+            },
+            "2": {
+              "name": "entity.name.function.kagari"
+            }
+          }
+        },
+        {
+          "match": "(?<!\\.)(\\.)\\s*([_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*)",
+          "captures": {
+            "1": {
+              "name": "punctuation.accessor.dot.kagari"
+            },
+            "2": {
+              "name": "variable.other.property.kagari"
+            }
+          }
+        }
+      ]
+    },
+    "calls": {
+      "patterns": [
+        {
+          "comment": "Generic function `name::<…>`.",
+          "name": "entity.name.function.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])(?!\\p{Lu})[_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*(?=\\s*::\\s*<)"
+        },
+        {
+          "name": "entity.name.function.kagari",
+          "match": "(?<![_\\p{L}\\p{N}])[_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*(?=\\()"
+        }
+      ]
+    },
+    "constants": {
+      "name": "constant.other.caps.kagari",
+      "match": "(?<![_\\p{L}\\p{N}])[A-Z][A-Z0-9_]+(?![_\\p{L}\\p{N}])"
+    },
+    "paths": {
+      "name": "entity.name.namespace.kagari",
+      "match": "(?<![_\\p{L}\\p{N}])(?!\\p{Lu})[_\\p{L}][_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*(?=\\s*::)"
+    },
+    "types": {
+      "name": "entity.name.type.kagari",
+      "match": "(?<![_\\p{L}\\p{N}])\\p{Lu}[_\\p{L}\\p{N}\\p{Mn}\\p{Mc}]*"
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.arrow.skinny.kagari",
+          "match": "->"
+        },
+        {
+          "name": "keyword.operator.arrow.fat.kagari",
+          "match": "=>"
+        },
+        {
+          "name": "punctuation.separator.namespace.kagari",
+          "match": "::"
+        },
+        {
+          "comment": "Generic angle brackets: `Vec<u8>`, `f::<u8>`; `a < b` is a comparison.",
+          "name": "punctuation.brackets.angle.kagari",
+          "match": "(?<=[_\\p{L}\\p{N}]|::)<(?![\\s<=])"
+        },
+        {
+          "name": "punctuation.brackets.angle.kagari",
+          "match": "(?<=[_\\p{L}\\p{N}>)\\]])>(?!=)"
+        },
+        {
+          "name": "keyword.operator.assignment.kagari",
+          "match": "<<=|>>=|[-+*/%^&|]="
+        },
+        {
+          "name": "keyword.operator.comparison.kagari",
+          "match": "==|!=|<=|>="
+        },
+        {
+          "name": "keyword.operator.bitwise.kagari",
+          "match": "<<|>>"
+        },
+        {
+          "name": "keyword.operator.comparison.kagari",
+          "match": "[<>]"
+        },
+        {
+          "name": "keyword.operator.logical.kagari",
+          "match": "&&|\\|\\||!"
+        },
+        {
+          "name": "keyword.operator.range.kagari",
+          "match": "\\.\\.=?"
+        },
+        {
+          "name": "keyword.operator.assignment.equal.kagari",
+          "match": "="
+        },
+        {
+          "name": "keyword.operator.question.kagari",
+          "match": "\\?"
+        },
+        {
+          "name": "keyword.operator.arithmetic.kagari",
+          "match": "[-+*/%]"
+        },
+        {
+          "name": "keyword.operator.bitwise.kagari",
+          "match": "[&|^]"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.comma.kagari",
+          "match": ","
+        },
+        {
+          "name": "punctuation.semi.kagari",
+          "match": ";"
+        },
+        {
+          "name": "punctuation.separator.namespace.kagari",
+          "match": "::"
+        },
+        {
+          "name": "punctuation.separator.colon.kagari",
+          "match": ":"
+        },
+        {
+          "name": "punctuation.accessor.dot.kagari",
+          "match": "\\."
+        },
+        {
+          "name": "punctuation.brackets.round.kagari",
+          "match": "[()]"
+        },
+        {
+          "name": "punctuation.brackets.square.kagari",
+          "match": "[\\[\\]]"
+        },
+        {
+          "name": "punctuation.brackets.curly.kagari",
+          "match": "[{}]"
+        },
+        {
+          "name": "punctuation.definition.attribute.kagari",
+          "match": "#"
+        }
+      ]
+    }
+  }
+}

@@ -19,7 +19,7 @@ The documentation site is [kagari.suitsu31.club](https://kagari.suitsu31.club) (
 | Diagnostics | Studios: every compiler diagnostic | [en](https://kagari.suitsu31.club/en/diagnostics/) | [ja](https://kagari.suitsu31.club/diagnostics/) |
 | Kagari Develop Guide | Contributors: design decisions, compiler, formats, runtime | [en](docs/dev/src/introduction.md) | — |
 
-The site's sources are in [`docs/site`](docs/site) (Astro; `npm ci && npm run dev` there). The
+The site's sources are in [`docs/site`](docs/site) (Astro; `pnpm install && pnpm run dev` there). The
 Develop Guide is an mdBook: `mdbook build docs/dev` writes it to `docs/_site/`.
 
 ## Status
