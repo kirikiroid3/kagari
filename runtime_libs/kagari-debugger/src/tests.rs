@@ -152,7 +152,10 @@ fn compile() -> (Vec<u8>, Artifact) {
 fn compile_story(story: &str) -> (Vec<u8>, Artifact) {
     let mut files = rustc_hash::FxHashMap::default();
     files.insert(PathBuf::from("/game/main.kix"), format!("{SYSTEM}{story}"));
-    files.insert(PathBuf::from("/game/font.ttf"), String::new());
+    // Asset files the stories may name (an asset no source names is not in the program).
+    for asset in ["font.ttf", "old.png", "new.png"] {
+        files.insert(PathBuf::from(format!("/game/{asset}")), String::new());
+    }
     let db = RootDatabase::new(Arc::new(MemoryFileSystem(files)));
     let program = db.program(FilePath::disk("/game/main.kix"));
     let result = build(&db, program);
@@ -179,6 +182,15 @@ fn compile_story(story: &str) -> (Vec<u8>, Artifact) {
 
 const TEST_FONT: &[u8] = include_bytes!("../../kagari-text/tests/fonts/kagari-test-cjk.otf");
 
+/// A 1×1 opaque green PNG, what every `.png` asset reads as.
+const TEST_PNG: &[u8] = &[
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+    0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0xf8, 0xcf, 0xc0, 0xf0,
+    0x1f, 0x00, 0x05, 0x00, 0x01, 0xff, 0x89, 0x99, 0x3d, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+    0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+];
+
 struct TestPlatform;
 
 impl Platform for TestPlatform {
@@ -194,6 +206,8 @@ impl Platform for TestPlatform {
     fn read_asset(&mut self, path: &str) -> std::io::Result<Option<Vec<u8>>> {
         Ok(Some(if path.ends_with(".ttf") {
             TEST_FONT.to_vec()
+        } else if path.ends_with(".png") {
+            TEST_PNG.to_vec()
         } else {
             Vec::new()
         }))

@@ -228,3 +228,67 @@ fn a_swap_needs_the_running_programs_artifact() {
     let error = d.swap(&mut game.t(), &bytes, artifact).unwrap_err();
     assert!(error.contains("--profile debug"), "{error}");
 }
+
+/// `Intro` shows `old.png` and returns; `Start` then calls `Greet`.
+const PICTURE_STORY: &str = r#"
+const BG: ImageAsset = asset("old.png");
+const A: EntityId = EntityId(1);
+
+const fn show(mut screen: Screen) -> Screen {
+    screen.entity(A).image().change(BG).apply_animation(cut());
+    screen
+}
+
+#[entry]
+#[scene]
+pushdown fn Start() {
+    Intro();
+    Greet();
+    s!(t!["Good night."]);
+}
+
+#[scene]
+pushdown fn Intro() {
+    s!(render = show, t!["A picture."]);
+}
+
+#[scene]
+pushdown fn Greet() {
+    s!(t!["Nice to meet you."]);
+}
+
+fn Title() -> RootPage {
+    RootPage(spacer())
+}
+"#;
+
+/// The screen at `Greet`'s call shows `old.png`; the rebuild no longer has that asset, so the
+/// screen cannot move and the story restarts from its entry, naming the asset.
+#[test]
+fn a_loaded_asset_that_is_gone_restarts_the_story() {
+    let (bytes, artifact) = compile_story(PICTURE_STORY);
+    let mut platform = TestPlatform;
+    let mut engine = Engine::boot(&bytes, &mut platform, 0).unwrap();
+    engine.debug_record_calls(true);
+    let mut game = Game { engine, platform };
+    let mut d = Debugger::new(&game.engine, Some(Rc::new(artifact)));
+    d.start(&mut game.t(), None, 1).unwrap();
+    d.goto(&mut game.t(), "crate::Greet#0").unwrap();
+    let edited = PICTURE_STORY
+        .replace("asset(\"old.png\")", "asset(\"new.png\")")
+        .replace("Nice to meet you.", "Nice to see you.");
+    let (bytes, artifact) = compile_story(&edited);
+    let body = d.swap(&mut game.t(), &bytes, artifact).unwrap();
+    assert_eq!(body.outcome, "restarted", "{body:?}");
+    assert_eq!(
+        body.reason.as_deref(),
+        Some("the asset `old.png` is gone"),
+        "{body:?}"
+    );
+    assert_eq!(body.thrown, ["crate::Greet"]);
+    assert_eq!(body.position.step.as_deref(), Some("crate::Intro#0"));
+    assert!(game.engine.crash().is_none());
+    // The restarted story shows the new picture and plays on.
+    d.goto(&mut game.t(), "crate::Greet#0").unwrap();
+    assert!(text(&game).contains("Nice to see you."), "{}", text(&game));
+}
