@@ -13,7 +13,7 @@ use crate::ops;
 use crate::program::Program;
 use crate::refs;
 use crate::rng::Rng;
-use crate::story::StoryStatics;
+use crate::story::{CallLog, StoryStatics};
 use crate::trap::{Trap, TrapKind, fault, mismatch};
 use crate::value::{Adt, AdtTy, Ref, RefRoot, Value};
 use crate::vm::Vm;
@@ -37,12 +37,35 @@ impl Frame {
     }
 }
 
-/// What only a story run has: the story statics, the PRNG and the log of its draws.
+/// What only a story run has: the story statics, the PRNG, the log of its draws and, when
+/// recorded, the call snapshots.
 pub(crate) struct StoryCtx<'a> {
     pub statics: &'a StoryStatics,
     pub rng: &'a mut Rng,
     /// Every value RAND produced, in order.
     pub draws: &'a mut Vec<Value>,
+    pub calls: Option<&'a mut CallLog>,
+    /// The fiber's last step (it changes only when a run suspends).
+    pub last_step: Option<crate::trap::StepId>,
+}
+
+/// A frame was pushed by a call of the story: snapshot it when calls are recorded.
+fn called(story: &mut Option<StoryCtx<'_>>, stack: &[Frame], program: &Program) {
+    let Some(story) = story.as_mut() else {
+        return;
+    };
+    let (Some(calls), Some(frame)) = (story.calls.as_deref_mut(), stack.last()) else {
+        return;
+    };
+    let depth = stack.len().saturating_sub(1);
+    calls.called(
+        program,
+        frame,
+        depth,
+        story.statics,
+        story.rng,
+        story.last_step,
+    );
 }
 
 /// How a run stopped.
@@ -256,6 +279,9 @@ fn step(
             }
             stack.pop();
             vm.depth = vm.depth.saturating_sub(1);
+            if let Some(calls) = story.as_mut().and_then(|s| s.calls.as_deref_mut()) {
+                calls.returned(stack.len());
+            }
             let Some(caller) = stack.last_mut() else {
                 return Ok(Some(Exit::Return(value)));
             };
@@ -274,6 +300,7 @@ fn step(
         } => {
             let args = raw_range(&frame.regs, args, argc)?;
             push_frame(vm, stack, func, args)?;
+            called(story, stack, program);
         }
         Instr::CallImp {
             dst,
@@ -297,7 +324,10 @@ fn step(
             let target = val(&frame.regs, target)?.into_owned();
             let args = raw_range(&frame.regs, args, argc)?;
             match callee(program, target, kind, args)? {
-                Callee::Frame(func, args) => push_frame(vm, stack, func, args)?,
+                Callee::Frame(func, args) => {
+                    push_frame(vm, stack, func, args)?;
+                    called(story, stack, program);
+                }
                 Callee::Host(f, args) => {
                     let value = host.call_host_fn(vm, &f, args)?;
                     let frame = stack.last_mut().ok_or_else(fault)?;

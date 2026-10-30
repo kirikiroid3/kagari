@@ -15,11 +15,15 @@ pub struct DebugPort {
     clients: Receiver<Link>,
     dir: PathBuf,
     server: Option<Server>,
+    /// The debug artifact read at open, for the first debugger.
+    artifact: Option<Artifact>,
 }
 
 impl DebugPort {
-    /// The channel `cli` asks for, if any.
-    pub fn open(cli: &Cli, dir: &Path) -> Result<Option<DebugPort>, Failure> {
+    /// The channel `cli` asks for, if any. With a debug artifact for the running
+    /// `game.kagari` (a debug build), `engine` records call snapshots from now on, so a
+    /// debugger can hot swap scenes.
+    pub fn open(cli: &Cli, dir: &Path, engine: &mut Engine) -> Result<Option<DebugPort>, Failure> {
         let clients = if let Some(port) = cli.debug_port {
             let (address, clients) = kagari_debugger::listen(port)
                 .map_err(|e| Failure::new(USAGE, format!("cannot listen on port {port}: {e}")))?;
@@ -33,10 +37,15 @@ impl DebugPort {
         } else {
             return Ok(None);
         };
+        let artifact = Artifact::load(dir, engine.script_hash());
+        if artifact.is_some() {
+            engine.debug_record_calls(true);
+        }
         Ok(Some(DebugPort {
             clients,
             dir: dir.to_path_buf(),
             server: None,
+            artifact,
         }))
     }
 
@@ -50,16 +59,20 @@ impl DebugPort {
         if self.server.as_ref().is_none_or(|s| !s.attached())
             && let Ok(link) = self.clients.try_recv()
         {
-            let artifact = Artifact::load(&self.dir, t.engine.script_hash());
+            let artifact = self
+                .artifact
+                .take()
+                .or_else(|| Artifact::load(&self.dir, t.engine.script_hash()));
             if artifact.is_none() {
                 log::warn!(
                     target: "kagari::debug",
                     "no debug artifact for this game.kagari (build with `--profile debug`): \
-                     no story graph, no local names"
+                     no story graph, no local names, no hot swap"
                 );
             }
             log::info!(target: "kagari::debug", "debugger attached");
-            self.server = Some(Server::attach(link, artifact, true, &mut t));
+            self.server =
+                Some(Server::attach(link, artifact, true, &mut t).with_game_dir(&self.dir));
         }
         if let Some(server) = self.server.as_mut() {
             server.poll(&mut t);

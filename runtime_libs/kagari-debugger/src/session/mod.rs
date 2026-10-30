@@ -11,6 +11,7 @@ mod exec;
 mod moves;
 mod navigate;
 mod pilots;
+mod swap;
 mod views;
 
 use std::cell::RefCell;

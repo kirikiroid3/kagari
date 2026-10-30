@@ -200,8 +200,9 @@ fn apply(ctx: &mut HostCtx, vm: &mut Vm, op: NavOp) -> Result<(), Trap> {
             seed,
         } => {
             let program = ctx.state.program.clone();
-            let fiber =
+            let mut fiber =
                 StoryFiber::start(vm, entry, args.clone(), StoryStatics::fresh(&program), seed)?;
+            crate::debug::record_calls(ctx.state, &mut fiber);
             clear(ctx);
             let generation = ctx.state.system.next_generation;
             ctx.state.system.next_generation = generation.saturating_add(1);

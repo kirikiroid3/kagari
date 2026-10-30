@@ -33,8 +33,8 @@ pub fn run(cli: &Cli, dir: &Path, bytes: &[u8]) -> Result<u8, Failure> {
         None => Store::by_title(),
     };
     let mut platform = DesktopPlatform::new(dir, store, TimeSource::Local, SeedSource::System);
-    let engine = game::boot(bytes, &mut platform)?;
-    let debug = DebugPort::open(cli, dir)?;
+    let mut engine = game::boot(bytes, &mut platform)?;
+    let debug = DebugPort::open(cli, dir, &mut engine)?;
 
     let event_loop = build_event_loop(cli.backend)?;
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_with_display_handle(

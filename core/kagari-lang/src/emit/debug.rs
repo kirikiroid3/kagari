@@ -13,7 +13,7 @@ use crate::eval::const_exprs::children;
 use crate::hir::source_map::StoreSourceMap;
 use crate::hir::{Condition, Expr, ExprId, ExprStore, PatId, body_of, body_source_map_of};
 use crate::mir::pretty::dump_body;
-use crate::mir::{Body, LocalKind};
+use crate::mir::{Body, LocalKind, item_mir};
 use crate::resolve::{LocalId, body_resolution};
 
 use super::codegen::{LocalRange, mir_body};
@@ -35,13 +35,24 @@ impl Emitter<'_> {
             _ => mir_body(self, instance),
         };
         let body_hash = match body {
-            Some(body) => sha256_hex(&dump_body(
-                self.db,
-                self.program,
-                &path,
-                body,
-                self.root_dir.as_deref(),
-            )),
+            Some(body) => {
+                let root = self.root_dir.as_deref();
+                let mut text = dump_body(self.db, self.program, &path, body, root);
+                // The body names its item's promoted constants only as `const {promoted#N}`;
+                // they hold its step records and texts, so their bodies count too.
+                let item = match instance {
+                    Instance::Fn(_) | Instance::Closure { .. } => self.instance_item(instance),
+                    _ => None,
+                };
+                if let Some(mir) = item.and_then(|i| item_mir(self.db, self.program, i).as_ref()) {
+                    for (index, promoted) in mir.promoted.iter().enumerate() {
+                        let name = format!("{path}::{{promoted#{index}}}");
+                        text.push('\n');
+                        text.push_str(&dump_body(self.db, self.program, &name, promoted, root));
+                    }
+                }
+                sha256_hex(&text)
+            }
             None => sha256_hex(&path),
         };
         let (scopes, locals) = match (instance, body) {

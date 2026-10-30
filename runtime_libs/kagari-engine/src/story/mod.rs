@@ -163,10 +163,20 @@ pub struct Trace {
     pub steps_after_last_choice: u32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct TracePos {
     pub choices: u32,
     pub steps: u32,
+}
+
+/// Where a resume of a fiber that records call snapshots started: the trace position and the
+/// screen the next step's render receives. The snapshots of the calls it makes carry it, so
+/// scene hot swap can put the game back where a call was made.
+#[derive(Clone, Debug)]
+pub(crate) struct CallMark {
+    pub pos: TracePos,
+    /// A `Screen` host value at a step's entry.
+    pub screen: Value,
 }
 
 pub(crate) struct BacklogEntry {

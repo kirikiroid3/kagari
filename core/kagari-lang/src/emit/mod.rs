@@ -22,7 +22,7 @@ use kagari_bytecode::{
     Static, StaticId, StaticKind, StrId, TypeId, Variant, encode, verify, verify_code,
     word_offsets,
 };
-use kagari_debug::{DebugInfo, FunctionDebug};
+use kagari_debug::{DebugInfo, FunctionDebug, StaticDebug};
 use kagari_syntax::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
@@ -41,7 +41,7 @@ use crate::item_tree::{FnKind, ItemId, ItemKind, item_tree};
 use crate::mir::{BodyKind, item_mir};
 use crate::paths;
 use crate::pipeline::check;
-use crate::signatures::{ProgramSignatures, program_signatures};
+use crate::signatures::{ItemSig, ProgramSignatures, display_ty_qualified, program_signatures};
 use crate::thir::PromotedId;
 use crate::ty::{Const, FnDefId, FnRef, GenericArg, GenericArgs, IntTy, Ty, TyKind};
 
@@ -248,6 +248,8 @@ struct Emitter<'db> {
     lines: Vec<FnLines>,
     /// Per function, its debug information.
     debug: Vec<FunctionDebug>,
+    /// Per static, its debug information.
+    statics_debug: Vec<StaticDebug>,
     files: FxHashMap<String, u32>,
     diagnostics: Vec<Diagnostic>,
 }
@@ -337,6 +339,7 @@ impl<'db> Emitter<'db> {
             queue: VecDeque::new(),
             lines: Vec::new(),
             debug: Vec::new(),
+            statics_debug: Vec::new(),
             files: FxHashMap::default(),
             diagnostics: Vec::new(),
         };
@@ -645,14 +648,21 @@ impl<'db> Emitter<'db> {
                 .as_ref()
                 .ok()
                 .map(|value| value.value.clone());
-            let path = paths::item_path(self.db, self.maps, item);
-            let path = self.string(&path);
+            let display = paths::item_path(self.db, self.maps, item);
+            let ty = match self.sigs.get(item) {
+                Some(ItemSig::Static { ty, .. }) => {
+                    display_ty_qualified(self.db, self.sigs, self.maps, ty)
+                }
+                _ => String::new(),
+            };
+            let path = self.string(&display);
             let init = value.as_ref().and_then(|value| self.constant(value));
             let Some(init) = init else {
                 self.internal_error(item, "a static has no constant initial value");
                 continue;
             };
             self.module.statics.push(Static { path, kind, init });
+            self.statics_debug.push(StaticDebug { path: display, ty });
         }
     }
 
@@ -994,6 +1004,7 @@ impl<'db> Emitter<'db> {
         self.module.debug = Some(Debug { files, functions });
         let debug = DebugInfo {
             functions: self.debug,
+            statics: self.statics_debug,
         };
         Ok((self.module, self.asset_files, self.shader_roles, debug))
     }

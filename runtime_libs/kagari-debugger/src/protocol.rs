@@ -96,6 +96,9 @@ pub mod command {
     pub const DETAIL: &str = "kagari/detail";
     pub const NAV: &str = "kagari/nav";
     pub const SEED: &str = "kagari/seed";
+    /// Scene hot swap: the runtime reloads `game.kagari` and its debug artifact from its game
+    /// directory and swaps them in.
+    pub const SWAP: &str = "kagari/swap";
 }
 
 /// The events a runtime sends.
@@ -377,7 +380,8 @@ pub struct SeedBody {
 #[serde(rename_all = "camelCase")]
 pub struct StoppedBody {
     /// `entry`, `breakpoint`, `step`, `pause`, `choice` (a choice needs an arm), `end` (the
-    /// story would return), `goto` (a move: goto, push, pop, seed) or `error`.
+    /// story would return), `goto` (a move: goto, push, pop, seed), `swap` (after a hot swap)
+    /// or `error`.
     pub reason: String,
     /// The step ID the story is at.
     pub step: Option<String>,
@@ -390,4 +394,54 @@ pub struct StoppedBody {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct OutputBody {
     pub text: String,
+}
+
+/// The body of `kagari/swap`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwapBody {
+    /// `kept` (no frame changed: the current step was entered again), `recalled` (`scene`
+    /// was called again by its caller), `restarted` (the story restarted from its entry),
+    /// `reset` (the game is at `System::start`), `none` (no game was running).
+    pub outcome: String,
+    /// The scene called again (`recalled`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scene: Option<String>,
+    /// Why the story restarted (`restarted`, `reset`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    /// The scenes thrown off the stack, outermost first.
+    pub thrown: Vec<String>,
+    /// Where the story is now.
+    pub position: Position,
+    /// The script hash of the new `game.kagari`.
+    pub script_hash: String,
+}
+
+impl SwapBody {
+    /// One line for the user: where the story went and what was thrown off.
+    pub fn summary(&self) -> String {
+        let at = self
+            .position
+            .step
+            .as_deref()
+            .map(|s| format!(", now at {s}"))
+            .unwrap_or_default();
+        let thrown = if self.thrown.is_empty() {
+            String::new()
+        } else {
+            format!(" (thrown off: {})", self.thrown.join(", "))
+        };
+        let reason = self.reason.as_deref().unwrap_or("");
+        match self.outcome.as_str() {
+            "kept" => format!("swapped; nothing on the stack changed{at}"),
+            "recalled" => format!(
+                "swapped; called `{}` again{thrown}{at}",
+                self.scene.as_deref().unwrap_or("")
+            ),
+            "restarted" => format!("swapped; restarted from the entry: {reason}{thrown}{at}"),
+            "reset" => format!("swapped; the game is back at its start: {reason}"),
+            _ => "swapped; no game was running".to_owned(),
+        }
+    }
 }

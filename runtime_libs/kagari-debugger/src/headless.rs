@@ -20,6 +20,7 @@ pub const BYTECODE_FILE: &str = "game.kagari";
 /// memory (empty at boot, never written to disk), no audio lengths, no thumbnails, a fixed
 /// time and seed.
 pub struct HeadlessPlatform {
+    dir: PathBuf,
     archives: ArchiveDir,
     stores: HashMap<String, Vec<u8>>,
     seed: u64,
@@ -28,6 +29,7 @@ pub struct HeadlessPlatform {
 impl HeadlessPlatform {
     pub fn new(dir: &Path, seed: u64) -> HeadlessPlatform {
         HeadlessPlatform {
+            dir: dir.to_path_buf(),
             archives: ArchiveDir::new(dir),
             stores: HashMap::new(),
             seed,
@@ -86,6 +88,10 @@ impl Platform for HeadlessPlatform {
     }
 
     fn set_title(&mut self, _title: &str) {}
+
+    fn program_changed(&mut self) {
+        self.archives = ArchiveDir::new(&self.dir);
+    }
 }
 
 /// How the query engine starts the story.
@@ -112,11 +118,13 @@ impl Headless {
         let bytes =
             std::fs::read(&path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
         let mut platform = HeadlessPlatform::new(dir, seed);
-        let engine = Engine::boot(&bytes, &mut platform, 0).map_err(|e| e.to_string())?;
+        let mut engine = Engine::boot(&bytes, &mut platform, 0).map_err(|e| e.to_string())?;
         if let Some(crash) = engine.crash() {
             return Err(format!("the game stopped while booting: {crash}"));
         }
         let artifact = Artifact::load(dir, engine.script_hash());
+        // A debug build can be hot swapped: record call snapshots.
+        engine.debug_record_calls(artifact.is_some());
         Ok(Headless {
             engine,
             platform,
@@ -146,8 +154,9 @@ pub fn serve(dir: &Path, start: &StartOptions, link: Link) {
         }
     };
     let artifact = game.artifact.take();
+    let dir = game.dir.clone();
     let mut t = game.target();
-    let mut server = Server::attach(link, artifact, false, &mut t);
+    let mut server = Server::attach(link, artifact, false, &mut t).with_game_dir(&dir);
     match server
         .debugger()
         .start(&mut t, start.entry.as_deref(), start.seed)

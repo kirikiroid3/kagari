@@ -27,6 +27,7 @@ use crate::{Engine, EngineState, HostCtx, Platform, system};
 
 pub use crate::saves::replay::Divergence;
 pub use crate::story::Trace;
+pub use crate::swap::{SwapOutcome, SwapPlan, Swapped};
 pub use kagari_vm::StepId;
 
 /// How a drive reached a step.
@@ -233,13 +234,22 @@ pub struct LiveStop {
 #[derive(Default)]
 pub(crate) struct DebugState {
     /// The generation of the held game.
-    held: Option<u64>,
+    pub held: Option<u64>,
     /// Stop at the next step the live game enters; shared, so an instruction hook can set it
     /// while the engine runs.
-    pause: Rc<Cell<bool>>,
+    pub pause: Rc<Cell<bool>>,
     breakpoints: HashSet<StepId>,
     /// A stop not yet taken by the debugger.
     stop: Option<LiveStop>,
+    /// New story fibers record call snapshots (scene hot swap).
+    pub record_calls: bool,
+}
+
+/// Makes a new story fiber record call snapshots when the debugger asked for them.
+pub(crate) fn record_calls(state: &EngineState, fiber: &mut StoryFiber) {
+    if state.debug.record_calls {
+        fiber.record_calls();
+    }
 }
 
 /// Whether the debugger holds the running game.
@@ -405,6 +415,16 @@ impl Engine {
         self.state.debug.breakpoints = steps.into_iter().collect();
     }
 
+    /// Story fibers record a snapshot at every scene call from now on (new games, loads,
+    /// debugger moves, and the running game for the calls it makes next), which
+    /// [`Engine::debug_swap`] unwinds to. Debugging only: memory grows with the call depth.
+    pub fn debug_record_calls(&mut self, on: bool) {
+        self.state.debug.record_calls = on;
+        if on && let Some(fiber) = self.state.game.as_mut().and_then(|g| g.fiber.as_mut()) {
+            fiber.record_calls();
+        }
+    }
+
     /// The stop the live game made by itself since the last call.
     pub fn debug_take_stop(&mut self) -> Option<LiveStop> {
         self.state.debug.stop.take()
@@ -426,7 +446,7 @@ impl Engine {
         }
     }
 
-    fn parts<'a>(
+    pub(crate) fn parts<'a>(
         &'a mut self,
         platform: &'a mut dyn Platform,
         now_ms: u64,
@@ -450,7 +470,7 @@ fn same_entry_exit(ctx: &HostCtx, trace: &Trace) -> Option<Value> {
 }
 
 /// Installs a driven game the way a load does, and holds it.
-fn install(ctx: &mut HostCtx, vm: &mut Vm, frame: Box<GameFrame>) {
+pub(crate) fn install(ctx: &mut HostCtx, vm: &mut Vm, frame: Box<GameFrame>) {
     let generation = frame.generation;
     ctx.state.pending_nav.push(NavOp::Restore(frame));
     if let Err(trap) = system::modes::settle(ctx, vm) {

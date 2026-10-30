@@ -1,11 +1,13 @@
 //! The story driver: resuming the fiber, entering steps, advancing, selecting, play modes.
 
+use std::rc::Rc;
+
 use kagari_vm::{FnKind, StepId, Suspend, Text, Trap, Value, Vm};
 
 use super::reveal::{RevealPlan, RevealRun, RevealState, Speeds};
 use super::{
-    BacklogEntry, ChoiceArmStep, ChoiceStep, Current, Entry, GameFrame, PlayMode, SayStep,
-    StoryInput, text_plain,
+    BacklogEntry, CallMark, ChoiceArmStep, ChoiceStep, Current, Entry, GameFrame, PlayMode,
+    SayStep, StoryInput, text_plain,
 };
 use crate::HostCtx;
 use crate::saves;
@@ -29,10 +31,18 @@ pub(crate) fn game_mut<'a>(ctx: &'a mut HostCtx) -> Result<&'a mut GameFrame, Tr
 
 /// Resumes the fiber with `input`; a reached step is entered.
 pub(crate) fn resume(ctx: &mut HostCtx, vm: &mut Vm, input: Value) -> Result<Resumed, Trap> {
-    let mut fiber = game_mut(ctx)?
+    let game = game_mut(ctx)?;
+    let mut fiber = game
         .fiber
         .take()
         .ok_or_else(|| Trap::host("no running game to resume"))?;
+    if fiber.records_calls() {
+        // The snapshots of the calls this resume makes carry where it started.
+        fiber.set_call_mark(Rc::new(CallMark {
+            pos: game.trace_pos(),
+            screen: game.screen.render_input(),
+        }));
+    }
     let result = fiber.resume(vm, ctx, input);
     if let Some(game) = ctx.state.game.as_mut() {
         game.fiber = Some(fiber);
@@ -48,6 +58,22 @@ pub(crate) fn resume(ctx: &mut HostCtx, vm: &mut Vm, input: Value) -> Result<Res
         }
         Suspend::Returned(v) => Ok(Resumed::Returned(v)),
     }
+}
+
+/// Enters again the step the fiber is suspended at, over the game's current screen (after a
+/// scene hot swap that kept the story's position).
+pub(crate) fn reenter(ctx: &mut HostCtx, vm: &mut Vm) -> Result<Resumed, Trap> {
+    let program = ctx.state.program.clone();
+    let (record, step) = game_mut(ctx)?
+        .fiber
+        .as_ref()
+        .and_then(|f| f.step_record(&program))
+        .ok_or_else(|| Trap::host("the story is not at a step"))?;
+    enter_step(ctx, vm, record, step).map_err(|mut trap| {
+        trap.step.get_or_insert(step);
+        trap
+    })?;
+    Ok(Resumed::Step)
 }
 
 /// Resumes a live game: a return finishes it.

@@ -3,6 +3,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+mod swap;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -143,8 +145,13 @@ fn Title() -> RootPage {
 
 /// The bytecode and the artifact of the fixture.
 fn compile() -> (Vec<u8>, Artifact) {
+    compile_story(STORY)
+}
+
+/// The bytecode and the artifact of the system part with `story`.
+fn compile_story(story: &str) -> (Vec<u8>, Artifact) {
     let mut files = rustc_hash::FxHashMap::default();
-    files.insert(PathBuf::from("/game/main.kix"), format!("{SYSTEM}{STORY}"));
+    files.insert(PathBuf::from("/game/main.kix"), format!("{SYSTEM}{story}"));
     files.insert(PathBuf::from("/game/font.ttf"), String::new());
     let db = RootDatabase::new(Arc::new(MemoryFileSystem(files)));
     let program = db.program(FilePath::disk("/game/main.kix"));

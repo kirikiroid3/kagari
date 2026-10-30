@@ -12,10 +12,22 @@ use crate::codec::{
     as_str, as_table, bool_field, list, opt_id, opt_u32_field, str_field, u32_field,
 };
 
-/// The debug information of a module, parallel to its function table.
+/// The debug information of a module, parallel to its function and static tables.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DebugInfo {
     pub functions: Vec<FunctionDebug>,
+    /// One per static of the module, in its order.
+    pub statics: Vec<StaticDebug>,
+}
+
+/// The debug information of one static (a story variable, `Setting` or `Meta`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct StaticDebug {
+    /// The static's path in the bytecode.
+    pub path: String,
+    /// Its type, with fully qualified paths (`Int<0, 9>`, `crate::Mood`,
+    /// `std::Option<crate::Mood>`). Hot swap compares story variables by it.
+    pub ty: String,
 }
 
 /// The debug information of one bytecode function.
@@ -101,6 +113,13 @@ impl DebugInfo {
                 }
             }
         }
+        drop(functions);
+        let mut statics = t.array("statics")?;
+        for s in &self.statics {
+            let mut table = statics.push_table()?;
+            table.set("path", Scalar::String(&s.path))?;
+            table.set("type", Scalar::String(&s.ty))?;
+        }
         Ok(())
     }
 
@@ -139,6 +158,13 @@ impl DebugInfo {
                             })?,
                         })
                     })?,
+                })
+            })?,
+            statics: list(t, "statics", |v| {
+                let s = as_table(v, "statics")?;
+                Ok(StaticDebug {
+                    path: str_field(s, "path")?.to_owned(),
+                    ty: str_field(s, "type")?.to_owned(),
                 })
             })?,
         })

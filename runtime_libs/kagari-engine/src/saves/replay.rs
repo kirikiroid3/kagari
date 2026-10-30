@@ -138,7 +138,7 @@ pub(crate) fn drive_trace(
                 .is_some_and(|func| func.flags.entry)
         })
         .ok_or_else(|| DriveError::Divergence(Divergence::MissingEntry(trace.entry.clone())))?;
-    let fiber = StoryFiber::start(
+    let mut fiber = StoryFiber::start(
         vm,
         entry,
         trace.args.clone(),
@@ -146,6 +146,7 @@ pub(crate) fn drive_trace(
         trace.seed,
     )
     .map_err(|_| DriveError::Divergence(Divergence::Args(trace.entry.clone())))?;
+    crate::debug::record_calls(ctx.state, &mut fiber);
     let generation = ctx.state.system.next_generation;
     let fresh = GameFrame::new(
         generation,

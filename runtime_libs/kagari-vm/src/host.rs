@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use kagari_bytecode::ImportId;
 
+use crate::remap::{Remap, RemapError};
 use crate::trap::Trap;
 use crate::value::Value;
 use crate::vm::Vm;
@@ -27,6 +28,11 @@ pub trait HostObject: Any {
     fn eq_object(&self, other: &dyn HostObject) -> Option<bool>;
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
+    /// The object rebuilt for another program (scene hot swap): its asset, type and static
+    /// indices by path. `Ok(None)` when it cannot move, which is the default.
+    fn remap(&self, _remap: &mut Remap<'_>) -> Result<Option<HostObj>, RemapError> {
+        Ok(None)
+    }
 }
 
 impl HostObj {
