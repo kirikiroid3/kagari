@@ -11,10 +11,10 @@
 mod convert;
 mod diagnostics;
 mod error;
-mod line_index;
+pub mod line_index;
 mod projects;
 mod server;
-mod std_files;
+pub mod std_files;
 
 use lsp_server::Connection;
 

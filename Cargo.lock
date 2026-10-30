@@ -1569,6 +1569,7 @@ dependencies = [
  "kagari-archive",
  "kagari-bytecode",
  "kagari-compat",
+ "kagari-debugger",
  "kagari-fmt",
  "kagari-lang",
  "kagari-lsp",
@@ -1576,6 +1577,8 @@ dependencies = [
  "kagari-shader",
  "kagari-std",
  "kagari-syntax",
+ "serde",
+ "serde_json",
  "sha2",
  "tempfile",
 ]
