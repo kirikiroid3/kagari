@@ -100,7 +100,9 @@ The runtime keeps going when a device is missing:
 
 The runtime logs to stderr. The default level is `kagari=info,wgpu=warn`, which includes the
 GPU adapter, the window backend, and the data directory in use. Set `RUST_LOG` to change it, for
-example `RUST_LOG=debug`.
+example `RUST_LOG=debug`. The progress of the story is logged under the target `kagari::story`:
+one line per step the story enters, `step <step ID> say` or `step <step ID> choice`, for example
+`step crate::Start#0 say`; see [Step IDs](../concepts/steps.md#step-ids).
 
 ## When the game stops with an error
 
@@ -113,6 +115,15 @@ Then:
 2. The window shows a black screen with the error message in white at the top left.
 3. The runtime prints `kagari-desktop-runtime: game stopped: <message>` to stderr.
 4. The window stays open until the player closes it; the exit status is then 3.
+
+The message gives the error, the function and its source location (`file@byte offset`), and,
+when the story had reached a step, `after step <step ID>` with the
+[step ID](../concepts/steps.md#step-ids) of the last step reached. Each outer call follows on its
+own line as `called from <function> (<location>)`. For example:
+
+```text
+vm panic: index out of range at crate::story::FirstDate (story.kis@1234), after step crate::story::FirstDate#28
+```
 
 An error in the game's code during start-up (while `main` runs, before the window opens) prints
 the same message and exits with status 3 at once. A game that cannot start for another reason

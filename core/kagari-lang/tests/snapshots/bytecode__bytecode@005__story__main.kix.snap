@@ -8,9 +8,9 @@ no diagnostics
 fn crate::Start [scene, entry] params=0 regs=6
   0000 CELL r0, r4
   0001 CONST r4, #17 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"It begins."}, …}
-  0002 STEP r5, r4
+  0002 STEP r5, r4, crate::Start#0
   0003 CONST r4, #27 std::narrative::Choice {"route", std::Option::Some {crate::Start::{closure#0}}, [std::narrative::ChoiceArm {"Stay", true, crate::Route::Stay}, std::narrative::ChoiceArm {"Leave", true, crate::Route::Leave}]}
-  0004 STEP r1, r4
+  0004 STEP r1, r4, crate::Start#1
   0005 ISVAR r4, r1, crate::Route::Leave
   0006 JMPIF r4, @0009
   0007 CALL r4, (), crate::Visit
@@ -32,15 +32,15 @@ fn crate::Start [scene, entry] params=0 regs=6
   0023 BOOL r1, false
   0024 JMPNOT r1, @0027
   0025 CONST r4, #30 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"Welcome back."}, …}
-  0026 STEP r5, r4
+  0026 STEP r5, r4, crate::Start#2
   0027 RAND r1, crate::Coin
   0028 ISVAR r4, r1, crate::Coin::Tails
   0029 JMPIF r4, @0033
   0030 CONST r4, #33 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"Heads."}, …}
-  0031 STEP r5, r4
+  0031 STEP r5, r4, crate::Start#3
   0032 JMP @0035
   0033 CONST r4, #36 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"Tails."}, …}
-  0034 STEP r5, r4
+  0034 STEP r5, r4, crate::Start#4
   0035 CONST r4, #37 crate::SEEN_END
   0036 STORE r0, r4
   0037 MOVE r2, r0
@@ -105,7 +105,7 @@ fn crate::Start::{closure#0} [const, closure] params=1 regs=6
 
 fn crate::Visit [scene] params=0 regs=3
   0000 CONST r1, #60 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"You stay a while."}, …}
-  0001 STEP r2, r1
+  0001 STEP r2, r1, crate::Visit#0
   0002 TUPLE r0, ()
   0003 RET r0
 

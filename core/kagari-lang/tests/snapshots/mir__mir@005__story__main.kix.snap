@@ -53,10 +53,10 @@ scene crate::Start() -> () {
     let _14: Meta<bool>; // temp cell
     let _15: (); // temp
     bb0 (entry): {
-        _1 = step(const {promoted#0}) -> bb1;
+        _1 = step#0(const {promoted#0}) -> bb1;
     }
     bb1: {
-        _2 = step(const {promoted#1}) -> bb2;
+        _2 = step#1(const {promoted#1}) -> bb2;
     }
     bb2: {
         switch_variant(_2) -> [Stay: bb3, Leave: bb4];
@@ -90,7 +90,7 @@ scene crate::Start() -> () {
         switch_bool(copy _5) -> [true: bb10, false: bb11];
     }
     bb10: {
-        _9 = step(const {promoted#2}) -> bb11;
+        _9 = step#2(const {promoted#2}) -> bb11;
     }
     bb11: {
         _10 = rng::<Coin>() -> bb12;
@@ -99,10 +99,10 @@ scene crate::Start() -> () {
         switch_variant(_10) -> [Heads: bb13, Tails: bb14];
     }
     bb13: {
-        _11 = step(const {promoted#3}) -> bb15;
+        _11 = step#3(const {promoted#3}) -> bb15;
     }
     bb14: {
-        _12 = step(const {promoted#4}) -> bb15;
+        _12 = step#4(const {promoted#4}) -> bb15;
     }
     bb15: {
         _14 = handle crate::SEEN_END;
@@ -238,7 +238,7 @@ scene crate::Visit() -> () {
     let mut _0: (); // return
     let _1: (); // temp
     bb0 (entry): {
-        _1 = step(const {promoted#0}) -> bb1;
+        _1 = step#0(const {promoted#0}) -> bb1;
     }
     bb1: {
         _0 = const ();

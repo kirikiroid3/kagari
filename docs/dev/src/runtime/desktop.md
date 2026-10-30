@@ -226,7 +226,7 @@ pkg-config`); macOS and Windows need none.
 
 **Logging.** Besides module targets, the engine logs progress under fixed targets that are useful
 when reading headless runs: `kagari::system` (`modes: [...]` whenever the mode stack changes),
-`kagari::story` (`step <function>#<ordinal> say|choice`, `chose <choice ID>`, `story returned`),
+`kagari::story` (`step <step id> say|choice`, e.g. `step crate::Start#0 say`; `chose <choice ID>`, `story returned`),
 `kagari::saves` (`saved`, `loaded … (n choices replayed)`, divergence warnings) and
 `kagari::desktop` (window backend, data directory).
 

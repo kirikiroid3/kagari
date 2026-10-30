@@ -120,7 +120,7 @@ impl Vm {
         exec::push_frame(self, &mut stack, func, args)?;
         match exec::run(self, host, &mut stack, None)? {
             Exit::Return(value) => Ok(value),
-            Exit::Step(_) => Err(Trap::new(TrapKind::KindMismatch)),
+            Exit::Step(..) => Err(Trap::new(TrapKind::KindMismatch)),
         }
     }
 

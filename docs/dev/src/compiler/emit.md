@@ -96,7 +96,7 @@ A bytecode function is an `Instance`:
 
 | Instance | Function | Path |
 | -------- | -------- | ---- |
-| `Fn(FnRef)` | An item with a body, generic arguments substituted (monomorphized per instantiation) | `crate::m::f::<u32>` |
+| `Fn(FnRef)` | An item with a body, generic arguments substituted (monomorphized per instantiation) | `crate::m::f::<u32>`, `crate::Remember::<crate::day::Mood>` |
 | `Closure { owner, expr }` | A closure of the owner instance's body | `crate::Start::{closure#0}` |
 | `Ctor(FnRef)` | Synthetic: a tuple struct or variant constructor used as a value | the constructor's path |
 | `Builtin(FnRef)` | Synthetic: a builtin used as a value, a wrapper that lowers like a direct call | the builtin's path |
@@ -104,7 +104,13 @@ A bytecode function is an `Instance`:
 | `Promoted(owner, index)` | Synthetic: a promoted constant that holds a `Screen` or fails to evaluate | `…::{promoted#N}` |
 
 `request(instance)` interns an instance to a `FuncId` on first use, pushes an empty `Function`
-with its kind, flags and parameter count, and queues it. Duplicate paths get a `#n` suffix. The
+with its kind, flags and parameter count, and queues it. An instance path carries its type
+arguments **fully qualified** (`Emitter::args_suffix` with `display_ty_qualified`, e.g.
+`std::narrative::text::either::<std::screen::Color>`), so two instances of one item never share
+a path even when their argument types have the same short name; paths are also stable across
+builds, which matters because each instance has its own step IDs and read flags
+(`crate::Remember::<crate::day::Mood>#0` vs `crate::Remember::<crate::night::Mood>#0`). Any
+remaining duplicate path gets a `#n` suffix. The
 roots are requested in `roots`: `fn main` and every non-generic game entry scene, in item order;
 statics requested their function values before. `run` then lowers the queue in FIFO order, and
 lowering requests more instances (`CALL` targets, `FUNC` values, `CLOSURE` bodies, function
@@ -205,7 +211,7 @@ exists, otherwise a host call:
 
 | Builtin | Instruction |
 | ------- | ----------- |
-| `push_step` | `STEP dst, record` |
+| `push_step` | `STEP dst, record, id`; as a value, the synthetic wrapper's one `STEP` has id 0 |
 | `rng_choose::<T>` | `RAND dst, domain`: `Enum(type)` for a fieldless enum, `Int(int type)` for `Int<lo, hi>` |
 | `asset::<A>("…")`, `system_font("…")` with a constant path | `CONST` of an `Asset` constant (the path resolved against the asset root, the system font directories, or, for a call in a std file, the std directory: `FilePath::Std`); otherwise an import call |
 | `screen::shader::erase_shader`, `erase_args` | `MOVE` (they only forget a type) |
@@ -230,7 +236,7 @@ The full builtin list, and which side implements what, is in
 | `SwitchVariant` | A chain of `ISVAR` + `JMPIF`; the target laid out next (or, without `otherwise`, the last) is reached without a test |
 | `Return` | `RET` of `_0` |
 | `Unreachable` | `UNREACHABLE` (a VM panic if reached) |
-| `Step` | `STEP` with the record operand; the outcome is written to `dest` |
+| `Step` | `STEP` with the record operand and the terminator's [step ID](./mir.md#step-ids); the outcome is written to `dest` |
 | `Rng` | `RAND` with the domain of the drawn type |
 | `SceneCall` | `CALL`/`CALLVAL`, as a call statement |
 
@@ -248,9 +254,9 @@ one `CONST` (the promoted record), so a step costs two instructions. An excerpt 
 fn crate::Start [scene, entry] params=0 regs=6
   0000 CELL r0, r4
   0001 CONST r4, #17 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"It begins."}, …}
-  0002 STEP r5, r4
+  0002 STEP r5, r4, crate::Start#0
   0003 CONST r4, #27 std::narrative::Choice {"route", std::Option::Some {crate::Start::{closure#0}}, [std::narrative::ChoiceArm {"Stay", true, crate::Route::Stay}, std::narrative::ChoiceArm {"Leave", true, crate::Route::Leave}]}
-  0004 STEP r1, r4
+  0004 STEP r1, r4, crate::Start#1
   0005 ISVAR r4, r1, crate::Route::Leave
   0006 JMPIF r4, @0009
   0007 CALL r4, (), crate::Visit

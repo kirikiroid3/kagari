@@ -1,15 +1,17 @@
 //! The two persistent stores: `settings.kisave` (the `Setting` statics) and `meta.kisave` (the
 //! `Meta` statics, read flags, seen sets and the next autosave slot).
 
+pub(crate) mod read;
 pub(crate) mod value;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use kagari_archive::save::{Save, Scalar, ValueRef};
 use kagari_bytecode::StaticKind;
-use kagari_vm::{AssetId, Program, StaticId, Value};
+use kagari_vm::{AssetId, Program, StaticId, StepId, Value};
 
 use crate::Platform;
+use read::ReadSet;
 use value::{Names, decode, encode_field, same_shape};
 
 const SETTINGS: &str = "settings.kisave";
@@ -25,7 +27,7 @@ pub(crate) struct SeenSet {
 pub(crate) struct Stores {
     pub settings: HashMap<StaticId, Value>,
     pub meta: HashMap<StaticId, Value>,
-    pub read: HashSet<String>,
+    pub read: ReadSet,
     pub seen_image: SeenSet,
     pub heard: SeenSet,
     pub watched: SeenSet,
@@ -40,7 +42,7 @@ impl Stores {
         let mut stores = Stores {
             settings: HashMap::new(),
             meta: HashMap::new(),
-            read: HashSet::new(),
+            read: ReadSet::default(),
             seen_image: SeenSet::default(),
             heard: SeenSet::default(),
             watched: SeenSet::default(),
@@ -68,9 +70,9 @@ impl Stores {
         stores
     }
 
-    /// Records a line as read; whether it was new.
-    pub fn set_read(&mut self, key: String) {
-        if self.read.insert(key) {
+    /// Records a line as read.
+    pub fn set_read(&mut self, step: StepId) {
+        if self.read.insert(step) {
             self.dirty_meta = true;
         }
     }
@@ -89,7 +91,7 @@ impl Stores {
             overlay(program, META, &mut self.meta, |path| values.get(path));
         }
         if let Some(ValueRef::Table(read)) = root.get("read") {
-            self.read = read.iter().map(|(k, _)| k.to_owned()).collect();
+            self.read = ReadSet::load(program, read);
         }
         for (name, set) in [
             ("seen_image", &mut self.seen_image),
@@ -134,14 +136,8 @@ impl Stores {
         let mut save = Save::new();
         let mut root = save.root_mut();
         write_values(names, &mut root.table("values").map_err(err)?, &self.meta)?;
-        {
-            let mut read = root.table("read").map_err(err)?;
-            let mut keys: Vec<&String> = self.read.iter().collect();
-            keys.sort();
-            for key in keys {
-                read.set(key, Scalar::Bool(true)).map_err(err)?;
-            }
-        }
+        self.read
+            .save(program, &mut root.table("read").map_err(err)?)?;
         for (name, set) in [
             ("seen_image", &self.seen_image),
             ("heard", &self.heard),

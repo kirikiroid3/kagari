@@ -71,37 +71,37 @@ fn crate::GameView [fn] params=1 regs=3
 fn std::narrative::text::TextEffect::and [const] params=2 regs=23
   0000 FIELD r12, r0, 0
   0001 FIELD r13, r1, 0
-  0002 CALL r2, (r12, r13), std::narrative::text::either::<Color>
+  0002 CALL r2, (r12, r13), std::narrative::text::either::<std::screen::Color>
   0003 FIELD r12, r0, 1
   0004 FIELD r13, r1, 1
-  0005 CALL r3, (r12, r13), std::narrative::text::either::<Decimal>
+  0005 CALL r3, (r12, r13), std::narrative::text::either::<std::Decimal>
   0006 FIELD r12, r0, 2
   0007 FIELD r13, r1, 2
-  0008 CALL r4, (r12, r13), std::narrative::text::either::<Weight>
+  0008 CALL r4, (r12, r13), std::narrative::text::either::<std::narrative::text::Weight>
   0009 FIELD r12, r0, 3
   0010 FIELD r13, r1, 3
   0011 CALL r5, (r12, r13), std::narrative::text::either::<bool>
   0012 FIELD r12, r0, 4
   0013 FIELD r13, r1, 4
-  0014 CALL r6, (r12, r13), std::narrative::text::either::<FontAsset>
+  0014 CALL r6, (r12, r13), std::narrative::text::either::<std::FontAsset>
   0015 FIELD r12, r0, 5
   0016 FIELD r13, r1, 5
-  0017 CALL r7, (r12, r13), std::narrative::text::either::<Outline>
+  0017 CALL r7, (r12, r13), std::narrative::text::either::<std::narrative::text::Outline>
   0018 FIELD r12, r0, 6
   0019 FIELD r13, r1, 6
-  0020 CALL r8, (r12, r13), std::narrative::text::either::<Shadow>
+  0020 CALL r8, (r12, r13), std::narrative::text::either::<std::narrative::text::Shadow>
   0021 FIELD r12, r0, 7
   0022 FIELD r13, r1, 7
-  0023 CALL r9, (r12, r13), std::narrative::text::either::<Emphasis>
+  0023 CALL r9, (r12, r13), std::narrative::text::either::<std::narrative::text::Emphasis>
   0024 FIELD r12, r0, 8
   0025 FIELD r13, r1, 8
-  0026 CALL r10, (r12, r13), std::narrative::text::either::<Reveal>
+  0026 CALL r10, (r12, r13), std::narrative::text::either::<std::narrative::text::Reveal>
   0027 FIELD r12, r0, 9
   0028 FIELD r13, r1, 9
-  0029 CALL r11, (r12, r13), std::narrative::text::either::<Pause>
+  0029 CALL r11, (r12, r13), std::narrative::text::either::<std::narrative::text::Pause>
   0030 FIELD r12, r0, 10
   0031 FIELD r13, r1, 10
-  0032 CALL r22, (r12, r13), std::narrative::text::either::<Mark>
+  0032 CALL r22, (r12, r13), std::narrative::text::either::<std::narrative::text::Mark>
   0033 MOVE r12, r2
   0034 MOVE r13, r3
   0035 MOVE r14, r4

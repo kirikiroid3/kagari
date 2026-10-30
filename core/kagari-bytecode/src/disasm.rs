@@ -32,7 +32,7 @@ pub fn disassemble(module: &Module, filter: &dyn Fn(&str) -> bool) -> String {
             f.regs
         );
         for (index, instr) in f.code.iter().enumerate() {
-            let operands = d.operands(instr);
+            let operands = d.operands(instr, &path);
             let _ = write!(out, "  {index:04} {}", instr.mnemonic());
             if !operands.is_empty() {
                 let _ = write!(out, " {}", operands.join(", "));
@@ -327,7 +327,8 @@ impl Disasm<'_> {
         }
     }
 
-    fn operands(&self, instr: &Instr) -> Vec<String> {
+    /// The operands of `instr`, an instruction of the function at `path`.
+    fn operands(&self, instr: &Instr, path: &str) -> Vec<String> {
         match *instr {
             Instr::Move { dst, src }
             | Instr::Not { dst, src }
@@ -339,7 +340,6 @@ impl Disasm<'_> {
             | Instr::ToText { dst, src }
             | Instr::Cell { dst, init: src }
             | Instr::Store { dst, value: src }
-            | Instr::Step { dst, record: src }
             | Instr::Concat { dst, parts: src }
             | Instr::VecPush {
                 vec: dst,
@@ -405,6 +405,8 @@ impl Disasm<'_> {
                 vec![reg(cond), label(target)]
             }
             Instr::Unreachable => Vec::new(),
+            // The step ID in its full form, as the runtime names it.
+            Instr::Step { dst, record, id } => vec![reg(dst), reg(record), format!("{path}#{id}")],
             Instr::Call {
                 dst,
                 args,

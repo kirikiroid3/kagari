@@ -95,12 +95,14 @@ impl FnCodegen<'_, '_> {
                 arg,
                 dest,
                 next: target,
+                id,
             } => {
                 let record = reg(self.operand_auto(arg));
                 let dst = self.dest(dest);
                 self.emit(Instr::Step {
                     dst: reg(dst),
                     record,
+                    id: id.0,
                 });
                 self.finish_dest(dest, dst);
                 self.goto(*target, next);

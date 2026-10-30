@@ -93,7 +93,7 @@ a `ThirExprKind::Promoted(id)` node. The promoted tree goes to `Thir::promoted` 
 every constant local the root reads, in dependency order. A literal, a path, and an expression of
 type `()` or `!` is *trivial* and stays inline. Nothing inside a promoted expression is promoted
 on its own. The typical promoted constant is the `Say` or `Choice` record of a step, which is why
-the steps of a scene carry `step(const {promoted#N})` in MIR.
+the steps of a scene carry `step#N(const {promoted#M})` in MIR.
 
 ### Why THIR exists
 
@@ -198,7 +198,7 @@ story analysis anchor on it.
 | `SwitchVariant { place, adt, targets, otherwise }` | Branch on an enum's variant |
 | `Return` | Return `_0` |
 | `Unreachable` | Cannot happen in a well-typed program; an abort at run time |
-| `Step { arg, dest, next }` | `push_step(arg)`: show a step, resume at `next` with the outcome in `dest` |
+| `Step { arg, dest, next, id }` | `push_step(arg)`: show a step, resume at `next` with the outcome in `dest`; `id` is its [step ID](#step-ids) |
 | `Rng { ty, dest, next }` | `rng_choose::<ty>()`: draw a value |
 | `SceneCall { callee, args, dest, next }` | Call a scene |
 
@@ -213,7 +213,7 @@ The MIR of the `Start` scene of `tests/bytecode/005__story/main.kix`:
 
 <!-- diagram: mir-scene-cfg (mermaid-ish)
 flowchart LR
-  bb0["bb0: step(promoted#0)"] ==> bb1["bb1 choice!: step(promoted#1)"]
+  bb0["bb0: step#0(promoted#0)"] ==> bb1["bb1 choice!: step#1(promoted#1)"]
   bb1 ==> bb2["bb2: switch_variant(_2)"]
   bb2 ==>|Stay| bb3["bb3: scene_call Visit()"]
   bb2 ==>|Leave| bb4["bb4: story ROUTE = Leave"]
@@ -221,8 +221,8 @@ flowchart LR
   bb4 ==> bb5
   bb5 ==> bb11["bb11: rng::<Coin>()"]
   bb11 ==> bb12["bb12: switch_variant(_10)"]
-  bb12 ==>|Heads| bb13["bb13: step(promoted#3)"]
-  bb12 ==>|Tails| bb14["bb14: step(promoted#4)"]
+  bb12 ==>|Heads| bb13["bb13: step#3(promoted#3)"]
+  bb12 ==>|Tails| bb14["bb14: step#4(promoted#4)"]
   bb13 ==> bb15["bb15: Meta::write; return"]
   bb14 ==> bb15
   %% highlighted: suspension terminators (Step, Rng, SceneCall)
@@ -237,10 +237,10 @@ scene crate::Start() -> () {
     let _2: Route; // route
     …
     bb0 (entry): {
-        _1 = step(const {promoted#0}) -> bb1;
+        _1 = step#0(const {promoted#0}) -> bb1;
     }
     bb1: {
-        _2 = step(const {promoted#1}) -> bb2;
+        _2 = step#1(const {promoted#1}) -> bb2;
     }
     bb2: {
         switch_variant(_2) -> [Stay: bb3, Leave: bb4];
@@ -255,6 +255,26 @@ scene crate::Start() -> () {
     …
 }
 ```
+
+### Step IDs {#step-ids}
+
+Each `Step` terminator carries a `mir::StepId(u32)` (printed `#N`): the step's index, 0-based,
+among the step forms of its item in **source order**. A step form is a `push_step` call, whether
+written `s!(…)`, `choice!{…}` or `push_step(…)`. `ItemCx::new` (`mir/build/mod.rs`) collects the
+THIR calls with `CalleeKind::Step`, sorts their HIR `ExprId`s and numbers them: HIR lowering
+allocates expressions in source order (a form's call after its arguments), so `ExprId` order is
+source order. The emitter copies the id into the `STEP` instruction, and the runtime names a
+step `{function path}#{id}` (read flags, traps, the progress log).
+
+- **Not text ranges.** Sorting by source position would make `item_mir` depend on the source
+  map, so every edit that moves text would invalidate it; `ExprId`s are stable across such edits.
+- **Not code layout.** The emitted block order (reverse postorder) can differ from source order,
+  e.g. a step after a `loop` with an early `break` is laid out before the loop's step
+  (`tests/bytecode/007__step_ids`: layout `#0, #2, #1`). IDs do not depend on it.
+- **Stability.** Inserting code without steps leaves every ID unchanged; inserting or removing a
+  step shifts the IDs of the later steps of the same function only.
+- **Dead steps count.** Numbering is over all step forms of the item, not over reachable MIR, so
+  removing dead code elsewhere does not renumber.
 
 ### Patterns as decision trees
 

@@ -333,6 +333,35 @@ state layout then never has to stay stable across versions.
 - The story PRNG (xoroshiro128++, seeded from the trace) is the only randomness; only scenes draw
   (`E3024`), and the analysis explores every outcome.
 
+### Stable step IDs {#step-ids}
+
+*Status: Implemented.*
+
+**Decision.** A step is named `{function path}#{id}`, where the id is the step's 0-based ordinal
+among the step forms (`push_step` calls, including `s!(…)` and `choice!{…}`) of its function in
+source order. MIR building assigns it (by HIR `ExprId` order), the `Step` terminator carries it,
+and the bytecode `STEP` instruction carries it as an operand. Read flags are stored per scene as
+segments of read step ids.
+
+**Why.** The former key, the index of the `STEP` among its function's `STEP`s in code layout
+order, changed whenever the emitter's block layout did, even without any edit to the steps, and
+generic instances could collide on short type names. Source-order ids change only when steps are
+inserted or removed, and only for later steps of the same function. `ExprId` order instead of
+text ranges keeps `item_mir` independent of the source map. An operand instead of a table in the
+Functions section or the ancillary Debug section keeps the id with its instruction and present in
+release builds. See [MIR](../compiler/mir.md#step-ids).
+
+**Consequences.**
+
+- Format change in place (pre-1.0): STEP is now opcode `0x72` with the id; `0x70` is retired and
+  never reused. Games must be rebuilt; the magic stays `V000`
+  ([Compatibility](../formats/kagari.md#compatibility)).
+- Read flags written before are dropped once on load (they cannot be mapped reliably).
+- Instance paths carry fully qualified type arguments
+  (`crate::Remember::<crate::day::Mood>`), so each monomorphized instance has its own unique,
+  stable step IDs and read flags.
+- Traps, the `kagari::story` log, `W5009` and `E5003` name the step by its ID.
+
 ### Extension types are identified by path and structural hash {#extensions}
 
 *Status: Planned.*

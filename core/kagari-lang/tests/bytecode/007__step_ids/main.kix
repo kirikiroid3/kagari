@@ -1,0 +1,96 @@
+// Step IDs: each step is numbered by its position among the step forms of its function in
+// source order, even where the block layout differs (the `break` makes the step after the
+// loop come before the loop's step), and each instance of a generic scene names its type
+// arguments by their full paths.
+
+use std::narrative::text::text_style;
+use std::screen::size;
+use std::system::default_bindings;
+
+mod day {
+    pub enum Mood {
+        Calm,
+    }
+}
+
+mod night {
+    pub enum Mood {
+        Calm,
+    }
+}
+
+#[scene]
+#[entry]
+pushdown fn Start() {
+    s!(t!["First."]);
+    let mut laps: Int<0, 3> = 0;
+    loop {
+        if laps == 1 {
+            break;
+        }
+        s!(t!["A lap."]);
+        laps = 1;
+    }
+    s!(t!["After the loop."]);
+    Remember(day::Mood::Calm);
+    Remember(night::Mood::Calm);
+}
+
+#[scene]
+pushdown fn Remember<M>(mood: M) {
+    let _ = mood;
+    s!(t!["Remembered."]);
+}
+
+static TEXT_SPEED: Setting<Duration> = setting(ms(30));
+static AUTO_DELAY: Setting<Duration> = setting(ms(1300));
+static AUTO_DELAY_PER_CHAR: Setting<Duration> = setting(ms(60));
+static SKIP_UNREAD: Setting<bool> = setting(false);
+static MASTER: Setting<Volume> = setting(volume(100));
+static MUSIC: Setting<Volume> = setting(volume(60));
+static SOUND: Setting<Volume> = setting(volume(100));
+static VOICE: Setting<Volume> = setting(volume(100));
+static VOICE_SUSTAIN: Setting<bool> = setting(false);
+static WAIT_FOR_VOICE: Setting<bool> = setting(true);
+static WINDOW_OPACITY: Setting<Int<0, 100>> = setting(80);
+static FULLSCREEN: Setting<bool> = setting(false);
+static ANIMATIONS: Setting<bool> = setting(true);
+const FONT: FontAsset = asset("font.ttf");
+
+fn main() -> System {
+    System {
+        title: "Step IDs",
+        resolution: size(1280, 720),
+        start: Title,
+        game: GameView,
+        save_slots: 20,
+        auto_slots: 3,
+        backlog: 200,
+        font: FONT,
+        text: text_style(26, WHITE),
+        settings: Settings {
+            text_speed: TEXT_SPEED,
+            auto_delay: AUTO_DELAY,
+            auto_delay_per_char: AUTO_DELAY_PER_CHAR,
+            skip_unread: SKIP_UNREAD,
+            master: MASTER,
+            music: MUSIC,
+            sound: SOUND,
+            voice: VOICE,
+            voice_sustain: VOICE_SUSTAIN,
+            wait_for_voice: WAIT_FOR_VOICE,
+            window_opacity: WINDOW_OPACITY,
+            fullscreen: FULLSCREEN,
+            animations: ANIMATIONS,
+        },
+        bindings: default_bindings(),
+    }
+}
+
+fn Title() -> RootPage {
+    RootPage(column![button!{on_click = || nav::start(Start, (), |_end| ()), t!["Start"]}])
+}
+
+fn GameView(game: Narrative) -> Element {
+    game_screen!(game = game)
+}

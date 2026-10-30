@@ -39,6 +39,7 @@ mod rvalue;
 use la_arena::{Arena, RawIdx};
 use rustc_hash::FxHashMap;
 
+use crate::callee::CalleeKind;
 use crate::db::Db;
 use crate::eval::ConstValue;
 use crate::eval::std_items::{StdTable, std_table};
@@ -52,7 +53,7 @@ use crate::ty::Ty;
 
 use super::{
     BasicBlock, BlockData, Body, BodyKind, ConstOperand, ItemMir, Local, LocalDecl, LocalKind,
-    LoopInfo, MirSource, Operand, Place, Rvalue, Statement, StatementKind, Terminator,
+    LoopInfo, MirSource, Operand, Place, Rvalue, Statement, StatementKind, StepId, Terminator,
 };
 
 /// The MIR of `item`'s body, its closures and its promoted constants; `None` exactly when
@@ -76,6 +77,8 @@ pub(super) struct ItemCx<'a> {
     bindings: FxHashMap<LocalId, LocalDecl>,
     /// The type of each closure, by index.
     closure_tys: FxHashMap<u32, Ty>,
+    /// The step ID of each `push_step` call, by its HIR expression.
+    steps: FxHashMap<ExprId, StepId>,
 }
 
 impl<'a> ItemCx<'a> {
@@ -130,6 +133,27 @@ impl<'a> ItemCx<'a> {
                 _ => None,
             })
             .collect();
+        // HIR lowering allocates expressions in source order (a form's call after its
+        // arguments), so the `ExprId` order of the `push_step` calls is the source order of
+        // the step forms, and it does not depend on text ranges.
+        let mut calls: Vec<ExprId> = thir
+            .exprs
+            .iter()
+            .filter_map(|(_, expr)| match expr.kind {
+                ThirExprKind::Call {
+                    kind: CalleeKind::Step,
+                    ..
+                } => Some(expr.src),
+                _ => None,
+            })
+            .collect();
+        calls.sort_unstable_by_key(|expr| expr.into_raw().into_u32());
+        calls.dedup();
+        let steps = calls
+            .into_iter()
+            .enumerate()
+            .map(|(ordinal, expr)| (expr, StepId(u32::try_from(ordinal).unwrap_or(u32::MAX))))
+            .collect();
         ItemCx {
             item,
             thir,
@@ -137,7 +161,13 @@ impl<'a> ItemCx<'a> {
             std,
             bindings,
             closure_tys,
+            steps,
         }
+    }
+
+    /// The step ID of the `push_step` call `expr` (a HIR expression).
+    pub(super) fn step_id(&self, expr: ExprId) -> Option<StepId> {
+        self.steps.get(&expr).copied()
     }
 
     /// The kind of the item's own body.

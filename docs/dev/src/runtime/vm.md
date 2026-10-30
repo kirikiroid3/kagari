@@ -51,10 +51,9 @@ rule through `HostObj::make_mut`.
 3. Build every constant as a `Value` in index order (children are clones of earlier entries).
    A Rat with `den == 0` or a text constant with non-Text parts is `LoadError::BadConstant`.
 4. Precompute: function and type indexes by path (`find_function`, `find_type`; the lowest id
-   wins on duplicates), the `main` function, per function the instruction indices of its STEPs
-   (for step ordinals), per function the `(instruction, byte offset)` debug pairs, and
-   `std::Option`'s type id with a cached `None` (for VECGET). Unit, the empty array, the empty
-   Vec and the empty path are shared values.
+   wins on duplicates), the `main` function, per function the `(instruction, byte offset)` debug
+   pairs, and `std::Option`'s type id with a cached `None` (for VECGET). Unit, the empty array,
+   the empty Vec and the empty path are shared values.
 
 The engine boots by `Program::load`, binding every import to an engine implementation (an
 unknown import path fails the boot with `BootError::UnsupportedImport`), then running `main`.
@@ -112,9 +111,11 @@ constant.
 
 `resume(vm, host, input)` runs until the next STEP or the entry scene's return:
 
-- On a STEP, the run returns `Suspend::Step { record, func, ordinal }`: the step record
-  (auto-deref'd), the function containing the STEP, and the STEP's ordinal among that
-  function's STEPs in code order. The top frame's `pc` stays on the STEP.
+- On a STEP, the run returns `Suspend::Step { record, step }`: the step record (auto-deref'd)
+  and a `StepId { func, id }`, the function containing the STEP and the STEP's step id operand
+  (its source-order ordinal, see [MIR](../compiler/mir.md#step-ids)). The VM needs no STEP index
+  table; `Program::step_path(step)` names it `{function path}#{id}`. The fiber remembers this
+  last step. The top frame's `pc` stays on the STEP.
 - The next `resume` writes `input` (the step's result: `()` for the first resume and for a
   `Say`, the chosen arm's `value` for a `Choice`) into the STEP's `dst` register and continues.
 - `Suspend::Returned(value)` ends the fiber (the ending value). A fiber that returned or trapped
@@ -180,10 +181,16 @@ pub trait Host {
 ## Traps {#traps}
 
 `TrapKind` values and their causes are listed in
-[The `.kagari` Format](../formats/kagari.md#panics). `Trap::render(program)` produces
-`vm panic: {kind} at {path} ({file}@{offset})`, then one `called from …` line per outer frame;
-without debug info the location is `instruction {i}`. The engine stops the game on the first
-trap and shows the message on the crash screen; later traps are ignored.
+[The `.kagari` Format](../formats/kagari.md#panics). A `Trap` is `{ kind, backtrace, step }`;
+`step: Option<StepId>` is the story's last step: a trap from `resume` gets the fiber's last step,
+and the engine sets it for a trap while entering a step. `Trap::render(program)` produces
+`vm panic: {kind} at {path} ({file}@{offset}), after step {step id}`, then one
+`called from {path} ({loc})` line per outer frame; without debug info the location is
+`instruction {i}`, and without a step the `, after step …` part is absent. Example:
+`vm panic: index out of range at crate::story::FirstDate (story.kis@1234), after step
+crate::story::FirstDate#28`. `Display` (no program) adds
+`\n  after step {id} of function {n}`. The engine stops the game on the first trap and shows
+the message on the crash screen; later traps are ignored.
 
 ## Relying on the verifier {#relying-on-the-verifier}
 
@@ -208,8 +215,8 @@ arguments and trap with `Host` or `TagMismatch`.
 - No `unsafe`, no panics: every failure is a `Trap` or a `LoadError`.
 - Values have value semantics: only `Ref` aliases. Any new aggregate or host object must
   copy on write.
-- A STEP's ordinal and the function path are what the engine records about the story's
-  position; do not renumber STEPs without considering saves (see
+- A STEP's step id and the function path are what the engine records about the story's
+  position (read flags); the id comes from the compiler and the VM only reports it (see
   [Saves, Traces and Snapshots](./saves.md)).
 - Determinism: identical program, seed and inputs give identical runs (no floats, no hash
   iteration order in semantics, the PRNG specified in the format chapter).

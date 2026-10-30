@@ -1,9 +1,11 @@
 //! The diagnostic text of types.
 
 use crate::db::Db;
+use crate::def_map::{Def, DefMaps};
 use crate::hir::{ClosureKind, FnPtrKind, signature_of};
 use crate::input::Program;
 use crate::item_tree::{FnKind, ItemId};
+use crate::paths;
 use crate::ty::{Const, FnDefId, FnRef, GenericArg, InferVar, Ty, TyKind};
 
 use super::lower::item_name;
@@ -30,7 +32,28 @@ pub(crate) fn display_ty_with(
     Printer {
         db,
         sigs,
+        maps: None,
         is_literal,
+    }
+    .ty(ty, &mut out);
+    out
+}
+
+/// A type with every item named by its full path: `crate::story::Route`,
+/// `std::Option<crate::Mood>`, `fn(u32) {crate::pick}`. Unlike [`display_ty`] two distinct
+/// types never print the same, so it names the type arguments of monomorphized instances.
+pub(crate) fn display_ty_qualified(
+    db: &dyn Db,
+    sigs: &ProgramSignatures,
+    maps: &DefMaps,
+    ty: &Ty,
+) -> String {
+    let mut out = String::new();
+    Printer {
+        db,
+        sigs: Some(sigs),
+        maps: Some(maps),
+        is_literal: &|_| false,
     }
     .ty(ty, &mut out);
     out
@@ -98,6 +121,8 @@ fn fn_def_signature(sigs: &ProgramSignatures, fn_ref: &FnRef) -> Option<(FnPtrKi
 struct Printer<'a> {
     db: &'a dyn Db,
     sigs: Option<&'a ProgramSignatures>,
+    /// `Some`: name items by their full paths.
+    maps: Option<&'a DefMaps>,
     is_literal: &'a dyn Fn(InferVar) -> bool,
 }
 
@@ -136,7 +161,10 @@ impl Printer<'_> {
                 out.push(']');
             }
             TyKind::Adt { item, args } => {
-                out.push_str(&item_name(self.db, *item));
+                match self.maps {
+                    Some(maps) => out.push_str(&paths::item_path(self.db, maps, *item)),
+                    None => out.push_str(&item_name(self.db, *item)),
+                }
                 self.args(args, out);
             }
             TyKind::Ref { mutable, inner } => {
@@ -161,11 +189,25 @@ impl Printer<'_> {
                 self.signature(params, ret, out);
             }
             TyKind::FnDef(fn_ref) => {
-                let name = match fn_ref.def {
-                    FnDefId::Item(item) | FnDefId::StructCtor(item) => {
+                let name = match (self.maps, fn_ref.def) {
+                    (Some(maps), FnDefId::Item(item)) => {
+                        let mut name = paths::assoc_path(self.db, maps, item);
+                        if !fn_ref.args.is_empty() {
+                            name.push_str("::");
+                            self.args(&fn_ref.args, &mut name);
+                        }
+                        name
+                    }
+                    (Some(maps), FnDefId::StructCtor(item)) => {
+                        paths::def_path(self.db, maps, Def::Item(item))
+                    }
+                    (Some(maps), FnDefId::VariantCtor(enum_item, index)) => {
+                        paths::def_path(self.db, maps, Def::Variant { enum_item, index })
+                    }
+                    (None, FnDefId::Item(item) | FnDefId::StructCtor(item)) => {
                         item_name(self.db, item).to_string()
                     }
-                    FnDefId::VariantCtor(item, index) => format!(
+                    (None, FnDefId::VariantCtor(item, index)) => format!(
                         "{}::{}",
                         item_name(self.db, item),
                         variant_name(self.db, item, index)

@@ -187,7 +187,12 @@ impl FnCodegen<'_, '_> {
         let arg = |index: usize| reg(args.get(index).copied().unwrap_or(0));
         let (d, a, b1, b2) = (reg(dst), arg(0), arg(1), arg(2));
         if item == std.push_step {
-            self.emit(Instr::Step { dst: d, record: a });
+            // Only the wrapper of `push_step` used as a value gets here: its one step.
+            self.emit(Instr::Step {
+                dst: d,
+                record: a,
+                id: 0,
+            });
             return;
         }
         if item == std.rng_choose

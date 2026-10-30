@@ -36,8 +36,9 @@ pub(crate) struct StoryCtx<'a> {
 pub(crate) enum Exit {
     /// The bottom frame returned.
     Return(Value),
-    /// A STEP suspended the run; the top frame's `pc` is still on it.
-    Step(Value),
+    /// A STEP suspended the run with its record and step id; the top frame's `pc` is still
+    /// on it.
+    Step(Value, u32),
 }
 
 /// What a call value resolves to.
@@ -263,12 +264,12 @@ fn step(
                 }
             }
         }
-        Instr::Step { record, .. } => {
+        Instr::Step { record, id, .. } => {
             if story.is_none() {
                 return Err(Trap::new(TrapKind::KindMismatch));
             }
             let record = val(&frame.regs, record)?.into_owned();
-            return Ok(Some(Exit::Step(record)));
+            return Ok(Some(Exit::Step(record, id)));
         }
         Instr::Rand { dst, domain } => {
             let Some(story) = story.as_mut() else {

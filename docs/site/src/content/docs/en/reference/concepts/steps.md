@@ -189,3 +189,24 @@ Because the ID does not depend on line numbers or arm order, saves survive reord
 rewording of the script. Renaming the function, the choice `id` or the variant breaks the saves
 that pass through it: loading such a save reports a divergence at that choice. See
 [Saves, Replay and Determinism](./saves.md).
+
+## Step IDs
+
+Every step (`s!`, `choice!`) has an ID: the path of its function, `#`, and a number, for example
+`crate::story::FirstDate#28`. The number is the step's position among the steps of its function
+in source order, starting at 0.
+
+Adding code that contains no step changes no ID. Adding or removing a step renumbers the later
+steps of that same function only; steps in other functions keep their IDs.
+
+Each instance of a generic scene has its own IDs, with the type arguments in the path, for
+example `crate::Remember::<crate::day::Mood>#0` and `crate::Remember::<crate::night::Mood>#0`.
+
+Step IDs appear in:
+
+- read flags, which are kept per step ID (see [Saves, Replay and Determinism](./saves.md));
+- the message of the runtime when the game stops with an error, which names the last step reached
+  (see [Runtime](../tools/runtime.md#when-the-game-stops-with-an-error));
+- the progress log of the runtime, one line `step <step ID> say` or `step <step ID> choice` per
+  step entered;
+- a note of the compiler's `W5009` and `E5003`, which names the step.

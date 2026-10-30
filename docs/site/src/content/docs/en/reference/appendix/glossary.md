@@ -167,6 +167,9 @@ it. Terms of the standard library link to the *STD Reference*.
   warning `W5006` is reported. [Projects](../tools/projects.md)
 - **Step.** A point where the story stops and waits for the player: an `s!(…)` or a `choice!{…}`.
   [Steps](../concepts/steps.md)
+- **Step ID.** The stable name of a step: its function path, `#` and the step's position among
+  the steps of that function in source order, such as `crate::story::FirstDate#28`. Read flags
+  are keyed by it. [Steps](../concepts/steps.md#step-ids)
 - **Story.** The `pushdown fn` of a game: its scenes, instant procedures and story variables.
   [The Story Machine](../concepts/story.md)
 - **Story machine.** The pushdown machine that runs the story inside the game mode.

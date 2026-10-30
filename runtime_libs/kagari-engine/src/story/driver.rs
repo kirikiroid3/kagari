@@ -1,6 +1,6 @@
 //! The story driver: resuming the fiber, entering steps, advancing, selecting, play modes.
 
-use kagari_vm::{FnKind, FuncId, Suspend, Text, Trap, Value, Vm};
+use kagari_vm::{FnKind, StepId, Suspend, Text, Trap, Value, Vm};
 
 use super::reveal::{RevealPlan, RevealRun, RevealState, Speeds};
 use super::{
@@ -38,12 +38,12 @@ pub(crate) fn resume(ctx: &mut HostCtx, vm: &mut Vm, input: Value) -> Result<Res
         game.fiber = Some(fiber);
     }
     match result? {
-        Suspend::Step {
-            record,
-            func,
-            ordinal,
-        } => {
-            enter_step(ctx, vm, record, func, ordinal)?;
+        Suspend::Step { record, step } => {
+            // A trap while entering the step names it, like a trap in story code after it.
+            enter_step(ctx, vm, record, step).map_err(|mut trap| {
+                trap.step.get_or_insert(step);
+                trap
+            })?;
             Ok(Resumed::Step)
         }
         Suspend::Returned(v) => Ok(Resumed::Returned(v)),
@@ -81,14 +81,8 @@ fn invalidate(ctx: &mut HostCtx, keys: &[SourceKey]) {
     }
 }
 
-/// Enters the step `record` reached at the `ordinal`-th STEP of `func`.
-fn enter_step(
-    ctx: &mut HostCtx,
-    vm: &mut Vm,
-    record: Value,
-    func: FuncId,
-    ordinal: u32,
-) -> Result<(), Trap> {
+/// Enters the step `record` reached at the STEP `step`.
+fn enter_step(ctx: &mut HostCtx, vm: &mut Vm, record: Value, step: StepId) -> Result<(), Trap> {
     let replaying = ctx.state.system.replaying;
     let program = ctx.state.program.clone();
     let record = deref(vm, record)?;
@@ -161,8 +155,7 @@ fn enter_step(
         };
         let text = opt_text(ctx, &field(3)?)?;
         let history = opt_text(ctx, &field(4)?)?;
-        let read_key = format!("{}#{}", program.function_path(func), ordinal);
-        let read = ctx.state.system.stores.read.contains(&read_key);
+        let read = ctx.state.system.stores.read.contains(step);
         let speeds = Speeds {
             text_speed_ms: ctx.state.system.duration_ms(|s| s.text_speed, 30),
         };
@@ -191,7 +184,7 @@ fn enter_step(
             who,
             text,
             voice,
-            read_key,
+            step,
             read,
         });
         if !replaying && let Some(voice) = voice {
@@ -248,13 +241,13 @@ fn enter_step(
             return Err(Trap::host(format!("the choice `{id}` has no shown arm")));
         }
         let game = game_mut(ctx)?;
-        let step = game.screen.step();
-        let disabled = step.disabled_arms.clone();
-        let align = step.menu_align;
+        let screen_step = game.screen.step();
+        let disabled = screen_step.disabled_arms.clone();
+        let align = screen_step.menu_align;
         let text_start = game.screen.text_start_ms();
         game.reveal = RevealRun::empty(t.saturating_add(u64::from(text_start)));
         game.current = Current::Choice(ChoiceStep {
-            func,
+            func: step.func,
             id,
             arms,
             disabled,
@@ -264,9 +257,8 @@ fn enter_step(
     if !replaying {
         log::info!(
             target: "kagari::story",
-            "step {}#{} {}",
-            program.function_path(func),
-            ordinal,
+            "step {} {}",
+            program.step_path(step),
             if is_say { "say" } else { "choice" }
         );
     }
@@ -305,14 +297,14 @@ fn enter_step(
 /// The next step after a `Say`. A return during replay is handed back, not finished.
 pub(crate) fn next_step(ctx: &mut HostCtx, vm: &mut Vm) -> Result<Resumed, Trap> {
     let replaying = ctx.state.system.replaying;
-    let key = match &game_mut(ctx)?.current {
-        Current::Say(say) => Some(say.read_key.clone()),
+    let step = match &game_mut(ctx)?.current {
+        Current::Say(say) => Some(say.step),
         _ => None,
     };
-    if let Some(key) = key
+    if let Some(step) = step
         && !replaying
     {
-        ctx.state.system.stores.set_read(key);
+        ctx.state.system.stores.set_read(step);
     }
     let game = game_mut(ctx)?;
     game.trace.steps_after_last_choice = game.trace.steps_after_last_choice.saturating_add(1);

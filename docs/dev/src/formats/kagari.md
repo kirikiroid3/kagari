@@ -322,7 +322,9 @@ function. The decoder maps it to an instruction index; a target inside a 2-word 
 
 Generated from `core/kagari-bytecode/src/instr.rs` (`Instr::opcode`, `Instr::mnemonic`,
 `Instr::words`, the variant doc comments); semantics from `runtime_libs/kagari-vm/src/exec/`.
-75 opcodes. Gaps in the numbering are unassigned.
+75 opcodes. Gaps in the numbering are unassigned, except `0x70`: it is **retired** (the former
+1-word STEP without a step id), the decoder rejects it as an unknown opcode, and it is never
+reused.
 
 | Op | Mnemonic | Words | Operands | Semantics |
 | -- | -------- | ----: | -------- | --------- |
@@ -376,8 +378,8 @@ Generated from `core/kagari-bytecode/src/instr.rs` (`Instr::opcode`, `Instr::mne
 | `0x61` | CALLIMP | 2 | a=dst, b=first arg, c=argc, x=import | Host call `Host::import`; raw args. |
 | `0x62` | CALLVAL | 2 | a=dst, b, c, x=callee reg (bits 0–15) \| kind (bits 16–23) | Call a `Func`, `Closure` or `HostFn`; kind and arity checked at run time; bits 24–63 zero. |
 | `0x63` | CLOSURE | 2 | a=dst, b=first capture, c=count, x=function | Captures are copied by value from raw registers. |
-| `0x70` | STEP | 1 | a=dst, b=step record | Suspend the story fiber; `a` receives the step result on resume. Scenes only. |
 | `0x71` | RAND | 2 | a=dst, x=index (bits 0–31) \| domain (bits 32–63: 0 enum, 1 int) | Uniform PRNG draw. Scenes only. |
+| `0x72` | STEP | 2 | a=dst, b=step record, x=step id (`u32`; bits 32–63 zero) | Suspend the story fiber; `a` receives the step result on resume. `x` is the step's source-order ordinal in its function (see [MIR](../compiler/mir.md#step-ids)); the VM reports it, never relies on it. Scenes only. |
 | `0x80` | TUPLE | 1 | a=dst, b=first, c=count | Raw elements; count 0 is unit. |
 | `0x81` | ARRAY | 1 | a=dst, b=first, c=count | Raw elements. |
 | `0x82` | REPEAT | 2 | a=dst, b=value (raw), x=count (u64) | `[v; n]`; costs `n` extra fuel. |
@@ -413,7 +415,7 @@ instruction when one exists, otherwise a CALLIMP of an import (`emit/codegen/cal
 
 | Builtin | Emitted as |
 | ------- | ---------- |
-| `push_step` | STEP |
+| `push_step` | STEP, with the step id of the MIR `Step` terminator |
 | `rng_choose::<T>` | RAND: a fieldless enum gives domain 0 and its type; an `Int<lo, hi>` domain 1 and its int type |
 | `asset::<A>(path)`, `system_font(path)` | CONST of an Asset constant when the emitted argument is a constant string; otherwise CALLIMP of the import, like any other builtin |
 | `Vec::new`, `Vec::len`, `Vec::get` | VECNEW, LEN, VECGET (with the `std::Option` type id) |
@@ -546,6 +548,14 @@ with a clear error. Optional data (debug info, future metadata) must not force a
 - The version `V000` changes only on a breaking change, once the format is declared stable.
   Until then (pre-1.0) the format may still change in place; every such change must update this
   chapter, the tests in `core/kagari-bytecode/src/tests.rs`, the VM and the emitter together.
+  Example: STEP gained its step id operand as a new opcode, `0x72`, and the old 1-word `0x70`
+  was retired, not repurposed. Files built before must be rebuilt (an old runtime rejects
+  `0x72`, a new one rejects `0x70`); the magic stays `V000`.
+- Why the step id is an operand, not a table in Functions or in the Debug section: read flags
+  need it in release builds, so it cannot be ancillary debug data; an operand keeps the id with
+  its instruction (no parallel table indexed by code order to keep consistent), the VM reads it
+  directly and the disassembler prints it (`0001 STEP r4, r3, crate::Start#0`). The verifier
+  checks nothing about ids (no uniqueness rule).
 - Saves do not depend on this layout: a save is a trace of the entry scene's path, its
   arguments, the PRNG seed and the choices taken (named by function path, choice id and arm),
   not of bytes or indices (see [Saves, Traces and Snapshots](../runtime/saves.md)).

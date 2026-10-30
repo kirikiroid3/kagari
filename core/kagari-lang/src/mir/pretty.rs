@@ -182,8 +182,13 @@ impl Printer<'_> {
             }
             Terminator::Return => "return".to_owned(),
             Terminator::Unreachable => "unreachable".to_owned(),
-            Terminator::Step { arg, dest, next } => format!(
-                "{} = step({}) -> {}",
+            Terminator::Step {
+                arg,
+                dest,
+                next,
+                id,
+            } => format!(
+                "{} = step{id}({}) -> {}",
                 self.place(dest),
                 self.operand(arg),
                 block(*next)

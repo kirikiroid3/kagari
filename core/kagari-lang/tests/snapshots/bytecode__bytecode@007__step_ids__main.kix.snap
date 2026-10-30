@@ -1,0 +1,143 @@
+---
+source: core/kagari-lang/tests/bytecode.rs
+expression: out
+input_file: core/kagari-lang/tests/bytecode/007__step_ids/main.kix
+---
+no diagnostics
+--- bytecode ---
+fn crate::Start [scene, entry] params=0 regs=5
+  0000 CONST r3, #15 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"First."}, …}
+  0001 STEP r4, r3, crate::Start#0
+  0002 INT r0, 0
+  0003 INT r3, 1
+  0004 EQ r1, r0, r3
+  0005 JMPNOT r1, @0014
+  0006 CONST r3, #18 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"After the loop."}, …}
+  0007 STEP r4, r3, crate::Start#2
+  0008 ADT r2, (), crate::day::Mood::Calm
+  0009 CALL r3, (r2), crate::Remember::<crate::day::Mood>
+  0010 ADT r2, (), crate::night::Mood::Calm
+  0011 CALL r3, (r2), crate::Remember::<crate::night::Mood>
+  0012 TUPLE r1, ()
+  0013 RET r1
+  0014 CONST r3, #21 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"A lap."}, …}
+  0015 STEP r4, r3, crate::Start#1
+  0016 INT r0, 1
+  0017 JMP @0003
+
+fn crate::main [fn, main] params=0 regs=16
+  0000 INT r3, 1280
+  0001 INT r4, 720
+  0002 CALL r0, (r3, r4), std::screen::size
+  0003 INT r3, 26
+  0004 CONST r4, #23 std::screen::Color {255, 255, 255, 255}
+  0005 CALL r1, (r3, r4), std::narrative::text::text_style
+  0006 CONST r3, #24 crate::TEXT_SPEED
+  0007 CONST r4, #25 crate::AUTO_DELAY
+  0008 CONST r5, #26 crate::AUTO_DELAY_PER_CHAR
+  0009 CONST r6, #27 crate::SKIP_UNREAD
+  0010 CONST r7, #28 crate::MASTER
+  0011 CONST r8, #29 crate::MUSIC
+  0012 CONST r9, #30 crate::SOUND
+  0013 CONST r10, #31 crate::VOICE
+  0014 CONST r11, #32 crate::VOICE_SUSTAIN
+  0015 CONST r12, #33 crate::WAIT_FOR_VOICE
+  0016 CONST r13, #34 crate::WINDOW_OPACITY
+  0017 CONST r14, #35 crate::FULLSCREEN
+  0018 CONST r15, #36 crate::ANIMATIONS
+  0019 ADT r2, (r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15), std::system::Settings
+  0020 CALL r13, (), std::system::default_bindings
+  0021 CONST r3, #37 "Step IDs"
+  0022 MOVE r4, r0
+  0023 FUNC r5, crate::Title
+  0024 FUNC r6, crate::GameView
+  0025 INT r7, 20
+  0026 INT r8, 3
+  0027 INT r9, 200
+  0028 CONST r10, #38 font "font.ttf"
+  0029 MOVE r11, r1
+  0030 MOVE r12, r2
+  0031 ADT r0, (r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13), std::system::System
+  0032 RET r0
+
+fn crate::Remember::<crate::day::Mood> [scene] params=1 regs=4
+  0000 CONST r2, #41 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"Remembered."}, …}
+  0001 STEP r3, r2, crate::Remember::<crate::day::Mood>#0
+  0002 TUPLE r1, ()
+  0003 RET r1
+
+fn crate::Remember::<crate::night::Mood> [scene] params=1 regs=4
+  0000 CONST r2, #41 std::narrative::Say {std::Option::None, std::Option::None, std::Option::None, std::Option::Some {"Remembered."}, …}
+  0001 STEP r3, r2, crate::Remember::<crate::night::Mood>#0
+  0002 TUPLE r1, ()
+  0003 RET r1
+
+fn crate::Title [fn] params=0 regs=2
+  0000 CLOSURE r1, (), crate::Title::{closure#3}
+  0001 ARRAY r1, (r1)
+  0002 CALLIMP r1, (r1), std::ui::column
+  0003 ADT r0, (r1), std::system::RootPage
+  0004 RET r0
+
+fn crate::GameView [fn] params=1 regs=3
+  0000 MOVE r2, r0
+  0001 CLOSURE r2, (r2), crate::GameView::{closure#0}
+  0002 ADT r2, (r2), std::ui::GameScreenProps
+  0003 CALLIMP r1, (r2), std::ui::game_screen
+  0004 RET r1
+
+fn crate::Title::{closure#3} [fn, closure] params=0 regs=7
+  0000 CLOSURE r3, (), crate::Title::{closure#2}
+  0001 ADT r0, (r3), std::Option::Some
+  0002 ADT r1, (), std::Option::None
+  0003 ADT r2, (), std::Option::None
+  0004 CLOSURE r3, (), crate::Title::{closure#0}
+  0005 ARRAY r6, (r3)
+  0006 MOVE r3, r0
+  0007 MOVE r4, r1
+  0008 MOVE r5, r2
+  0009 ADT r3, (r3, r4, r5, r6), std::ui::ButtonProps
+  0010 CALLIMP r0, (r3), std::ui::button
+  0011 RET r0
+
+fn crate::GameView::{closure#0} [fn, closure] params=1 regs=2
+  0000 MOVE r1, r0
+  0001 RET r1
+
+fn crate::Title::{closure#2} [fn, closure] params=0 regs=5
+  0000 TUPLE r0, ()
+  0001 CLOSURE r3, (), crate::Title::{closure#1}
+  0002 FUNC r4, crate::Start
+  0003 MOVE r1, r4
+  0004 MOVE r2, r0
+  0005 CALLIMP r0, (r1, r2, r3), std::system::nav::start
+  0006 RET r0
+
+fn crate::Title::{closure#0} [fn, closure] params=0 regs=3
+  0000 CONST r2, #43 "Start"
+  0001 CALLIMP r0, (r2), std::ui::label
+  0002 RET r0
+
+fn crate::Title::{closure#1} [fn, closure] params=1 regs=2
+  0000 TUPLE r1, ()
+  0001 RET r1
+
+import std::ui::column [fn] params=1
+import std::ui::game_screen [fn] params=1
+import std::ui::button [fn] params=1
+import std::system::nav::start [fn] params=3
+import std::ui::label [fn] params=1
+static crate::TEXT_SPEED [setting] = std::time::Duration {30}
+static crate::AUTO_DELAY [setting] = std::time::Duration {1300}
+static crate::AUTO_DELAY_PER_CHAR [setting] = std::time::Duration {60}
+static crate::SKIP_UNREAD [setting] = false
+static crate::MASTER [setting] = std::system::Volume {100, false}
+static crate::MUSIC [setting] = std::system::Volume {60, false}
+static crate::SOUND [setting] = std::system::Volume {100, false}
+static crate::VOICE [setting] = std::system::Volume {100, false}
+static crate::VOICE_SUSTAIN [setting] = false
+static crate::WAIT_FOR_VOICE [setting] = true
+static crate::WINDOW_OPACITY [setting] = 80
+static crate::FULLSCREEN [setting] = false
+static crate::ANIMATIONS [setting] = true
+options max_call_depth=2048

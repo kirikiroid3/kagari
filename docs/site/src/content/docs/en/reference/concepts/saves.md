@@ -104,10 +104,12 @@ Changing story variables, their initial values, or conditions is safe as long as
 selections still lead along the same choices; replay reports the first place where they do not.
 
 Read flags, which drive skipping read text and marking read lines in the backlog, are kept outside
-saves and keyed by the function and the position of the step among the steps of that function, in
-code order. Inserting or removing a step (`s!` or `choice!`) in a function therefore shifts the
-read flags of every later step in that same function: after such a patch, some lines a player has
-read count as unread and the reverse. Steps in other functions are not affected.
+saves and keyed by [step ID](./steps.md#step-ids). They are stored per scene, compactly, as ranges
+of read steps. Inserting or removing a step (`s!` or `choice!`) in a function shifts the read flags
+of every later step in that same function: after such a patch, some lines a player has read count
+as unread and the reverse. Code without steps and steps in other functions are not affected. Read
+flags from games built with earlier versions of Kagari are dropped once: those lines count as
+unread again.
 
 ## Snapshots and traces
 

@@ -4,11 +4,17 @@ expression: out
 input_file: core/kagari-lang/tests/game_source/analysis/005__story/main.kix
 ---
 analysis/005__story/main.kix:22:9: warning[W5009]: this step is never reached
+  note: analysis/005__story/main.kix:22:9: step `crate::Main#0`
 analysis/005__story/main.kix:30:9: warning[W5009]: this step is never reached
+  note: analysis/005__story/main.kix:30:9: step `crate::Main#2`
 analysis/005__story/main.kix:46:9: warning[W5009]: this step is never reached
+  note: analysis/005__story/main.kix:46:9: step `crate::Main#5`
 analysis/005__story/main.kix:55:9: warning[W5009]: this step is never reached
+  note: analysis/005__story/main.kix:55:9: step `crate::Main#7`
 analysis/005__story/main.kix:66:9: warning[W5009]: this step is never reached
+  note: analysis/005__story/main.kix:66:9: step `crate::Main#9`
 analysis/005__story/main.kix:102:15: error[E5003]: this choice can be reached with every arm hidden: the player would have nothing to select (for example when `KEY` is `false`, `KNOCKS` is `2`)
+  note: analysis/005__story/main.kix:102:15: step `crate::Door#0`
 analysis/005__story/main.kix:145:13: warning[W5008]: the scene `Epilogue` is never reached from an entry scene
 --- resolutions ---
 analysis/005__story/main.kix:3:17 bool -> prim bool

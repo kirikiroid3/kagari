@@ -1,17 +1,18 @@
 //! A loaded program: the decoded and verified module, its constants as values, the path
-//! indexes, STEP ordinals and source locations.
+//! indexes and source locations.
 
 use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
 use kagari_bytecode::{
-    ConstId, Constant, DecodeError, FuncId, Instr, Module, StrId, TypeId, VerifyError,
-    VerifyErrorKind, decode, verify, word_offsets,
+    ConstId, Constant, DecodeError, FuncId, Module, StrId, TypeId, VerifyError, VerifyErrorKind,
+    decode, verify, word_offsets,
 };
 use kagari_num::{Decimal, Rat};
 use rustc_hash::FxHashMap;
 
+use crate::trap::StepId;
 use crate::value::{Adt, AdtTy, Proj, Text, Value};
 
 /// Why a program cannot be loaded.
@@ -64,8 +65,6 @@ pub struct Program {
     functions: FxHashMap<Box<str>, FuncId>,
     types: FxHashMap<Box<str>, TypeId>,
     main: FuncId,
-    /// Per function, the instruction indices of its STEPs, ascending.
-    steps: Box<[Box<[u32]>]>,
     /// Per function, `(instruction index, byte offset)`, ascending.
     lines: Box<[FnLines]>,
     pub(crate) unit: Value,
@@ -108,18 +107,6 @@ impl Program {
                 instr: None,
                 kind: VerifyErrorKind::MissingMain,
             }))?;
-        let steps = module
-            .functions
-            .iter()
-            .map(|f| {
-                f.code
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, instr)| matches!(instr, Instr::Step { .. }))
-                    .map(|(index, _)| index_u32(index))
-                    .collect()
-            })
-            .collect();
         let lines = module
             .functions
             .iter()
@@ -164,7 +151,6 @@ impl Program {
             functions,
             types,
             main,
-            steps,
             lines,
             unit: Value::unit(),
             empty_array: Value::Array(Rc::new(Vec::new())),
@@ -222,10 +208,9 @@ impl Program {
         self.constants.get(id.0 as usize)
     }
 
-    /// The ordinal of the STEP at instruction `pc` of `f` among the STEPs of `f`.
-    pub(crate) fn step_ordinal(&self, f: FuncId, pc: u32) -> Option<u32> {
-        let steps = self.steps.get(f.0 as usize)?;
-        steps.binary_search(&pc).ok().map(index_u32)
+    /// The step ID `{function path}#{id}`: how saves, logs and messages name a step.
+    pub fn step_path(&self, step: StepId) -> String {
+        format!("{}#{}", self.function_path(step.func), step.id)
     }
 
     pub(crate) fn function(&self, f: FuncId) -> Option<&kagari_bytecode::Function> {

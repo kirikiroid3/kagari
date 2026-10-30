@@ -54,6 +54,18 @@ impl MirSource {
     }
 }
 
+/// A step's ordinal among the step forms (`s!(…)`, `choice!{…}`, `push_step(…)` calls) of
+/// its item, in source order. With the function path it is the stable step ID
+/// `{path}#{ordinal}`: code that contains no step does not change it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct StepId(pub u32);
+
+impl std::fmt::Display for StepId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "#{}", self.0)
+    }
+}
+
 /// The MIR of one item: its body, the bodies of its closures and of its promoted constants.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ItemMir {
@@ -377,10 +389,13 @@ pub enum Terminator {
     Return,
     /// Cannot happen in a well-typed program.
     Unreachable,
+    /// `push_step(arg)`. `id` is the step's ordinal among the step forms of the item, in
+    /// source order: the step ID shared by the analysis, the bytecode and the runtime.
     Step {
         arg: Operand,
         dest: Place,
         next: BasicBlock,
+        id: StepId,
     },
     Rng {
         ty: Ty,

@@ -310,18 +310,21 @@ write story state, and the engine never serializes it: a load rebuilds it by rep
 
 **Resuming.** `driver::resume` takes the fiber out of the frame, resumes it with an input value
 (unit after a `Say`, the arm's value after a selection) and puts it back. The fiber runs until the
-next `STEP` (`Suspend::Step { record, func, ordinal }`) or until the entry scene returns
+next `STEP` (`Suspend::Step { record, step }`, `step` a `StepId`) or until the entry scene returns
 (`Suspend::Returned`).
 
-**Entering a step.** `enter_step` receives the step record:
+**Entering a step.** `enter_step(ctx, vm, record, step)` receives the step record and its
+`StepId`; a trap while entering it (render, malformed record) gets `trap.step` = that step if
+unset:
 
 1. The record must be a `std::narrative::Say` or `std::narrative::Choice`.
 2. The previous voice stops, unless `voice_sustain` is on.
 3. The render runs: `render(screen)` as `const fn` with the screen the next step receives
    (`render_input`), or the screen unchanged when the step has no render. The result becomes the
    new `ScreenRuntime` (below); the images it shows are loaded; new images enter the seen set.
-4. A `Say` records its read key (`<function path>#<ordinal>`, the index of the `STEP` among its
-   function's `STEP`s in code order), pushes a backlog line (the `history` text when given),
+4. A `Say` keeps its step ID (`SayStep.step`, named `<function path>#<id>`, the step's
+   source-order ordinal in its function, see [Saves](./saves.md#choice-ids-and-positions)) for
+   its read flag, pushes a backlog line (the `history` text when given),
    builds the reveal plan at the player's text speed, and starts the voice at the text start.
 5. A `Choice` decodes its id (a text, flattened to plain characters), its arms (text, shown, value)
    and each arm's ID ([Saves](./saves.md#choice-ids-and-positions)); a choice with no shown arm
@@ -520,7 +523,7 @@ bindable.
 | Store | Contents |
 | ----- | -------- |
 | `settings.kisave` | every `Setting` static by static path |
-| `meta.kisave` | `values` (every `Meta` static by path), `read` (read keys), `seen_image`, `heard`, `watched` (asset paths), `auto_next` (the next autosave slot) |
+| `meta.kisave` | `values` (every `Meta` static by path), `read` (read flags: per scene path, an array of `u64` step id segments), `seen_image`, `heard`, `watched` (asset paths), `auto_next` (the next autosave slot) |
 
 Both start at the statics' init constants and are overlaid from disk at boot. A stored value
 replaces the initial one only if it decodes against the current program and has the same shape

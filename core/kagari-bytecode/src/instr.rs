@@ -183,10 +183,12 @@ pub enum Instr {
         count: u16,
         func: FuncId,
     },
-    /// 0x70 `STEP a=dst, b=step record`.
-    Step { dst: Reg, record: Reg },
     /// 0x71 `RAND a=dst, x = kind (bits 32-39) | index (bits 0-31)`.
     Rand { dst: Reg, domain: RandDomain },
+    /// 0x72 `STEP a=dst, b=step record, x=step id`. The step id is the step's ordinal among
+    /// the step forms of the function's item, in source order (0x70, a STEP without an id,
+    /// is retired).
+    Step { dst: Reg, record: Reg, id: u32 },
     /// 0x80 `TUPLE a, b=first, c=count`.
     Tuple { dst: Reg, first: Reg, count: u16 },
     /// 0x81 `ARRAY a, b, c`.
@@ -351,8 +353,8 @@ impl Instr {
             Instr::CallImp { .. } => 0x61,
             Instr::CallVal { .. } => 0x62,
             Instr::Closure { .. } => 0x63,
-            Instr::Step { .. } => 0x70,
             Instr::Rand { .. } => 0x71,
+            Instr::Step { .. } => 0x72,
             Instr::Tuple { .. } => 0x80,
             Instr::Array { .. } => 0x81,
             Instr::Repeat { .. } => 0x82,
@@ -463,6 +465,7 @@ impl Instr {
             | Instr::CallVal { .. }
             | Instr::Closure { .. }
             | Instr::Rand { .. }
+            | Instr::Step { .. }
             | Instr::Repeat { .. }
             | Instr::Adt { .. }
             | Instr::IsVariant { .. }
@@ -500,7 +503,9 @@ impl Instr {
             | Instr::Cell { dst, init: src }
             | Instr::RefField { dst, base: src, .. }
             | Instr::Store { dst, value: src }
-            | Instr::Step { dst, record: src }
+            | Instr::Step {
+                dst, record: src, ..
+            }
             | Instr::Concat { dst, parts: src }
             | Instr::Repeat {
                 dst, value: src, ..
@@ -609,7 +614,6 @@ impl Instr {
             | Instr::ToText { dst, src }
             | Instr::Cell { dst, init: src }
             | Instr::Store { dst, value: src }
-            | Instr::Step { dst, record: src }
             | Instr::Concat { dst, parts: src }
             | Instr::VecPush {
                 vec: dst,
@@ -714,6 +718,7 @@ impl Instr {
                 };
                 (w(dst, 0, 0), Some(x))
             }
+            Instr::Step { dst, record, id } => (w(dst, record, 0), Some(u64::from(id))),
             Instr::Repeat { dst, value, count } => (w(dst, value, 0), Some(count)),
             Instr::Adt {
                 dst,
@@ -861,7 +866,6 @@ impl Instr {
                 count: c,
                 func: FuncId(id32(x()?)?),
             },
-            0x70 => Instr::Step { dst: a, record: b },
             0x71 => {
                 let x = x()?;
                 let index = lo32(x);
@@ -872,6 +876,11 @@ impl Instr {
                 };
                 Instr::Rand { dst: a, domain }
             }
+            0x72 => Instr::Step {
+                dst: a,
+                record: b,
+                id: id32(x()?)?,
+            },
             0x80 => Instr::Tuple {
                 dst: a,
                 first: b,

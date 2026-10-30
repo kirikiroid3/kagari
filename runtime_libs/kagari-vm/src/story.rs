@@ -10,7 +10,7 @@ use crate::exec::{self, Exit, Frame, StoryCtx};
 use crate::host::Host;
 use crate::program::{Program, new_cell};
 use crate::rng::Rng;
-use crate::trap::{Trap, TrapKind, fault};
+use crate::trap::{StepId, Trap, TrapKind, fault};
 use crate::value::Value;
 use crate::vm::Vm;
 
@@ -56,18 +56,15 @@ pub struct StoryFiber {
     statics: StoryStatics,
     rng: Rng,
     state: FiberState,
+    /// The last step reached, named in the trap of a later panic.
+    last_step: Option<StepId>,
 }
 
 /// Why a resume stopped.
 #[derive(Debug)]
 pub enum Suspend {
-    /// A STEP with its record; `ordinal` is the index of this STEP among the STEPs of `func`,
-    /// in code order.
-    Step {
-        record: Value,
-        func: FuncId,
-        ordinal: u32,
-    },
+    /// A STEP with its record and its step ID.
+    Step { record: Value, step: StepId },
     /// The entry scene returned.
     Returned(Value),
 }
@@ -94,6 +91,7 @@ impl StoryFiber {
             statics,
             rng: Rng::from_seed(seed),
             state: FiberState::Fresh,
+            last_step: None,
         })
     }
 
@@ -143,30 +141,22 @@ impl StoryFiber {
         );
         vm.leave();
         match result {
-            Ok(Exit::Step(record)) => {
+            Ok(Exit::Step(record, id)) => {
                 let frames = u32::try_from(self.stack.len()).unwrap_or(u32::MAX);
                 vm.depth = vm.depth.saturating_sub(frames);
                 self.state = FiberState::Suspended;
                 let top = self.stack.last().ok_or_else(fault)?;
-                let ordinal = vm.program().step_ordinal(top.func, top.pc);
-                match ordinal {
-                    Some(ordinal) => Ok(Suspend::Step {
-                        record,
-                        func: top.func,
-                        ordinal,
-                    }),
-                    None => {
-                        self.state = FiberState::Failed;
-                        Err(fault())
-                    }
-                }
+                let step = StepId { func: top.func, id };
+                self.last_step = Some(step);
+                Ok(Suspend::Step { record, step })
             }
             Ok(Exit::Return(value)) => {
                 self.state = FiberState::Done;
                 Ok(Suspend::Returned(value))
             }
-            Err(trap) => {
+            Err(mut trap) => {
                 self.state = FiberState::Failed;
+                trap.step = self.last_step;
                 Err(trap)
             }
         }

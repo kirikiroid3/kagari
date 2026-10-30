@@ -7,7 +7,7 @@ no diagnostics
 --- bytecode ---
 fn crate::Show [scene, entry] params=0 regs=3
   0000 CONST r1, #17 std::narrative::Say {std::Option::None, std::Option::None, std::Option::Some {crate::Show::{closure#0}}, std::Option::Some {"Hello."}, …}
-  0001 STEP r2, r1
+  0001 STEP r2, r1, crate::Show#0
   0002 TUPLE r0, ()
   0003 RET r0
 

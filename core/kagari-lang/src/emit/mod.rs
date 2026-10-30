@@ -39,7 +39,7 @@ use crate::item_tree::{FnKind, ItemId, ItemKind, item_tree};
 use crate::mir::{BodyKind, item_mir};
 use crate::paths;
 use crate::pipeline::check;
-use crate::signatures::{ProgramSignatures, display_ty, program_signatures};
+use crate::signatures::{ProgramSignatures, display_ty_qualified, program_signatures};
 use crate::thir::PromotedId;
 use crate::ty::{Const, FnDefId, FnRef, GenericArg, GenericArgs, IntTy, Ty, TyKind};
 
@@ -809,6 +809,9 @@ impl<'db> Emitter<'db> {
         }
     }
 
+    /// `::<…>` with the instance's generic arguments, every type named by its full path, so
+    /// that two instances of one function never share a path: a monomorphized scene has
+    /// its own step IDs and read flags.
     fn args_suffix(&self, args: &[GenericArg]) -> String {
         if args.is_empty() {
             return String::new();
@@ -816,7 +819,7 @@ impl<'db> Emitter<'db> {
         let shown: Vec<String> = args
             .iter()
             .map(|arg| match arg {
-                GenericArg::Type(ty) => display_ty(self.db, self.program, ty),
+                GenericArg::Type(ty) => display_ty_qualified(self.db, self.sigs, self.maps, ty),
                 GenericArg::Const(Const::Value(value)) => value.to_string(),
                 GenericArg::Const(_) => "_".to_owned(),
             })

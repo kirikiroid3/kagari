@@ -288,7 +288,8 @@ animations play (when off, every duration counts as 0). A volume is a `Volume`: 
 `Int<0, 100>` and a mute flag. A studio declares further settings as its own handles, such as
 `PETALS_ON` above.
 
-Read-text flags are meta written by the engine each time the story advances, keyed by step. The
+Read-text flags are meta written by the engine each time the story advances, keyed by
+[step ID](./steps.md#step-ids). The
 story never sees them; the system uses them for skipping read text and to mark read lines in the
 backlog.
 

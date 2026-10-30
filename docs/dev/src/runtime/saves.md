@@ -105,9 +105,22 @@ The position after the last choice is a count of `Say` steps (`steps_after_last_
 backlog entry stores the `TracePos { choices, steps }` it was reached at, which is what
 `Narrative::rewind` cuts the trace to.
 
-Read flags use a different key, `<function path>#<ordinal>`, where the ordinal is the index of
-the `STEP` among the `STEP`s of that function in code order. They live in `meta.kisave`, not in
-saves.
+Read flags are keyed by **step ID** instead: `<function path>#<id>`, where the id is the step's
+0-based index among the step forms of its function in source order (see
+[MIR](../compiler/mir.md#step-ids)), carried by the `STEP` instruction. Only `Say` steps are
+marked read, when the player moves past them (not during replay). They live in `meta.kisave`,
+not in saves: the `read` table has one field per scene (per function, so each monomorphized
+instance such as `crate::Remember::<crate::day::Mood>` has its own), named by the function path
+and valued by an array of `u64` segments `[a0, a1, a2, a3, …]`: each pair is an inclusive range
+of read step ids, pairs ascending, never overlapping or touching (a scene read straight through
+is one pair `[0, n]`). Fields are written in path order. `ReadSet` (`store/read.rs`) merges
+inserts with neighbours and looks up by binary search.
+
+On load, malformed arrays are normalized (sorted, merged; reversed pairs and a trailing odd value
+dropped). Scenes this program lacks are kept by path and written back, like the seen sets'
+retained asset paths. Entries of the former format (`{path}#{ordinal}` → `true`, keyed by code
+layout order) are not arrays and are dropped: they cannot be mapped to source-order ids
+reliably, so read flags from before are lost once.
 
 ## Saving
 
@@ -230,7 +243,9 @@ See [Open Questions](../process/open-questions.md).
 | Randomness drawn in a different order before the saved position | replay follows the new program; the position may change or diverge |
 | Asset renamed | saves are unaffected unless an entry argument holds the asset (then `Args`); the seen sets keep the old path |
 | Statics, types or assets renumbered | none: everything is stored by path |
-| Steps inserted before a line in the same function | that line's read flag key shifts (`#<ordinal>`) |
+| Code without steps inserted, or code moved without changing step order | read flags unaffected (step ids are source-order ordinals) |
+| Steps inserted or removed before a line in the same function | the step ids of that function's later steps shift, so their read flags move with the ids |
+| Generic scene instantiated with another type | that instance has its own read flags (its path carries the type arguments) |
 
 The save container and field layout are versioned (`version = 1`); a reader must reject unknown
 versions rather than guess.

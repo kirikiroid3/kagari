@@ -42,8 +42,19 @@ impl Builder<'_> {
                 let Some(arg) = args.into_iter().next() else {
                     return self.abort(block);
                 };
+                let Some(id) = self.cx.step_id(self.thir.expr(expr).src) else {
+                    return self.abort(block);
+                };
                 let next = self.new_block();
-                self.terminate(block, Terminator::Step { arg, dest, next });
+                self.terminate(
+                    block,
+                    Terminator::Step {
+                        arg,
+                        dest,
+                        next,
+                        id,
+                    },
+                );
                 BlockAnd(next, ())
             }
             CalleeKind::Rng => {

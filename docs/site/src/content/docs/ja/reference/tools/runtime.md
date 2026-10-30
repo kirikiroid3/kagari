@@ -76,7 +76,7 @@ kagari-desktop-runtime [OPTIONS] [GAME_DIR]
 
 ## ログ {#logging}
 
-ランタイムは stderr にログを出します。既定のレベルは `kagari=info,wgpu=warn` で、使用中の GPU アダプタ、ウィンドウのバックエンド、データディレクトリが出力されます。変更するには `RUST_LOG` を設定します（例: `RUST_LOG=debug`）。
+ランタイムは stderr にログを出します。既定のレベルは `kagari=info,wgpu=warn` で、使用中の GPU アダプタ、ウィンドウのバックエンド、データディレクトリが出力されます。変更するには `RUST_LOG` を設定します（例: `RUST_LOG=debug`）。物語の進行はターゲット `kagari::story` に記録されます。物語が入ったステップごとに `step <step ID> say` または `step <step ID> choice` の 1 行を出します。たとえば `step crate::Start#0 say` です。[ステップ ID](../concepts/steps.md#step-ids) を参照してください。
 
 ## ゲームがエラーで停止したとき {#when-the-game-stops-with-an-error}
 
@@ -86,6 +86,12 @@ kagari-desktop-runtime [OPTIONS] [GAME_DIR]
 2. ウィンドウは黒い画面になり、左上に白い文字でエラーメッセージを表示します。
 3. ランタイムは `kagari-desktop-runtime: game stopped: <message>` を stderr に出力します。
 4. ウィンドウはプレイヤーが閉じるまで開いたままで、閉じたときの終了ステータスは 3 です。
+
+メッセージには、エラー、関数とそのソース上の位置（`file@byte offset`）、そして物語がステップに到達していた場合は、最後に到達したステップの[ステップ ID](../concepts/steps.md#step-ids) を示す `after step <step ID>` が含まれます。外側の呼び出しは、それぞれ 1 行ずつ `called from <function> (<location>)` として続きます。たとえば次のとおりです。
+
+```text
+vm panic: index out of range at crate::story::FirstDate (story.kis@1234), after step crate::story::FirstDate#28
+```
 
 起動中（`main` の実行中、ウィンドウが開く前）にゲームのコードでエラーが起きると、同じメッセージを出力し、ただちにステータス 3 で終了します。それ以外の理由でゲームを開始できない場合は、`kagari-desktop-runtime: cannot start the game: <reason>` を出力してステータス 2 で終了します。
 

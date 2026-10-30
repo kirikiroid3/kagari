@@ -47,7 +47,7 @@ Fix: run a step before the recursive call, for example move `s!(t!["Echo."]);` a
 
 ## E5003 `stuck-choice` {#e5003}
 
-**Error.** The analysis can reach a `choice!` with every arm hidden by its guard, so the player would have nothing to pick. The message gives one set of story variable values where this happens.
+**Error.** The analysis can reach a `choice!` with every arm hidden by its guard, so the player would have nothing to pick. The message gives one set of story variable values where this happens. A note names the [step ID](../reference/concepts/steps.md#step-ids) of the choice.
 
 ```kix
 static mut KEY: bool = false;
@@ -181,7 +181,7 @@ Fix: call the scene from a reachable scene, mark it `#[entry]`, or delete it.
 
 ## W5009 `unreachable-step` {#w5009}
 
-**Warning.** No reachable state of the story ever gets to this step, often because a condition can never be true.
+**Warning.** No reachable state of the story ever gets to this step, often because a condition can never be true. A note names the [step ID](../reference/concepts/steps.md#step-ids) of the step.
 
 ```kix
 static mut KNOCKS: Int<0, 3> = 0;

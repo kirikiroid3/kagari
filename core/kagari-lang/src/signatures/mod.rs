@@ -24,7 +24,7 @@ use crate::ty::Ty;
 pub(crate) use collect::assoc_parent;
 pub use consts::fold_const_expr;
 pub use display::display_ty;
-pub(crate) use display::display_ty_with;
+pub(crate) use display::{display_ty_qualified, display_ty_with};
 pub use traits::{BoundEnv, implements};
 pub(crate) use traits::{TraitSolver, normalize_projection, type_key};
 

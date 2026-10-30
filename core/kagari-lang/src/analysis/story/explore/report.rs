@@ -98,7 +98,13 @@ impl Explorer<'_, '_> {
             if !witness.is_empty() {
                 message.push_str(&format!(" (for example when {})", witness.join(", ")));
             }
-            out.push(data.diagnostic(expr, DiagnosticCode::AnalysisStuckChoice, message));
+            out.push(data.step_diagnostic(
+                self.cx.db,
+                self.cx.program,
+                expr,
+                DiagnosticCode::AnalysisStuckChoice,
+                message,
+            ));
         }
     }
 
@@ -146,6 +152,7 @@ impl Explored {
     pub fn report_reachability(
         &self,
         db: &dyn crate::db::Db,
+        program: crate::input::Program,
         scenes: &Scenes<'_>,
         out: &mut Vec<Diag>,
     ) {
@@ -176,7 +183,9 @@ impl Explored {
                 if let (Terminator::Step { .. }, Some(expr)) = (&data.term, data.term_src)
                     && !blocks.contains(&block)
                 {
-                    out.push(scene.diagnostic(
+                    out.push(scene.step_diagnostic(
+                        db,
+                        program,
                         expr,
                         DiagnosticCode::AnalysisUnreachableStep,
                         "this step is never reached",

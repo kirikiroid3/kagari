@@ -7,7 +7,7 @@ pub(crate) mod reveal;
 
 use std::collections::VecDeque;
 
-use kagari_vm::{AssetId, FuncId, StoryFiber, Text, Value};
+use kagari_vm::{AssetId, FuncId, StepId, StoryFiber, Text, Value};
 
 use crate::screen::runtime::ScreenRuntime;
 use crate::values::{VAlign, Visibility};
@@ -125,7 +125,8 @@ pub(crate) struct SayStep {
     pub who: Option<Text>,
     pub text: Option<Text>,
     pub voice: Option<AssetId>,
-    pub read_key: String,
+    /// The step ID, which keys the read flag.
+    pub step: StepId,
     pub read: bool,
 }
 

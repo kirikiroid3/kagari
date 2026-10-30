@@ -32,7 +32,8 @@ use crate::hir::ExprId;
 use crate::input::Program;
 use crate::item_tree::ItemIndex;
 use crate::item_tree::{FnKind, ItemId, ItemKind, item_tree};
-use crate::mir::{BasicBlock, ItemMir, LocalSet, item_mir};
+use crate::mir::{BasicBlock, ItemMir, LocalSet, StepId, Terminator, item_mir};
+use crate::paths;
 use crate::signatures::program_signatures;
 
 use explore::StoryCx;
@@ -80,6 +81,38 @@ impl<'db> SceneData<'db> {
         message: impl Into<String>,
     ) -> Diag {
         Diag::new(self.anchor(expr), code, message)
+    }
+
+    /// The step ID of the step whose `push_step` call is `expr`.
+    pub fn step_id(&self, expr: ExprId) -> Option<StepId> {
+        self.mir
+            .main
+            .blocks
+            .iter()
+            .find_map(|(_, data)| match data.term {
+                Terminator::Step { id, .. } if data.term_src == Some(expr) => Some(id),
+                _ => None,
+            })
+    }
+
+    /// A diagnostic at the step `expr`, with its step ID (`{path}#{ordinal}`, the name the
+    /// bytecode and the runtime use) as related information.
+    pub fn step_diagnostic(
+        &self,
+        db: &dyn Db,
+        program: Program,
+        expr: ExprId,
+        code: DiagnosticCode,
+        message: impl Into<String>,
+    ) -> Diag {
+        let diagnostic = self.diagnostic(expr, code, message);
+        match self.step_id(expr) {
+            Some(id) => {
+                let path = paths::assoc_path(db, def_maps(db, program), self.item);
+                diagnostic.with_related(self.anchor(expr), format!("step `{path}{id}`"))
+            }
+            None => diagnostic,
+        }
     }
 }
 
@@ -146,7 +179,7 @@ pub(super) fn check(db: &dyn Db, program: Program) -> Vec<Diag> {
     let explored = explore::explore(cx, &scenes, &vars, &mut out);
     if let Some(explored) = explored {
         screens::check(cx, &scenes, &explored, &mut out);
-        explored.report_reachability(db, &scenes, &mut out);
+        explored.report_reachability(db, program, &scenes, &mut out);
         if program.options(db).keyframe_check {
             out.extend(keyframes::check(db, program, &explored, &scenes));
         }

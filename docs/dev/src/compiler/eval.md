@@ -173,7 +173,7 @@ THIR promotion makes the maximal constant subexpressions of every `pushdown fn` 
 constants: MIR bodies of kind `Const` in `ItemMir::promoted`. `promoted_value(item, index)` runs
 one and freezes the result. The step records of `s!` and `choice!` are the typical case: their
 texts, voice, render function, choice id and arm values are all constant, so the whole `Say` or
-`Choice` record is one constant and the scene's MIR says `step(const {promoted#N})`. A guard
+`Choice` record is one constant and the scene's MIR says `step#N(const {promoted#M})`. A guard
 (`shown`) that reads a story variable makes the `Choice` record non-constant; its constant parts
 are still promoted individually.
 

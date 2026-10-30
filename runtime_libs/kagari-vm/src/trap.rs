@@ -6,11 +6,21 @@ use kagari_bytecode::FuncId;
 
 use crate::program::Program;
 
-/// A VM panic. `backtrace` lists `(function, instruction index)` innermost first.
+/// A VM panic. `backtrace` lists `(function, instruction index)` innermost first; `step` is
+/// the last step the story fiber reached before a trap in story code.
 #[derive(Clone, Debug)]
 pub struct Trap {
     pub kind: TrapKind,
     pub backtrace: Vec<(FuncId, u32)>,
+    pub step: Option<StepId>,
+}
+
+/// A step ID: the function of a STEP and its id, the step's ordinal among the step forms of
+/// the function's source item (`Program::step_path` prints `{path}#{id}`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct StepId {
+    pub func: FuncId,
+    pub id: u32,
 }
 
 /// Why the VM panicked.
@@ -61,6 +71,7 @@ impl Trap {
         Trap {
             kind,
             backtrace: Vec::new(),
+            step: None,
         }
     }
 
@@ -69,16 +80,26 @@ impl Trap {
         Trap::new(TrapKind::Host(message.into()))
     }
 
-    /// `vm panic: {kind} at {path} ({loc})`, then `\n  called from {path} ({loc})` per outer
-    /// frame; `loc` is the source location, else `instruction {i}`.
+    /// `vm panic: {kind} at {path} ({loc})`, then `, after step {step id}` when the story had
+    /// reached a step, then `\n  called from {path} ({loc})` per outer frame; `loc` is the
+    /// source location, else `instruction {i}`.
     pub fn render(&self, program: &Program) -> String {
-        let mut out = format!("vm panic: {}", self.kind);
-        for (index, &(func, instr)) in self.backtrace.iter().enumerate() {
-            let lead = if index == 0 { " at" } else { "\n  called from" };
+        let frame = |func: FuncId, instr: u32| {
             let loc = program
                 .location(func, instr)
                 .unwrap_or_else(|| format!("instruction {instr}"));
-            out.push_str(&format!("{lead} {} ({loc})", program.function_path(func)));
+            format!("{} ({loc})", program.function_path(func))
+        };
+        let mut out = format!("vm panic: {}", self.kind);
+        let mut frames = self.backtrace.iter();
+        if let Some(&(func, instr)) = frames.next() {
+            out.push_str(&format!(" at {}", frame(func, instr)));
+        }
+        if let Some(step) = self.step {
+            out.push_str(&format!(", after step {}", program.step_path(step)));
+        }
+        for &(func, instr) in frames {
+            out.push_str(&format!("\n  called from {}", frame(func, instr)));
         }
         out
     }
@@ -89,6 +110,9 @@ impl fmt::Display for Trap {
         write!(f, "vm panic: {}", self.kind)?;
         for (func, instr) in &self.backtrace {
             write!(f, "\n  at function {}, instruction {instr}", func.0)?;
+        }
+        if let Some(step) = self.step {
+            write!(f, "\n  after step {} of function {}", step.id, step.func.0)?;
         }
         Ok(())
     }

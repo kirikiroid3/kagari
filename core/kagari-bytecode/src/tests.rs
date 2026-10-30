@@ -294,7 +294,11 @@ fn full() -> Module {
         0,
         2,
         vec![
-            Instr::Step { dst: 0, record: 1 },
+            Instr::Step {
+                dst: 0,
+                record: 1,
+                id: 7,
+            },
             Instr::Rand {
                 dst: 0,
                 domain: RandDomain::Enum(TypeId(0)),
@@ -547,6 +551,23 @@ fn full_module_uses_every_opcode_and_tag() {
 }
 
 #[test]
+fn step_id_is_a_u32_operand_and_0x70_is_retired() {
+    let step = Instr::Step {
+        dst: 1,
+        record: 2,
+        id: u32::MAX,
+    };
+    let (first, x) = step.encode(|label| label.0);
+    let x = x.unwrap();
+    assert_eq!(Instr::decode(&[first, x]), Ok((step, 2)));
+    assert_eq!(Instr::decode(&[first, x + 1]), Err(InstrError::BadOperand));
+    assert_eq!(
+        Instr::decode(&[0x70, 0]),
+        Err(InstrError::UnknownOpcode(0x70))
+    );
+}
+
+#[test]
 fn roundtrip() {
     let m = full();
     assert_eq!(verify(&m), Ok(()));
@@ -742,7 +763,14 @@ fn verify_rejects_step_outside_scene() {
         FnKind::Instant,
         0,
         1,
-        vec![Instr::Step { dst: 0, record: 0 }, Instr::Ret { src: 0 }],
+        vec![
+            Instr::Step {
+                dst: 0,
+                record: 0,
+                id: 0,
+            },
+            Instr::Ret { src: 0 },
+        ],
     ));
     assert_eq!(
         verify_kind(&m),
@@ -805,7 +833,7 @@ fn disassembles() {
     let text = disassemble(&m, &|path| path == "crate::Start" || path == "crate::main");
     let start = "\
 fn crate::Start [scene, entry] params=0 regs=2
-  0000 STEP r0, r1
+  0000 STEP r0, r1, crate::Start#7
   0001 RAND r0, crate::Coin
   0002 RAND r1, Int<0,5>
   0003 REFSTAT r1, crate::SEEN

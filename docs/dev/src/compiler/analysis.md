@@ -217,6 +217,17 @@ work.
 With a complete exploration, a game scene with no context is `W5008`, and a `Step` terminator of
 a reached scene whose block is no node's block in any context is `W5009`.
 
+`W5009` and the stuck-choice `E5003` carry a related note at the step naming its
+[step ID](./mir.md#step-ids): ``step `crate::Main#2` `` (the item path and the `Step`
+terminator's id; for a generic scene the item path without type arguments). They are built by
+`SceneData::step_diagnostic` (`analysis/story/mod.rs`). Example from
+`tests/analysis/005__story`:
+
+```text
+analysis/005__story/main.kix:30:9: warning[W5009]: this step is never reached
+  note: analysis/005__story/main.kix:30:9: step `crate::Main#2`
+```
+
 ## Screens
 
 Renders never influence the story, so screens are computed afterwards over the explored graph

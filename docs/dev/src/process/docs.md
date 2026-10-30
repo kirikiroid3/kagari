@@ -148,6 +148,7 @@ Use these renderings consistently. The Japanese edition of the engine proposal
 | stability: Stable / Tentative / Planned | 安定 / 暫定 / 予定 | studio | スタジオ |
 | shader / role / effect value | シェーダー / ロール / 効果値 | mix / mask / paint | ミックス / マスク / ペイント |
 | local motion / transitional motion | ローカルモーション / 遷移モーション | travel / pose | トラベル / ポーズ |
+| step ID | ステップ ID | | |
 
 A new term that recurs gets a row here and in the Reference's glossary appendix in the same change.
 

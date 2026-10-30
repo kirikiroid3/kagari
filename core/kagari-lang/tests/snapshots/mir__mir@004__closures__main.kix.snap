@@ -59,7 +59,7 @@ scene crate::Show() -> () {
     let mut _0: (); // return
     let _1: (); // temp
     bb0 (entry): {
-        _1 = step(const {promoted#0}) -> bb1;
+        _1 = step#0(const {promoted#0}) -> bb1;
     }
     bb1: {
         _0 = const ();
