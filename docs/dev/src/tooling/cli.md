@@ -174,9 +174,11 @@ kagari build [--manifest-path PATH] [--target TARGET]... [--profile debug|releas
    the `kagari_debug::DebugInfo` of the module. Store the analysis cache. Non-empty diagnostics
    are printed to **stderr**. No module → exit 1.
 3. **Runtime-profile check** (`build/compat.rs`), before anything is written: for each asset and
-   each profile in `build.runtime-compatibility`, read at most 1 MiB, `kagari_compat::sniff` the
-   format by content (never by extension), and print one line per unsupported kind
-   (`supports_kind`) or format (`supports`):
+   each profile in `build.runtime-compatibility`, read at most 1 MiB (for an ISO BMFF file,
+   `ftyp` first, instead `kagari_compat::read_iso_bmff_head`: the top-level boxes except `mdat`
+   and free space, up to 16 MiB, since encoders write `moov` after the media data),
+   `kagari_compat::sniff` the format by content (never by extension), and print one line per
+   unsupported kind (`supports_kind`) or format (`supports`):
 
    ```text
    error: asset `bgimage/title.gif` (image): GIF is not supported by runtime profile `native_v0`

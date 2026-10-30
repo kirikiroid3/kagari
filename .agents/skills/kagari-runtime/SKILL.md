@@ -53,7 +53,9 @@ Develop Guide (`docs/dev/src/`):
   `settle`.
 - `kagari_text::units` defines reveal units for both layout and reveal.
 - `kagari-compat::supports` must match the decoder features in the workspace `Cargo.toml`
-  (`image`: png/jpeg/webp/bmp; `jxl-oxide` in the engine; `kira`: ogg/vorbis/flac/wav/pcm/mp3).
+  (`image`: png/jpeg/webp/bmp; `jxl-oxide` in the engine; `kira`:
+  ogg/vorbis/flac/wav/pcm/mp3/aac/isomp4/alac). The desktop runtime's
+  `supported_encodings_decode` test decodes the `kagari-compat` audio fixtures.
 
 ## Workflows
 

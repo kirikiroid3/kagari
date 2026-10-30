@@ -13,7 +13,8 @@ The prelude re-exports `looped`, `sound` and `crossfade`. The rest needs a
 `use std::screen::audio::…`.
 
 Which audio formats a game may ship depends on the runtime profile; `native_v0` accepts Ogg
-Vorbis, FLAC, WAV and MP3, and rejects Ogg Opus. See [Runtime Profiles](./appendix/profiles.md).
+Vorbis, Ogg FLAC, FLAC, WAV, MP3, AAC-LC (ADTS or MP4/M4A) and ALAC (MP4/M4A), and rejects Ogg
+Opus. See [Runtime Profiles](./appendix/profiles.md).
 
 ## Overview
 

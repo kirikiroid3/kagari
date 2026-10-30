@@ -648,7 +648,7 @@ not consult it.
 | Kind | `native_v0` decodes | Implemented by |
 | ---- | ------------------- | -------------- |
 | Image | PNG, baseline and progressive JPEG, lossy, lossless and extended WebP, BMP, still RGB or greyscale JPEG XL | `image` with features `png`, `jpeg`, `webp`, `bmp`; `jxl-oxide` with feature `image`, no CMS (engine) |
-| Audio, voice | Ogg Vorbis, FLAC, WAV (PCM, IEEE float), MP3 | `kira` with features `ogg`, `vorbis`, `flac`, `wav`, `pcm`, `mp3` (desktop) |
+| Audio, voice | Ogg Vorbis, Ogg FLAC, FLAC, WAV (PCM, IEEE float), MP3, mono/stereo AAC-LC (ADTS, MP4), mono/stereo ALAC (MP4) | `kira` with features `ogg`, `vorbis`, `flac`, `wav`, `pcm`, `mp3`, `aac`, `isomp4`, `alac` (desktop) |
 | Font | TrueType, OpenType (CFF), collections (face 0) | `skrifa` (`kagari-text`) |
 | Shader | WGSL of the six roles | `kagari-shader` (preludes, validation), `kagari-render` (pipelines) |
 | Video | none | movies are modelled in the screen but never drawn |
@@ -659,8 +659,18 @@ refuses them too: `BmpUnsupported` mirrors the `image` BMP decoder (known DIB he
 plane, uncompressed/RLE/bitfields layouts; no embedded JPEG or PNG, no CMYK), and
 `JxlUnsupported` comes from parsing the header with `jxl-oxide` itself (animation, which the
 runtime would show as one frame; CMYK, which needs a CMS the build does not enable; or a header
-that does not parse within the 1 MiB `kagari build` reads). `watched` is never set by
-`native_v0`, since no movie plays.
+that does not parse within the 1 MiB `kagari build` reads). For AAC and MP4 the sniffer mirrors
+symphonia: an ADTS header must say profile LC, a sample rate index below 13, one or two channels
+and one raw data block per frame (the ADTS reader decodes every stream as AAC-LC); in an MP4 it
+reads the first sample description of the first `soun` track (the track kira's
+`default_track(Audio)` picks), where `mp4a` needs an `esds` with object type 0x40, 0x66 or 0x67 and
+an AudioSpecificConfig of object type 2 (LC; explicit SBR/PS is 5/29), one or two channels and
+1024-sample frames, and `alac` needs a version 0 magic cookie with one or two channels (kira plays
+only mono and stereo). Everything else is `AacUnsupported` or `Mp4Other`. Implicit SBR (HE-AAC
+signalled only in the bitstream) is not detectable from headers; symphonia then decodes the AAC-LC
+core. Symphonia applies neither the MP4 edit list nor gapless metadata, so decoded AAC keeps the
+encoder priming (usually 1024 samples) and padding; the Reference says so for loop points.
+`watched` is never set by `native_v0`, since no movie plays.
 
 ## Errors: traps and the Crashed state
 

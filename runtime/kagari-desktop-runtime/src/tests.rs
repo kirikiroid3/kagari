@@ -160,3 +160,41 @@ fn wav_sizes_past_the_end_mean_until_the_end() {
     odd.push(0);
     assert_eq!(frames(odd), Some(1000));
 }
+
+/// The encoder output `kagari-compat` accepts (0.1 s at 16 kHz) decodes. AAC keeps the encoder's
+/// priming and padding: symphonia applies neither the MP4 edit list nor gapless metadata.
+#[test]
+fn supported_encodings_decode() {
+    let fixtures: [(&str, &[u8], usize); 4] = [
+        (
+            "flac.oga",
+            include_bytes!("../../../runtime_libs/kagari-compat/tests/fixtures/flac.oga"),
+            1600,
+        ),
+        (
+            "aac-lc.aac",
+            include_bytes!("../../../runtime_libs/kagari-compat/tests/fixtures/aac-lc.aac"),
+            3072,
+        ),
+        (
+            "aac-lc.m4a",
+            include_bytes!("../../../runtime_libs/kagari-compat/tests/fixtures/aac-lc.m4a"),
+            3072,
+        ),
+        (
+            "alac.m4a",
+            include_bytes!("../../../runtime_libs/kagari-compat/tests/fixtures/alac.m4a"),
+            1600,
+        ),
+    ];
+    for (path, bytes, frames) in fixtures {
+        let mut cache = SoundCache::default();
+        let data = cache
+            .decode(path, bytes)
+            .unwrap_or_else(|| panic!("{path} decodes"));
+        assert_eq!(
+            (path, data.sample_rate, data.frames.len()),
+            (path, 16_000, frames)
+        );
+    }
+}

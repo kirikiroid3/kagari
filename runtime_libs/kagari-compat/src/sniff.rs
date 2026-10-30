@@ -1,6 +1,8 @@
 //! Format detection by content. Every read is bounds-checked: truncated data falls back to the
 //! rule's "unrecognized" answer instead of failing.
 
+use std::io::{self, Read, Seek, SeekFrom};
+
 use kagari_bytecode::AssetKind;
 
 use crate::AssetFormat;
@@ -69,6 +71,11 @@ fn u32_le(bytes: &[u8], at: usize) -> Option<u32> {
 fn u32_be(bytes: &[u8], at: usize) -> Option<u32> {
     let b: [u8; 4] = bytes.get(at..at.checked_add(4)?)?.try_into().ok()?;
     Some(u32::from_be_bytes(b))
+}
+
+fn u64_be(bytes: &[u8], at: usize) -> Option<u64> {
+    let b: [u8; 8] = bytes.get(at..at.checked_add(8)?)?.try_into().ok()?;
+    Some(u64::from_be_bytes(b))
 }
 
 /// Walks the JPEG markers up to the first frame header.
@@ -216,8 +223,239 @@ fn iso_bmff(kind: AssetKind, bytes: &[u8]) -> AssetFormat {
                 AssetFormat::Unknown
             }
         }
-        AssetKind::Audio | AssetKind::Voice => AssetFormat::Aac,
+        AssetKind::Audio | AssetKind::Voice => mp4_audio(bytes).unwrap_or(AssetFormat::Mp4Other),
         _ => AssetFormat::Unknown,
+    }
+}
+
+/// Splits the first box off `bytes`: its type, its payload and the bytes after it.
+fn split_box(bytes: &[u8]) -> Option<(&[u8], &[u8], &[u8])> {
+    let kind = bytes.get(4..8)?;
+    let (header, size) = match u32_be(bytes, 0)? {
+        0 => (8, bytes.len()),
+        1 => (16, usize::try_from(u64_be(bytes, 8)?).ok()?),
+        size => (8, usize::try_from(size).ok()?),
+    };
+    Some((kind, bytes.get(header..size)?, bytes.get(size..)?))
+}
+
+/// The boxes in `bytes` as (type, payload), up to the first that does not fit.
+fn boxes(mut bytes: &[u8]) -> impl Iterator<Item = (&[u8], &[u8])> {
+    std::iter::from_fn(move || {
+        let (kind, body, rest) = split_box(bytes)?;
+        bytes = rest;
+        Some((kind, body))
+    })
+}
+
+/// The payload of the first box of type `kind` in `bytes`.
+fn child<'a>(bytes: &'a [u8], kind: &[u8]) -> Option<&'a [u8]> {
+    boxes(bytes).find_map(|(k, body)| (k == kind).then_some(body))
+}
+
+/// The first sample description of the first audio (`soun`) track, the track the runtime plays.
+/// Its children are read like the `symphonia` MP4 reader does: AAC from `esds` (directly or in a
+/// QuickTime `wave`), ALAC from the `alac` magic cookie.
+fn mp4_audio(bytes: &[u8]) -> Option<AssetFormat> {
+    let moov = child(bytes, b"moov")?;
+    let stbl = boxes(moov)
+        .filter(|(kind, _)| *kind == b"trak")
+        .find_map(|(_, trak)| {
+            let mdia = child(trak, b"mdia")?;
+            (child(mdia, b"hdlr")?.get(8..12)? == b"soun").then_some(())?;
+            child(child(mdia, b"minf")?, b"stbl")
+        })?;
+    let (kind, entry, _) = split_box(child(stbl, b"stsd")?.get(8..)?)?;
+    let fields = match u16_be(entry, 8)? {
+        0 => 28,
+        1 => 44,
+        2 => 64,
+        _ => return None,
+    };
+    let children = entry.get(fields..)?;
+    let config =
+        |kind: &[u8]| child(children, kind).or_else(|| child(child(children, b"wave")?, kind));
+    match kind {
+        b"mp4a" => esds(config(b"esds")?),
+        b"alac" => alac(config(b"alac")?),
+        _ => None,
+    }
+}
+
+/// An MPEG-4 descriptor at the start of `bytes`: its tag, payload and the bytes after it.
+fn descriptor(bytes: &[u8]) -> Option<(u8, &[u8], &[u8])> {
+    let tag = *bytes.first()?;
+    let mut len: usize = 0;
+    let mut at: usize = 1;
+    for _ in 0..4 {
+        let byte = *bytes.get(at)?;
+        at = at.checked_add(1)?;
+        len = len
+            .checked_mul(128)?
+            .checked_add(usize::from(byte & 0x7F))?;
+        if byte & 0x80 == 0 {
+            break;
+        }
+    }
+    let end = at.checked_add(len)?;
+    Some((tag, bytes.get(at..end)?, bytes.get(end..)?))
+}
+
+/// The descriptor with `tag` among those in `bytes`.
+fn find_descriptor(mut bytes: &[u8], tag: u8) -> Option<&[u8]> {
+    loop {
+        let (found, body, rest) = descriptor(bytes)?;
+        if found == tag {
+            return Some(body);
+        }
+        bytes = rest;
+    }
+}
+
+/// The `esds` payload (after its version and flags): an ES descriptor whose decoder config
+/// names MPEG-4 or MPEG-2 Main/LC AAC and carries the AudioSpecificConfig.
+fn esds(esds: &[u8]) -> Option<AssetFormat> {
+    let (tag, es, _) = descriptor(esds.get(4..)?)?;
+    if tag != 3 {
+        return None;
+    }
+    let flags = *es.get(2)?;
+    let mut at: usize = 3;
+    if flags & 0x80 != 0 {
+        at = at.checked_add(2)?;
+    }
+    if flags & 0x40 != 0 {
+        at = at.checked_add(usize::from(*es.get(at)?))?.checked_add(1)?;
+    }
+    if flags & 0x20 != 0 {
+        at = at.checked_add(2)?;
+    }
+    let config = find_descriptor(es.get(at..)?, 4)?;
+    if !matches!(config.first()?, 0x40 | 0x66 | 0x67) {
+        return None;
+    }
+    let asc = find_descriptor(config.get(13..)?, 5)?;
+    Some(if aac_lc(asc) == Some(true) {
+        AssetFormat::Mp4Aac
+    } else {
+        AssetFormat::AacUnsupported
+    })
+}
+
+/// Mirrors what the `symphonia` AAC decoder accepts from an AudioSpecificConfig: object type
+/// AAC-LC (so no explicit SBR or PS), a valid sample rate, one or two channels (no program config
+/// element), 1024-sample frames and no version 3 extensions.
+fn aac_lc(asc: &[u8]) -> Option<bool> {
+    let mut bits = Bits { bytes: asc, at: 0 };
+    let object_type = match bits.read(5)? {
+        31 => bits.read(6)?.checked_add(32)?,
+        object_type => object_type,
+    };
+    let rate_ok = match bits.read(4)? {
+        15 => bits.read(24)? != 0,
+        index => index < 13,
+    };
+    let channels = bits.read(4)?;
+    if object_type != 2 || !rate_ok || !matches!(channels, 1 | 2) {
+        return Some(false);
+    }
+    let short_frame = bits.read(1)? == 1;
+    if bits.read(1)? == 1 {
+        bits.read(14)?;
+    }
+    let version3 = bits.read(1)? == 1 && bits.read(1)? == 1;
+    Some(!short_frame && !version3)
+}
+
+/// A most-significant-bit-first reader.
+struct Bits<'a> {
+    bytes: &'a [u8],
+    at: usize,
+}
+
+impl Bits<'_> {
+    fn read(&mut self, count: u32) -> Option<u32> {
+        let mut value: u32 = 0;
+        for _ in 0..count {
+            let byte = *self.bytes.get(self.at / 8)?;
+            let bit = byte.checked_shl(u32::try_from(self.at % 8).ok()?)? >> 7;
+            value = value.checked_mul(2)?.checked_add(u32::from(bit))?;
+            self.at = self.at.checked_add(1)?;
+        }
+        Some(value)
+    }
+}
+
+/// Mirrors the `symphonia` ALAC reader and decoder: an `alac` box (version and flags 0) holding a
+/// 24- or 48-byte magic cookie of version 0, at most 64 Ki frames per packet and a bit depth up to
+/// 32. More than two channels decode but cannot be played.
+fn alac(config: &[u8]) -> Option<AssetFormat> {
+    let cookie = config.get(4..)?;
+    let decodable = config.get(..4)? == [0, 0, 0, 0]
+        && matches!(cookie.len(), 24 | 48)
+        && u32_be(cookie, 0)? <= 4096 * 16
+        && *cookie.get(4)? == 0
+        && *cookie.get(5)? <= 32
+        && matches!(cookie.get(9)?, 1 | 2);
+    decodable.then_some(AssetFormat::Mp4Alac)
+}
+
+/// Reads the top-level boxes of the ISO BMFF file in `reader`, except media data and free space,
+/// into one buffer of at most `limit` bytes. `sniff` needs the `moov` box, which encoders often
+/// write after `mdat`, far past any fixed-size head of the file.
+pub fn read_iso_bmff_head<R: Read + Seek>(reader: &mut R, limit: u64) -> io::Result<Vec<u8>> {
+    let mut head = Vec::new();
+    loop {
+        let mut header = [0u8; 16];
+        if !read_or_eof(reader, &mut header[..8])? {
+            break;
+        }
+        let mut len: usize = 8;
+        let size = match u32::from_be_bytes([header[0], header[1], header[2], header[3]]) {
+            // The box runs to the end of the file.
+            0 => None,
+            1 => {
+                if !read_or_eof(reader, &mut header[8..])? {
+                    break;
+                }
+                len = 16;
+                let [.., a, b, c, d, e, f, g, h] = header;
+                Some(u64::from_be_bytes([a, b, c, d, e, f, g, h]))
+            }
+            size => Some(u64::from(size)),
+        };
+        let body = match size.map(|size| size.checked_sub(len as u64)) {
+            Some(None) => break,
+            Some(Some(body)) => Some(body),
+            None => None,
+        };
+        if matches!(&header[4..8], b"mdat" | b"free" | b"skip" | b"wide") {
+            match body.map(i64::try_from) {
+                Some(Ok(body)) => reader.seek(SeekFrom::Current(body))?,
+                _ => break,
+            };
+            continue;
+        }
+        let room = limit.saturating_sub(head.len().saturating_add(len) as u64);
+        if body.is_some_and(|body| body > room) {
+            break;
+        }
+        head.extend_from_slice(&header[..len]);
+        let wanted = body.unwrap_or(room);
+        let read = reader.by_ref().take(wanted).read_to_end(&mut head)?;
+        if body.is_none() || (read as u64) < wanted {
+            break;
+        }
+    }
+    Ok(head)
+}
+
+/// Fills `buf`; `false` if the reader ends first.
+fn read_or_eof(reader: &mut impl Read, buf: &mut [u8]) -> io::Result<bool> {
+    match reader.read_exact(buf) {
+        Ok(()) => Ok(true),
+        Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => Ok(false),
+        Err(error) => Err(error),
     }
 }
 
@@ -248,7 +486,7 @@ fn audio_stream(bytes: &[u8]) -> Option<AssetFormat> {
         return None;
     }
     if b1 & 0xF6 == 0xF0 {
-        return Some(AssetFormat::Aac);
+        return Some(adts(bytes));
     }
     let b2 = *bytes.get(2)?;
     let mp3 = b1 & 0xE0 == 0xE0
@@ -257,6 +495,22 @@ fn audio_stream(bytes: &[u8]) -> Option<AssetFormat> {
         && (1..=14).contains(&(b2 >> 4))
         && (b2 >> 2) & 3 != 3;
     mp3.then_some(AssetFormat::Mp3)
+}
+
+/// Mirrors the `symphonia` ADTS reader, which decodes every stream as AAC-LC: profile LC, a sample
+/// rate index below 13, one or two channels (configuration 0 needs a program config element) and
+/// one raw data block per frame.
+fn adts(bytes: &[u8]) -> AssetFormat {
+    let decodable = (|| {
+        let (b2, b3, b6) = (*bytes.get(2)?, *bytes.get(3)?, *bytes.get(6)?);
+        let channels = (b2 & 1) << 2 | b3 >> 6;
+        Some(b2 >> 6 == 1 && (b2 >> 2) & 0xF < 13 && matches!(channels, 1 | 2) && b6 & 3 == 0)
+    })();
+    if decodable == Some(true) {
+        AssetFormat::AdtsAac
+    } else {
+        AssetFormat::AacUnsupported
+    }
 }
 
 /// Skips the ID3v2 tag and its padding, then sniffs the audio stream after it.

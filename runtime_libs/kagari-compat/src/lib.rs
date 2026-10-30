@@ -17,4 +17,4 @@ mod tests;
 
 pub use format::{AssetFormat, describe, supports, supports_kind};
 pub use profile::RuntimeProfile;
-pub use sniff::sniff;
+pub use sniff::{read_iso_bmff_head, sniff};

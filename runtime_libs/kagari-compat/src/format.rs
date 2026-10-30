@@ -34,7 +34,18 @@ pub enum AssetFormat {
     WavFloat,
     WavOther,
     Mp3,
-    Aac,
+    /// AAC-LC in an ADTS stream.
+    AdtsAac,
+    /// AAC-LC in an MP4/M4A file.
+    Mp4Aac,
+    /// ALAC in an MP4/M4A file.
+    Mp4Alac,
+    /// AAC other than mono or stereo AAC-LC with 1024-sample frames and one frame per ADTS
+    /// packet: HE-AAC, Main, SSR, LTP, more than two channels, a program config element.
+    AacUnsupported,
+    /// An MP4/M4A file whose first audio track holds another codec, ALAC with more than two
+    /// channels, or a sample description that does not parse.
+    Mp4Other,
     TrueType,
     OpenTypeCff,
     FontCollection,
@@ -76,7 +87,15 @@ pub fn describe(format: AssetFormat) -> &'static str {
         AssetFormat::WavFloat => "WAV (IEEE float)",
         AssetFormat::WavOther => "WAV (compressed or unknown encoding)",
         AssetFormat::Mp3 => "MP3",
-        AssetFormat::Aac => "AAC/M4A",
+        AssetFormat::AdtsAac => "AAC-LC (ADTS)",
+        AssetFormat::Mp4Aac => "AAC-LC in MP4/M4A",
+        AssetFormat::Mp4Alac => "ALAC in MP4/M4A",
+        AssetFormat::AacUnsupported => {
+            "AAC other than mono or stereo AAC-LC (HE-AAC, Main, SSR, LTP or multichannel)"
+        }
+        AssetFormat::Mp4Other => {
+            "MP4/M4A with another codec, more than two channels or an unreadable sample description"
+        }
         AssetFormat::TrueType => "TrueType font",
         AssetFormat::OpenTypeCff => "OpenType (CFF) font",
         AssetFormat::FontCollection => "TrueType/OpenType collection",
@@ -112,7 +131,15 @@ pub fn supports(profile: RuntimeProfile, kind: AssetKind, format: AssetFormat) -
             ),
             AssetKind::Audio | AssetKind::Voice => matches!(
                 format,
-                F::OggVorbis | F::Flac | F::WavPcm | F::WavFloat | F::Mp3
+                F::OggVorbis
+                    | F::OggFlac
+                    | F::Flac
+                    | F::WavPcm
+                    | F::WavFloat
+                    | F::Mp3
+                    | F::AdtsAac
+                    | F::Mp4Aac
+                    | F::Mp4Alac
             ),
             AssetKind::Font => matches!(format, F::TrueType | F::OpenTypeCff | F::FontCollection),
             AssetKind::Shader => matches!(format, F::Wgsl),

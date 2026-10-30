@@ -8,7 +8,7 @@ title: "std::screen::audio"
 
 プレリュードは `looped`、`sound`、`crossfade` を再エクスポートします。残りには `use std::screen::audio::…` が必要です。
 
-ゲームに同梱できる音声形式はランタイムプロファイルによって決まります。`native_v0` は Ogg Vorbis、FLAC、WAV、MP3 を受け付け、Ogg Opus は受け付けません。[ランタイムプロファイル](./appendix/profiles.md) を参照してください。
+ゲームに同梱できる音声形式はランタイムプロファイルによって決まります。`native_v0` は Ogg Vorbis、Ogg FLAC、FLAC、WAV、MP3、AAC-LC（ADTS または MP4/M4A）、ALAC（MP4/M4A）を受け付け、Ogg Opus は受け付けません。[ランタイムプロファイル](./appendix/profiles.md) を参照してください。
 
 ## 概要 {#overview}
 

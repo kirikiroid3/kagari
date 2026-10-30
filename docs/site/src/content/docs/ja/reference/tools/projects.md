@@ -169,14 +169,16 @@ target/v0/
 | アセットの種類 | `native_v0` がデコードできる形式 |
 | -------------- | -------------------------------- |
 | 画像 | PNG（APNG は既定の画像を表示）、ベースラインおよびプログレッシブ JPEG、非可逆・可逆・拡張（アルファまたはメタデータ付き）WebP、BMP（非圧縮、RLE またはビットフィールド）、静止画の JPEG XL（RGB またはグレースケール） |
-| オーディオ、ボイス | Ogg Vorbis、FLAC、WAV（PCM または IEEE 浮動小数点）、MP3 |
+| オーディオ、ボイス | Ogg Vorbis、Ogg FLAC、FLAC、WAV（PCM または IEEE 浮動小数点）、MP3、モノラルまたはステレオの AAC-LC（ADTS の `.aac`、または MP4/M4A）、モノラルまたはステレオの ALAC（MP4/M4A） |
 | フォント | TrueType、OpenType（CFF）、TrueType/OpenType コレクション |
 | シェーダー | WGSL ソース（UTF-8 テキスト） |
 | 動画 | なし |
 
 RIFF または `data` チャンクのサイズがファイルの終端を越える WAV（ストリーミング用のエンコーダー、たとえばパイプへ書き出す ffmpeg や TTS サービスが残す `0xFFFFFFFF` のプレースホルダーなど）は、ファイルの終端まで再生されます。
 
-それ以外はすべて拒否されます。アニメーション WebP、算術・可逆・階層・12 ビット符号化の JPEG、GIF、JPEG または PNG を埋め込んだ BMP や CMYK の BMP、AVIF、アニメーションまたは CMYK の JPEG XL、Ogg Opus、Ogg FLAC、その他のコーデックの Ogg、圧縮 WAV、AAC/M4A、WOFF、WOFF2 です。動画のアセットは内容にかかわらず拒否されます。問題はアセットとプロファイルの組ごとに 1 行ずつ出力されます。
+MP4/M4A ファイルは最初のオーディオトラックを再生します。`kagari build` はサンプル記述がファイルのどこにあっても読むので、インデックスが末尾にあるファイル（ffmpeg の既定）も受け付けます。ランタイムは AAC のエンコーダー遅延を取り除きません。AAC ファイルはエンコーダーのプライミング（通常 1024 サンプル、48 kHz で約 21 ms の無音）で始まり、パディングで終わります。ループ位置などの再生位置はプライミングの先頭から数えます。途切れずにループさせたい音楽には Ogg Vorbis、FLAC、WAV を使ってください。
+
+それ以外はすべて拒否されます。アニメーション WebP、算術・可逆・階層・12 ビット符号化の JPEG、GIF、JPEG または PNG を埋め込んだ BMP や CMYK の BMP、AVIF、アニメーションまたは CMYK の JPEG XL、Ogg Opus、その他のコーデックの Ogg、圧縮 WAV、HE-AAC など AAC-LC 以外の AAC プロファイル、3 チャンネル以上の AAC または ALAC、その他のコーデック（Opus、MP3、FLAC など）の MP4/M4A、WOFF、WOFF2 です。動画のアセットは内容にかかわらず拒否されます。問題はアセットとプロファイルの組ごとに 1 行ずつ出力されます。
 
 ```text
 error: asset `bgimage/title.gif` (image): GIF is not supported by runtime profile `native_v0`

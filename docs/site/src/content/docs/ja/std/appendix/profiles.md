@@ -44,7 +44,7 @@ runtime-compatibility = ["native_v0"]
 |アセット型|対応する形式|対応しない形式|
 |---|---|---|
 |`ImageAsset`|PNG、ベースラインおよびプログレッシブ JPEG、非可逆・可逆・拡張（アルファまたはメタデータ付き）WebP、BMP（非圧縮、RLE またはビットフィールド）、静止画の JPEG XL（RGB またはグレースケール）|算術・可逆・階層・12 ビット符号化の JPEG、アニメーション WebP、GIF、JPEG または PNG を埋め込んだ BMP や CMYK の BMP、AVIF、アニメーションまたは CMYK の JPEG XL|
-|`AudioAsset`、`VoiceAsset`|Ogg Vorbis、FLAC、WAV（PCM）、WAV（IEEE 浮動小数点）、MP3|Ogg Opus、Ogg FLAC、その他の Ogg コーデック、圧縮 WAV、AAC/M4A|
+|`AudioAsset`、`VoiceAsset`|Ogg Vorbis、Ogg FLAC、FLAC、WAV（PCM）、WAV（IEEE 浮動小数点）、MP3、モノラルまたはステレオの AAC-LC（ADTS または MP4/M4A）、モノラルまたはステレオの ALAC（MP4/M4A）|Ogg Opus、その他の Ogg コーデック、圧縮 WAV、HE-AAC などその他の AAC プロファイル、3 チャンネル以上の AAC または ALAC、その他のコーデックの MP4/M4A|
 |`FontAsset`|TrueType、OpenType（CFF）、TrueType/OpenType コレクション（`.ttc`）|WOFF、WOFF2|
 |`VideoAsset`|—|すべての形式：動画アセットには対応していません|
 |`ColorShader`、`MixShader`、`TextureShader`、`MaskShader`、`LocalMotionShader`、`TransitionalMotionShader`|そのロールとして検証を通る WGSL ソース（UTF-8 テキスト）|テキストでないデータ、誤りのある WGSL|

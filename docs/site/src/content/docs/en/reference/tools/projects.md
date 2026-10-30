@@ -197,7 +197,7 @@ The only profile is `native_v0`, the [desktop runtime](./runtime.md):
 | Asset kind | Formats `native_v0` decodes |
 | ---------- | --------------------------- |
 | Image | PNG (APNG shows its default image), baseline and progressive JPEG, lossy, lossless and extended (alpha or metadata) WebP, BMP (uncompressed, RLE or bitfields), still JPEG XL (RGB or greyscale) |
-| Audio, voice | Ogg Vorbis, FLAC, WAV (PCM or IEEE float), MP3 |
+| Audio, voice | Ogg Vorbis, Ogg FLAC, FLAC, WAV (PCM or IEEE float), MP3, mono or stereo AAC-LC (ADTS `.aac`, or MP4/M4A), mono or stereo ALAC (MP4/M4A) |
 | Font | TrueType, OpenType (CFF), TrueType/OpenType collections |
 | Shader | WGSL source (UTF-8 text) |
 | Video | none |
@@ -206,10 +206,19 @@ A WAV whose RIFF or `data` chunk size runs past the end of the file, such as the
 placeholder that streaming encoders (ffmpeg writing to a pipe, TTS services) leave, plays to the
 end of the file.
 
+An MP4/M4A file plays its first audio track. `kagari build` reads its sample description wherever
+it is in the file, so files with the index at the end (the ffmpeg default) are accepted. The
+runtime does not trim AAC encoder delay: an AAC file starts with the encoder's priming, usually
+1024 samples (about 21 ms at 48 kHz) of silence, and ends with its padding, and playback
+positions such as loop points count from the start of the priming. Use Ogg Vorbis, FLAC or WAV
+for music that must loop without a gap.
+
 Everything else is rejected: animated WebP, JPEG with arithmetic, lossless, hierarchical or
 12-bit coding, GIF, BMP with embedded JPEG or PNG or CMYK pixels, AVIF, animated or CMYK JPEG XL,
-Ogg Opus, Ogg FLAC, Ogg with another codec, compressed WAV, AAC/M4A, WOFF and WOFF2. Video assets
-are rejected whatever their content. Each problem prints one line per asset and profile:
+Ogg Opus, Ogg with another codec, compressed WAV, AAC profiles other than AAC-LC (HE-AAC, Main,
+LTP, …), AAC or ALAC with more than two channels, MP4/M4A with another codec (Opus, MP3, FLAC, …),
+WOFF and WOFF2. Video assets are rejected whatever their content. Each problem prints one line per
+asset and profile:
 
 ```text
 error: asset `bgimage/title.gif` (image): GIF is not supported by runtime profile `native_v0`

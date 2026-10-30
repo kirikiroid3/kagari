@@ -47,7 +47,7 @@ Formats are recognized by file content, not by extension.
 |Asset type|Supported formats|Not supported|
 |---|---|---|
 |`ImageAsset`|PNG; baseline and progressive JPEG; lossy, lossless and extended (alpha or metadata) WebP; BMP (uncompressed, RLE or bitfields); still JPEG XL (RGB or greyscale)|JPEG with arithmetic, lossless, hierarchical or 12-bit coding; animated WebP; GIF; BMP with embedded JPEG or PNG, or CMYK; AVIF; animated or CMYK JPEG XL|
-|`AudioAsset`, `VoiceAsset`|Ogg Vorbis; FLAC; WAV (PCM); WAV (IEEE float); MP3|Ogg Opus; Ogg FLAC; other Ogg codecs; compressed WAV; AAC/M4A|
+|`AudioAsset`, `VoiceAsset`|Ogg Vorbis; Ogg FLAC; FLAC; WAV (PCM); WAV (IEEE float); MP3; mono or stereo AAC-LC (ADTS or MP4/M4A); mono or stereo ALAC (MP4/M4A)|Ogg Opus; other Ogg codecs; compressed WAV; HE-AAC and other AAC profiles; AAC or ALAC with more than two channels; MP4/M4A with another codec|
 |`FontAsset`|TrueType; OpenType (CFF); TrueType/OpenType collections (`.ttc`)|WOFF; WOFF2|
 |`VideoAsset`|—|every format: video assets are not supported|
 |`ColorShader`, `MixShader`, `TextureShader`, `MaskShader`, `LocalMotionShader`, `TransitionalMotionShader`|WGSL source (UTF-8 text) that validates as its role|non-text data; WGSL with errors|
