@@ -1,0 +1,21 @@
+[package]
+name = "kagari-debugger"
+description = "The Kagari story debugger: the query engine, the runtime side of the debug protocol and a headless platform"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+kagari-archive = { workspace = true }
+kagari-bytecode = { workspace = true }
+kagari-debug = { workspace = true }
+kagari-engine = { workspace = true }
+kagari-vm = { workspace = true }
+log = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+kagari-lang = { workspace = true }
+rustc-hash = { workspace = true }

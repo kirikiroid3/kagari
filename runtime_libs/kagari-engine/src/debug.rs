@@ -13,6 +13,7 @@
 //!   [`Engine::debug_release`]; the system UI keeps running. The hold belongs to one game
 //!   (its generation), so a load or a new game by the player ends it.
 
+use std::cell::Cell;
 use std::collections::HashSet;
 use std::fmt;
 use std::rc::Rc;
@@ -233,8 +234,9 @@ pub struct LiveStop {
 pub(crate) struct DebugState {
     /// The generation of the held game.
     held: Option<u64>,
-    /// Stop at the next step the live game enters.
-    pause: bool,
+    /// Stop at the next step the live game enters; shared, so an instruction hook can set it
+    /// while the engine runs.
+    pause: Rc<Cell<bool>>,
     breakpoints: HashSet<StepId>,
     /// A stop not yet taken by the debugger.
     stop: Option<LiveStop>,
@@ -249,7 +251,7 @@ pub(crate) fn held(state: &EngineState) -> bool {
 pub(crate) fn entered_live(state: &mut EngineState, step: StepId) {
     let reason = if state.debug.breakpoints.contains(&step) {
         StopReason::Breakpoint
-    } else if state.debug.pause {
+    } else if state.debug.pause.get() {
         StopReason::Pause
     } else {
         return;
@@ -258,7 +260,7 @@ pub(crate) fn entered_live(state: &mut EngineState, step: StepId) {
         return;
     };
     state.debug.held = Some(game.generation);
-    state.debug.pause = false;
+    state.debug.pause.set(false);
     state.debug.stop = Some(LiveStop { step, reason });
 }
 
@@ -368,7 +370,7 @@ impl Engine {
     /// Ends the hold: the player's story input works again.
     pub fn debug_release(&mut self) {
         self.state.debug.held = None;
-        self.state.debug.pause = false;
+        self.state.debug.pause.set(false);
     }
 
     /// Holds the game at its current step, or at the next step it enters when it is not at
@@ -387,8 +389,15 @@ impl Engine {
                     reason: StopReason::Pause,
                 });
             }
-            None => self.state.debug.pause = true,
+            None => self.state.debug.pause.set(true),
         }
+    }
+
+    /// The flag behind a pause at the next step: while set, the live game holds at the next
+    /// step it enters (with [`StopReason::Pause`]) and clears it. Shared, so an instruction
+    /// hook stopped inside the engine's own call can request the stop.
+    pub fn debug_pause_flag(&self) -> Rc<Cell<bool>> {
+        self.state.debug.pause.clone()
     }
 
     /// Hold the live game when it enters one of `steps`.

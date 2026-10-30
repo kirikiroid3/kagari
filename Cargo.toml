@@ -18,6 +18,7 @@ members = [
     "runtime_libs/kagari-text",
     "runtime_libs/kagari-compat",
     "runtime_libs/kagari-engine",
+    "runtime_libs/kagari-debugger",
     "runtime_libs/kagari-render",
     "runtime/kagari-desktop-runtime"
 ]
@@ -45,6 +46,7 @@ kagari-vm = { path = "runtime_libs/kagari-vm" }
 kagari-text = { path = "runtime_libs/kagari-text" }
 kagari-compat = { path = "runtime_libs/kagari-compat" }
 kagari-engine = { path = "runtime_libs/kagari-engine" }
+kagari-debugger = { path = "runtime_libs/kagari-debugger" }
 kagari-render = { path = "runtime_libs/kagari-render" }
 kagari-desktop-runtime = { path = "runtime/kagari-desktop-runtime" }
 rowan = "0.17"
