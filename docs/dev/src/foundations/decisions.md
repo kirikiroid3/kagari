@@ -362,6 +362,28 @@ release builds. See [MIR](../compiler/mir.md#step-ids).
   stable step IDs and read flags.
 - Traps, the `kagari::story` log, `W5009` and `E5003` name the step by its ID.
 
+### The debugger moves the story by replay and speaks DAP's framing {#debugger}
+
+*Status: Implemented.*
+
+**Decision.** The story debugger (`kagari-debugger`) moves the story only by driving the engine's
+save replay loop: a changed trace is replayed, or the live game is steered on, with side effects
+off, and the result is installed like a load. A runtime speaks the Kagari debug protocol, DAP's
+framing and envelope with step IDs and byte offsets as payloads; `kagari dap` translates it to
+DAP for editors, with the project's sources. Instruction breakpoints use a VM hook that costs one
+`Option` check per instruction while no debugger is attached.
+
+**Why.** What the debugger shows must be what play reaches, and a trace is already the witness
+of a position. A runtime has no sources, so it cannot speak lines; one framing keeps one codec.
+The hook's detached cost was measured within noise (about 23 ns per instruction either way).
+
+**Consequences.**
+
+- A move costs a replay from the entry scene; snapshots would make it cheaper.
+- `nav` needs the debug artifact's story graph and claims `unreachable` only for a complete one.
+- A release runtime opens no debug channel unless started with `--debug-port` or `--debug-stdio`.
+- See [The Debugger](../runtime/debugger.md).
+
 ### Extension types are identified by path and structural hash {#extensions}
 
 *Status: Planned.*

@@ -10,12 +10,12 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
 | Path | What |
 | ---- | ---- |
 | `tooling/kagari-project` | `kagari.toml` parsing/validation, project discovery, `Project::program`, targets, system font dirs |
-| `tooling/kagari-cli` | The `kagari` binary: `init`, `check`, `build` (`--profile debug`/`release`), `clean`, `fmt`, `disasm`, `lsp`; `analysis_cache.rs`, `outputs.rs` (what is written/removed in `out-dir`); new-project `template/` |
+| `tooling/kagari-cli` | The `kagari` binary: `init`, `check`, `build` (`--profile debug`/`release`), `clean`, `fmt`, `disasm`, `lsp`, `debug`, `dap`; `analysis_cache.rs`, `outputs.rs` (what is written/removed in `out-dir`); `src/debugger/` (story debugger front end, DAP adapter); new-project `template/` |
 | `tooling/kagari-fmt` | Width-based formatter (`MAX_WIDTH` 100, `INDENT` 4, not configurable) |
 | `tooling/kagari-lsp` | Language server (lsp-server, crossbeam, salsa snapshots) |
 | `core/kagari-lang/src/ide` | Go to definition, hover, file symbols over salsa queries |
 | `tooling/tree-sitter-kagari` | Editor grammar; `src/parser.c`, `src/grammar.json`, `src/node-types.json` are generated |
-| `tooling/zed-kagari` | Zed extension; excluded from the Cargo workspace |
+| `tooling/zed-kagari` | Zed extension (language server, debug adapter `Kagari` with schema `debug_adapter_schemas/Kagari.json`); excluded from the Cargo workspace |
 | `tooling/mdbook-kagari` | mdBook preprocessor: highlights the Develop Guide's `kis`/`kix` blocks with the grammar's `parser.c` and Zed's `highlights.scm` (`docs/dev/src/process/docs.md#code-highlighting`) |
 | `tooling/textmate-kagari` | `kagari.tmLanguage.json`, the canonical TextMate grammar (Shiki); regex approximation of the tree-sitter grammar. The documentation site uses a copy in `docs/site/grammars/` that may lag |
 
@@ -106,6 +106,8 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
 ```sh
 cargo test -p kagari-project -p kagari-cli      # manifest + CLI integration (runs the binary)
 cargo test -p kagari-cli --test debug           # tests/debug.rs: debug builds, analysis cache, clean
+cargo test -p kagari-cli --test debugger        # kagari debug
+cargo test -p kagari-cli --test dap             # kagari dap
 cargo test -p kagari-fmt                        # fixtures, idempotence, corpus stability
 cargo test -p kagari-lsp                        # end-to-end server test, line index
 cargo test -p kagari-lang ide::                 # IDE queries
@@ -117,6 +119,6 @@ The `ide` fixture must check without diagnostics (`fixture_program_checks_cleanl
 
 ## Docs to update
 
-- User-facing CLI/manifest/editor behaviour: `docs/site/src/content/docs/en/reference/tools/{cli,projects,editors}.md`
+- User-facing CLI/manifest/editor/debugger behaviour: `docs/site/src/content/docs/en/reference/tools/{cli,projects,editors,debugger}.md`
   **and** the `ja` mirrors (same headings with `{#id}`, identical code blocks).
 - Internals: `docs/dev/src/tooling/{cli,fmt,lsp}.md`, `docs/dev/src/compiler/ide.md`.

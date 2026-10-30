@@ -18,6 +18,9 @@ it. Terms of the standard library link to the *STD Reference*.
   `#[must_use]`. [Attributes](../special/attributes.md)
 - **Backlog.** The history of the lines and choices shown in the running story, which the player
   can read back and rewind to. [The Game System](../concepts/system.md)
+- **Breakpoint.** A place where the debugger stops the story. A step breakpoint stops when the
+  story enters a step; an instruction breakpoint stops before a line's code runs.
+  [The Debugger](../tools/debugger.md#breakpoints)
 - **Builtin.** An item implemented by the engine and marked `#[builtin]`; only the standard library
   declares builtins. [Builtin Types](../special/builtin-types.md)
 - **Call rules.** The rules that say which function kind may call which: `fn` never calls
@@ -44,9 +47,13 @@ it. Terms of the standard library link to the *STD Reference*.
   [Constant Expressions](../syntax/constants.md)
 - **Cursor.** The point on a step's timeline at which a render schedules the next animation.
   [`std::screen`](../../std/screen.md)
+- **Debug adapter.** A program that lets an editor drive a debugger through the Debug Adapter
+  Protocol; `kagari dap` is Kagari's. [The Debugger](../tools/debugger.md#editors)
 - **Debug build.** A build with `kagari build --profile debug`: the same `game.kagari` as a
   release build, plus `game.kagari-cache` with the explored story graph and debug information for
   debugging tools. [The `kagari` CLI](../tools/cli.md#build-profiles)
+- **Debugger.** The tool that stops the story, moves it and inspects it: `kagari debug`, and
+  editors through `kagari dap`. [The Debugger](../tools/debugger.md)
 - **Decidable.** Of a question about programs: answerable by an algorithm for every program. Story
   reachability in Kagari is decidable. [Philosophy](../overview/philosophy.md)
 - **Deferred reference.** A setting handle used in a render; the render cannot read its value and
@@ -131,6 +138,8 @@ it. Terms of the standard library link to the *STD Reference*.
   decidable. The story is one. [Philosophy](../overview/philosophy.md)
 - **`pushdown fn`.** The function kind of the story: pushdown control over finite data.
   [Function Kinds](../concepts/kinds.md)
+- **Query engine.** The runtime without a window that the debugger runs a game on, to answer
+  questions about the story and to move through it. [The Debugger](../tools/debugger.md)
 - **Random draw.** A value the story draws with `rng_choose`; the generator's seed is part of the
   save, and the analysis covers every value a draw can give.
   [Saves, Replay and Determinism](../concepts/saves.md)

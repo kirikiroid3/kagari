@@ -40,6 +40,7 @@
 - [Text and Rendering](./runtime/text-render.md)
 - [Shaders](./runtime/shaders.md)
 - [The Desktop Runtime](./runtime/desktop.md)
+- [The Debugger](./runtime/debugger.md)
 
 # Tooling
 

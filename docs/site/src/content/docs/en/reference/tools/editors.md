@@ -2,13 +2,14 @@
 title: "Editor Support"
 ---
 
-Kagari ships three pieces for editors:
+Kagari ships four pieces for editors:
 
 | Piece | What it gives | Where |
 | ----- | ------------- | ----- |
 | Language server | Diagnostics, formatting, go to definition, hover, document outline | `kagari lsp` |
+| Debug adapter | Breakpoints, stepping, the call stack and variables of the story, and the debugger's commands | `kagari dap` |
 | Tree-sitter grammar | Syntax highlighting and structure for `.kis` and `.kix` | `tooling/tree-sitter-kagari` |
-| Zed extension | Both of the above, ready to install in Zed | `tooling/zed-kagari` |
+| Zed extension | All of the above, ready to install in Zed | `tooling/zed-kagari` |
 
 All of them need the `kagari` executable; see [Installing](./cli.md#installing).
 
@@ -103,10 +104,48 @@ The extension starts `kagari lsp`. To use another executable or arguments, set t
 If `kagari` is neither configured nor on the `PATH`, Zed reports
 `` `kagari` was not found on PATH ``.
 
+### Debugging in Zed
+
+The extension also registers the debug adapter `Kagari`, which runs `kagari dap` in the
+worktree (see [The Debugger](./debugger.md#editors) for every setting). Add debug scenarios to
+`.zed/debug.json`:
+
+```json
+[
+  {
+    "label": "Kagari: run in a window",
+    "adapter": "Kagari",
+    "request": "launch",
+    "mode": "window",
+    "stopOnEntry": true
+  },
+  {
+    "label": "Kagari: query engine",
+    "adapter": "Kagari",
+    "request": "launch",
+    "mode": "headless",
+    "seed": 1
+  },
+  {
+    "label": "Kagari: attach",
+    "adapter": "Kagari",
+    "request": "attach",
+    "port": 4711
+  }
+]
+```
+
+A launch builds the debug profile first (`"buildFirst": false` skips it). Set breakpoints by
+clicking a line: a line with `s!(…)` or `choice!{…}` stops when the story enters that step; another
+line in story code stops before its code runs. The debug console takes the debugger's commands,
+such as `ls` or `nav crate::story::Ending#0`.
+
 ## Other editors
 
 Any editor with an LSP client can use the language server: register the command `kagari lsp`
-for the file extensions `kis` and `kix`.
+for the file extensions `kis` and `kix`. Any editor with a Debug Adapter Protocol client can use
+the debug adapter: start `kagari dap` over stdio with the launch and attach settings of
+[The Debugger](./debugger.md#editors).
 
 For syntax highlighting, use the tree-sitter grammar in `tooling/tree-sitter-kagari`
 (`grammar.js`, with the generated parser in `src/`). Its scope is `source.kagari` and it covers

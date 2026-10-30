@@ -3,7 +3,7 @@ title: "The kagari CLI"
 ---
 
 `kagari` is the Kagari toolchain: it creates, checks, builds, cleans and formats projects,
-disassembles `.kagari` files, and runs the language server.
+disassembles `.kagari` files, runs the language server, and debugs stories.
 
 ```text
 kagari <COMMAND>
@@ -16,6 +16,8 @@ Commands:
   fmt     Format the project's source files, or the given files
   disasm  Disassemble a `.kagari` bytecode file
   lsp     Run the language server over stdio
+  debug   Debug the story: the query engine's REPL on the headless game (by default), a game in a window (`--window`), or a running game (`--attach`)
+  dap     Run the debug adapter (Debug Adapter Protocol) over stdio
   help    Print this message or the help of the given subcommand(s)
 ```
 
@@ -190,12 +192,12 @@ a release build.
 | `release` (default) | `game.kagari` and the archives. |
 | `debug` | The same, plus `game.kagari-cache`, the debug artifact. |
 
-The debug artifact is for debugging tools and holds:
+The debug artifact is for the [debugger](./debugger.md) and other tools, and holds:
 
 - the explored story graph: every reachable story state the analysis found, per scene and calling
   context, with the steps (by [step ID](../concepts/steps.md#step-ids)), scene calls and random
-  draws, the locals and story variables kept in each state, and the successors of each state for
-  every choice arm, drawn value and scene exit;
+  draws, the locals and story variables kept in each state, the successors of each state for
+  every choice arm, drawn value and scene exit, and which renders are keyframes;
 - debug information for every function: the names of its local variables, where they live over
   the function's code, and its lexical scopes;
 - the hash of the matching `game.kagari`, so that a stale artifact is rejected rather than read
@@ -210,7 +212,8 @@ wrote target/v0/game.kagari-cache
 ```
 
 A release build deletes a `game.kagari-cache` an earlier debug build left in the target directory.
-The runtime does not read `game.kagari-cache`, so a shipped game does not need it.
+The runtime reads `game.kagari-cache` only when a debugger attaches to it, so a shipped game does
+not need it.
 
 ## `kagari clean`
 
@@ -301,3 +304,27 @@ kagari lsp
 
 Runs the language server, speaking the Language Server Protocol over stdin and stdout. Editors
 start it; you do not run it by hand. See [Editor Support](./editors.md#the-language-server).
+
+## `kagari debug`
+
+```text
+kagari debug [--manifest-path <PATH>] [--target <TARGET>] [--entry <PATH>] [--seed <N>] [--no-build]
+kagari debug --window [--runtime <PATH>] [--manifest-path <PATH>] [--target <TARGET>] [--no-build]
+kagari debug --attach <ADDRESS> [--manifest-path <PATH>] [--target <TARGET>]
+```
+
+Builds the project in the debug profile and debugs its story: by default on the query engine
+(the game without a window), with `--window` in a window, with `--attach` in a game already
+running with `--debug-port`. It reads one command per line from stdin. The options and the
+commands are in [The Debugger](./debugger.md#kagari-debug). The status is 0 after the input ends
+or `quit`, and 2 when the project cannot be built or the game cannot be reached.
+
+## `kagari dap`
+
+```text
+kagari dap
+```
+
+Runs the debug adapter, speaking the Debug Adapter Protocol over stdin and stdout. Editors start
+it; you do not run it by hand. Its launch and attach settings are in
+[The Debugger](./debugger.md#editors).

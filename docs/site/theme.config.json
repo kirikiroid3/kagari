@@ -167,7 +167,8 @@
             "reference/tools/cli",
             "reference/tools/editors",
             "reference/tools/runtime",
-            "reference/tools/headless"
+            "reference/tools/headless",
+            "reference/tools/debugger"
           ]
         },
         {

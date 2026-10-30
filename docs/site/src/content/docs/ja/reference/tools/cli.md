@@ -2,7 +2,7 @@
 title: "kagari CLI"
 ---
 
-`kagari` は Kagari のツールチェインです。プロジェクトの作成・検査・ビルド・掃除・整形、`.kagari` ファイルの逆アセンブル、言語サーバーの実行を行います。
+`kagari` は Kagari のツールチェインです。プロジェクトの作成・検査・ビルド・掃除・整形、`.kagari` ファイルの逆アセンブル、言語サーバーの実行、物語のデバッグを行います。
 
 ```text
 kagari <COMMAND>
@@ -15,6 +15,8 @@ Commands:
   fmt     Format the project's source files, or the given files
   disasm  Disassemble a `.kagari` bytecode file
   lsp     Run the language server over stdio
+  debug   Debug the story: the query engine's REPL on the headless game (by default), a game in a window (`--window`), or a running game (`--attach`)
+  dap     Run the debug adapter (Debug Adapter Protocol) over stdio
   help    Print this message or the help of the given subcommand(s)
 ```
 
@@ -148,9 +150,9 @@ kagari build --profile debug
 | `release`（既定） | `game.kagari` とアーカイブ。 |
 | `debug` | 同じものに加えて、デバッグ用成果物 `game.kagari-cache`。 |
 
-デバッグ用成果物はデバッグツールのためのもので、次の内容を収めます。
+デバッグ用成果物は[デバッガー](./debugger.md)などのツールのためのもので、次の内容を収めます。
 
-- 探索された物語のグラフ。解析が見つけた到達可能なすべての物語状態を、シーンと呼び出し文脈ごとに収めます。各状態には、ステップ（[ステップ ID](../concepts/steps.md#step-ids) で示します）、シーン呼び出し、乱数の抽選、その状態で保持されるローカル変数と物語変数、選択肢のアーム・抽選された値・シーンの終了ごとの後続状態が含まれます。
+- 探索された物語のグラフ。解析が見つけた到達可能なすべての物語状態を、シーンと呼び出し文脈ごとに収めます。各状態には、ステップ（[ステップ ID](../concepts/steps.md#step-ids) で示します）、シーン呼び出し、乱数の抽選、その状態で保持されるローカル変数と物語変数、選択肢のアーム・抽選された値・シーンの終了ごとの後続状態、どのレンダーがキーフレームかが含まれます。
 - すべての関数のデバッグ情報。ローカル変数の名前、関数のコード上でそれらが置かれる場所、レキシカルスコープです。
 - 対応する `game.kagari` のハッシュ。古い成果物を別のビルドに対して読まず、拒否できるようにするためのものです。
 
@@ -162,7 +164,7 @@ wrote target/v0/bgimage.kiarchive (3 files)
 wrote target/v0/game.kagari-cache
 ```
 
-リリースビルドは、以前のデバッグビルドがターゲットディレクトリに残した `game.kagari-cache` を削除します。ランタイムは `game.kagari-cache` を読まないので、出荷するゲームには不要です。
+リリースビルドは、以前のデバッグビルドがターゲットディレクトリに残した `game.kagari-cache` を削除します。ランタイムが `game.kagari-cache` を読むのはデバッガーが接続したときだけなので、出荷するゲームには不要です。
 
 ## `kagari clean` {#kagari-clean}
 
@@ -242,3 +244,21 @@ kagari lsp
 ```
 
 言語サーバーを実行し、stdin と stdout で Language Server Protocol を話します。エディタが起動するもので、手で実行するものではありません。[エディタ対応](./editors.md#the-language-server)を参照してください。
+
+## `kagari debug` {#kagari-debug}
+
+```text
+kagari debug [--manifest-path <PATH>] [--target <TARGET>] [--entry <PATH>] [--seed <N>] [--no-build]
+kagari debug --window [--runtime <PATH>] [--manifest-path <PATH>] [--target <TARGET>] [--no-build]
+kagari debug --attach <ADDRESS> [--manifest-path <PATH>] [--target <TARGET>]
+```
+
+プロジェクトをデバッグプロファイルでビルドし、その物語をデバッグします。既定ではクエリエンジン（ウィンドウなしのゲーム）上で、`--window` ではウィンドウで、`--attach` では `--debug-port` 付きですでに実行中のゲームでデバッグします。stdin から 1 行に 1 コマンドを読みます。オプションとコマンドは[デバッガー](./debugger.md#kagari-debug)にあります。入力が終わるか `quit` の後はステータス 0、プロジェクトをビルドできないかゲームに接続できないときはステータス 2 です。
+
+## `kagari dap` {#kagari-dap}
+
+```text
+kagari dap
+```
+
+デバッグアダプターを実行し、stdin と stdout で Debug Adapter Protocol を話します。エディタが起動するもので、手で実行するものではありません。launch と attach の設定は[デバッガー](./debugger.md#editors)にあります。

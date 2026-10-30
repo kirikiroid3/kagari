@@ -149,7 +149,9 @@ Use these renderings consistently. The Japanese edition of the engine proposal
 | shader / role / effect value | シェーダー / ロール / 効果値 | mix / mask / paint | ミックス / マスク / ペイント |
 | local motion / transitional motion | ローカルモーション / 遷移モーション | travel / pose | トラベル / ポーズ |
 | step ID | ステップ ID | analysis cache | 解析キャッシュ |
-| debug build / release build | デバッグビルド / リリースビルド | | |
+| debug build / release build | デバッグビルド / リリースビルド | query engine | クエリエンジン |
+| debug adapter | デバッグアダプター | debugger | デバッガー |
+| breakpoint (step / instruction) | ブレークポイント（ステップ / 命令） | | |
 
 A new term that recurs gets a row here and in the Reference's glossary appendix in the same change.
 

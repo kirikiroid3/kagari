@@ -1,6 +1,6 @@
 ---
 name: kagari-runtime
-description: Load when changing the Kagari engine, text layout, renderer, runtime profiles or desktop/headless runtime (runtime_libs/kagari-engine, kagari-text, kagari-render, kagari-compat, runtime/kagari-desktop-runtime) — not for the VM core (kagari-vm), which is kagari-bytecode.
+description: Load when changing the Kagari engine, text layout, renderer, runtime profiles, story debugger or desktop/headless runtime (runtime_libs/kagari-engine, kagari-text, kagari-render, kagari-compat, kagari-debugger, runtime/kagari-desktop-runtime) — not for the VM core (kagari-vm), which is kagari-bytecode.
 ---
 
 # Kagari runtime
@@ -9,10 +9,11 @@ description: Load when changing the Kagari engine, text layout, renderer, runtim
 
 | Path | What |
 | ---- | ---- |
-| `runtime_libs/kagari-engine` | host imports, mode stack, reactive UI, story driver, screen and timeline, audio model, input, stores, saves |
+| `runtime_libs/kagari-engine` | host imports, mode stack, reactive UI, story driver, screen and timeline, audio model, input, stores, saves; `debug.rs` (debugger access) |
 | `runtime_libs/kagari-text` | fonts, shaping, line breaking, ruby, rasterization |
 | `runtime_libs/kagari-render` | the wgpu compositor for `Frame` |
 | `runtime_libs/kagari-compat` | runtime profiles (`native_v0`) and asset sniffing, used by `kagari build` |
+| `runtime_libs/kagari-debugger` | query engine, debug protocol server, instruction hook, headless platform |
 | `runtime/kagari-desktop-runtime` | winit/wgpu/kira/gilrs shell, `Platform`, headless mode |
 
 The VM (`runtime_libs/kagari-vm`) and the bytecode format belong to the `kagari-bytecode` skill.
@@ -26,6 +27,7 @@ Develop Guide (`docs/dev/src/`):
 - `runtime/saves.md` — trace saves, choice IDs, replay, divergence, determinism rules.
 - `runtime/text-render.md` — text pipeline, reveal, `Frame`, renderer, design resolution.
 - `runtime/desktop.md` — the binary, exit statuses, headless script, platform deps.
+- `runtime/debugger.md` — query engine, debug protocol, instruction hook, `nav`, breakpoints.
 - `runtime/vm.md` and `std/builtins.md` when an import's ABI is involved.
 
 ## Invariants (do not break)
@@ -80,6 +82,7 @@ decoder features, docs listed below.
 
 ```sh
 cargo test -p kagari-engine -p kagari-text -p kagari-render -p kagari-compat -p kagari-desktop-runtime
+cargo test -p kagari-debugger
 cargo clippy --workspace --all-targets
 ```
 
@@ -117,6 +120,6 @@ echo "exit: $?"   # 0 ok, 2 boot/usage, 3 trap, 4 GPU, 5 script
 ## Docs to update
 
 - Develop Guide chapters above (same change).
-- Reference (en **and** ja): `tools/runtime.md`, `tools/headless.md`, `concepts/system.md`,
+- Reference (en **and** ja): `tools/runtime.md`, `tools/headless.md`, `tools/debugger.md`, `concepts/system.md`,
   `concepts/saves.md`, `tools/projects.md` (profiles).
 - STD Reference (en **and** ja): the module page of every changed std item; `appendix/profiles.md`.

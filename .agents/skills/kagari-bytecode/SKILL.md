@@ -12,7 +12,7 @@ description: Load when changing core/kagari-bytecode (the .kagari format, opcode
 | `core/kagari-bytecode/src/module.rs` | `Module`, tables, enum codes, `MAGIC` (`V000`), `NONE` |
 | `core/kagari-bytecode/src/instr.rs` | `Instr`, opcode/mnemonic/words/registers/range, encode/decode of one instruction |
 | `core/kagari-bytecode/src/{encode,decode,verify,disasm}.rs` | file encoding, decoding (`DecodeError`), verifier (`VerifyErrorKind`), `kagari disasm` |
-| `runtime_libs/kagari-vm/src/` | `Program::load`, `Vm`, `exec/` loop, `refs`, `int`/`ops`, `story` (fiber), `rng`, `host` (`Host` trait), `trap` |
+| `runtime_libs/kagari-vm/src/` | `Program::load`, `Vm`, `exec/` loop, `refs`, `int`/`ops`, `story` (fiber), `rng`, `host` (`Host` trait), `trap`, `hook` (debugger instruction hook; introspection never changes what a run computes) |
 | `core/kagari-archive/src/{archive,save}/` | `.kiarchive` (blocks, index, patches), `.kisave` (paged tree, `compact`) |
 | `core/kagari-debug/src/` | `.kagari-cache` files over the `.kisave` container (uncompressed): `StoryGraph` (`graph.rs`), `DebugInfo` (`debug_info.rs`), `AnalysisCache` / `DebugArtifact` (`file.rs`), `codec.rs`; `SCHEMA`, `ANALYSIS_FILE`, `DEBUG_FILE` in `lib.rs` |
 | `core/kagari-lang/src/emit/` | producer of `Module` (intrinsics vs imports in `codegen/call.rs`) |

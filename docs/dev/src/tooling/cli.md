@@ -22,6 +22,7 @@ the outcome to output and an exit code. No compiler logic lives in the CLI.
 | `tooling/kagari-cli/src/analysis_cache.rs` | `path`, `offer`, `store`: the analysis cache shared by `check` and `build` |
 | `tooling/kagari-cli/src/outputs.rs` | `BYTECODE_FILE`, removing build outputs and caches, removing empty directories |
 | `tooling/kagari-cli/src/command/{check,clean,disasm,fmt,lsp}.rs` | One module per subcommand |
+| `tooling/kagari-cli/src/command/{debug,dap}.rs`, `src/debugger/` | `kagari debug` (the REPL), `kagari dap` (the debug adapter) and what they share; see [The Debugger](../runtime/debugger.md) |
 | `tooling/kagari-cli/src/command/build/{mod,archives,compat,shaders}.rs` | `kagari build` and its profiles, archive packing, runtime-profile check, shader check |
 | `tooling/kagari-cli/src/command/init/{mod,template,font}.rs` | `kagari init`, embedded template, default-font choice |
 | `tooling/kagari-cli/template/` | The new-project template (`_gitignore` becomes `.gitignore`) |
@@ -121,7 +122,7 @@ the project root with `/` separators (it reuses `FilePath::display`).
 | ---: | ------- | ----------- |
 | 0 | Success (warnings allowed) | `ExitCode::SUCCESS`, `exit(false)` |
 | 1 | The command ran and found problems | `exit(true)`: error diagnostics (`check`, `build`), an asset a runtime profile cannot decode (`build`), files that would change or cannot be formatted (`fmt`), a file that fails to decode or verify (`disasm`) |
-| 2 | The command could not run | `Failure`: no or invalid manifest, toolchain mismatch, I/O error, `--target` not in `build.targets`, `init` over existing files, `fmt` on a non-`.kis`/`.kix` path, LSP protocol error; also clap's own usage errors |
+| 2 | The command could not run | `Failure`: no or invalid manifest, toolchain mismatch, I/O error, `--target` not in `build.targets`, `init` over existing files, `fmt` on a non-`.kis`/`.kix` path, LSP protocol error, `debug` when the debug build fails or the game cannot be reached; also clap's own usage errors |
 
 Keep this split: 1 means "your game has a problem", 2 means "the tool could not do its job".
 Scripts and CI rely on it.
@@ -275,6 +276,25 @@ needs no project.
 Calls `kagari_lsp::run_stdio()`; see [Language Server and Editors](./lsp.md). A protocol or I/O
 error becomes a `Failure`.
 
+### `kagari debug` and `kagari dap`
+
+```text
+kagari debug [--manifest-path PATH] [--target TARGET] [--entry PATH] [--seed N] [--no-build]
+kagari debug --window [--runtime PATH] … | --attach ADDRESS …
+kagari dap
+```
+
+Both are front ends of the story debugger ([The Debugger](../runtime/debugger.md)). `debug`
+resolves the project and the target directory (`debugger::backend::project`), runs `kagari build
+--profile debug` as a child process of the same executable (its output is printed; `dap` sends it
+as `output` events, since its stdout is the protocol), then connects a backend: the headless
+query engine on a thread of this process (`kagari_debugger::headless::serve` over an in-process
+`Link`), `kagari-desktop-runtime DIR --debug-stdio` (next to `kagari`, else on `PATH`), or a TCP
+connection to `--debug-port`. Source file names in the bytecode are relative to the root file's
+directory (`backend::source_root`); `locate.rs` turns byte offsets into lines with the language
+server's `LineIndex` and writes std files to a temp directory with its `std_files`. The REPL
+exits 0 at the end of its input or on `quit`; `dap` exits when the editor disconnects.
+
 ### `kagari init`
 
 ```text
@@ -307,6 +327,8 @@ that.
 | `tooling/kagari-cli/tests/check.rs` | Fresh project has no diagnostics (also from a subdirectory), assets outside the asset dir, `system-fonts = false`, missing manifest (2), toolchain mismatch (2) |
 | `tooling/kagari-cli/tests/build.rs` | Bytecode decodes and verifies, archive names and contents, stale archive removal, unlisted target (2), rejected image/audio/video formats (1, no bytecode written), invalid WGSL (1, `error: shader … line`), std shaders packed into `std.kiarchive`, `disasm` of the result |
 | `tooling/kagari-cli/tests/debug.rs` | A debug build writes `game.kagari-cache` (script hash, one debug entry per function, every reached step is a bytecode step) and the same bytecode as a release build, which removes the artifact; `check` and `build` reuse a cached analysis (a diagnostic only the cache holds is printed) until a source edit, and replace an invalid cache; `clean` removes outputs and caches only |
+| `tooling/kagari-cli/tests/debugger.rs` | `kagari debug` on a story with scene calls, a guarded choice and a draw: `ls`, `nav` and the `push` that follows it, `goto`, `stack`, `pop`, `detail`, `seed`; breakpoints by step ID and by `file:line` |
+| `tooling/kagari-cli/tests/dap.rs` | `kagari dap` end to end over DAP: launch headless, breakpoints by line, stack trace, `kagari/push` and `kagari/nav`, `evaluate`, continue to a breakpoint |
 | `tooling/kagari-cli/tests/fmt.rs` | Fresh project is formatted, rewriting, syntax errors |
 
 The integration tests run the real binary (`env!("CARGO_BIN_EXE_kagari")`) through
