@@ -21,7 +21,6 @@ and [Headless Mode](https://kagari.suitsu31.club/en/reference/tools/headless/).
 | `app.rs` | the windowed runtime: the winit `ApplicationHandler`, the frame, surface handling |
 | `gpu.rs` | adapter, device and `Renderer` creation; out-of-memory and device-lost tracking |
 | `platform.rs` | `DesktopPlatform`: the engine's `Platform` |
-| `archives.rs` | the `.kiarchive` files, opened on first use |
 | `store.rs` | settings and saves on disk |
 | `audio.rs`, `sounds.rs` | the kira backend and the decoded-sound cache |
 | `input.rs`, `pads.rs` | winit keyboard and mouse mapping, gilrs gamepads |
@@ -55,7 +54,7 @@ becomes the exit status.
 | Method | Implementation |
 | ------ | -------------- |
 | `read_store`, `write_store`, `delete_store` | `Store` ([Stores](#stores)) |
-| `read_asset` | `Archives::read` |
+| `read_asset` | `kagari_archive::archive::ArchiveDir::read` |
 | `audio_duration_ms` | decode with kira (`SoundCache::decode`) and take the duration; works without an audio device |
 | `render_thumbnail` | `Renderer::render_to_rgba` on the platform's `Gpu`; `None` (with a warning) before the GPU exists |
 | `local_time` | `jiff::Zoned::now()`, or the fixed headless time |
@@ -64,7 +63,7 @@ becomes the exit status.
 
 ### Archives
 
-`Archives` maps an asset path to its archive with `kagari_archive::archive::archive_stem` (the
+`ArchiveDir` (in `kagari-archive`) maps an asset path to its archive with `archive_stem` (the
 same grouping `kagari build` writes: one archive per top-level asset directory) and opens
 `<stem>.kiarchive` with `open_chain`, which also applies patch archives. Each archive is opened
 on first use and kept; a missing archive is remembered as absent and logged once. See

@@ -1,37 +1,38 @@
-//! The game's `.kiarchive` files, opened on first use.
+//! The `.kiarchive` files of a game directory, opened on first use.
 
 use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use kagari_archive::archive::{ARCHIVE_EXTENSION, Error, PatchedArchive, archive_stem, open_chain};
+use super::{ARCHIVE_EXTENSION, Error, PatchedArchive, archive_stem, open_chain};
 
 /// The archives of a game directory, keyed by [`archive_stem`] (the grouping `kagari build`
-/// writes). A missing archive is remembered as `None`.
-pub struct Archives {
+/// writes). A missing archive is remembered as `None` and reported once.
+pub struct ArchiveDir {
     dir: PathBuf,
     open: HashMap<String, Option<PatchedArchive<File>>>,
 }
 
-impl Archives {
-    pub fn new(dir: &Path) -> Archives {
-        Archives {
+impl ArchiveDir {
+    pub fn new(dir: &Path) -> ArchiveDir {
+        ArchiveDir {
             dir: dir.to_path_buf(),
             open: HashMap::new(),
         }
     }
 
     /// The bytes of the asset at a bytecode asset path; `Ok(None)` when its archive or its
-    /// entry is absent.
-    pub fn read(&mut self, path: &str) -> io::Result<Option<Vec<u8>>> {
+    /// entry is absent. `missing` is called with the archive's path the first time it is found
+    /// absent.
+    pub fn read(&mut self, path: &str, missing: impl FnOnce(&Path)) -> io::Result<Option<Vec<u8>>> {
         let stem = archive_stem(path);
         let file = self.dir.join(format!("{stem}.{ARCHIVE_EXTENSION}"));
         if !self.open.contains_key(stem) {
             let archive = match open_chain(&file) {
                 Ok(archive) => Some(archive),
                 Err(Error::Io(e)) if e.kind() == io::ErrorKind::NotFound => {
-                    log::warn!("missing archive {}", file.display());
+                    missing(&file);
                     None
                 }
                 Err(e) => return Err(invalid(&file, &e)),

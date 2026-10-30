@@ -6,9 +6,9 @@ use std::fs::File;
 use std::io::{self, Read, Seek};
 use std::path::{Path, PathBuf};
 
-use super::{ARCHIVE_EXTENSION, Error};
 use super::index::{ArchiveIndex, FileLoc, Lookup};
 use super::read::{Archive, BlockCache, read_loc};
+use super::{ARCHIVE_EXTENSION, Error};
 
 /// Validated layer indexes, base first, without any I/O.
 #[derive(Clone, Debug)]
