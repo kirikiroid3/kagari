@@ -26,14 +26,19 @@ match. `kagari help <COMMAND>` or `kagari <COMMAND> --help` prints the help of o
 
 ## Installing
 
-Build the tool from the Kagari repository:
+The installers in [Installing Kagari](../../tutorial/install.md) put `kagari` and
+`kagari-desktop-runtime` on your `PATH` on Linux and Windows; on NixOS, use the flake described
+there.
+
+To build both from the Kagari repository instead (needs Rust and Cargo):
 
 ```sh
 cargo install --path tooling/kagari-cli
+cargo install --path runtime/kagari-desktop-runtime
 ```
 
-This installs the `kagari` executable into Cargo's `bin` directory. Inside the repository you can
-also run it without installing: `cargo run -p kagari-cli -- <COMMAND>`.
+This installs them into Cargo's `bin` directory. Inside the repository you can also run `kagari`
+without installing: `cargo run -p kagari-cli -- <COMMAND>`.
 
 ## Finding the project
 

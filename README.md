@@ -36,7 +36,19 @@ Develop Guide is an mdBook: `mdbook build docs/dev` writes it to `docs/_site/`.
 | Tooling: `kagari` CLI, formatter, language server, tree-sitter grammar, Zed extension | ✅ |
 | Desktop runtime, profile `native_v0` (the whole std except video and shaders) | ✅ |
 
-## Quick start
+## Installing
+
+Linux (x86_64, glibc 2.35 or newer):
+
+```sh
+curl -fsSL https://kagari-download.suitsu31.club/installer.sh | bash
+```
+
+Windows has an installer and NixOS a flake (`nix profile install github:kirikiroid3/kagari#stable`);
+see [Installing Kagari](https://kagari.suitsu31.club/en/tutorial/install/). macOS builds are not
+available yet.
+
+## Quick start from the repository
 
 ```sh
 cargo run -p kagari-cli -- build --manifest-path example/test_game1/kagari.toml

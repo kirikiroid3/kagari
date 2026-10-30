@@ -159,7 +159,8 @@ Except for status 0, the runtime prints `kagari-desktop-runtime: <message>` to s
 
 At run time the runtime needs a GPU driver for Vulkan, Metal, DirectX 12 or OpenGL. When no
 hardware adapter is usable it tries a software fallback adapter before giving up with status 4.
-On Linux it also needs Wayland or X11 and ALSA.
+On Linux it also needs Wayland or X11, ALSA and libudev. The prebuilt Linux build runs on x86_64
+with glibc 2.35 or newer (see [Installing Kagari](../../tutorial/install.md#linux)).
 
 Building the runtime from source needs these system packages:
 

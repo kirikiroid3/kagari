@@ -4,8 +4,10 @@ sidebar:
   label: "Getting Started"
 ---
 
-This tutorial is being written. It will walk you through installing Kagari with the `kagari-up`
-installer, then writing and running your first visual novel.
+This tutorial is being written. It will walk you through installing Kagari, then writing and
+running your first visual novel.
+
+Start with [Installing Kagari](./install.md).
 
 ## In the meantime
 

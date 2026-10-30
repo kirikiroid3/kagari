@@ -1,0 +1,239 @@
+# Builds the Kagari toolchain (`kagari` + `kagari-desktop-runtime`) and uploads it to the download
+# bucket (Cloudflare R2, served at https://kagari-download.suitsu31.club). Nothing goes to GitHub
+# Releases. The layout, the secrets and the release steps: docs/dev/src/process/releases.md.
+#
+# A tag push builds the release whose version is the tag without a leading `v`; it must equal
+# the workspace version in Cargo.toml. A manual run on a tag does the same; a manual run on a
+# branch uploads a development build `<workspace version>-dev.<short commit>` and moves nothing
+# that points at the latest release.
+
+name: Release
+
+on:
+  push:
+    tags: ["*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      numeric: ${{ steps.version.outputs.numeric }}
+      release: ${{ steps.version.outputs.release }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: version
+        run: |
+          crate_version="$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])')"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            if [ "${GITHUB_REF_NAME#v}" != "$crate_version" ]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match the workspace version $crate_version"
+              exit 1
+            fi
+            version="$crate_version"
+            release=true
+          else
+            version="$crate_version-dev.${GITHUB_SHA::7}"
+            release=false
+          fi
+          {
+            echo "version=$version"
+            echo "numeric=${crate_version%%[-+]*}"
+            echo "release=$release"
+          } >>"$GITHUB_OUTPUT"
+          echo "Version $version (release: $release)" >>"$GITHUB_STEP_SUMMARY"
+
+  linux:
+    needs: version
+    runs-on: ubuntu-latest
+    # glibc 2.35: the oldest glibc the binaries run on (installer.sh checks it).
+    container: ubuntu:22.04
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      CC: gcc
+      CXX: g++
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: gcc
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git gcc g++ make \
+            pkg-config libasound2-dev libudev-dev
+      - uses: actions/checkout@v5
+      - name: Install Rust (rust-toolchain.toml)
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+            sh -s -- -y --profile minimal --default-toolchain none
+          echo "$HOME/.cargo/bin" >>"$GITHUB_PATH"
+          "$HOME/.cargo/bin/rustup" toolchain install --profile minimal
+      - name: Build
+        run: cargo build --release --locked -p kagari-cli -p kagari-desktop-runtime
+      - name: Smoke test
+        run: |
+          target/release/kagari --version
+          target/release/kagari-desktop-runtime --version
+      - name: Package
+        run: |
+          name="kagari-$VERSION-x86_64-linux"
+          mkdir -p "dist/$name"
+          cp target/release/kagari target/release/kagari-desktop-runtime LICENSE "dist/$name/"
+          tar -C dist --owner=0 --group=0 --numeric-owner -czf "dist/$name.tar.gz" "$name"
+          (cd dist && sha256sum "$name.tar.gz" >"$name.tar.gz.sha256")
+          rm -r "dist/$name"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: dist/
+          if-no-files-found: error
+
+  windows:
+    needs: version
+    runs-on: windows-2025
+    # The executables and the installer are not code-signed (Windows SmartScreen warns on first
+    # run); see docs/dev/src/process/releases.md#code-signing.
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      NUMERIC_VERSION: ${{ needs.version.outputs.numeric }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust (rust-toolchain.toml)
+        run: rustup toolchain install --profile minimal
+      - name: Build
+        run: cargo build --release --locked -p kagari-cli -p kagari-desktop-runtime
+      - name: Smoke test
+        run: |
+          target\release\kagari.exe --version
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          target\release\kagari-desktop-runtime.exe --version
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Stage
+        run: |
+          New-Item -ItemType Directory -Force stage, dist | Out-Null
+          Copy-Item target\release\kagari.exe, target\release\kagari-desktop-runtime.exe, LICENSE stage\
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+      - name: Build the installer
+        run: |
+          $iscc = Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup*\ISCC.exe", "$env:ProgramFiles\Inno Setup*\ISCC.exe" -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $iscc) { throw "ISCC.exe not found" }
+          & $iscc.FullName "/DAppVersion=$env:VERSION" "/DNumericVersion=$env:NUMERIC_VERSION" `
+            "/DSourceDir=$PWD\stage" "/DOutputDir=$PWD\dist" packaging\windows\kagari.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Checksum
+        run: |
+          $name = "kagari-$env:VERSION-x86_64-windows-setup.exe"
+          $hash = (Get-FileHash -Algorithm SHA256 "dist\$name").Hash.ToLowerInvariant()
+          Set-Content -NoNewline -Encoding ascii "dist\$name.sha256" "$hash  $name`n"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: dist/
+          if-no-files-found: error
+
+  upload:
+    needs: [version, linux, windows]
+    runs-on: ubuntu-latest
+    environment: release
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      RELEASE: ${{ needs.version.outputs.release }}
+      BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      AWS_DEFAULT_REGION: auto
+      # R2 rejects the checksums newer AWS CLIs send by default.
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-x86_64
+          path: dist/linux
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-x86_64
+          path: dist/windows
+      - name: Upload to R2
+        run: |
+          # put FILE KEY CONTENT-TYPE CACHE-CONTROL
+          put() {
+            echo "s3://$BUCKET/$2"
+            aws s3 cp "$1" "s3://$BUCKET/$2" --only-show-errors --content-type "$3" --cache-control "$4"
+          }
+          immutable='public, max-age=31536000, immutable'
+          text='text/plain; charset=utf-8'
+
+          # Versioned files first; the pointers to them last.
+          for file in dist/linux/*; do
+            case "$file" in
+              *.tar.gz) type=application/gzip ;;
+              *) type="$text" ;;
+            esac
+            put "$file" "linux_x86_bin/$VERSION/$(basename "$file")" "$type" "$immutable"
+          done
+          for file in dist/windows/*; do
+            case "$file" in
+              *.exe) type=application/vnd.microsoft.portable-executable ;;
+              *) type="$text" ;;
+            esac
+            put "$file" "windows_x86_installer/$VERSION/$(basename "$file")" "$type" "$immutable"
+          done
+
+          if [ "$RELEASE" = true ]; then
+            printf '%s\n' "$VERSION" >latest
+            put latest linux_x86_bin/latest "$text" no-cache
+            put latest windows_x86_installer/latest "$text" no-cache
+            put installer.sh installer.sh "$text" no-cache
+          fi
+
+  # Points the flake's `stable` package at the tag just released (nix/stable.json on main).
+  nix-stable:
+    needs: [version, upload]
+    if: needs.version.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - name: Update nix/stable.json
+        run: |
+          if [ -f nix/stable.json ]; then
+            current="$(python3 -c 'import json; print(json.load(open("nix/stable.json"))["version"])')"
+            newest="$(printf '%s\n%s\n' "$current" "$VERSION" | sort -V | tail -n 1)"
+            if [ "$current" = "$VERSION" ] || [ "$newest" != "$VERSION" ]; then
+              echo "nix/stable.json is at $current; leaving it"
+              exit 0
+            fi
+          fi
+          mkdir -p nix
+          printf '{\n  "version": "%s",\n  "rev": "%s"\n}\n' "$VERSION" "$GITHUB_SHA" >nix/stable.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add nix/stable.json
+          git commit -m "chore(nix): point the stable package at $VERSION"
+          git push origin HEAD:main

@@ -81,7 +81,8 @@ language server.
 
 To install it:
 
-1. Install `kagari` so that it is on your `PATH` (`cargo install --path tooling/kagari-cli`).
+1. Install `kagari` so that it is on your `PATH` (see
+   [Installing Kagari](../../tutorial/install.md)).
 2. In Zed, run the command **zed: install dev extension** and choose the `tooling/zed-kagari`
    directory of the Kagari repository.
 

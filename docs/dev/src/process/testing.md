@@ -22,7 +22,9 @@ nix develop         # without direnv
 ```
 
 The dev shell provides only system libraries and sets `LD_LIBRARY_PATH` for the libraries loaded
-with `dlopen`; Rust itself still comes from rustup and `rust-toolchain.toml`. On Debian/Ubuntu
+with `dlopen`; Rust itself still comes from rustup and `rust-toolchain.toml`. (The flake's
+packages, which build the release binaries with nixpkgs' Rust, are described in
+[Releases](./releases.md#nix).) On Debian/Ubuntu
 install `libasound2-dev libudev-dev pkg-config`, on Fedora `alsa-lib-devel systemd-devel`;
 macOS and Windows need nothing. The compiler and tooling crates need none of these.
 

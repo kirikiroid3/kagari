@@ -24,13 +24,16 @@ Commands:
 
 ## インストール {#installing}
 
-Kagari リポジトリからツールをビルドします。
+[Kagari のインストール](../../tutorial/install.md) のインストーラーは、Linux と Windows で `kagari` と `kagari-desktop-runtime` を `PATH` に置きます。NixOS ではそこで説明している flake を使います。
+
+代わりに Kagari リポジトリから両方をビルドするには、次のようにします（Rust と Cargo が必要です）。
 
 ```sh
 cargo install --path tooling/kagari-cli
+cargo install --path runtime/kagari-desktop-runtime
 ```
 
-これで `kagari` 実行ファイルが Cargo の `bin` ディレクトリにインストールされます。リポジトリ内では、インストールせずに `cargo run -p kagari-cli -- <COMMAND>` で実行することもできます。
+これで両方が Cargo の `bin` ディレクトリにインストールされます。リポジトリ内では、インストールせずに `cargo run -p kagari-cli -- <COMMAND>` で `kagari` を実行することもできます。
 
 ## プロジェクトの探索 {#finding-the-project}
 

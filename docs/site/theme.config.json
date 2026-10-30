@@ -87,7 +87,8 @@
       },
       "icon": "lucide:graduation-cap",
       "items": [
-        "tutorial"
+        "tutorial",
+        "tutorial/install"
       ]
     },
     {

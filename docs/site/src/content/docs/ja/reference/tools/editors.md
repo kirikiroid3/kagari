@@ -62,7 +62,7 @@ std のソースはコンパイラに内蔵されています。定義へ移動�
 
 インストール手順:
 
-1. `kagari` をインストールし、`PATH` に置きます（`cargo install --path tooling/kagari-cli`）。
+1. `kagari` をインストールし、`PATH` に置きます（[Kagari のインストール](../../tutorial/install.md)を参照）。
 2. Zed でコマンド **zed: install dev extension** を実行し、Kagari リポジトリの `tooling/zed-kagari` ディレクトリを選びます。
 
 拡張機能は `kagari lsp` を起動します。別の実行ファイルや引数を使うには、Zed の `settings.json` で設定します。

@@ -502,3 +502,31 @@ tree database; a new container would duplicate it.
 - `kagari check` writes into the output directory; `kagari clean` removes what the CLI writes.
 - The files are large for large stories (about 140 MiB at 200 000 states); the format favours
   readability (named fields) over size.
+
+## Distribution
+
+### Installers, not a toolchain manager {#distribution}
+
+*Status: Implemented (Linux x86_64, Windows x86_64, the Nix flake); macOS planned.*
+
+**Decision.** Kagari ships as two prebuilt binaries, `kagari` and `kagari-desktop-runtime`, built
+by CI from a tag and uploaded to the download bucket. Linux gets a tarball and a Bash installer
+script, Windows a per-user installer, NixOS the flake's `stable` and `unstable` packages. There is
+no version manager (no `kagari-up`) and nothing updates by itself. The details are in
+[Releases](../process/releases.md).
+
+**Why.** A toolchain manager such as rustup exists to keep several toolchains side by side, pin
+one per project and add components. Kagari needs none of it: a project states the toolchain
+versions it accepts (`[toolchain] kagari`) and the engine versions it targets (`[build] targets`,
+runtime profiles) in its manifest, and one current `kagari` builds every supported target. Game
+authors must not need Rust or Cargo, so building from source is not the install path.
+
+**Consequences.**
+
+- The CLI finds the runtime next to its own executable (then on `PATH`), so every install puts
+  both binaries in one directory.
+- A project that needs another toolchain version installs that version
+  (`installer.sh --version`); two versions side by side are not supported.
+- The runtime a game ships is the author's installed runtime; packaging a game for another
+  platform needs that platform's runtime of the same version, which no command provides yet.
+- Rejected: a `kagari-up` installer and self-updater (the earlier plan in the Tutorial).

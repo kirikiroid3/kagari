@@ -118,7 +118,7 @@ vm panic: index out of range at crate::story::FirstDate (story.kis@1234), after 
 
 ## システム要件 {#system-requirements}
 
-実行時には、Vulkan、Metal、DirectX 12、OpenGL のいずれかの GPU ドライバが必要です。使えるハードウェアアダプタがない場合はソフトウェアのフォールバックアダプタを試し、それもなければステータス 4 で終了します。Linux ではさらに Wayland または X11 と ALSA が必要です。
+実行時には、Vulkan、Metal、DirectX 12、OpenGL のいずれかの GPU ドライバが必要です。使えるハードウェアアダプタがない場合はソフトウェアのフォールバックアダプタを試し、それもなければステータス 4 で終了します。Linux ではさらに Wayland または X11、ALSA、libudev が必要です。ビルド済みの Linux 版は、glibc 2.35 以降の x86_64 で動作します（[Kagari のインストール](../../tutorial/install.md#linux)を参照）。
 
 ソースからランタイムをビルドするには、次のシステムパッケージが必要です。
 

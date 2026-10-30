@@ -52,4 +52,5 @@
 
 - [Testing](./process/testing.md)
 - [Documentation](./process/docs.md)
+- [Releases](./process/releases.md)
 - [Open Questions](./process/open-questions.md)
