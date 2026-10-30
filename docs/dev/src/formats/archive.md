@@ -17,7 +17,8 @@ Where in the code:
 - `core/kagari-archive/src/le.rs`: bounds-checked little-endian accessors (the crate denies
   `unwrap`, `panic` and unchecked arithmetic).
 - Writers and readers: `tooling/kagari-cli/src/command/build/archives.rs` (packs assets),
-  `runtime/kagari-desktop-runtime/src/archives.rs` (opens chains),
+  `core/kagari-archive/src/archive/dir.rs` (`ArchiveDir`: a game directory's chains, opened on
+  first use by the desktop runtime and the debugger's headless platform),
   `runtime_libs/kagari-engine/src/store/` and `src/saves/` (`.kisave` content, see
   [Saves, Traces and Snapshots](../runtime/saves.md)).
 

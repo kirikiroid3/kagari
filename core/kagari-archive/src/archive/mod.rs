@@ -8,6 +8,7 @@
 mod build;
 mod chain;
 mod codec;
+mod dir;
 mod error;
 mod index;
 mod read;
@@ -18,6 +19,7 @@ mod tests;
 pub use build::{ArchiveBuilder, ArchiveOptions};
 pub use chain::{ArchiveChain, PatchedArchive, open_chain, patch_path};
 pub use codec::Codec;
+pub use dir::ArchiveDir;
 pub use error::Error;
 pub use index::{ArchiveIndex, BlockInfo, FileLoc, Header, Lookup, decode_block};
 pub use read::Archive;

@@ -7,7 +7,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use kagari_engine::{AssetStore, Frame, Platform, Timestamp};
 use kira::sound::static_sound::StaticSoundData;
 
-use crate::archives::Archives;
+use kagari_archive::archive::ArchiveDir;
+
 use crate::gpu::Gpu;
 use crate::sounds::SoundCache;
 use crate::store::Store;
@@ -35,7 +36,7 @@ pub const HEADLESS_TIME: Timestamp = Timestamp {
 };
 
 pub struct DesktopPlatform {
-    archives: Archives,
+    archives: ArchiveDir,
     store: Store,
     pub sounds: SoundCache,
     /// Set once the GPU exists (after the window opens, or at headless start).
@@ -52,7 +53,7 @@ impl DesktopPlatform {
         seed: SeedSource,
     ) -> DesktopPlatform {
         DesktopPlatform {
-            archives: Archives::new(game_dir),
+            archives: ArchiveDir::new(game_dir),
             store,
             sounds: SoundCache::default(),
             gpu: None,
@@ -69,7 +70,7 @@ impl DesktopPlatform {
         if self.sounds.failed(path) {
             return None;
         }
-        match self.archives.read(path) {
+        match self.read_asset(path) {
             Ok(Some(bytes)) => self.sounds.decode(path, &bytes),
             Ok(None) => {
                 log::warn!("audio `{path}` not found");
@@ -97,7 +98,9 @@ impl Platform for DesktopPlatform {
     }
 
     fn read_asset(&mut self, path: &str) -> io::Result<Option<Vec<u8>>> {
-        self.archives.read(path)
+        self.archives.read(path, |file| {
+            log::warn!("missing archive {}", file.display());
+        })
     }
 
     fn audio_duration_ms(&mut self, path: &str, bytes: &[u8]) -> Option<u32> {

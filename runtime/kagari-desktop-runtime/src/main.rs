@@ -10,7 +10,6 @@
 //! an input script.
 
 mod app;
-mod archives;
 mod audio;
 mod cli;
 mod exit;
