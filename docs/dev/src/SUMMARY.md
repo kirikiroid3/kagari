@@ -30,6 +30,7 @@
 
 - [The `.kagari` Format](./formats/kagari.md)
 - [Archives and Save Databases](./formats/archive.md)
+- [`.kagari-cache` Files](./formats/cache.md)
 
 # Runtime
 

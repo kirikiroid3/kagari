@@ -1,6 +1,6 @@
 ---
 name: kagari-analysis
-description: Load when changing THIR, MIR, const evaluation, story/system analysis or bytecode emission in core/kagari-lang (src/thir, src/mir, src/eval, src/analysis, src/emit) or their tests (tests/mir.rs, tests/bytecode.rs, tests/game_source/analysis).
+description: Load when changing THIR, MIR, const evaluation, story/system analysis, the analysis cache or bytecode emission in core/kagari-lang (src/thir, src/mir, src/eval, src/analysis, src/cache.rs, src/emit) or their tests (tests/mir.rs, tests/bytecode.rs, tests/game_source/analysis).
 ---
 
 # Kagari middle and back end (THIR → MIR → eval / analysis / emit)
@@ -12,7 +12,11 @@ description: Load when changing THIR, MIR, const evaluation, story/system analys
 - `core/kagari-lang/src/eval/` — stage 4: `const_eval`, per-item queries, MIR executor
   (`eval/machine`), tabulation, renders/keyframes, compile-time `Screen` model.
 - `core/kagari-lang/src/analysis/` — stage 5: termination, story exploration, screens,
-  keyframes, influence (`W5010`), system mode graph (`E6xxx`).
+  keyframes, influence (`W5010`), system mode graph (`E6xxx`). `analysis/story/graph.rs`
+  converts the explored state space (`Explored`) into the persisted `kagari_debug::StoryGraph`.
+- `core/kagari-lang/src/cache.rs` — reuse of stage 5 across runs: `source_fingerprint` (sources
+  incl. std, compile options, asset/font dirs, toolchain version, `FINGERPRINT_SALT`),
+  `offer_analysis_cache`, `analysis_cache_use`; the CLI stores it as `analysis.kagari-cache`.
 - `core/kagari-lang/src/emit/` — stage 6: module tables, instances, codegen, regalloc.
 - Not here: parsing, resolution, inference, stage-3 checks (`kagari-syntax`, `hir`, `resolve`,
   `infer`, `typeck`), the bytecode format itself (`core/kagari-bytecode`), the VM/engine.
@@ -27,6 +31,7 @@ Develop Guide (`docs/dev/src/`):
 - `compiler/emit.md` — instances, regalloc, constants, builtins → intrinsics/imports, terminators.
 - `compiler/pipeline.md` and `compiler/diagnostics.md` for salsa queries and `Diag`/`Anchor`.
 - `formats/kagari.md` when touching emitted instructions or tables.
+- `formats/cache.md` — the analysis cache and the debug artifact (story graph, debug info).
 
 ## Invariants
 
@@ -46,6 +51,11 @@ Develop Guide (`docs/dev/src/`):
   state is exactly (block, kept locals, story variables) within a context (scene, args, globals).
 - **Diagnostics.** Raise errors as `Fault`/`Diag` with an `Anchor` (never text ranges); report only
   for game-crate items; stage 5 runs only without errors from stages 1–4.
+- **Analysis cache.** Stage-5 diagnostics are reused whenever the fingerprint matches. A change
+  to what the analysis computes or reports for the same sources (a new check, a changed rule or
+  message) must bump `FINGERPRINT_SALT` in `core/kagari-lang/src/cache.rs`; a change to the stored
+  shape (`StoryGraph`, diagnostic records) must also bump `kagari_debug::SCHEMA`. A new input the
+  analysis reads that stages 1–4 do not guard goes into `source_fingerprint`.
 - Crate lints deny `unwrap`, `expect`, `panic` and `arithmetic_side_effects`: use `get`,
   `checked_*`/`saturating_*`, and `stacker::maybe_grow` in recursive walkers.
 
@@ -61,7 +71,8 @@ Develop Guide (`docs/dev/src/`):
    `System`/settings boilerplate).
 4. Add exactly one `## CODE name` entry to `docs/site/src/content/docs/{en,ja}/diagnostics/*.md`
    (`tests/diagnostics_book.rs` fails otherwise).
-5. Document the algorithm in `docs/dev/src/compiler/analysis.md`.
+5. Document the algorithm in `docs/dev/src/compiler/analysis.md`; bump `FINGERPRINT_SALT`
+   (`src/cache.rs`) so that existing analysis caches are not reused.
 
 ### Change lowering (THIR/MIR)
 
@@ -78,6 +89,9 @@ Develop Guide (`docs/dev/src/`):
    possibly a format version bump; update `docs/dev/src/formats/kagari.md` and `runtime/vm.md`.
 3. Any byte change alters every game's script hash: say so in the change description.
 4. Review `tests/snapshots/bytecode__*.snap`; `tests/bytecode.rs` also checks the decode round trip.
+5. `emit/mod.rs` also builds `kagari_debug::DebugInfo` (local names, register ranges, scopes,
+   body hash per function) for debug builds; keep it in step with register allocation, and never
+   let it change the bytecode (`emit/tests.rs::debug_info_describes_every_function`).
 
 ### Add a const builtin
 
@@ -102,6 +116,7 @@ Unit tests: `eval/tests.rs`, `analysis/story/tests.rs`, `emit/tests.rs`. Runtime
 ## Docs to update
 
 - Develop Guide: the matching `docs/dev/src/compiler/*.md` chapter; `formats/kagari.md` for bytecode;
+  `formats/cache.md` for the story graph, debug info or analysis cache;
   `process/open-questions.md` when a tentative limit changes.
 - Site, en + ja: Diagnostics pages for any code change; Language Reference pages for user-visible
   rules (termination, consistency, keyframes, constant expressions, compiler options).

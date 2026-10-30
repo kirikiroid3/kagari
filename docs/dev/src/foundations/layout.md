@@ -26,7 +26,6 @@ with `{ workspace = true }`. Every crate root denies `clippy::unwrap_used`, `cli
 <!-- diagram: layout-crates (mermaid-ish)
 flowchart TD
   cli["kagari-cli (bin kagari)"] ==> lsp["kagari-lsp"]
-  cli ==> archive["kagari-archive"]
   lsp ==> project["kagari-project"]
   lsp ==> fmt["kagari-fmt"]
   project ==> compat["kagari-compat"]
@@ -36,6 +35,8 @@ flowchart TD
   lang ==> std["kagari-std"]
   lang ==> num["kagari-num"]
   lang ==> bytecode["kagari-bytecode"]
+  lang ==> debug["kagari-debug"]
+  debug ==> archive["kagari-archive"]
   compat ==> bytecode
   desktop["kagari-desktop-runtime (bin)"] ==> render["kagari-render"]
   render ==> engine["kagari-engine"]
@@ -62,11 +63,12 @@ The graph omits edges that other edges imply (for example `kagari-cli` also depe
 | `kagari-num` | — | — |
 | `kagari-bytecode` | — | — |
 | `kagari-archive` | — | `lz4_flex`, `crc32fast` |
-| `kagari-lang` | `kagari-bytecode`, `kagari-num`, `kagari-syntax`, `kagari-std` | `salsa`, `rowan`, `la-arena`, `imbl`, `triomphe`, `smallvec`, `stacker` |
+| `kagari-debug` | `kagari-archive` | — |
+| `kagari-lang` | `kagari-bytecode`, `kagari-debug`, `kagari-num`, `kagari-syntax`, `kagari-std` | `salsa`, `rowan`, `la-arena`, `imbl`, `triomphe`, `smallvec`, `stacker`, `sha2` |
 | `kagari-fmt` | `kagari-syntax` | `unicode-width` |
 | `kagari-project` | `kagari-compat`, `kagari-lang` | `toml`, `serde`, `semver` |
 | `kagari-lsp` | `kagari-lang`, `kagari-syntax`, `kagari-std`, `kagari-fmt`, `kagari-project` | `lsp-server`, `lsp-types`, `salsa` |
-| `kagari-cli` | `kagari-archive`, `kagari-bytecode`, `kagari-compat`, `kagari-fmt`, `kagari-lang`, `kagari-lsp`, `kagari-project`, `kagari-syntax` | `clap` |
+| `kagari-cli` | `kagari-archive`, `kagari-bytecode`, `kagari-compat`, `kagari-fmt`, `kagari-lang`, `kagari-lsp`, `kagari-project`, `kagari-syntax` | `clap`, `sha2` |
 | `mdbook-kagari` | — | `mdbook-preprocessor`, `mdbook-markdown`, `tree-sitter`, `cc` (build) |
 | `kagari-compat` | `kagari-bytecode` | — |
 | `kagari-vm` | `kagari-bytecode`, `kagari-num` (dev: `kagari-lang`) | — |
@@ -81,8 +83,8 @@ Two rules follow from the graph and must stay true:
   and the desktop runtime reach `kagari-lang` only as a dev-dependency, to compile test fixtures.
   A shipped runtime contains no compiler.
 - **The compiler does not depend on the runtime.** `kagari-lang` shares only `kagari-bytecode`
-  (the format) and `kagari-num` (exact numbers, so const evaluation and the VM compute the same
-  values) with it.
+  (the format), `kagari-num` (exact numbers, so const evaluation and the VM compute the same
+  values) and `kagari-debug` (the story graph and debug information a debugger reads) with it.
 
 ## `core/`
 
@@ -118,6 +120,12 @@ can use it. See [The `.kagari` Format](../formats/kagari.md).
 solid blocks, CRC32, numbered patch chains) and `.kisave` save databases (16 KiB pages, in-place
 edits, `compact()`). Used by `kagari build` to pack assets and by the runtime to read assets and
 store saves and settings. See [Archives and Save Databases](../formats/archive.md).
+
+**`kagari-debug`** — `.kagari-cache` files over the `.kisave` container: the explored story graph
+(`StoryGraph`, with a walk from the roots to every reached step ID), the debug information of a
+debug build (`DebugInfo`), and the two file kinds, the analysis cache and the debug artifact.
+The compiler writes them; a debugger or query engine reads them without the compiler. See
+[`.kagari-cache` Files](../formats/cache.md).
 
 ## `tooling/`
 

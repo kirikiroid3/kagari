@@ -11,8 +11,10 @@ where they report.
 
 | Path | Contents |
 | ---- | -------- |
-| `core/kagari-lang/src/analysis/mod.rs` | `analysis(db, program)` (salsa): story, influence and system checks |
-| `core/kagari-lang/src/analysis/story/mod.rs` | `check`: collects scenes and story variables, runs the story analyses in order; `SCREEN_CAP` |
+| `core/kagari-lang/src/analysis/mod.rs` | `analysis(db, program)` (salsa): story, influence and system checks; `story_graph` |
+| `core/kagari-lang/src/analysis/story/mod.rs` | `story_analysis` (salsa, `no_eq`): collects scenes and story variables, runs the story analyses in order and keeps the explored graph; `SCREEN_CAP` |
+| `core/kagari-lang/src/analysis/story/graph.rs` | The explored graph as `kagari_debug::StoryGraph`, the form `.kagari-cache` files store |
+| `core/kagari-lang/src/cache.rs` | `source_fingerprint`, `analysis_diagnostics`, reusing an offered analysis cache |
 | `core/kagari-lang/src/analysis/story/termination.rs` | Stepless loops (`E5001`) and stepless call cycles (`E5002`) |
 | `core/kagari-lang/src/analysis/story/liveness.rs` | `scene_kept` (salsa, per scene): the locals each suspension keeps |
 | `core/kagari-lang/src/analysis/story/segment.rs` | Running a scene from one suspension to the next in the MIR executor |
@@ -27,20 +29,24 @@ where they report.
 | `core/kagari-lang/src/analysis/system/code.rs` | The code of each mode: transitive closure of per-item summaries |
 | `core/kagari-lang/src/analysis/system/summary.rs` | `system_summary` (salsa, per item): navigation operations, calls and bindings from MIR |
 | `core/kagari-lang/tests/game_source/analysis/*` | Snapshot fixtures: system, bindings, influence, termination, story, screens, rng |
+| `core/kagari-lang/tests/analysis_cache.rs` | The persisted graph (step IDs, arm IDs, draws, kept locals) and reuse of a cached analysis (salsa events) |
 
 ## When stage 5 runs
 
-`pipeline::check` collects the diagnostics of stages 1–4 and calls `analysis` only when none of
-them is an error: the analyses execute the story and assume well-typed, well-kinded code. Inside
-`analysis`, the three parts are independent:
+`pipeline::check` collects the diagnostics of stages 1–4 (`front_diagnostics`) and asks for the
+stage-5 diagnostics (`cache::analysis_diagnostics`) only when none of them is an error
+(`analysis_runs`): the analyses execute the story and assume well-typed, well-kinded code.
+`analysis_diagnostics` returns the diagnostics of an offered analysis cache when its fingerprint
+matches (see [Reusing the analysis](#reusing-the-analysis)), else resolves those of `analysis`.
+Inside `analysis`, the three parts are independent:
 
 ```rust
-let mut diagnostics = story::check(db, program);
+let mut diagnostics = story::story_analysis(db, program).diagnostics.clone();
 diagnostics.extend(influence::check(db, program));
 diagnostics.extend(system::check(db, program));
 ```
 
-`story::check` runs in a fixed order:
+`story_analysis` runs in a fixed order:
 
 1. Collect every scene (a `#[scene] pushdown fn` with a body, its MIR and kept locals) and every
    story variable (`static mut`), in load order.
@@ -51,6 +57,10 @@ diagnostics.extend(system::check(db, program));
    found on reachable states is real).
 5. **Reachability** (`W5008`, `W5009`), only when the exploration was complete.
 6. **Keyframe placement** (`W5011`), only when `CompileOptions::keyframe_check` is on.
+
+It returns the diagnostics together with the `Explored` graph and the item of every scene. The
+query is `no_eq`: the graph is large, has no cheap equality, and every change that reaches it
+changes the diagnostics anyway.
 
 Diagnostics are reported only for scenes and story variables of the game crate.
 
@@ -134,7 +144,7 @@ uninitialized local), each assignment of story variables once (`GlobalsId`: an `
 | Concept | Key | Contents |
 | ------- | --- | -------- |
 | Context (`CtxId`) | `(FnRef, args: [ValueId], GlobalsId)` | A scene entered with argument values and story variables; its entry target, nodes, exits and callers |
-| Node (`NodeId`, per context) | `(BasicBlock, FrameId, GlobalsId)` | A suspension state: `Step { expr, render, choice, succ }`, `Call { callee: CtxId, succ: [(ExitId, Target)] }` or `Rng { succ }` |
+| Node (`NodeId`, per context) | `(BasicBlock, FrameId, GlobalsId)` | A suspension state: `Step { expr, render, choice, outcomes, succ }` (`outcomes`: per successor, the arm's position in the choice's arm list and the resume value; `(0, ())` for a `Say`), `Call { callee: CtxId, succ: [(ExitId, Target)] }` or `Rng { draws, succ }` (`draws`: the drawn value per successor) |
 | Exit (`ExitId`, per context) | `ExitData { ret, globals, outs }` | A way the context returns: value, story variables, final values of `&mut` parameters |
 | `Target` | — | Where a resumption leads: `Node(id)`, `Exit(id)`, or `Dead` (an error, or a path the analysis gave up) |
 
@@ -319,6 +329,54 @@ Handlers can still run forever; nothing in the proposal depends on them terminat
 compiler does not check it. Exhaustive endings are ordinary `match` exhaustiveness in the exit
 handler.
 
+## The persisted story graph
+
+`analysis::story_graph(db, program)` turns the `Explored` graph of `story_analysis` into a
+`kagari_debug::StoryGraph` (`story/graph.rs`), the form `.kagari-cache` files store (layout in
+[`.kagari-cache` Files](../formats/cache.md)). It is computed on demand: the language server never
+pays for it. Every index (values, frames, story-variable sets, contexts, nodes, exits) is the
+`Explored` index, so the graph is the analysis's own state space, renamed for readers that do not
+link the compiler:
+
+| `Explored` | `StoryGraph` |
+| ---------- | ------------ |
+| `ConstValue` | `Value`, named the way saves name values: ADTs by type path (`paths::item_path`) and variant name, assets by bytecode path (`assets::bytecode_path`), handles by static path; functions by instance path (`paths::generic_args_suffix`), closures as `{owner}::{closure#N}` (`paths::closure_number`), screens opaque |
+| `Context::fn_ref` | `Context::path`: the instance path the bytecode gives the scene, so `{path}#{ordinal}` is the step ID of the bytecode and the runtime |
+| `NodeKind::Step` | `Say { step, render, next }` or `Choice { step, render, arms }`; `step` is the ordinal of the block's `Terminator::Step`; a shown arm is named by its **arm ID**, as `saves::trace::arm_id` in the engine names it: `{type path}::{variant}` for an ADT value, else `#{position in the arm list}` |
+| `NodeKind::Call` | `Call { callee, exits: [(exit, target)] }` |
+| `NodeKind::Rng` | `Draw { draws: [(value, target)] }` |
+| the kept locals of a block (`scene_kept`) | `Scene::points`: per block some node is at, the binding names of its kept locals in frame order (`""` for a temporary) |
+| `Explored::vars` | `StoryGraph::vars`: story-variable paths |
+| `Explored::complete` and the `W5006`/`W5007` diagnostics | `complete`, `incomplete: [{code, message}]` |
+
+A render that the exploration never interned is appended to `values`.
+
+## Reusing the analysis
+
+The exploration is the expensive part of a build. The CLI keeps its result in
+`<out-dir>/analysis.kagari-cache` and offers it to the next run, so an unchanged program is not
+analyzed again (`cache.rs`; the CLI side is in [Projects and the CLI](../tooling/cli.md)). The
+language server never offers one: salsa already memoizes the analysis there.
+
+- `source_fingerprint(db, program)` (salsa) is a SHA-256 over every input stage 5 reads that
+  stages 1–4 do not already guard: a salt (`FINGERPRINT_SALT`), the toolchain version, every
+  `CompileOptions` field, the asset root and the system-font directories, and the path, crate
+  and text of every file of `def_maps` (std included), each length-prefixed. Asset *existence*
+  is not part of it: a missing asset is a stage 1–4 error, and then stage 5 does not run.
+- `Program::analysis_cache` is a salsa input field, `None` unless a tool calls
+  `offer_analysis_cache(db, program, &cache)`, which converts the cached diagnostic records back
+  to `Diagnostic`s (an unknown code or an inverted range refuses the whole offer).
+- `analysis_diagnostics` (salsa) returns the offered diagnostics when the offered fingerprint
+  equals `source_fingerprint`, without running `analysis`; otherwise it resolves the diagnostics
+  of `analysis`. Reading the field only when it is set keeps the language server from computing
+  the fingerprint.
+- After `check`, `analysis_cache_use` reports `NotRun` (errors in stages 1–4), `Reused`, or
+  `Fresh(cache)`: the fingerprint, the resolved stage-5 diagnostics and `story_graph`, for the tool
+  to write.
+
+The test `tests/analysis_cache.rs` observes the reuse through salsa events: with a matching offer,
+`story_analysis` never executes.
+
 ## Compiler options
 
 `kagari_lang::CompileOptions` (`input.rs`) is part of the salsa `Program` input; build it with
@@ -332,7 +390,8 @@ options)`. `kagari-project` fills it from `kagari.toml`.
 | `recursion_depth` | `[build] recursion-depth` | 2048 (`DEFAULT_RECURSION_DEPTH`) | Emission: written into the bytecode as `max_call_depth` |
 | `system_fonts` | `[assets] system-fonts` | `true` | Name resolution of `system_font("…")` (`E1031` when off) |
 
-Changing an option invalidates the queries that read it, not the whole database.
+Changing an option invalidates the queries that read it, not the whole database, and changes the
+source fingerprint.
 
 ## Invariants
 
@@ -348,6 +407,10 @@ Changing an option invalidates the queries that read it, not the whole database.
   segments by the machine budget, screens by `SCREEN_CAP`.
 - The analyses read MIR and run the same executor as stage 4, so the story they check is the
   story codegen emits.
+- An offered analysis is reused only for the exact inputs it was computed from (equal
+  `source_fingerprint`); the cached and the fresh diagnostics of a program are the same list.
+- The persisted graph names everything as the bytecode and the engine do (paths, step IDs, arm
+  IDs); it holds no `ItemId`, `ExprId` or text range.
 
 ## When you change this
 
@@ -358,12 +421,18 @@ Changing an option invalidates the queries that read it, not the whole database.
   `tests/game_source/analysis/`, and one entry per language in the Reference's diagnostics
   appendix.
 - **A new suspension or call form.** Update `liveness.rs` (what the state keeps), `segment.rs`
-  (resume and stop), `termination.rs`, `explore/mod.rs` (`settle`), `screens.rs` and
-  `keyframes.rs` (node kinds).
+  (resume and stop), `termination.rs`, `explore/mod.rs` (`settle`), `screens.rs`,
+  `keyframes.rs` and `graph.rs` (node kinds), and `kagari_debug::NodeKind` with its schema.
 - **A change to what a state contains** changes the number of states of every story: check the
   analysis snapshots and the `state_cap` default.
+- **Anything that changes the analysis's results for the same sources** (a new check, a changed
+  message, a different exploration): bump `FINGERPRINT_SALT` in `cache.rs`, or caches written by
+  the same toolchain version are reused with the old results. A new input the analysis reads goes
+  into `source_fingerprint`.
+- **A change to the stored graph** (`StoryGraph` fields or their meaning): bump
+  `kagari_debug::SCHEMA` and update [`.kagari-cache` Files](../formats/cache.md).
 - **A system check.** `analysis/system/` plus fixtures `analysis/001__system`, `002__system_bindings`
   and `ui/*`; the Reference's game-system chapter (en and ja).
 - **An option.** `CompileOptions`, `kagari-project`'s manifest (and its tests), the Reference's
-  project chapter (en and ja), and the table above.
+  project chapter (en and ja), the table above, and `source_fingerprint`.
 - Run `cargo test -p kagari-lang` and review `tests/snapshots/game_source__*.snap`.

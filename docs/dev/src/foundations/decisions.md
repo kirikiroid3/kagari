@@ -451,3 +451,31 @@ separately, on HIR, with Maranget-style usefulness and constructor splitting
 **Why.** Decision trees test each place once and give plain `SwitchVariant`/`SwitchBool`
 terminators that every MIR consumer understands. Exhaustiveness is a check, so it belongs with the
 other checks before lowering.
+
+### Debug builds persist the story graph; the analysis is cached by fingerprint {#debug-builds}
+
+*Status: Implemented.*
+
+**Decision.** `kagari build --profile debug` writes `game.kagari-cache` next to `game.kagari`: the
+explored story graph, debug information per function, and the script hash of the bytecode. The
+bytecode is the same in both profiles. `kagari check` and `kagari build` keep the story analysis in
+`<out-dir>/analysis.kagari-cache`, keyed by a fingerprint of every input the analysis reads, and
+reuse it while the sources are unchanged. Both files are `.kisave` databases, uncompressed, read
+through the `kagari-debug` crate.
+
+**Why.** The analysis already computes every reachable story state and used to throw it away; a
+query engine and a debugger need it, and runtime crates cannot recompute it because they must not
+depend on the compiler. The exploration is the expensive part of a build (seconds at the default
+`state-cap`, against a quarter of a second to read the cache back), and its result depends only on
+inputs the compiler can enumerate. A fingerprint over the sources, rather than the script hash,
+lets `check` use the cache without emitting bytecode. `.kisave` already is a validated, versioned
+tree database; a new container would duplicate it.
+
+**Consequences.**
+
+- The bytecode does not depend on the profile, so determinism and saves do not either.
+- A change to what the analysis computes must bump the fingerprint salt, and a change to the stored
+  shape the cache schema ([`.kagari-cache` Files](../formats/cache.md)).
+- `kagari check` writes into the output directory; `kagari clean` removes what the CLI writes.
+- The files are large for large stories (about 140 MiB at 200 000 states); the format favours
+  readability (named fields) over size.

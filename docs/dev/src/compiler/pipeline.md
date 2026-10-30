@@ -14,7 +14,8 @@ programs without errors.
 | `core/kagari-lang/src/lib.rs` | Crate docs, public API (`check`, `build`, `parse`, `RootDatabase`, `Diagnostic`, …) |
 | `core/kagari-lang/src/db.rs` | `Db` trait, `RootDatabase`, `FileSystem` (`OsFileSystem`, `MemoryFileSystem`) |
 | `core/kagari-lang/src/input.rs` | Salsa inputs `SourceFile`, `AssetFile`, `Program`; `FilePath`; `CompileOptions`; `file_exists` |
-| `core/kagari-lang/src/pipeline.rs` | `check`: every diagnostic of stages 1–5, and the analysis gate |
+| `core/kagari-lang/src/pipeline.rs` | `check`: every diagnostic of stages 1–5 (`front_diagnostics` for 1–4), and the analysis gate (`analysis_runs`) |
+| `core/kagari-lang/src/cache.rs` | `source_fingerprint`, `analysis_diagnostics`, `offer_analysis_cache`, `analysis_cache_use`: reusing stage 5 across runs |
 | `core/kagari-lang/src/emit/mod.rs` | `build`: `check`, then stage 6 (see [Emitting Bytecode](./emit.md)) |
 | `core/kagari-lang/src/parse_query.rs` | `parse`, the bridge to `kagari-syntax` |
 | `core/kagari-lang/src/item_tree.rs`, `hir/` | Stage 1 queries after parsing (see [Name Resolution and HIR](./resolve.md)) |
@@ -76,7 +77,7 @@ work happens.
 | ----- | ------ | ---------- |
 | `SourceFile` | `path: FilePath`, `text: Option<Arc<str>>` (`None`: missing or unreadable) | `Db::source_file(path)`, on first use |
 | `AssetFile` | `path: FilePath`, `exists: bool` | `Db::asset_file(path)`, on first use |
-| `Program` | `root: SourceFile`, `asset_root: FilePath`, `font_dirs: Arc<[FilePath]>`, `options: CompileOptions` | `RootDatabase::program`, `program_with`, `program_with_assets` |
+| `Program` | `root: SourceFile`, `asset_root: FilePath`, `font_dirs: Arc<[FilePath]>`, `options: CompileOptions`, `analysis_cache: Option<Arc<CachedAnalysis>>` (`None` at creation) | `RootDatabase::program`, `program_with`, `program_with_assets` |
 
 - `FilePath` is either `Std(name)` (a file embedded in `kagari-std`, `/`-separated relative to the
   std directory, read with `kagari_std::file`) or `Disk(path)` (absolute, lexically normalized).
@@ -85,8 +86,9 @@ work happens.
   `Arc<Mutex<…>>`, so one path always maps to one input. The first request for a path reads the
   file (or checks existence) through the `FileSystem` the database was created with:
   `OsFileSystem` for the tools, `MemoryFileSystem` for tests.
-- After creation an input changes only through a setter: `set_file_text(path, text)` and
-  `set_asset_exists(path, exists)`. The database never re-reads the disk by itself.
+- After creation an input changes only through a setter: `set_file_text(path, text)`,
+  `set_asset_exists(path, exists)` and `cache::offer_analysis_cache(db, program, cache)`. The
+  database never re-reads the disk by itself.
 - `file_exists(file)` is a tracked query that reads only whether `text` is `Some`. `mod` lookup uses
   it, so editing a module's text does not re-run module discovery of its parent.
 - `program_with` uses the root file's directory as the asset root and no font directories;
@@ -126,7 +128,11 @@ names carry `::interned_arguments`).
 | `instant_recursion` | `Program` | `Diag`s | Program-wide cycle check |
 | `thir`, `item_mir` | `(Program, ItemId)` | `Option<…>` | Lowering; no diagnostics |
 | `std_table`, `const_value`, `static_value`, `promoted_value`, `const_eval` | `Program` (+ item) | values, `Diag`s | `const_value`/`static_value` have `cycle_result` (`E4006`) |
+| `story_analysis` | `Program` | `StoryAnalysis` | `no_eq`; stage 5's story part, keeps the explored graph |
 | `analysis` | `Program` | `Analysis` | Stage 5 |
+| `front_diagnostics` | `Program` | `Vec<Diagnostic>` | Stages 1–4, resolved, unsorted |
+| `source_fingerprint` | `Program` | `String` | SHA-256 of every input stage 5 reads; computed only when an analysis cache is offered |
+| `analysis_diagnostics` | `Program` | `Vec<Diagnostic>` | Stage 5, resolved: the offered cache's when its fingerprint matches, else `analysis`'s |
 | `check` | `Program` | `Vec<Diagnostic>` | Resolved, sorted, deduplicated |
 
 ### Firewalls: raw queries and projections
@@ -180,16 +186,17 @@ There are two kinds of interning:
 ### What is cached, and for how long
 
 Every tracked query is memoized for the life of the database. The CLI creates a fresh
-`RootDatabase` per command, so caching only shares work inside one run (`build` reuses everything
-`check` computed). The language server keeps one database for the whole session, so the
-firewalls above are what makes typing cheap.
+`RootDatabase` per command, so salsa only shares work inside one run (`build` reuses everything
+`check` computed). Across runs, the CLI keeps the one expensive result, stage 5, on disk and offers
+it back (see [Reusing the analysis](./analysis.md#reusing-the-analysis)). The language server
+keeps one database for the whole session, so the firewalls above are what makes typing cheap.
 
 ## How the tools drive the pipeline
 
 | Driver | What it does |
 | ------ | ------------ |
-| `kagari check` | Loads the project, `RootDatabase::new(Arc::new(OsFileSystem))`, `project.program(&db)`, `check`, prints `render_diagnostics` relative to the project root. `--resolutions` adds `debug::resolution_dump`. Exits 1 when there is an error. Emit errors (`E7xxx`) never appear here: only `build` emits. |
-| `kagari build` | Same setup, then `kagari_lang::build`: `check`; if there is an error, no module; otherwise emit, verify (`E7003` on failure), report `E7001` without `fn main`, encode. The CLI then checks asset compatibility and writes archives (see [Projects and the CLI](../tooling/cli.md)). |
+| `kagari check` | Loads the project, `RootDatabase::new(Arc::new(OsFileSystem))`, `project.program(&db)`, offers `<out-dir>/analysis.kagari-cache`, `check`, writes the cache when the analysis ran, prints `render_diagnostics` relative to the project root. `--resolutions` adds `debug::resolution_dump`. Exits 1 when there is an error. Emit errors (`E7xxx`) never appear here: only `build` emits. |
+| `kagari build` | Same setup, then `kagari_lang::build`: `check`; if there is an error, no module; otherwise emit, verify (`E7003` on failure), report `E7001` without `fn main`, encode. The CLI then checks asset compatibility and writes archives and, for a debug build, the debug artifact (see [Projects and the CLI](../tooling/cli.md)). |
 | Language server | One `RootDatabase` (`OsFileSystem`) per session. `didOpen`/`didChange` call `set_file_text` with the editor's text, `didClose` with the disk text; watched-file events call `set_file_text` for `.kis`/`.kix` files that are not open, `set_asset_exists` for files under a project's asset directory, and reload the projects when a `kagari.toml` changes. Every change spawns a thread with a clone of the database that runs `check` for each loaded project; a later write cancels it (`salsa::Cancelled::catch`). Open files outside every project get only `kagari_syntax::parse` errors. See [Language Server and Editors](../tooling/lsp.md) and [IDE Layer](./ide.md). |
 | Tests | `RootDatabase::new` over `OsFileSystem` (fixture directories) or `MemoryFileSystem`; `RootDatabase::with_event_callback` to observe salsa events. |
 
@@ -223,8 +230,9 @@ stage 5. See [Name Resolution and HIR](./resolve.md#hir) and [THIR and MIR](./mi
 `check` collects, in this order: def-map diagnostics, `program_signatures` diagnostics, then per
 loaded file its parse errors (as `E0001`), item-tree diagnostics, signature and body resolution,
 inference, pattern checks and kind checks of every item; then `instant_recursion` and
-`const_eval`. If none of these has `Severity::Error`, it adds `analysis(program)`. Finally it sorts
-by `(file, start, end, code, message)` and removes exact duplicates.
+`const_eval` (`front_diagnostics`). If none of these has `Severity::Error` (`analysis_runs`), it
+adds `analysis_diagnostics(program)`. Finally it sorts by `(file, start, end, code, message)` and
+removes exact duplicates.
 
 > **Decision.** Stage 5 runs only on a program with no errors from stages 1–4.
 >
@@ -246,8 +254,8 @@ std produces none, and `kagari-lang`'s fixtures would show them if it did.
 - No diagnostics from lowering (`thir/`, `mir/`). Lowering returns `None` instead of guessing.
 - `check` runs `analysis` only when stages 1–4 have no error; `build` emits only when `check` has no
   error.
-- Inputs change only through `set_file_text` / `set_asset_exists`; queries never do I/O except
-  through `Db::source_file` / `Db::asset_file`, which create inputs.
+- Inputs change only through `set_file_text` / `set_asset_exists` / `offer_analysis_cache`;
+  queries never do I/O except through `Db::source_file` / `Db::asset_file`, which create inputs.
 - `crate::intern` tables are global and never freed: intern only small, structural values (types,
   generic argument lists), never per-revision data.
 - `incremental.rs` keeps passing: an edit inside one body re-runs only that body's queries and
