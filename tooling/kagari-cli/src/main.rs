@@ -1,11 +1,13 @@
 #![deny(clippy::unwrap_used, clippy::panic, clippy::expect_used, clippy::arithmetic_side_effects)]
 
-//! The `kagari` command: create, check, build and format Kagari projects, disassemble
+//! The `kagari` command: create, check, build, clean and format Kagari projects, disassemble
 //! bytecode, and run the language server.
 
+mod analysis_cache;
 mod cli;
 mod command;
 mod failure;
+mod outputs;
 mod workspace;
 
 use std::process::ExitCode;
@@ -25,7 +27,9 @@ fn main() -> ExitCode {
         Command::Build {
             manifest_path,
             targets,
-        } => command::build::run(manifest_path.as_deref(), &targets),
+            profile,
+        } => command::build::run(manifest_path.as_deref(), &targets, profile),
+        Command::Clean { manifest_path } => command::clean::run(manifest_path.as_deref()),
         Command::Fmt {
             check,
             manifest_path,

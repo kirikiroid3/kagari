@@ -21,6 +21,7 @@ kagari-shader = { workspace = true, features = ["validate"] }
 kagari-std = { workspace = true }
 kagari-syntax = { workspace = true }
 clap = { workspace = true }
+sha2 = { workspace = true }
 
 [dev-dependencies]
 kagari-archive = { workspace = true }

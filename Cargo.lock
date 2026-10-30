@@ -1576,6 +1576,7 @@ dependencies = [
  "kagari-shader",
  "kagari-std",
  "kagari-syntax",
+ "sha2",
  "tempfile",
 ]
 
