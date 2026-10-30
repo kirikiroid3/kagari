@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "core/kagari-archive",
     "core/kagari-num",
+    "core/kagari-debug",
     "core/kagari-bytecode",
     "core/kagari-lang",
     "core/kagari-std",
@@ -31,6 +32,7 @@ edition = "2024"
 [workspace.dependencies]
 kagari-archive = { path = "core/kagari-archive" }
 kagari-num = { path = "core/kagari-num" }
+kagari-debug = { path = "core/kagari-debug" }
 kagari-bytecode = { path = "core/kagari-bytecode" }
 kagari-lang = { path = "core/kagari-lang" }
 kagari-syntax = { path = "core/kagari-syntax" }
