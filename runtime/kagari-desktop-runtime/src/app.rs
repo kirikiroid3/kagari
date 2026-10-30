@@ -14,6 +14,7 @@ use winit::window::{Fullscreen, Window, WindowId};
 
 use crate::audio::AudioOut;
 use crate::cli::{BackendArg, Cli};
+use crate::debug::DebugPort;
 use crate::exit::{Failure, STOPPED, WINDOW};
 use crate::game;
 use crate::gpu;
@@ -33,6 +34,7 @@ pub fn run(cli: &Cli, dir: &Path, bytes: &[u8]) -> Result<u8, Failure> {
     };
     let mut platform = DesktopPlatform::new(dir, store, TimeSource::Local, SeedSource::System);
     let engine = game::boot(bytes, &mut platform)?;
+    let debug = DebugPort::open(cli, dir)?;
 
     let event_loop = build_event_loop(cli.backend)?;
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_with_display_handle(
@@ -52,6 +54,7 @@ pub fn run(cli: &Cli, dir: &Path, bytes: &[u8]) -> Result<u8, Failure> {
         design: ws.resolution,
         exit: None,
         idle: false,
+        debug,
     };
     event_loop
         .run_app(&mut app)
@@ -123,6 +126,8 @@ struct App {
     exit: Option<u8>,
     /// Nothing could be drawn this frame: wait instead of spinning.
     idle: bool,
+    /// The debug channel, when `--debug-port` or `--debug-stdio` opened one.
+    debug: Option<DebugPort>,
 }
 
 impl App {
@@ -220,6 +225,9 @@ impl App {
         let now = self.now();
         for event in self.pads.poll() {
             self.engine.input(event, &mut self.platform, now);
+        }
+        if let Some(debug) = self.debug.as_mut() {
+            debug.poll(&mut self.engine, &mut self.platform, now);
         }
         self.engine.update(&mut self.platform, now);
         if self.exit.is_none()
