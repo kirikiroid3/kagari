@@ -29,7 +29,7 @@ where they report.
 | `core/kagari-lang/src/analysis/system/code.rs` | The code of each mode: transitive closure of per-item summaries |
 | `core/kagari-lang/src/analysis/system/summary.rs` | `system_summary` (salsa, per item): navigation operations, calls and bindings from MIR |
 | `core/kagari-lang/tests/game_source/analysis/*` | Snapshot fixtures: system, bindings, influence, termination, story, screens, rng |
-| `core/kagari-lang/tests/analysis_cache.rs` | The persisted graph (step IDs, arm IDs, draws, kept locals) and reuse of a cached analysis (salsa events) |
+| `core/kagari-lang/tests/analysis_cache.rs` | The persisted graph (step IDs, arm IDs, draws, kept locals, keyframe renders) and reuse of a cached analysis (salsa events) |
 
 ## When stage 5 runs
 
@@ -348,6 +348,7 @@ link the compiler:
 | the kept locals of a block (`scene_kept`) | `Scene::points`: per block some node is at, the binding names of its kept locals in frame order (`""` for a temporary) |
 | `Explored::vars` | `StoryGraph::vars`: story-variable paths |
 | `Explored::complete` and the `W5006`/`W5007` diagnostics | `complete`, `incomplete: [{code, message}]` |
+| `RenderInfo::keyframe` of `const_eval`'s `renders` (computed for every step render, whether or not `keyframe_check` is on) | `StoryGraph::keyframes`: the value indices of the keyframe renders the nodes refer to, ascending (`keyframes::is_keyframe`) |
 
 A render that the exploration never interned is appended to `values`.
 

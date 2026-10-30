@@ -38,6 +38,10 @@ pub struct StoryGraph {
     pub contexts: Vec<Context>,
     /// The contexts of the entry scenes, one per argument value.
     pub roots: Vec<u32>,
+    /// The render function values (indices into `values`, as [`NodeKind::Say`] and
+    /// [`NodeKind::Choice`] refer to them) that are keyframe renders: their output does not
+    /// depend on their input screen. Ascending and unique.
+    pub keyframes: Vec<u32>,
 }
 
 /// Why the exploration stopped early somewhere.
@@ -184,6 +188,11 @@ impl StoryGraph {
 
     pub fn value(&self, id: u32) -> Option<&Value> {
         self.values.get(id as usize)
+    }
+
+    /// Whether value `value` is a keyframe render.
+    pub fn is_keyframe(&self, value: u32) -> bool {
+        self.keyframes.binary_search(&value).is_ok()
     }
 
     /// The step ID (`{path}#{ordinal}`) of a step node.
@@ -338,7 +347,8 @@ impl StoryGraph {
                 context.put(&mut c)?;
             }
         }
-        put_ids(t, "roots", &self.roots)
+        put_ids(t, "roots", &self.roots)?;
+        put_ids(t, "keyframes", &self.keyframes)
     }
 
     pub(crate) fn read(t: TableRef<'_>) -> Result<StoryGraph, Error> {
@@ -383,6 +393,13 @@ impl StoryGraph {
             })?,
             contexts: list(t, "contexts", |v| Context::read(as_table(v, "contexts")?))?,
             roots: ids(t, "roots")?,
+            keyframes: {
+                let keyframes = ids(t, "keyframes")?;
+                if !keyframes.is_sorted_by(|a, b| a < b) {
+                    return Err(Error::Malformed("keyframes"));
+                }
+                keyframes
+            },
         })
     }
 }

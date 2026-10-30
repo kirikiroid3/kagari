@@ -83,7 +83,10 @@ pub(super) fn check(
 
 /// Whether `render` is a render whose output does not depend on its input screen. No
 /// render is not a keyframe.
-fn is_keyframe(renders: &FxHashMap<RenderId, RenderInfo>, render: Option<&ConstValue>) -> bool {
+pub(super) fn is_keyframe(
+    renders: &FxHashMap<RenderId, RenderInfo>,
+    render: Option<&ConstValue>,
+) -> bool {
     let id = match render {
         Some(ConstValue::Fn(FnRef {
             def: FnDefId::Item(item),
