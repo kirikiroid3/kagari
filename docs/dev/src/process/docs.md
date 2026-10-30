@@ -312,9 +312,11 @@ preset; `docs/site/vercel.json` pins the commands (`pnpm install --frozen-lockfi
 `pnpm run build`, output `dist`). Vercel picks the pnpm version from `pnpm-lock.yaml`
 (`lockfileVersion: '9.0'`, pnpm 10). Its `ignoreCommand` skips a deployment when nothing under
 `docs/site` changed since the last successful deployment of the branch
-(`git diff --quiet "$VERCEL_GIT_PREVIOUS_SHA" HEAD -- .`, run in the root directory); the first
-deployment of a branch, and a previous commit outside Vercel's shallow clone, always build. This
-is why the site imports nothing from outside `docs/site`. The Node.js version in the project
+(`git diff --quiet "$VERCEL_GIT_PREVIOUS_SHA" HEAD -- .`, run in the root directory). Any other
+outcome exits 1 and builds: the first deployment of a branch, and a previous commit outside
+Vercel's shallow clone (depth 10; `git diff` would fail with exit 128, which Vercel treats as a
+failed deployment, not as "build"). Because only `docs/site` is diffed, the site imports nothing
+from outside it. The Node.js version in the project
 settings must satisfy `engines`. The domain is `kagari.suitsu31.club` (`site` in
 `astro.config.ts`, used for canonical URLs).
 
