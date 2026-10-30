@@ -43,6 +43,7 @@ mod saves;
 mod screen;
 mod store;
 mod story;
+mod swap;
 mod system;
 #[cfg(test)]
 mod test_support;
@@ -91,6 +92,10 @@ pub trait Platform {
     /// Called once by the boot, after `main` returned and before the first store call: the
     /// desktop's store directory depends on the title.
     fn set_title(&mut self, title: &str);
+    /// A debugger swapped in a rebuilt program ([`Engine::debug_swap`]), before it boots: drop
+    /// whatever was read or decoded from the old build's assets (open archives, decoded
+    /// sounds, textures). Nothing by default.
+    fn program_changed(&mut self) {}
 }
 
 /// The window the game asks for.
@@ -165,6 +170,15 @@ pub(crate) fn flush_stores(ctx: &mut HostCtx, vm: &Vm) {
     ctx.state.system.stores.flush(&names, &mut *ctx.platform);
 }
 
+/// The script hash of a `game.kagari`: the lowercase hex SHA-256 of its bytes. Saves record it;
+/// a debug artifact names the bytecode it belongs to by it.
+pub fn script_hash(program_bytes: &[u8]) -> String {
+    sha2::Sha256::digest(program_bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
 /// A running game program.
 pub struct Engine {
     vm: Vm,
@@ -200,10 +214,7 @@ impl Engine {
         now_ms: u64,
     ) -> Result<Engine, BootError> {
         let program = Program::load(program_bytes).map_err(BootError::Load)?;
-        let script_hash: String = sha2::Sha256::digest(program_bytes)
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect();
+        let script_hash = script_hash(program_bytes);
         let mut vm = Vm::new(program.clone());
         let bindings = host::Bindings::new(&program)?;
         let mut state = EngineState::new(&mut vm, program.clone(), bindings);

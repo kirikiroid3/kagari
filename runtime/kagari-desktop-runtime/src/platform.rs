@@ -1,7 +1,7 @@
 //! [`DesktopPlatform`]: the engine's view of this machine.
 
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use kagari_engine::{AssetStore, Frame, Platform, Timestamp};
@@ -36,6 +36,7 @@ pub const HEADLESS_TIME: Timestamp = Timestamp {
 };
 
 pub struct DesktopPlatform {
+    game_dir: PathBuf,
     archives: ArchiveDir,
     store: Store,
     pub sounds: SoundCache,
@@ -53,6 +54,7 @@ impl DesktopPlatform {
         seed: SeedSource,
     ) -> DesktopPlatform {
         DesktopPlatform {
+            game_dir: game_dir.to_path_buf(),
             archives: ArchiveDir::new(game_dir),
             store,
             sounds: SoundCache::default(),
@@ -155,5 +157,15 @@ impl Platform for DesktopPlatform {
 
     fn set_title(&mut self, title: &str) {
         self.store.set_title(title);
+    }
+
+    /// A debugger swapped in a rebuild: the archives are opened again, and the decoded sounds
+    /// and the renderer's textures and pipelines are dropped.
+    fn program_changed(&mut self) {
+        self.archives = ArchiveDir::new(&self.game_dir);
+        self.sounds = SoundCache::default();
+        if let Some(gpu) = self.gpu.as_mut() {
+            gpu.renderer = kagari_render::Renderer::new(&gpu.device, &gpu.queue, gpu.format);
+        }
     }
 }

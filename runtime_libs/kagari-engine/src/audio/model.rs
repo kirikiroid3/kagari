@@ -401,4 +401,13 @@ impl AudioModel {
         self.system.playing.track = None;
         self.system.requested = None;
     }
+
+    /// Takes over from the model of a program a debugger swapped out: everything `old` plays
+    /// stops before anything this model already asked for.
+    pub fn take_over(&mut self, mut old: AudioModel) {
+        old.stop_all();
+        let mut commands = old.take_commands();
+        commands.append(&mut self.out.commands);
+        self.out.commands = commands;
+    }
 }

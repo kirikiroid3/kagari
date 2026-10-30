@@ -42,12 +42,11 @@ impl Project {
             Some(name) => root.join(name),
             None => root.join(MANIFEST_FILE),
         };
-        let running = semver::Version::parse(TOOLCHAIN_VERSION).map_err(|error| {
-            ProjectError::Manifest {
+        let running =
+            semver::Version::parse(TOOLCHAIN_VERSION).map_err(|error| ProjectError::Manifest {
                 path: manifest_path.clone(),
                 message: format!("invalid toolchain version `{TOOLCHAIN_VERSION}`: {error}"),
-            }
-        })?;
+            })?;
         if !manifest.toolchain.matches(&running) {
             return Err(ProjectError::Toolchain {
                 path: manifest_path,

@@ -16,6 +16,7 @@ mod int;
 mod ops;
 mod program;
 mod refs;
+mod remap;
 mod rng;
 mod story;
 mod trap;
@@ -32,6 +33,7 @@ pub use kagari_bytecode::{AssetId, FnKind, FuncId, ImportId, IntTypeId, StaticId
 pub use kagari_num::{Decimal, Rat};
 pub use ops::value_eq;
 pub use program::{LoadError, Program};
+pub use remap::{Remap, RemapError};
 pub use story::{StoryFiber, StoryStatics, Suspend};
 pub use trap::{StepId, Trap, TrapKind};
 pub use types::TypeTable;

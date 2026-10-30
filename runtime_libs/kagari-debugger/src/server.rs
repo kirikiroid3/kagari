@@ -7,6 +7,7 @@
 //! Either way a stop inside code blocks in the VM's hook and serves the requests that make
 //! sense there ([`serve_code_stop`]).
 
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use kagari_engine::debug::StopReason;
@@ -19,7 +20,7 @@ use crate::frames::{Artifact, frame_info, frame_scopes, story_vars};
 use crate::hook::Hook;
 use crate::protocol::{
     InstructionBreakpointsArgs, Message, NavArgs, PushArgs, ScopesArgs, ScopesBody, SeedArgs,
-    StackBody, StepArgs, StepBreakpointsArgs, StoppedBody, command, event,
+    StackBody, StepArgs, StepBreakpointsArgs, StoppedBody, SwapBody, command, event,
 };
 use crate::session::{Debugger, Run, Target, parse_step};
 use crate::transport::{Connection, Link};
@@ -33,6 +34,8 @@ pub struct Server {
     /// The client was told the story is stopped.
     stopped: bool,
     attached: bool,
+    /// Where `kagari/swap` reads the rebuilt `game.kagari` and its debug artifact.
+    game_dir: Option<PathBuf>,
 }
 
 impl Server {
@@ -58,7 +61,14 @@ impl Server {
             live,
             stopped: !live,
             attached: true,
+            game_dir: None,
         }
+    }
+
+    /// The game directory `kagari/swap` reloads from.
+    pub fn with_game_dir(mut self, dir: &Path) -> Server {
+        self.game_dir = Some(dir.to_path_buf());
+        self
     }
 
     pub fn attached(&self) -> bool {
@@ -278,8 +288,47 @@ impl Server {
                     self.send_stopped(body);
                 }
             }
+            command::SWAP => {
+                let result = self.swap(t);
+                let held = result.is_ok() && t.engine.debug_held();
+                let description = result.as_ref().ok().map(SwapBody::summary);
+                respond(&self.conn, result.and_then(json));
+                self.sync_hook(t);
+                if held {
+                    let body = self.debugger.stopped(t, "swap", description);
+                    self.send_stopped(body);
+                }
+            }
             _ => respond(&self.conn, Err(format!("unknown request `{command}`"))),
         }
+    }
+
+    /// `kagari/swap`: reloads the game directory's `game.kagari` with its debug artifact and
+    /// swaps them in; the hook is installed again with the new artifact.
+    fn swap(&mut self, t: &mut Target<'_>) -> Result<SwapBody, String> {
+        let dir = self
+            .game_dir
+            .clone()
+            .ok_or("this runtime does not know its game directory")?;
+        let path = dir.join(crate::headless::BYTECODE_FILE);
+        let bytes =
+            std::fs::read(&path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+        let hash = kagari_engine::script_hash(&bytes);
+        let artifact = Artifact::load(&dir, &hash)
+            .ok_or("no debug artifact for the new game.kagari: build it with `--profile debug`")?;
+        let body = self.debugger.swap(t, &bytes, artifact)?;
+        t.engine.set_instr_hook(Some(Box::new(Hook {
+            state: self.debugger.hook.clone(),
+            conn: self.conn.clone(),
+            artifact: self.debugger.artifact().cloned(),
+        })));
+        log::info!(
+            target: "kagari::debug",
+            "swapped in game.kagari {}: {}",
+            body.script_hash,
+            body.summary()
+        );
+        Ok(body)
     }
 }
 

@@ -79,7 +79,10 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
     let toolchain = semver::VersionReq::parse(&raw.toolchain.kagari)
         .map_err(|error| format!("`toolchain.kagari`: {error}"))?;
 
-    let entry = relative(raw.project.entry.as_deref().unwrap_or("src/main.kis"), "project.entry")?;
+    let entry = relative(
+        raw.project.entry.as_deref().unwrap_or("src/main.kis"),
+        "project.entry",
+    )?;
     if !matches!(
         entry.extension().and_then(|ext| ext.to_str()),
         Some("kis" | "kix")
@@ -87,7 +90,10 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
         return Err("`project.entry` must name a `.kis` or `.kix` file".to_owned());
     }
     let asset_dir = relative(raw.assets.dir.as_deref().unwrap_or("assets"), "assets.dir")?;
-    let out_dir = relative(raw.build.out_dir.as_deref().unwrap_or("target"), "build.out-dir")?;
+    let out_dir = relative(
+        raw.build.out_dir.as_deref().unwrap_or("target"),
+        "build.out-dir",
+    )?;
 
     let targets = match raw.build.targets {
         None => vec![Target::V0],
@@ -98,7 +104,10 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
             let mut targets = Vec::new();
             for name in names {
                 let target = Target::parse(&name).ok_or_else(|| {
-                    format!("unknown target `{name}`; supported targets: {}", supported_targets())
+                    format!(
+                        "unknown target `{name}`; supported targets: {}",
+                        supported_targets()
+                    )
                 })?;
                 if !targets.contains(&target) {
                     targets.push(target);

@@ -7,7 +7,9 @@ use std::any::Any;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use kagari_vm::{AssetId, Decimal, HostObject, StaticId, Text, Trap, Value, value_eq};
+use kagari_vm::{
+    AssetId, Decimal, HostObj, HostObject, Remap, RemapError, StaticId, Text, Trap, Value, value_eq,
+};
 
 use crate::values::{
     AudioFade, EffectSpec, Flip, LoopSpec, Motion, MovieSpec, PaintSpec, Plane, PoseSpec,
@@ -826,5 +828,9 @@ impl HostObject for ScreenObj {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+
+    fn remap(&self, remap: &mut Remap<'_>) -> Result<Option<HostObj>, RemapError> {
+        self.remapped(remap)
     }
 }

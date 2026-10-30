@@ -100,4 +100,65 @@ impl TypeTable {
                 .map_or(UNKNOWN, |name| name),
         }
     }
+
+    /// The definition of `ty` as paths and names: whether it is an enum, and per variant its
+    /// name and, for a module type, its field names (`None` for positional fields). `None`
+    /// when `ty` is out of range.
+    pub(crate) fn shape(&self, ty: AdtTy) -> Option<TypeShape> {
+        match ty {
+            AdtTy::Module(id) => {
+                let adt = self.program.module().types.get(id.0 as usize)?;
+                Some(TypeShape {
+                    is_enum: adt.is_enum,
+                    variants: adt
+                        .variants
+                        .iter()
+                        .map(|v| self.program.string(v.name).to_owned())
+                        .collect(),
+                    fields: Some(
+                        adt.variants
+                            .iter()
+                            .map(|v| {
+                                v.fields
+                                    .iter()
+                                    .map(|f| f.map(|f| self.program.string(f).to_owned()))
+                                    .collect()
+                            })
+                            .collect(),
+                    ),
+                })
+            }
+            AdtTy::Synthetic(id) => {
+                let (_, variants, is_enum) = self.synthetic.get(id as usize)?;
+                Some(TypeShape {
+                    is_enum: *is_enum,
+                    variants: variants.iter().map(|v| v.to_string()).collect(),
+                    fields: None,
+                })
+            }
+        }
+    }
+}
+
+/// What a type is made of, by name: two programs agree on a type when its shapes do.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct TypeShape {
+    pub is_enum: bool,
+    pub variants: Vec<String>,
+    /// Per variant, the field names; `None` for a synthetic type (the engine registered only
+    /// its variant names).
+    pub fields: Option<Vec<Vec<Option<String>>>>,
+}
+
+impl TypeShape {
+    /// Whether values of one may stand for values of the other: the same kind and variants,
+    /// and the same fields where both know them.
+    pub(crate) fn agrees(&self, other: &TypeShape) -> bool {
+        self.is_enum == other.is_enum
+            && self.variants == other.variants
+            && match (&self.fields, &other.fields) {
+                (Some(a), Some(b)) => a == b,
+                _ => true,
+            }
+    }
 }

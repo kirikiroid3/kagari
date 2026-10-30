@@ -10,7 +10,8 @@ use kagari_archive::save::{Save, Scalar};
 use crate::{
     AnalysisCache, Caller, Context, DebugArtifact, DebugInfo, DiagnosticRecord, Error, Exit,
     FileKind, FunctionDebug, Incomplete, LocalDebug, Node, NodeKind, Point, RegisterRange,
-    RelatedRecord, SCHEMA, Scene, ScopeDebug, Severity, SourceRef, StoryGraph, Target, Text, Value,
+    RelatedRecord, SCHEMA, Scene, ScopeDebug, Severity, SourceRef, StaticDebug, StoryGraph, Target,
+    Text, Value,
 };
 
 fn every_value() -> Vec<Value> {
@@ -208,6 +209,10 @@ fn sample_debug() -> DebugInfo {
                 ..FunctionDebug::default()
             },
         ],
+        statics: vec![StaticDebug {
+            path: "crate::TRUST".to_owned(),
+            ty: "Int<0, 9>".to_owned(),
+        }],
     }
 }
 

@@ -61,29 +61,26 @@ pub struct HookState {
 
 impl HookState {
     pub fn new(program: Rc<Program>, pause_flag: Rc<Cell<bool>>) -> HookState {
-        let steppable = (0..program.module().functions.len())
-            .map(|index| {
-                let Ok(index) = u32::try_from(index) else {
-                    return false;
-                };
-                let f = FuncId(index);
-                program.kind(f).is_some_and(|k| k != FnKind::Fn)
-                    && program
-                        .file(f)
-                        .is_some_and(|file| !file.starts_with("std/"))
-            })
-            .collect();
         HookState {
             armed: true,
             breakpoints: HashSet::new(),
             stepping: None,
             step_in_story: false,
             pause_flag,
-            steppable,
+            steppable: steppable(&program),
             program,
             pending_steps: None,
             detached: false,
         }
+    }
+
+    /// A swapped-in program: the instruction breakpoints (code words of old functions) and
+    /// any code step are dropped.
+    pub fn reprogram(&mut self, program: Rc<Program>) {
+        self.steppable = steppable(&program);
+        self.program = program;
+        self.breakpoints.clear();
+        self.clear_step();
     }
 
     pub fn program(&self) -> &Rc<Program> {
@@ -182,6 +179,23 @@ impl HookState {
         self.step_in_story = false;
         self.pause_flag.set(false);
     }
+}
+
+/// Per function: whether a code step may stop in it (story code with a source file outside the
+/// std directory).
+fn steppable(program: &Program) -> Vec<bool> {
+    (0..program.module().functions.len())
+        .map(|index| {
+            let Ok(index) = u32::try_from(index) else {
+                return false;
+            };
+            let f = FuncId(index);
+            program.kind(f).is_some_and(|k| k != FnKind::Fn)
+                && program
+                    .file(f)
+                    .is_some_and(|file| !file.starts_with("std/"))
+        })
+        .collect()
 }
 
 /// The hook installed in the VM.

@@ -1,7 +1,15 @@
 //! The story coroutine: σ = frames + story statics + PRNG. A fiber runs its entry scene until
 //! the next STEP, then waits for the step's result.
+//!
+//! A fiber may record **call snapshots** (debugging only, [`StoryFiber::record_calls`]): at
+//! every scene call, what the called frame can change behind its caller (the story variables,
+//! the values behind reference arguments, the PRNG). Unwinding to one
+//! ([`StoryFiber::unwind_to_call`]) throws the frames off and leaves the caller on its call,
+//! which the next resume runs again; scene hot swap re-calls a changed scene this way.
 
+use std::any::Any;
 use std::cell::RefCell;
+use std::fmt;
 use std::rc::Rc;
 
 use kagari_bytecode::{FnKind, FuncId, Instr, StaticId, StaticKind};
@@ -10,9 +18,11 @@ use crate::exec::{self, Exit, Frame, StoryCtx};
 use crate::hook::FrameView;
 use crate::host::Host;
 use crate::program::{Program, new_cell};
+use crate::refs;
+use crate::remap::{Remap, RemapError};
 use crate::rng::Rng;
 use crate::trap::{StepId, Trap, TrapKind, fault};
-use crate::value::Value;
+use crate::value::{Ref, Value};
 use crate::vm::Vm;
 
 /// One cell per story-variable static, from its init constant.
@@ -40,10 +50,100 @@ impl StoryStatics {
     pub fn cell(&self, var: StaticId) -> Option<&Rc<RefCell<Value>>> {
         self.0.get(var.0 as usize)?.as_ref()
     }
+
+    /// The value of every story variable, by static index (`None` for other statics or a
+    /// cell being written).
+    fn values(&self) -> Box<[Option<Value>]> {
+        self.0
+            .iter()
+            .map(|cell| {
+                cell.as_ref()
+                    .and_then(|c| c.try_borrow().ok())
+                    .map(|v| v.clone())
+            })
+            .collect()
+    }
+}
+
+/// What a scene call can change behind its caller, as it was when the call started.
+struct CallSnapshot {
+    /// The stack index of the called frame.
+    depth: usize,
+    /// Every story variable, by static index.
+    statics: Box<[Option<Value>]>,
+    /// The reference arguments and the values behind them.
+    targets: Vec<(Ref, Value)>,
+    rng: Rng,
+    last_step: Option<StepId>,
+    /// The host's mark of the resume that made the call ([`StoryFiber::set_call_mark`]).
+    mark: Option<Rc<dyn Any>>,
+    /// `false` when something could not be recorded (a reference argument into a host part):
+    /// the call cannot be unwound to.
+    complete: bool,
+}
+
+/// The call snapshots of the scene frames on the stack, bottom first, and the current mark.
+#[derive(Default)]
+pub(crate) struct CallLog {
+    snapshots: Vec<CallSnapshot>,
+    mark: Option<Rc<dyn Any>>,
+}
+
+impl fmt::Debug for CallLog {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CallLog")
+            .field("snapshots", &self.snapshots.len())
+            .finish()
+    }
+}
+
+impl CallLog {
+    /// The frame at `depth` was just pushed: snapshot what it can change when it is a scene.
+    pub(crate) fn called(
+        &mut self,
+        program: &Program,
+        frame: &Frame,
+        depth: usize,
+        statics: &StoryStatics,
+        rng: &Rng,
+        last_step: Option<StepId>,
+    ) {
+        if program.kind(frame.func) != Some(FnKind::Scene) {
+            return;
+        }
+        let params = program.params(frame.func).map_or(0, usize::from);
+        let mut complete = true;
+        let mut targets = Vec::new();
+        for arg in frame.regs.iter().take(params) {
+            if let Value::Ref(r) = arg {
+                match refs::read(r) {
+                    Ok(value) => targets.push((r.clone(), value)),
+                    Err(_) => complete = false,
+                }
+            }
+        }
+        self.snapshots.push(CallSnapshot {
+            depth,
+            statics: statics.values(),
+            targets,
+            rng: rng.clone(),
+            last_step,
+            mark: self.mark.clone(),
+            complete,
+        });
+    }
+
+    /// The stack is `len` frames high now: the snapshots of frames that returned go.
+    pub(crate) fn returned(&mut self, len: usize) {
+        while self.snapshots.last().is_some_and(|s| s.depth >= len) {
+            self.snapshots.pop();
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum FiberState {
+    /// Runs from the top frame's `pc` without an input: a new fiber, or one unwound to a call.
     Fresh,
     Suspended,
     Done,
@@ -61,6 +161,8 @@ pub struct StoryFiber {
     last_step: Option<StepId>,
     /// The values RAND produced during the last resume, in order.
     draws: Vec<Value>,
+    /// The call snapshots, when recorded.
+    calls: Option<CallLog>,
 }
 
 /// Why a resume stopped.
@@ -96,6 +198,271 @@ impl StoryFiber {
             state: FiberState::Fresh,
             last_step: None,
             draws: Vec::new(),
+            calls: None,
+        })
+    }
+
+    /// Records a snapshot at every scene call from now on (debugging only: memory grows with
+    /// the call depth).
+    pub fn record_calls(&mut self) {
+        self.calls.get_or_insert_with(CallLog::default);
+    }
+
+    /// Whether call snapshots are recorded.
+    pub fn records_calls(&self) -> bool {
+        self.calls.is_some()
+    }
+
+    /// The host's mark for the snapshots of the calls the next resumes make, until the next
+    /// mark; ignored when no calls are recorded.
+    pub fn set_call_mark(&mut self, mark: Rc<dyn Any>) {
+        if let Some(calls) = self.calls.as_mut() {
+            calls.mark = Some(mark);
+        }
+    }
+
+    /// The current mark: the one of the resume that reached the current step.
+    pub fn call_mark(&self) -> Option<&Rc<dyn Any>> {
+        self.calls.as_ref()?.mark.as_ref()
+    }
+
+    /// Whether the call that pushed frame `depth` can be unwound to.
+    pub fn has_call_snapshot(&self, depth: usize) -> bool {
+        self.calls
+            .as_ref()
+            .is_some_and(|c| c.snapshots.iter().any(|s| s.depth == depth && s.complete))
+    }
+
+    /// Throws off frame `depth` and every frame above it, and restores what the call that
+    /// pushed it snapshotted (story variables, the values behind reference arguments, the
+    /// PRNG, the last step). The caller is left on its CALL: the next resume (with any input)
+    /// runs the call again. Returns the call's mark.
+    pub fn unwind_to_call(
+        &mut self,
+        program: &Program,
+        depth: usize,
+    ) -> Result<Option<Rc<dyn Any>>, String> {
+        if !matches!(self.state, FiberState::Fresh | FiberState::Suspended) {
+            return Err("the story is not running".to_owned());
+        }
+        let calls = self
+            .calls
+            .as_mut()
+            .ok_or("no call snapshots are recorded")?;
+        let index = calls
+            .snapshots
+            .iter()
+            .position(|s| s.depth == depth)
+            .ok_or("the call was not snapshotted")?;
+        let snapshot = calls.snapshots.get(index).ok_or("no such snapshot")?;
+        if !snapshot.complete {
+            return Err("the call passed a reference into the engine".to_owned());
+        }
+        // The caller is still on its call: a caller's `pc` stays on the CALL while it runs.
+        let on_call = depth
+            .checked_sub(1)
+            .and_then(|i| self.stack.get(i))
+            .and_then(|caller| program.function(caller.func)?.code.get(caller.pc as usize))
+            .is_some_and(|i| matches!(i, Instr::Call { .. } | Instr::CallVal { .. }));
+        if !on_call || depth >= self.stack.len() {
+            return Err("no caller on a call below that frame".to_owned());
+        }
+        for (cell, value) in self.statics.0.iter().zip(snapshot.statics.iter()) {
+            if let (Some(cell), Some(value)) = (cell, value) {
+                *cell
+                    .try_borrow_mut()
+                    .map_err(|_| "a story variable is borrowed".to_owned())? = value.clone();
+            }
+        }
+        for (target, value) in &snapshot.targets {
+            refs::with_mut(target, |v| *v = value.clone()).map_err(|t| t.to_string())?;
+        }
+        self.rng = snapshot.rng.clone();
+        self.last_step = snapshot.last_step;
+        let mark = snapshot.mark.clone();
+        calls.snapshots.truncate(index);
+        self.stack.truncate(depth);
+        self.draws.clear();
+        self.state = FiberState::Fresh;
+        Ok(mark)
+    }
+
+    /// The record and step ID of the STEP a suspended fiber is at.
+    pub fn step_record(&self, program: &Program) -> Option<(Value, StepId)> {
+        if self.state != FiberState::Suspended {
+            return None;
+        }
+        let top = self.stack.last()?;
+        let Some(Instr::Step { record, id, .. }) =
+            program.function(top.func)?.code.get(top.pc as usize)
+        else {
+            return None;
+        };
+        let value = match top.regs.get(usize::from(*record))? {
+            Value::Ref(r) => refs::read(r).ok()?,
+            Value::Uninit => return None,
+            v => v.clone(),
+        };
+        Some((
+            value,
+            StepId {
+                func: top.func,
+                id: *id,
+            },
+        ))
+    }
+
+    /// This fiber rebuilt for another program (scene hot swap): every frame's function, the
+    /// story variables and every value by path ([`Remap`]); the snapshots' marks through
+    /// `mark`. Each frame's function must have the same code layout in the new program (the
+    /// caller keeps only frames whose code is unchanged), so `pc` and registers stay valid.
+    pub fn transplant(
+        &self,
+        remap: &mut Remap<'_>,
+        mark: &mut dyn FnMut(&Rc<dyn Any>, &mut Remap<'_>) -> Result<Rc<dyn Any>, RemapError>,
+    ) -> Result<StoryFiber, RemapError> {
+        let old = remap.old();
+        let new = remap.new_program();
+        // Story variables by path; every new one must have been one before, and back.
+        let story = |program: &Program| -> Vec<String> {
+            program
+                .module()
+                .statics
+                .iter()
+                .filter(|s| s.kind == StaticKind::StoryVariable)
+                .map(|s| program.string(s.path).to_owned())
+                .collect()
+        };
+        let (old_vars, new_vars) = (story(old), story(new));
+        if let Some(added) = new_vars.iter().find(|p| !old_vars.contains(p)) {
+            return Err(RemapError::StoryVariable(format!(
+                "the story variable `{added}` was added"
+            )));
+        }
+        if let Some(removed) = old_vars.iter().find(|p| !new_vars.contains(p)) {
+            return Err(RemapError::StoryVariable(format!(
+                "the story variable `{removed}` was removed"
+            )));
+        }
+        // Old static index → new static index.
+        let static_map: Vec<Option<usize>> = old
+            .module()
+            .statics
+            .iter()
+            .map(|s| {
+                remap
+                    .static_by_path(old.string(s.path))
+                    .map(|id| id.0 as usize)
+            })
+            .collect();
+        let statics = StoryStatics::fresh(new);
+        for (old_index, cell) in self.statics.0.iter().enumerate() {
+            let Some(cell) = cell else { continue };
+            let new_cell = static_map
+                .get(old_index)
+                .copied()
+                .flatten()
+                .and_then(|i| statics.0.get(i))
+                .and_then(Option::as_ref)
+                .ok_or_else(|| {
+                    RemapError::StoryVariable("a story variable changed kind".to_owned())
+                })?;
+            remap.seed_cell(cell, new_cell.clone());
+        }
+        for (old_index, cell) in self.statics.0.iter().enumerate() {
+            let (Some(cell), Some(Some(new_index))) = (cell, static_map.get(old_index)) else {
+                continue;
+            };
+            let value = cell
+                .try_borrow()
+                .map_err(|_| RemapError::Host("borrowed cell".to_owned()))?
+                .clone();
+            let value = remap.value(&value)?;
+            if let Some(Some(target)) = statics.0.get(*new_index) {
+                *target
+                    .try_borrow_mut()
+                    .map_err(|_| RemapError::Host("borrowed cell".to_owned()))? = value;
+            }
+        }
+        let mut stack = Vec::with_capacity(self.stack.len());
+        for frame in &self.stack {
+            let func = remap.func(frame.func)?;
+            let path = old.function_path(frame.func);
+            let lines_up = match (old.function(frame.func), new.function(func)) {
+                (Some(a), Some(b)) => {
+                    a.code.len() == b.code.len()
+                        && a.regs == b.regs
+                        && a.code
+                            .iter()
+                            .zip(&b.code)
+                            .all(|(x, y)| x.opcode() == y.opcode())
+                }
+                _ => false,
+            };
+            if !lines_up {
+                return Err(RemapError::Frame(path.to_owned()));
+            }
+            let regs = frame
+                .regs
+                .iter()
+                .map(|v| remap.value(v))
+                .collect::<Result<_, _>>()?;
+            stack.push(Frame {
+                func,
+                pc: frame.pc,
+                regs,
+            });
+        }
+        let step = |remap: &mut Remap<'_>, step: Option<StepId>| {
+            step.and_then(|s| {
+                remap
+                    .func(s.func)
+                    .ok()
+                    .map(|func| StepId { func, id: s.id })
+            })
+        };
+        let calls = match &self.calls {
+            None => None,
+            Some(log) => {
+                let mut snapshots = Vec::with_capacity(log.snapshots.len());
+                for s in &log.snapshots {
+                    let mut values: Vec<Option<Value>> = vec![None; new.module().statics.len()];
+                    for (old_index, value) in s.statics.iter().enumerate() {
+                        if let (Some(value), Some(Some(new_index))) =
+                            (value, static_map.get(old_index))
+                            && let Some(slot) = values.get_mut(*new_index)
+                        {
+                            *slot = Some(remap.value(value)?);
+                        }
+                    }
+                    let mut targets = Vec::with_capacity(s.targets.len());
+                    for (r, v) in &s.targets {
+                        targets.push((remap.reference(r)?, remap.value(v)?));
+                    }
+                    snapshots.push(CallSnapshot {
+                        depth: s.depth,
+                        statics: values.into_boxed_slice(),
+                        targets,
+                        rng: s.rng.clone(),
+                        last_step: step(remap, s.last_step),
+                        mark: s.mark.as_ref().map(|m| mark(m, remap)).transpose()?,
+                        complete: s.complete,
+                    });
+                }
+                Some(CallLog {
+                    snapshots,
+                    mark: log.mark.as_ref().map(|m| mark(m, remap)).transpose()?,
+                })
+            }
+        };
+        Ok(StoryFiber {
+            stack,
+            statics,
+            rng: self.rng.clone(),
+            state: self.state,
+            last_step: step(remap, self.last_step),
+            draws: Vec::new(),
+            calls,
         })
     }
 
@@ -143,6 +510,8 @@ impl StoryFiber {
                 statics: &self.statics,
                 rng: &mut self.rng,
                 draws: &mut self.draws,
+                calls: self.calls.as_mut(),
+                last_step: self.last_step,
             }),
         );
         vm.leave();

@@ -1,4 +1,9 @@
-#![deny(clippy::unwrap_used, clippy::panic, clippy::expect_used, clippy::arithmetic_side_effects)]
+#![deny(
+    clippy::unwrap_used,
+    clippy::panic,
+    clippy::expect_used,
+    clippy::arithmetic_side_effects
+)]
 
 //! Kagari projects: the `kagari.toml` manifest and the program it describes.
 

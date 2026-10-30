@@ -4,6 +4,7 @@
 pub(crate) mod draw;
 pub(crate) mod model;
 pub(crate) mod parts;
+mod remap;
 pub(crate) mod runtime;
 pub(crate) mod sample;
 #[cfg(test)]

@@ -225,3 +225,107 @@ fn keep() {}
     // 0x6F68E1E7E2646EE1 mod 10 = 7; t = 2^64 mod 10 = 6, and r ≥ t.
     assert_eq!(int(&read_static(&fiber, draw_static)), 7);
 }
+
+#[test]
+fn unwinding_to_a_call_restores_what_the_callee_changed() {
+    let program = compile(
+        r#"static mut GOT: Int<0, 9> = 0;
+static mut DRAW: Int<0, 9> = 0;
+
+#[scene]
+#[entry]
+pushdown fn Outer() {
+    let mut n: Int<0, 9> = 1;
+    s!(t!["one"]);
+    Inner(&mut n);
+    GOT = n;
+    s!(t!["three"]);
+}
+
+#[scene]
+pushdown fn Inner(n: &mut Int<0, 9>) {
+    GOT = 7;
+    *n = 5;
+    DRAW = rng_choose::<Int<0, 9>>();
+    s!(t!["two"]);
+}
+
+fn keep() {}
+"#,
+    );
+    let outer = func(&program, "crate::Outer");
+    let inner = func(&program, "crate::Inner");
+    let got = static_id(&program, "crate::GOT");
+    let draw = static_id(&program, "crate::DRAW");
+    let mut vm = Vm::new(Rc::clone(&program));
+    let mut host = TestHost::default();
+    let mut fiber =
+        StoryFiber::start(&vm, outer, vec![], StoryStatics::fresh(&program), 0).unwrap();
+    fiber.record_calls();
+    let mark: Rc<dyn std::any::Any> = Rc::new("at one");
+    let mut resume = |fiber: &mut StoryFiber| {
+        expect_step(fiber.resume(&mut vm, &mut host, Value::unit()).unwrap())
+    };
+    assert_eq!(resume(&mut fiber), (outer, 0));
+    fiber.set_call_mark(mark.clone());
+    assert_eq!(resume(&mut fiber), (inner, 0));
+    let first_draw = int(&read_static(&fiber, draw));
+    assert_eq!(int(&read_static(&fiber, got)), 7);
+    // The entry frame was not called; Inner's frame was.
+    assert!(!fiber.has_call_snapshot(0));
+    assert!(fiber.has_call_snapshot(1));
+    let back = fiber.unwind_to_call(&program, 1).unwrap().unwrap();
+    assert!(Rc::ptr_eq(&back, &mark));
+    assert_eq!(int(&read_static(&fiber, got)), 0);
+    assert_eq!(fiber.frames().len(), 1);
+    assert!(!fiber.has_call_snapshot(1));
+    // The call runs again: the same draw (the PRNG is back), then `n` as Inner wrote it.
+    assert_eq!(resume(&mut fiber), (inner, 0));
+    assert_eq!(int(&read_static(&fiber, draw)), first_draw);
+    assert_eq!(resume(&mut fiber), (outer, 1));
+    assert_eq!(int(&read_static(&fiber, got)), 5);
+    // Returned frames drop their snapshots.
+    assert!(!fiber.has_call_snapshot(1));
+}
+
+#[test]
+fn unwinding_puts_back_the_value_behind_a_reference_argument() {
+    let program = compile(
+        r#"static mut GOT: Int<0, 9> = 0;
+
+#[scene]
+#[entry]
+pushdown fn Outer() {
+    let mut n: Int<0, 9> = 1;
+    s!(t!["one"]);
+    Inner(&mut n);
+    GOT = n;
+    s!(t!["three"]);
+}
+
+#[scene]
+pushdown fn Inner(n: &mut Int<0, 9>) {
+    if *n == 1 { *n = 4; } else { *n = 9; }
+    s!(t!["two"]);
+}
+
+fn keep() {}
+"#,
+    );
+    let outer = func(&program, "crate::Outer");
+    let got = static_id(&program, "crate::GOT");
+    let mut vm = Vm::new(Rc::clone(&program));
+    let mut host = TestHost::default();
+    let mut fiber =
+        StoryFiber::start(&vm, outer, vec![], StoryStatics::fresh(&program), 0).unwrap();
+    fiber.record_calls();
+    for _ in 0..2 {
+        expect_step(fiber.resume(&mut vm, &mut host, Value::unit()).unwrap());
+    }
+    fiber.unwind_to_call(&program, 1).unwrap();
+    // Without the restore, `n` would be 4 here and Inner would make it 9.
+    for _ in 0..2 {
+        expect_step(fiber.resume(&mut vm, &mut host, Value::unit()).unwrap());
+    }
+    assert_eq!(int(&read_static(&fiber, got)), 4);
+}

@@ -28,7 +28,9 @@ mod value;
 #[cfg(test)]
 mod tests;
 
-pub use debug_info::{DebugInfo, FunctionDebug, LocalDebug, RegisterRange, ScopeDebug};
+pub use debug_info::{
+    DebugInfo, FunctionDebug, LocalDebug, RegisterRange, ScopeDebug, StaticDebug,
+};
 pub use file::{
     AnalysisCache, DebugArtifact, DiagnosticRecord, FileKind, RelatedRecord, Severity, SourceRef,
 };
@@ -46,7 +48,7 @@ pub const ANALYSIS_FILE: &str = "analysis.kagari-cache";
 /// The debug artifact next to `game.kagari` in a target directory.
 pub const DEBUG_FILE: &str = "game.kagari-cache";
 /// The schema version of the content; a reader rejects any other.
-pub const SCHEMA: i64 = 2;
+pub const SCHEMA: i64 = 3;
 
 /// Why a cache file cannot be read or written.
 #[derive(Clone, Debug, PartialEq, Eq)]
