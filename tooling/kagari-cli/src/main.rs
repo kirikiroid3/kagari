@@ -43,6 +43,7 @@ fn main() -> ExitCode {
         } => command::fmt::run(check, manifest_path.as_deref(), &files),
         Command::Disasm { file, all } => command::disasm::run(&file, all),
         Command::Lsp => command::lsp::run(),
+        Command::Dap => command::dap::run(),
         Command::Debug {
             manifest_path,
             target,
