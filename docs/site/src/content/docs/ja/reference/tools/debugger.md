@@ -115,4 +115,4 @@ kagari debug --attach 4711
 | `stopOnEntry` | ウィンドウ: 物語が最初に入ったステップで停止します。 |
 | `host`、`port` | attach: ゲームが待ち受ける場所（`--debug-port`）。 |
 
-エディタの表示は物語に対応します。1 つのスレッド（物語）、シーンのコールスタック、各フレームの変数と物語変数、行のブレークポイント、そして上で述べた continue、ステップオーバー、ステップイン、ステップアウトです。デバッグコンソールはこのページのコマンド（`ls`、`nav crate::Start#9`、`push B`）を評価します。物語コマンドは、構造化された結果を返すカスタムリクエスト `kagari/stack`、`kagari/ls`、`kagari/goto`、`kagari/push`、`kagari/pop`、`kagari/detail`、`kagari/nav`、`kagari/seed` としても使えます。
+エディタの表示は物語に対応します。1 つのスレッド（物語）、シーンのコールスタック、各フレームの変数と物語変数、行のブレークポイント、そして上で述べた continue、ステップオーバー、ステップイン、ステップアウトです。デバッグコンソールはこのページのコマンド（`ls`、`nav crate::Start#9`、`push B`）を評価します。物語コマンドは、構造化された結果を返すカスタムリクエスト `kagari/stack`、`kagari/ls`、`kagari/goto`、`kagari/push`、`kagari/pop`、`kagari/detail`、`kagari/nav`、`kagari/seed` としても使えます。条件付きブレークポイント、関数ブレークポイント、例外ブレークポイントには対応していません。
