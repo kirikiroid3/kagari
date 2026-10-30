@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 kagari-archive = { workspace = true }
+kagari-debugger = { workspace = true }
 kagari-engine = { workspace = true }
 kagari-render = { workspace = true }
 wgpu = { workspace = true }

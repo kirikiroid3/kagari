@@ -12,6 +12,7 @@
 mod app;
 mod audio;
 mod cli;
+mod debug;
 mod exit;
 mod game;
 mod gpu;

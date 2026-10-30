@@ -36,4 +36,11 @@ pub struct Cli {
     /// The seed of every new story in headless mode [default: 1]
     #[arg(long, value_name = "N", requires = "headless")]
     pub seed: Option<u64>,
+    /// Accept a debugger (`kagari dap`, `kagari debug --attach`) on 127.0.0.1:PORT (0 picks a
+    /// free port, logged at start)
+    #[arg(long, value_name = "PORT", conflicts_with_all = ["headless", "debug_stdio"])]
+    pub debug_port: Option<u16>,
+    /// Talk to a debugger over standard input and output (how `kagari dap` launches a game)
+    #[arg(long, conflicts_with = "headless")]
+    pub debug_stdio: bool,
 }

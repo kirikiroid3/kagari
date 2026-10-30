@@ -1620,6 +1620,7 @@ dependencies = [
  "gilrs",
  "jiff",
  "kagari-archive",
+ "kagari-debugger",
  "kagari-engine",
  "kagari-render",
  "kira",
