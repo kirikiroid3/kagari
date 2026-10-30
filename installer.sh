@@ -63,8 +63,8 @@ check_platform() {
     esac
 
     if [ -e /etc/NIXOS ] || grep -qs '^ID=nixos' /etc/os-release; then
-        say "NixOS cannot run these prebuilt binaries; use the flake instead:"
-        say "  nix profile install github:kirikiroid3/kagari#stable"
+        say "NixOS cannot run these prebuilt binaries; add the Kagari flake to your system flake instead:"
+        say "  ${TUTORIAL_URL}#nixos"
         exit 1
     fi
 

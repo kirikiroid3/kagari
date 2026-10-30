@@ -54,13 +54,32 @@ macOS 版はまだありません。
 
 ## NixOS {#nixos}
 
-ビルド済みの Linux バイナリは NixOS では動きません。インストーラースクリプトもここを案内します。代わりに flake からインストールします。
+ビルド済みの Linux バイナリは NixOS では動きません。インストーラースクリプトもここを案内します。システムの flake の入力に Kagari の flake を加え、そのパッケージを `environment.systemPackages` に入れます。
 
-```sh
-nix profile install github:kirikiroid3/kagari#stable
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    kagari.url = "github:kirikiroid3/kagari";
+  };
+
+  outputs = { nixpkgs, kagari, ... }: {
+    nixosConfigurations.my-machine = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ./configuration.nix
+        ({ pkgs, ... }: {
+          environment.systemPackages = [
+            kagari.packages.${pkgs.stdenv.hostPlatform.system}.stable
+          ];
+        })
+      ];
+    };
+  };
+}
 ```
 
-`#stable` は最新のリリース、`#unstable` は `main` ブランチの先頭をビルドしたものです。プロファイル内のパッケージ名はこの属性名（`stable` または `unstable`）になります。
+そのあと `sudo nixos-rebuild switch --flake .#my-machine` で適用します。`stable` は最新のリリース、`unstable` は `main` ブランチの先頭をビルドしたものです。Home Manager を使う場合は、同じパッケージを `home.packages` に入れます。
 
 ## インストールの確認 {#checking-the-installation}
 
@@ -79,6 +98,6 @@ kagari-desktop-runtime --version
 | -------- | ---- | ---------------- |
 | Linux | インストーラースクリプトをもう一度実行します。 | `--uninstall` を付けて実行します。 |
 | Windows | 新しいインストーラーを実行します。インストール済みのバージョンを置き換えます。 | **設定 → アプリ → インストールされているアプリ → Kagari → アンインストール**。 |
-| NixOS | `nix profile upgrade stable` | `nix profile remove stable` |
+| NixOS | `nix flake update kagari` を実行し、`nixos-rebuild switch` します。 | パッケージ（と入力）を削除し、`nixos-rebuild switch` します。 |
 
 自動では更新されません。

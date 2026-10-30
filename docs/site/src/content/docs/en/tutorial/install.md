@@ -69,15 +69,36 @@ There is no macOS build yet.
 
 ## NixOS {#nixos}
 
-The prebuilt Linux binaries do not run on NixOS; the installer script points you here. Install
-from the flake instead:
+The prebuilt Linux binaries do not run on NixOS; the installer script points you here. Add the
+Kagari flake as an input of your system flake and put its package in
+`environment.systemPackages`:
 
-```sh
-nix profile install github:kirikiroid3/kagari#stable
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    kagari.url = "github:kirikiroid3/kagari";
+  };
+
+  outputs = { nixpkgs, kagari, ... }: {
+    nixosConfigurations.my-machine = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ./configuration.nix
+        ({ pkgs, ... }: {
+          environment.systemPackages = [
+            kagari.packages.${pkgs.stdenv.hostPlatform.system}.stable
+          ];
+        })
+      ];
+    };
+  };
+}
 ```
 
-`#stable` is the latest release; `#unstable` builds the head of the `main` branch. The profile
-names the package after that attribute (`stable` or `unstable`).
+Then apply it with `sudo nixos-rebuild switch --flake .#my-machine`. `stable` is the latest
+release; `unstable` builds the head of the `main` branch. With Home Manager, put the same package
+in `home.packages` instead.
 
 ## Checking the installation {#checking-the-installation}
 
@@ -99,6 +120,6 @@ is `kagari lsp`, which the editor finds on your `PATH`.
 | ------ | ------ | --------- |
 | Linux | Run the installer script again. | Run it with `--uninstall`. |
 | Windows | Run a newer installer; it replaces the installed version. | **Settings → Apps → Installed apps → Kagari → Uninstall**. |
-| NixOS | `nix profile upgrade stable` | `nix profile remove stable` |
+| NixOS | `nix flake update kagari`, then `nixos-rebuild switch` | Remove the package (and the input), then `nixos-rebuild switch`. |
 
 Nothing updates by itself.
