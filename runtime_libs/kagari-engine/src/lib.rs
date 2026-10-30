@@ -35,6 +35,7 @@ macro_rules! import_table {
 mod anim;
 mod assets;
 mod audio;
+pub mod debug;
 mod frame;
 mod host;
 mod input;
@@ -143,6 +144,8 @@ pub(crate) struct EngineState {
     pub game: Option<story::GameFrame>,
     /// Navigation deferred until the VM returns (`system::modes::settle`).
     pub pending_nav: Vec<system::NavOp>,
+    /// The debugger's hold on the running game and its step breakpoints.
+    pub debug: debug::DebugState,
 }
 
 /// The receiver of every host import.
@@ -183,6 +186,7 @@ impl EngineState {
             ui: ui::UiState::new(),
             game: None,
             pending_nav: Vec::new(),
+            debug: debug::DebugState::default(),
             program,
         }
     }

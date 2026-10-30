@@ -87,7 +87,10 @@ fn settle_ops(ctx: &mut HostCtx, vm: &mut Vm) -> Result<(), Trap> {
         if ctx.state.system.top() == Some(ModeKind::Game)
             && let Some(input) = ctx.state.game.as_mut().and_then(|g| g.pending_input.take())
         {
-            driver::apply_input(ctx, vm, input)?;
+            // A debugger holding the story drops the player's story input.
+            if !crate::debug::held(ctx.state) {
+                driver::apply_input(ctx, vm, input)?;
+            }
             continue;
         }
         return Ok(());

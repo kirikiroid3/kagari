@@ -130,10 +130,11 @@ fn enter_step(ctx: &mut HostCtx, vm: &mut Vm, record: Value, step: StepId) -> Re
     let render = field(if is_say { 2 } else { 1 })?;
     let render = option(ctx, &render)?.cloned();
     let input = game_mut(ctx)?.screen.render_input();
-    let out = match render {
-        Some(f) => vm.call_value(ctx, &f, FnKind::Const, vec![input])?,
+    let out = match &render {
+        Some(f) => vm.call_value(ctx, f, FnKind::Const, vec![input])?,
         None => input,
     };
+    game_mut(ctx)?.render = render;
     {
         let state = &mut *ctx.state;
         let game = state
@@ -247,7 +248,7 @@ fn enter_step(ctx: &mut HostCtx, vm: &mut Vm, record: Value, step: StepId) -> Re
         let text_start = game.screen.text_start_ms();
         game.reveal = RevealRun::empty(t.saturating_add(u64::from(text_start)));
         game.current = Current::Choice(ChoiceStep {
-            func: step.func,
+            step,
             id,
             arms,
             disabled,
@@ -290,6 +291,9 @@ fn enter_step(ctx: &mut HostCtx, vm: &mut Vm, record: Value, step: StepId) -> Re
     }
     if !is_say && !replaying {
         saves::autosave(ctx, vm);
+    }
+    if !replaying {
+        crate::debug::entered_live(ctx.state, step);
     }
     Ok(())
 }
@@ -336,7 +340,7 @@ pub(crate) fn select(ctx: &mut HostCtx, vm: &mut Vm, index: u32) -> Result<Resum
                 (
                     a.text.clone(),
                     a.value.clone(),
-                    saves::trace::choice_id(&program, choice.func, &choice.id, &a.arm_id),
+                    saves::trace::choice_id(&program, choice.step.func, &choice.id, &a.arm_id),
                 )
             }),
         _ => None,
@@ -441,7 +445,7 @@ pub(crate) fn effective_mode(ctx: &HostCtx) -> PlayMode {
 /// Auto and Skip, once per `update` while the game is on top. Skip ends at a choice.
 pub(crate) fn tick(ctx: &mut HostCtx, vm: &mut Vm) -> Result<(), Trap> {
     use crate::system::modes::ModeKind;
-    if ctx.state.system.top() != Some(ModeKind::Game) {
+    if ctx.state.system.top() != Some(ModeKind::Game) || crate::debug::held(ctx.state) {
         return Ok(());
     }
     tick_mode(ctx, vm)?;

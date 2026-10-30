@@ -26,7 +26,8 @@ between std declarations and these imports is in [Builtins and the Host ABI](../
 | `ui/` | the reactive graph (`reactive.rs`), the element arena (`element.rs`), `std::ui` imports (`imports.rs`), layout, focus and controls, styles, text styles and the layout cache (`text.rs`), drawing (`draw.rs`) |
 | `input/` | `InputEvent`, `Key`, `MouseButton`, `PadButton`, dispatch (`mod.rs`) and `System::bindings` (`bindings.rs`) |
 | `store/` | `settings.kisave` and `meta.kisave` (`mod.rs`), VM values as `.kisave` tables (`value.rs`) |
-| `saves/` | slots, saving, autosave and loading (`mod.rs`), the file layout and choice IDs (`trace.rs`), replay and `Divergence` (`replay.rs`) |
+| `saves/` | slots, saving, autosave and loading (`mod.rs`), the file layout and choice IDs (`trace.rs`), replay, the drive loop and `Divergence` (`replay.rs`) |
+| `debug.rs` | what a debugger needs: `GameView`, `Pilot`, `debug_probe`/`debug_jump`/`debug_step`, the hold, live step breakpoints, the instruction hook ([below](#debugger-access)) |
 | `values/` | `STD_ADTS` (`table.rs`, the std types the engine reads or builds, in declaration order), `StdTypes`, typed decoders (`decode.rs`), shader arguments (`shader_args.rs`) |
 | `assets.rs` | `AssetStore`: lazily decoded images, fonts, shader sources, audio lengths, save thumbnails |
 | `frame.rs` | the `Frame` draw list |
@@ -362,6 +363,39 @@ count and resumes the fiber with the arm's value.
 Fallbacks when a setting has no value: text speed 30 ms, `auto_delay` 3000 ms, per-character
 delay 0, `skip_unread` false, `wait_for_voice` true, `voice_sustain` false, window opacity 100 %,
 animations on.
+
+## Debugger access
+
+`debug.rs` is the engine side of the story debugger ([The Debugger](./debugger.md)). It keeps the
+debugger out of the engine's state: positions are traces, and every move goes through the replay
+loop.
+
+- **Drives.** `saves/replay.rs` has one loop, `run`: it follows a trace (exactly as a load
+  replays it, with the same `Divergence`s) and then asks a `Pilot` what to do at each step
+  (`Steer::Next`, `Select(index)`, `Stop`). The pilot also observes every step entered, with a
+  `GameView`: the step record, its render value, the fiber (frames, story variables, the draws of
+  the last resume), the trace and how the step was reached (`Arrival`). `replay` is this loop with
+  a pilot that stops at once. Drives run with `replaying` set, so nothing persistent or audible
+  happens.
+- **Probe, jump, step.** `Engine::debug_probe` drives a scratch game and drops it (lookahead,
+  seed search). `debug_jump` replays a trace, steers on and installs the result with
+  `NavOp::Restore`, like a load, so the new step shows at once and the animations in between are
+  skipped. `debug_step` steers the live game in place and installs it the same way; when the
+  story returns it goes back to the last step reached, and when the drive fails (a trap, a pilot
+  error) it replays the trace it started from.
+- **The hold.** Every debugger move leaves the game held, and so does a live step entering a step
+  breakpoint (`debug_set_breakpoints`) or a pause (`debug_pause`). While held, `settle` drops the
+  player's story input and `driver::tick` does nothing (no auto, no skip); the system UI keeps
+  running. The hold names the game's generation, so a load or a new game ends it.
+  `debug_take_stop` reports a stop the live game made by itself; `debug_release` ends the hold.
+- **The instruction hook** (`set_instr_hook`) is the VM's ([The VM](./vm.md)); the engine only
+  passes it through.
+
+**Decision.** The debugger moves the story only by replaying traces through the save replay loop.
+**Why.** What the debugger shows must be what play reaches: a trace is already the witness of a
+position, and replay is already deterministic and free of side effects.
+**Consequences.** A move costs a replay from the entry scene (`debug_step` avoids it by steering
+the live game on). Snapshots would make moves cheaper ([Saves](./saves.md#snapshots-and-the-script-hash)).
 
 ## Screen state and the timeline
 
