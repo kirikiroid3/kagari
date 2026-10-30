@@ -7,19 +7,21 @@ drives the story fiber step by step and implements every import.
 
 Where in the code:
 
-- `src/program.rs`: `Program::load` (decode, verify, precompute) and `LoadError`.
-- `src/vm.rs`: `Vm` (program, type table, call depth, fuel), `call`, `call_value`,
-  `with_fresh_budget`.
-- `src/exec/mod.rs`: frames, the instruction loop, calls, STEP/RAND/REFSTAT.
+- `src/program.rs`: `Program::load` (decode, verify, precompute), `LoadError`, and the code
+  position helpers (`offset`, `file`, `location`, `instr_at_word`, `word_of_instr`).
+- `src/vm.rs`: `Vm` (program, type table, call depth, fuel, instruction hook), `call`,
+  `call_value`, `with_fresh_budget`, `set_hook`.
+- `src/exec/mod.rs`: frames, the instruction loop, calls, STEP/RAND/REFSTAT, the hook check.
   `src/exec/data.rs`: data instructions.
 - `src/value.rs`: `Value`, `Adt`, `AdtTy`, `Closure`, `Text`, `Ref`, `RefRoot`, `Proj`.
 - `src/refs.rs`: reference resolution, reads, copy-on-write writes.
 - `src/int.rs`, `src/ops.rs`: integer, Decimal, Rat, comparison and TOTEXT semantics.
 - `src/story.rs`: `StoryFiber`, `StoryStatics`, `Suspend`. `src/rng.rs`: the PRNG.
+- `src/hook.rs`: `FrameView`, `InstrHook`, `HookStop` (see [Debugger access](#debugger)).
 - `src/host.rs`: `Host`, `HostObj`, `HostObject`, `HostFn`. `src/types.rs`: `TypeTable`.
 - `src/trap.rs`: `Trap`, `TrapKind`.
-- Tests: `src/tests.rs`, `tests/vm.rs`, `tests/story.rs` (with a `TestHost` in
-  `tests/common/mod.rs`).
+- Tests: `src/tests.rs`, `tests/vm.rs`, `tests/story.rs`, `tests/introspection.rs` (frames,
+  draws, the hook, code positions), with a `TestHost` in `tests/common/mod.rs`.
 
 The byte format and the per-opcode semantics are in [The `.kagari` Format](../formats/kagari.md);
 this chapter covers the machine around them.
@@ -124,6 +126,44 @@ constant.
 STEP, RAND and REFSTAT outside a story run are `KindMismatch` (the verifier already restricts
 them to scenes and instant procedures; a plain `Vm::call` of an instant procedure has no story
 context).
+
+## Debugger access {#debugger}
+
+The story debugger (`kagari-debugger`) reads the machine through these; none of them changes
+what a run computes.
+
+**Code positions.** `Program::offset(f, instr)` is the byte offset of the last Debug entry at or
+before instruction `instr` (the Debug section maps code words to offsets; load converts them to
+instruction indices), `Program::file(f)` the source file of `f`'s Debug entry, and
+`Program::location` is `"{file}@{offset}"` from both. `instr_at_word(f, word)` /
+`word_of_instr(f, instr)` convert between instruction indices (what `pc` and backtraces use)
+and code word indices (what the Debug section and the disassembler use); `None` when no
+instruction starts at that word. `kind(f)` and `params(f)` give the function's kind and
+parameter count.
+
+**Fiber introspection.** `StoryFiber::frames()` is the fiber's stack as `FrameView { func, pc,
+regs }`, bottom (the entry scene) first: a fresh fiber shows the entry frame at `pc` 0, a
+suspended one its top frame on the STEP and every caller on its CALL; empty once the fiber
+returned or failed.
+
+**Draw log.** Every RAND of a story run appends the produced value to the fiber's log;
+`StoryFiber::draws()` is what the last `resume` drew, in order (`resume` clears it first). A
+debugger replays the RNG-dependent part of the story graph in lockstep with it.
+
+**Instruction hook.** `Vm::set_hook(Some(Box<dyn InstrHook>))` installs a hook (returning the
+previous one). While installed, every run of the VM (story resumes, `call`, `call_value`,
+nested runs) calls `InstrHook::check(func, pc, depth)` before each instruction, before its fuel
+is charged; `depth` is the shared call depth. When it returns `true` the loop calls
+`InstrHook::stop(&HookStop { program, types, frames, statics, depth })`: `frames` are the
+current run's frames bottom first (for a story run, the fiber's), `statics` the story variables
+when the run is the story fiber's (`None` for `call`/`call_value` runs). `stop` may block (a
+debugger serving requests while paused); the hook is taken out of the VM for the call and put
+back afterwards, so it is never re-entered. Then the instruction executes normally.
+
+Detached, the hook costs one `Option` check per instruction: the check and stop live in a
+`#[cold]`, non-inlined function. Measured with a tight `i128` loop of 10⁸ instructions (release,
+median of 5 runs, repeated 4 times interleaved): 23.2 ns/instruction before the hook existed,
+23.0 ns/instruction with it detached, −0.9 %, within run-to-run noise.
 
 ## Budgets {#budgets}
 

@@ -10,6 +10,7 @@
 //! every instruction are specified in `docs/dev/src/formats/kagari.md`.
 
 mod exec;
+mod hook;
 mod host;
 mod int;
 mod ops;
@@ -25,6 +26,7 @@ mod vm;
 #[cfg(test)]
 mod tests;
 
+pub use hook::{FrameView, HookStop, InstrHook};
 pub use host::{Host, HostFn, HostObj, HostObject};
 pub use kagari_bytecode::{AssetId, FnKind, FuncId, ImportId, IntTypeId, StaticId, TypeId};
 pub use kagari_num::{Decimal, Rat};

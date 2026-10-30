@@ -6,6 +6,7 @@ use std::borrow::Cow;
 
 use kagari_bytecode::{FnKind, FuncId, Instr, RandDomain, Reg};
 
+use crate::hook::{FrameView, HookStop};
 use crate::host::{Host, HostFn};
 use crate::int;
 use crate::ops;
@@ -26,10 +27,22 @@ pub(crate) struct Frame {
     pub regs: Box<[Value]>,
 }
 
-/// What only a story run has: the story statics and the PRNG.
+impl Frame {
+    pub fn view(&self) -> FrameView<'_> {
+        FrameView {
+            func: self.func,
+            pc: self.pc,
+            regs: &self.regs,
+        }
+    }
+}
+
+/// What only a story run has: the story statics, the PRNG and the log of its draws.
 pub(crate) struct StoryCtx<'a> {
     pub statics: &'a StoryStatics,
     pub rng: &'a mut Rng,
+    /// Every value RAND produced, in order.
+    pub draws: &'a mut Vec<Value>,
 }
 
 /// How a run stopped.
@@ -59,6 +72,10 @@ pub(crate) fn run(
 ) -> Result<Exit, Trap> {
     let program = vm.program().clone();
     loop {
+        // The only per-instruction cost of the hook while none is installed.
+        if vm.hook.is_some() {
+            check_hook(vm, stack, story.as_ref(), &program);
+        }
         match step(vm, host, stack, &mut story, &program) {
             Ok(None) => {}
             Ok(Some(exit)) => return Ok(exit),
@@ -72,6 +89,31 @@ pub(crate) fn run(
             }
         }
     }
+}
+
+/// Asks the installed hook whether to stop before the top frame's instruction, and lets it stop.
+/// The hook is taken out of the VM while it stops, so it cannot be re-entered.
+#[cold]
+#[inline(never)]
+fn check_hook(vm: &mut Vm, stack: &[Frame], story: Option<&StoryCtx<'_>>, program: &Program) {
+    let (Some(top), Some(hook)) = (stack.last(), vm.hook.as_mut()) else {
+        return;
+    };
+    if !hook.check(top.func, top.pc, vm.depth) {
+        return;
+    }
+    let Some(mut hook) = vm.hook.take() else {
+        return;
+    };
+    let frames: Vec<FrameView<'_>> = stack.iter().map(Frame::view).collect();
+    hook.stop(&HookStop {
+        program,
+        types: vm.types(),
+        frames: &frames,
+        statics: story.map(|s| s.statics),
+        depth: vm.depth,
+    });
+    vm.hook = Some(hook);
 }
 
 /// A frame of `func` with its parameters set from `args`; `KindMismatch` when the count
@@ -276,6 +318,7 @@ fn step(
                 return Err(Trap::new(TrapKind::KindMismatch));
             };
             let value = rand(program, story.rng, domain)?;
+            story.draws.push(value.clone());
             set(&mut frame.regs, dst, value)?;
             advance(frame)?;
         }
