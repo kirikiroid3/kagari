@@ -44,7 +44,7 @@ pub use machine::screen::{
 };
 pub(crate) use num::{int_bits, is_signed};
 pub use queries::{const_value, promoted_value};
-pub use value::{AssetKind, ConstValue, HandleKind, Text, display_value};
+pub use value::{AssetKind, ConstValue, HandleKind, Text, display_value, display_value_exact};
 
 use ctx::{BodyRef, Ctx};
 use domain::DomainCtx;

@@ -11,13 +11,14 @@ in [The `.kagari` Format](../formats/kagari.md), the execution model in [The VM]
 | Path | Contents |
 | ---- | -------- |
 | `core/kagari-lang/src/emit/mod.rs` | `build(db, program) -> Build`; the `Emitter`: tables, statics, roots, the instance queue, debug info |
-| `core/kagari-lang/src/emit/codegen/mod.rs` | `lower_instance`, `FnCodegen`: block layout, emission, labels, line table, emission-time faults |
+| `core/kagari-lang/src/emit/debug.rs` | `FunctionDebug` of each function for `.kagari-cache`: scopes, named locals and their registers, body hash |
+| `core/kagari-lang/src/emit/codegen/mod.rs` | `lower_instance`, `FnCodegen`: block layout, emission, labels, line table, register ranges of locals, emission-time faults |
 | `core/kagari-lang/src/emit/codegen/regalloc.rs` | Block layout (reverse postorder) and register allocation |
 | `core/kagari-lang/src/emit/codegen/place.rs` | Reads and writes of locals, story variables and projections |
 | `core/kagari-lang/src/emit/codegen/rvalue.rs` | Assignments, operands, constants |
 | `core/kagari-lang/src/emit/codegen/call.rs` | Calls, builtins (intrinsics or imports), closures, constructor and builtin wrappers |
 | `core/kagari-lang/src/emit/codegen/term.rs` | Terminators, including `STEP` and `RAND` |
-| `core/kagari-lang/src/emit/tests.rs` | Missing `main`, reachability of functions, the slider import |
+| `core/kagari-lang/src/emit/tests.rs` | Missing `main`, reachability of functions, the slider import, debug information |
 | `core/kagari-lang/tests/bytecode.rs` | Snapshot: warnings and disassembly of each `tests/bytecode/*` fixture; decode round trip |
 | `core/kagari-bytecode` | `Module`, `Instr`, `encode`/`decode`, `verify`/`verify_code`, `disassemble`, `word_offsets` |
 
@@ -29,6 +30,8 @@ pub struct Build {
     pub module: Option<Module>,         // `None` on any error
     pub bytes: Option<Vec<u8>>,         // `module` encoded
     pub asset_files: Vec<FilePath>,     // the file of each `module.assets` entry, by index
+    pub shader_roles: Vec<Option<ShaderRole>>, // parallel to `asset_files`
+    pub debug: Option<DebugInfo>,       // `Some` exactly when `module` is; parallel to its functions
 }
 ```
 
@@ -273,6 +276,25 @@ fn crate::count [instant] params=0 regs=3
 ```
 
 `VISITS += 1` on an `Int<0, 3>` computes in `i128` and clamps, as MIR's `IntClamp` says.
+
+## Debug information
+
+`Build::debug` is a `kagari_debug::DebugInfo` for a debugger, written by debug builds to
+`game.kagari-cache`. It has one `FunctionDebug` per entry of `module.functions`, in the same order.
+`Emitter::run` builds it next to each function's code (`emit/debug.rs`). It is computed from the
+same inputs as the code but never feeds back into it: a debug and a release build emit the same
+bytes, and the bytecode snapshots do not see it.
+
+| Field | Derived from |
+| ----- | ------------ |
+| `path` | The function's path in the module (with a `#n` suffix for a repeated path) |
+| `file` | The same display string the Debug section uses (relative to the root file's directory); `None` for constructors and builtins |
+| `body_hash` | Lowercase hex SHA-256 of `mir::pretty::dump_body` of the instance's MIR body, headed by the path (generic arguments included). The dump has no offsets or `ExprId`s, and in this mode shows constants without loss (rich texts with readings and effects, asset paths relative to the root directory). Comments, layout and other items' bodies do not change it. Constructors and builtins hash their path |
+| `scopes` | HIR of the owning item, ranges from its body source map, in preorder (parents first). Scope 0 is the body: its root expression plus the parameter patterns (for a closure, the closure expression). Then every nested block, `match` arm (pattern to arm body), `if let`/`while let` (pattern to the branch or loop body) and `for` (pattern to body). The body's own root block is scope 0; nested closures are separate functions and add no scope |
+| `locals` | MIR locals with `LocalKind::User`, one per source binding (sorted by the resolver's `LocalId`, which is declaration order); the name from `body_resolution`; the scope is the innermost one containing the binding's pattern (scope 0 for `self` and for captures declared outside a closure) |
+| `ranges` | The register allocation (`Frame::locs`): an argument's register and a celled local's cell register cover the whole function. Any other register local covers its live interval: while emitting, `FnCodegen` records for each interval position the instructions it covers (a block start is empty at its first instruction, a statement's use covers its instructions, its definition is empty at its end), and the interval `[from, to]` becomes the instructions from the start of `from` to the end of `to`, then code words through `word_offsets`. Locals that are never read (`Loc::Dead`) have no range. Ranges of one binding are sorted, clipped so they do not overlap, and joined when they touch on the same register |
+
+Promoted constants, constructors and builtins have no scopes or locals.
 
 ## Diagnostics
 

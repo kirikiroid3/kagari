@@ -2,10 +2,11 @@
 //! `ExprId`s, so it is stable under edits that do not change the code.
 
 use std::fmt::Write as _;
+use std::path::Path;
 
 use crate::db::Db;
 use crate::def_map::{Def, DefMaps, def_maps};
-use crate::eval::display_value;
+use crate::eval::{display_value, display_value_exact};
 use crate::input::Program;
 use crate::item_tree::ItemId;
 use crate::paths;
@@ -31,6 +32,7 @@ pub fn dump_item(db: &dyn Db, program: Program, item: ItemId) -> String {
         maps: def_maps(db, program),
         sigs: program_signatures(db, program),
         mir,
+        exact: None,
     };
     let path = paths::assoc_path(db, printer.maps, item);
     let mut out = String::new();
@@ -46,12 +48,39 @@ pub fn dump_item(db: &dyn Db, program: Program, item: ItemId) -> String {
     out
 }
 
+/// The dump of one body named `path`, with constants shown without loss (asset paths relative
+/// to `base`): a fingerprint of the body that offsets, comments and other items do not change.
+pub fn dump_body(
+    db: &dyn Db,
+    program: Program,
+    path: &str,
+    body: &Body,
+    base: Option<&Path>,
+) -> String {
+    let Some(mir) = item_mir(db, program, body.source.owner()).as_ref() else {
+        return String::new();
+    };
+    let printer = Printer {
+        db,
+        program,
+        maps: def_maps(db, program),
+        sigs: program_signatures(db, program),
+        mir,
+        exact: Some(base),
+    };
+    let mut out = String::new();
+    printer.body(&mut out, path, body);
+    out
+}
+
 struct Printer<'a> {
     db: &'a dyn Db,
     program: Program,
     maps: &'a DefMaps,
     sigs: &'a ProgramSignatures,
     mir: &'a ItemMir,
+    /// `Some(base)`: values shown by [`display_value_exact`] relative to `base`.
+    exact: Option<Option<&'a Path>>,
 }
 
 fn local(local: Local) -> String {
@@ -280,7 +309,13 @@ impl Printer<'_> {
         match operand {
             Operand::Copy(place) => format!("copy {}", self.place(place)),
             Operand::Const(constant) => match constant {
-                ConstOperand::Value(value) => format!("const {}", display_value(self.db, value)),
+                ConstOperand::Value(value) => format!(
+                    "const {}",
+                    match self.exact {
+                        Some(base) => display_value_exact(self.db, value, base),
+                        None => display_value(self.db, value),
+                    }
+                ),
                 ConstOperand::Item { item, args } => format!(
                     "const {}{}",
                     paths::assoc_path(self.db, self.maps, *item),
