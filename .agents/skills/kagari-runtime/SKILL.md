@@ -13,7 +13,7 @@ description: Load when changing the Kagari engine, text layout, renderer, runtim
 | `runtime_libs/kagari-text` | fonts, shaping, line breaking, ruby, rasterization |
 | `runtime_libs/kagari-render` | the wgpu compositor for `Frame` |
 | `runtime_libs/kagari-compat` | runtime profiles (`native_v0`) and asset sniffing, used by `kagari build` |
-| `runtime_libs/kagari-debugger` | query engine, debug protocol server, instruction hook, headless platform |
+| `runtime_libs/kagari-debugger` | query engine (`session/`), debug protocol server, instruction hook, headless platform; features `client` (front-end helpers) and `dap` (the debug adapter) |
 | `runtime/kagari-desktop-runtime` | winit/wgpu/kira/gilrs shell, `Platform`, headless mode |
 
 The VM (`runtime_libs/kagari-vm`) and the bytecode format belong to the `kagari-bytecode` skill.
@@ -82,7 +82,7 @@ decoder features, docs listed below.
 
 ```sh
 cargo test -p kagari-engine -p kagari-text -p kagari-render -p kagari-compat -p kagari-desktop-runtime
-cargo test -p kagari-debugger
+cargo test -p kagari-debugger --features dap
 cargo clippy --workspace --all-targets
 ```
 

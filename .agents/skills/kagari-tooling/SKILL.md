@@ -10,7 +10,7 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
 | Path | What |
 | ---- | ---- |
 | `tooling/kagari-project` | `kagari.toml` parsing/validation, project discovery, `Project::program`, targets, system font dirs |
-| `tooling/kagari-cli` | The `kagari` binary: `init`, `check`, `build` (`--profile debug`/`release`), `clean`, `fmt`, `disasm`, `lsp`, `debug`, `dap`; `analysis_cache.rs`, `outputs.rs` (what is written/removed in `out-dir`); `src/debugger/` (story debugger front end, DAP adapter); new-project `template/` |
+| `tooling/kagari-cli` | The `kagari` binary: `init`, `check`, `build` (`--profile debug`/`release`), `clean`, `fmt`, `disasm`, `lsp`, `debug`, `dap`; `analysis_cache.rs`, `outputs.rs` (what is written/removed in `out-dir`); `debugger.rs` (projects for the story debugger: `open`, the DAP `Launcher`; the REPL and adapter live in `kagari-debugger`'s `client`/`dap` features); new-project `template/` |
 | `tooling/kagari-fmt` | Width-based formatter (`MAX_WIDTH` 100, `INDENT` 4, not configurable) |
 | `tooling/kagari-lsp` | Language server (lsp-server, crossbeam, salsa snapshots) |
 | `core/kagari-lang/src/ide` | Go to definition, hover, file symbols over salsa queries |

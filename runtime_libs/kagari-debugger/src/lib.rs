@@ -5,7 +5,7 @@
     clippy::arithmetic_side_effects
 )]
 
-//! The Kagari story debugger, runtime side (`docs/dev/src/runtime/debugger.md`):
+//! The Kagari story debugger (`docs/dev/src/runtime/debugger.md`):
 //!
 //! - the **query engine** ([`Debugger`]): `stack`, `ls`, `goto`, `push`, `pop`, `detail`,
 //!   `nav`, `seed`, step breakpoints and step-level execution over an engine, every move a
@@ -13,11 +13,17 @@
 //! - the **Kagari debug protocol** ([`protocol`]): DAP's framing and message shapes with
 //!   Kagari's payloads (step IDs, byte offsets), and its [`Server`];
 //! - instruction breakpoints and stepping inside code through the VM's hook ([`hook`]);
-//! - a **headless** game ([`headless`]) for the query engine without a window.
+//! - a **headless** game ([`headless`]) for the query engine without a window;
+//! - with the feature `client`, what front ends share ([`client`]: reaching a runtime, source
+//!   locations, the commands as text); with the feature `dap`, a debug adapter ([`dap`]).
 //!
 //! The crate never depends on the compiler: the story graph and the local names come from
 //! the debug artifact (`game.kagari-cache`).
 
+#[cfg(feature = "client")]
+pub mod client;
+#[cfg(feature = "dap")]
+pub mod dap;
 pub mod frames;
 pub mod headless;
 pub mod hook;

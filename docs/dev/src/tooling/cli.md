@@ -22,7 +22,7 @@ the outcome to output and an exit code. No compiler logic lives in the CLI.
 | `tooling/kagari-cli/src/analysis_cache.rs` | `path`, `offer`, `store`: the analysis cache shared by `check` and `build` |
 | `tooling/kagari-cli/src/outputs.rs` | `BYTECODE_FILE`, removing build outputs and caches, removing empty directories |
 | `tooling/kagari-cli/src/command/{check,clean,disasm,fmt,lsp}.rs` | One module per subcommand |
-| `tooling/kagari-cli/src/command/{debug,dap}.rs`, `src/debugger/` | `kagari debug` (the REPL), `kagari dap` (the debug adapter) and what they share; see [The Debugger](../runtime/debugger.md) |
+| `tooling/kagari-cli/src/command/{debug,dap}.rs`, `src/debugger.rs` | `kagari debug` (the REPL) and `kagari dap` over `kagari-debugger`'s `client` and `dap` features; `debugger.rs` opens projects for them (`Projects`, the adapter's `Launcher`); see [The Debugger](../runtime/debugger.md) |
 | `tooling/kagari-cli/src/command/build/{mod,archives,compat,shaders}.rs` | `kagari build` and its profiles, archive packing, runtime-profile check, shader check |
 | `tooling/kagari-cli/src/command/init/{mod,template,font}.rs` | `kagari init`, embedded template, default-font choice |
 | `tooling/kagari-cli/template/` | The new-project template (`_gitignore` becomes `.gitignore`) |
@@ -285,15 +285,16 @@ kagari dap
 ```
 
 Both are front ends of the story debugger ([The Debugger](../runtime/debugger.md)). `debug`
-resolves the project and the target directory (`debugger::backend::project`), runs `kagari build
+resolves the project and the target directory (`debugger::open`), runs `kagari build
 --profile debug` as a child process of the same executable (its output is printed; `dap` sends it
 as `output` events, since its stdout is the protocol), then connects a backend: the headless
 query engine on a thread of this process (`kagari_debugger::headless::serve` over an in-process
 `Link`), `kagari-desktop-runtime DIR --debug-stdio` (next to `kagari`, else on `PATH`), or a TCP
-connection to `--debug-port`. Source file names in the bytecode are relative to the root file's
-directory (`backend::source_root`); `locate.rs` turns byte offsets into lines with the language
-server's `LineIndex` and writes std files to a temp directory with its `std_files`. The REPL
-exits 0 at the end of its input or on `quit`; `dap` exits when the editor disconnects.
+connection to `--debug-port`. The source root is the root file's directory, which the
+bytecode's source file names are relative to; `Projects` offers `open` to the adapter as its
+`Launcher`. Locations, line breakpoints and the commands as text come from
+`kagari_debugger::client`. The REPL exits 0 at the end of its input or on `quit`; `dap` exits
+when the editor disconnects.
 
 ### `kagari init`
 

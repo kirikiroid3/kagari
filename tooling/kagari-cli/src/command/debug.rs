@@ -10,15 +10,15 @@ use std::thread;
 use std::time::Duration;
 
 use kagari_debugger::Connection;
+use kagari_debugger::client::text::{self, Parsed};
+use kagari_debugger::client::{Backend, Locator};
 use kagari_debugger::headless::{BYTECODE_FILE, StartOptions};
 use kagari_debugger::protocol::{
     BreakpointsBody, InitializeBody, Message, OutputBody, StoppedBody, command, event,
 };
 use serde_json::{Value, json};
 
-use crate::debugger::backend::{self, Backend};
-use crate::debugger::locate::Locator;
-use crate::debugger::text::{self, Parsed};
+use crate::debugger;
 use crate::failure::Failure;
 
 /// The options of `kagari debug`.
@@ -34,11 +34,12 @@ pub struct Options<'a> {
 }
 
 pub fn run(options: &Options<'_>) -> Result<ExitCode, Failure> {
-    let (project, dir) =
-        backend::project(options.manifest_path, options.target).map_err(Failure)?;
-    if options.attach.is_none() && !options.no_build {
-        backend::build_debug(&project, &dir, &mut |line| println!("{line}")).map_err(Failure)?;
-    }
+    let build = options.attach.is_none() && !options.no_build;
+    let opened = debugger::open(options.manifest_path, options.target, build, &mut |line| {
+        println!("{line}");
+    })
+    .map_err(Failure)?;
+    let dir = opened.game_dir;
     let chosen = match options.attach {
         Some(address) => Backend::Attach {
             address: if address.contains(':') {
@@ -50,7 +51,7 @@ pub fn run(options: &Options<'_>) -> Result<ExitCode, Failure> {
         None if options.window => Backend::Window {
             runtime: options
                 .runtime
-                .map_or_else(backend::default_runtime, Path::to_path_buf),
+                .map_or_else(debugger::default_runtime, Path::to_path_buf),
             dir: dir.clone(),
             args: Vec::new(),
         },
@@ -67,11 +68,10 @@ pub fn run(options: &Options<'_>) -> Result<ExitCode, Failure> {
         .link
         .take()
         .ok_or_else(|| Failure("no connection".to_owned()))?;
-    let source_root = backend::source_root(&project);
     let mut repl = Repl {
         conn: Connection::new(link),
-        loc: Locator::new(&source_root, Some(&dir.join(BYTECODE_FILE))),
-        root: source_root.clone(),
+        loc: Locator::new(&opened.source_root, Some(&dir.join(BYTECODE_FILE))),
+        root: opened.source_root.clone(),
         pending: HashMap::new(),
         breakpoints: Vec::new(),
     };
@@ -274,7 +274,7 @@ impl Repl {
                 }
                 Some(Waiting::Initialize) => {
                     let init: InitializeBody = serde_json::from_value(body).unwrap_or_default();
-                    println!("{}", describe(&init));
+                    println!("{}", text::describe(&init));
                 }
                 Some(Waiting::Silent) => {
                     let verdict: BreakpointsBody = serde_json::from_value(body).unwrap_or_default();
@@ -299,25 +299,6 @@ impl Repl {
             Message::Request { .. } => {}
         }
     }
-}
-
-/// The `initialize` answer as a line for the user.
-pub(crate) fn describe(init: &InitializeBody) -> String {
-    let mode = if init.live {
-        "a running game"
-    } else {
-        "the query engine"
-    };
-    let graph = match &init.artifact {
-        None => "no debug artifact: `nav` and local names are unavailable".to_owned(),
-        Some(a) if !a.graph => "no story graph: `nav` is unavailable".to_owned(),
-        Some(a) if a.complete => "the story graph is complete".to_owned(),
-        Some(a) => {
-            let codes: Vec<&str> = a.incomplete.iter().map(|i| i.code.as_str()).collect();
-            format!("the story graph is incomplete ({})", codes.join(", "))
-        }
-    };
-    format!("debugging {mode}; {graph}. Type `help` for the commands.")
 }
 
 /// `file:line`.

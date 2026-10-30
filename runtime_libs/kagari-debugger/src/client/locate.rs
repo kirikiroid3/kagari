@@ -1,7 +1,7 @@
 //! Source locations for the debugger front ends. A runtime names a location by the file the
-//! bytecode's Debug section names (relative to the project root, or `std/…`) and a byte
-//! offset; the front ends show lines and columns, and turn a source line into the breakpoints
-//! the runtime understands (step IDs, or code words of story functions).
+//! bytecode's Debug section names (relative to the root file's directory, or `std/…`) and a
+//! byte offset; the front ends show lines and columns, and turn a source line into the
+//! breakpoints the runtime understands (step IDs, or code words of story functions).
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -9,15 +9,59 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use kagari_bytecode::{FnKind, Instr, Module, word_offsets};
-use kagari_debugger::protocol::InstructionPoint;
-use kagari_lsp::line_index::LineIndex;
-use kagari_syntax::TextSize;
 
-/// A source file with its line index.
+use crate::protocol::InstructionPoint;
+
+/// A source file with the start offset of each line.
 struct Source {
     path: PathBuf,
     text: String,
-    index: LineIndex,
+    starts: Vec<usize>,
+}
+
+impl Source {
+    fn new(path: PathBuf, text: String) -> Source {
+        let starts = std::iter::once(0)
+            .chain(
+                text.match_indices('\n')
+                    .filter_map(|(at, _)| at.checked_add(1)),
+            )
+            .collect();
+        Source { path, text, starts }
+    }
+
+    /// The 0-based line and UTF-16 column of `offset` (clamped to the text, moved back to a
+    /// character's start).
+    fn position(&self, offset: u32) -> (u32, u32) {
+        let mut offset = (offset as usize).min(self.text.len());
+        while !self.text.is_char_boundary(offset) {
+            offset = offset.saturating_sub(1);
+        }
+        let line = self
+            .starts
+            .partition_point(|&start| start <= offset)
+            .saturating_sub(1);
+        let start = self.starts.get(line).copied().unwrap_or(0);
+        let column = self
+            .text
+            .get(start..offset)
+            .map_or(0, |part| part.encode_utf16().count());
+        let narrow = |n: usize| u32::try_from(n).unwrap_or(u32::MAX);
+        (narrow(line), narrow(column))
+    }
+}
+
+/// The on-disk copy of std file `name`, written to a per-version directory under the system's
+/// temp directory when missing (the language server writes the same files).
+fn std_file(name: &str) -> Option<PathBuf> {
+    let text = kagari_std::file(name)?;
+    let mut path = std::env::temp_dir().join(format!("kagari-std-{}", env!("CARGO_PKG_VERSION")));
+    path.extend(name.split('/').filter(|part| !part.is_empty()));
+    if !path.is_file() {
+        std::fs::create_dir_all(path.parent()?).ok()?;
+        std::fs::write(&path, text).ok()?;
+    }
+    Some(path)
 }
 
 /// A position: the file on disk, a 1-based line and a 1-based column (in UTF-16 units, as
@@ -67,16 +111,11 @@ impl Locator {
         let path = if on_disk.is_file() {
             Some(on_disk)
         } else {
-            file.strip_prefix("std/")
-                .and_then(kagari_lsp::std_files::materialize)
+            file.strip_prefix("std/").and_then(std_file)
         };
         let source = path.and_then(|path| {
             let text = std::fs::read_to_string(&path).ok()?;
-            Some(Rc::new(Source {
-                index: LineIndex::new(&text),
-                path,
-                text,
-            }))
+            Some(Rc::new(Source::new(path, text)))
         });
         self.sources
             .borrow_mut()
@@ -87,11 +126,11 @@ impl Locator {
     /// The line and column of `offset` in `file`.
     pub fn locate(&self, file: &str, offset: u32) -> Option<Location> {
         let source = self.source(file)?;
-        let position = source.index.position(&source.text, TextSize::new(offset));
+        let (line, column) = source.position(offset);
         Some(Location {
             path: source.path.clone(),
-            line: position.line.saturating_add(1),
-            column: position.character.saturating_add(1),
+            line: line.saturating_add(1),
+            column: column.saturating_add(1),
         })
     }
 
@@ -109,13 +148,7 @@ impl Locator {
 
     /// The 0-based line of `offset` in `file`.
     fn line_of(&self, file: &str, offset: u32) -> Option<u32> {
-        let source = self.source(file)?;
-        Some(
-            source
-                .index
-                .position(&source.text, TextSize::new(offset))
-                .line,
-        )
+        Some(self.source(file)?.position(offset).0)
     }
 
     /// What line `line` (1-based) of the file at `path` can break at.

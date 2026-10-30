@@ -12,7 +12,7 @@ both over the Debug Adapter Protocol. The user-facing description is the Referen
 
 | Path | Contents |
 | ---- | -------- |
-| `runtime_libs/kagari-debugger/src/session.rs` | `Debugger`: the query commands, step breakpoints, step-level execution (`run`), and the pilots that steer the engine's drives |
+| `runtime_libs/kagari-debugger/src/session/` | `Debugger`: state, starting, breakpoints, stack and scopes (`mod.rs`, with the `probe`/`jump`/`step` drive helpers); `ls`, `goto`, `detail`, `push`, `pop`, `seed` (`moves.rs`); `nav` and the seed search (`navigate.rs`); step-level execution (`exec.rs`); the pilots that steer the drives (`pilots.rs`); details, `ls` lines and the Step scope (`views.rs`) |
 | `runtime_libs/kagari-debugger/src/tracker.rs` | `Tracker`: the story's node in the story graph, followed in lockstep |
 | `runtime_libs/kagari-debugger/src/nav.rs` | `Summaries`, `shortest`: shortest paths through the story graph |
 | `runtime_libs/kagari-debugger/src/hook.rs` | `HookState`, `Hook`: instruction breakpoints and code stepping (the VM's `InstrHook`) |
@@ -26,14 +26,18 @@ both over the Debug Adapter Protocol. The user-facing description is the Referen
 | `runtime_libs/kagari-engine/src/debug.rs` | The engine side: drives, the hold, live step breakpoints ([The Engine](./engine.md#debugger-access)) |
 | `runtime_libs/kagari-vm/src/hook.rs` | `InstrHook`, `HookStop`, `FrameView` ([The VM](./vm.md)) |
 | `runtime/kagari-desktop-runtime/src/debug.rs` | `--debug-port`, `--debug-stdio` ([The Desktop Runtime](./desktop.md#the-debug-channel)) |
-| `tooling/kagari-cli/src/debugger/` | What the front ends share: `backend.rs` (reaching a runtime, the debug build), `locate.rs` (offsets ↔ lines, line breakpoints), `text.rs` (commands as text) |
-| `tooling/kagari-cli/src/command/debug.rs`, `command/dap.rs` | `kagari debug` (the REPL), `kagari dap` (the adapter) ([Projects and the CLI](../tooling/cli.md)) |
+| `runtime_libs/kagari-debugger/src/client/` | Feature `client`, what the front ends share: `backend.rs` (`Backend`: reaching a runtime), `locate.rs` (`Locator`: offsets ↔ lines, line breakpoints), `text.rs` (commands and results as text) |
+| `runtime_libs/kagari-debugger/src/dap/` | Feature `dap`, the debug adapter: the loop (`mod.rs`), `launch`/`attach` and the `Launcher` handoff (`launch.rs`), the editor's requests (`editor.rs`), the runtime's answers and events (`answers.rs`), line breakpoints (`breakpoints.rs`), stacks and variable references (`frames.rs`), line stepping (`stepping.rs`) |
+| `tooling/kagari-cli/src/command/debug.rs`, `command/dap.rs`, `src/debugger.rs` | `kagari debug` (the REPL), `kagari dap`, and `Projects`, the CLI's `Launcher` (project, target directory, source root, the debug build, the runtime's path) ([Projects and the CLI](../tooling/cli.md)) |
 | `tooling/zed-kagari` | Registers the adapter in Zed ([Language Server and Editors](../tooling/lsp.md)) |
 
 `kagari-debugger` depends on the engine, the VM, `kagari-debug` and `kagari-archive`, never on the
 compiler: the story graph and the names of locals come from the debug artifact
 (`game.kagari-cache`, [`.kagari-cache` Files](../formats/cache.md)), which a runtime reads only
-when its script hash is that of the `game.kagari` it runs.
+when its script hash is that of the `game.kagari` it runs. Its front-end parts are behind
+features, so a runtime does not build them: `client` (adds `kagari-std`, whose std sources the
+locator writes to a temp directory like the language server does) and `dap` (implies `client`).
+The desktop runtime uses neither; `kagari-cli` enables `dap`.
 
 ## Structure
 
@@ -205,7 +209,12 @@ thread and prints responses and events as they arrive; `break` takes step IDs or
 frame's scopes. The headless story starts at the story graph's first root (or `--entry`) with the
 graph's arguments; without a graph, at an entry scene without parameters.
 
-**`kagari dap`** is the adapter. It maps DAP onto the protocol:
+**`kagari dap`** is the adapter of the feature `dap`; `kagari-cli` only runs it on stdio with its
+`Launcher`. The adapter knows no projects: for a `launch` or `attach` it reads the configuration
+into a `Place` (`manifestPath`, `cwd`, `target`) and asks the `Launcher` to open it (find the
+project and the target directory, build the debug profile when `buildFirst`, name the source root
+and the default runtime); `launch.rs` turns the answer into a `Prepared` runtime (a `Backend`, a
+`Locator`, whether to pause), which the adapter connects. It maps DAP onto the protocol:
 
 | DAP | Kagari |
 | --- | ------ |
@@ -243,12 +252,12 @@ archives (`ArchiveDir`), not a window or a separate binary.
 
 ## When you change this
 
-- A command: `session.rs`, the protocol's `command` and bodies, the server's dispatch, `text.rs`
+- A command: `session/`, the protocol's `command` and bodies, the server's dispatch, `client/text.rs`
   (parse, format, `HELP`), `kagari dap` if it needs a mapping, the tests in
   `runtime_libs/kagari-debugger/src/tests.rs` and `tooling/kagari-cli/tests/`, this chapter and
   the Reference [The Debugger](https://kagari.suitsu31.club/en/reference/tools/debugger/) (en and ja).
 - The engine's drives or the hold: [The Engine](./engine.md#debugger-access) and
   `runtime_libs/kagari-engine/src/tests/debug.rs`.
 - The story graph's shape: the tracker and `nav` read it ([`.kagari-cache` Files](../formats/cache.md)).
-- Launch or attach settings: `command/dap.rs`, the Zed schema
+- Launch or attach settings: `dap/launch.rs`, the Zed schema
   (`tooling/zed-kagari/debug_adapter_schemas/Kagari.json`), the Reference's editor page.

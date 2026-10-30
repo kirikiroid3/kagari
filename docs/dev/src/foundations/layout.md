@@ -72,14 +72,14 @@ The graph omits edges that other edges imply (for example `kagari-cli` also depe
 | `kagari-fmt` | `kagari-syntax` | `unicode-width` |
 | `kagari-project` | `kagari-compat`, `kagari-lang` | `toml`, `serde`, `semver` |
 | `kagari-lsp` | `kagari-lang`, `kagari-syntax`, `kagari-std`, `kagari-fmt`, `kagari-project` | `lsp-server`, `lsp-types`, `salsa` |
-| `kagari-cli` | `kagari-archive`, `kagari-bytecode`, `kagari-compat`, `kagari-debugger`, `kagari-fmt`, `kagari-lang`, `kagari-lsp`, `kagari-project`, `kagari-syntax` | `clap`, `serde`, `serde_json`, `sha2` |
+| `kagari-cli` | `kagari-archive`, `kagari-bytecode`, `kagari-compat`, `kagari-debugger` (feature `dap`), `kagari-fmt`, `kagari-lang`, `kagari-lsp`, `kagari-project`, `kagari-syntax` | `clap`, `serde_json`, `sha2` |
 | `mdbook-kagari` | — | `mdbook-preprocessor`, `mdbook-markdown`, `tree-sitter`, `cc` (build) |
 | `kagari-compat` | `kagari-bytecode` | — |
 | `kagari-vm` | `kagari-bytecode`, `kagari-num` (dev: `kagari-lang`) | — |
 | `kagari-text` | — | `harfrust`, `skrifa`, `zeno`, `unicode-linebreak`, `unicode-segmentation` |
 | `kagari-engine` | `kagari-bytecode`, `kagari-vm`, `kagari-text`, `kagari-archive` (dev: `kagari-lang`) | `image`, `png`, `sha2` |
 | `kagari-render` | `kagari-bytecode`, `kagari-engine`, `kagari-text` | `wgpu`, `bytemuck` |
-| `kagari-debugger` | `kagari-archive`, `kagari-bytecode`, `kagari-debug`, `kagari-engine`, `kagari-vm` (dev: `kagari-lang`) | `serde`, `serde_json`, `log` |
+| `kagari-debugger` | `kagari-archive`, `kagari-bytecode`, `kagari-debug`, `kagari-engine`, `kagari-vm`, `kagari-std` (feature `client`) (dev: `kagari-lang`) | `serde`, `serde_json`, `log` |
 | `kagari-desktop-runtime` | `kagari-archive`, `kagari-debugger`, `kagari-engine`, `kagari-render` | `winit`, `wgpu`, `kira`, `gilrs`, `directories`, `clap`, `jiff` |
 
 Two rules follow from the graph and must stay true:
@@ -209,9 +209,11 @@ offscreen, or reads back sRGB RGBA8 (thumbnails, headless captures). See
 
 **`kagari-debugger`** — The story debugger without a compiler: the query engine (a headless
 runtime on a headless `Platform` that runs the debugger's story commands against a debug build),
-the runtime side of the debug protocol, and the instruction hook it installs in the VM. The
-desktop runtime serves it with `--debug-port`/`--debug-stdio`; `kagari debug` and `kagari dap`
-drive it. It never depends on the compiler. See [The Debugger](../runtime/debugger.md).
+the runtime side of the debug protocol, and the instruction hook it installs in the VM; behind
+the features `client` and `dap`, what the debugger front ends share (reaching a runtime, source
+locations, the commands as text) and the debug adapter. The desktop runtime serves it with
+`--debug-port`/`--debug-stdio`; `kagari debug` and `kagari dap` drive it. It never depends on
+the compiler. See [The Debugger](../runtime/debugger.md).
 
 ## `runtime/`
 

@@ -1,13 +1,32 @@
 //! The query engine's commands as text: what `kagari debug` reads and what a DAP client's
 //! `evaluate` sends, and their results as text.
 
-use kagari_debugger::protocol::{
-    Detail, LsBody, NavBody, PathItem, Position, PushBody, ScopesBody, SeedBody, StackBody,
-    StoppedBody, Var, command,
-};
 use serde_json::{Value, json};
 
 use super::locate::Locator;
+use crate::protocol::{
+    Detail, InitializeBody, LsBody, NavBody, PathItem, Position, PushBody, ScopesBody, SeedBody,
+    StackBody, StoppedBody, Var, command,
+};
+
+/// The `initialize` answer as a line for the user.
+pub fn describe(init: &InitializeBody) -> String {
+    let mode = if init.live {
+        "a running game"
+    } else {
+        "the query engine"
+    };
+    let graph = match &init.artifact {
+        None => "no debug artifact: `nav` and local names are unavailable".to_owned(),
+        Some(a) if !a.graph => "no story graph: `nav` is unavailable".to_owned(),
+        Some(a) if a.complete => "the story graph is complete".to_owned(),
+        Some(a) => {
+            let codes: Vec<&str> = a.incomplete.iter().map(|i| i.code.as_str()).collect();
+            format!("the story graph is incomplete ({})", codes.join(", "))
+        }
+    };
+    format!("debugging {mode}; {graph}. Type `help` for the commands.")
+}
 
 /// A command line, parsed.
 #[derive(Clone, Debug, PartialEq)]

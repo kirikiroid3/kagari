@@ -1,16 +1,23 @@
 [package]
 name = "kagari-debugger"
-description = "The Kagari story debugger: the query engine, the runtime side of the debug protocol and a headless platform"
+description = "The Kagari story debugger: the query engine, the debug protocol, a headless platform, and (features) the front ends' shared parts and a DAP adapter"
 version.workspace = true
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
+
+[features]
+# What debugger front ends share: reaching a runtime, source locations, the commands as text.
+client = ["dep:kagari-std"]
+# The debug adapter (Debug Adapter Protocol over stdio).
+dap = ["client"]
 
 [dependencies]
 kagari-archive = { workspace = true }
 kagari-bytecode = { workspace = true }
 kagari-debug = { workspace = true }
 kagari-engine = { workspace = true }
+kagari-std = { workspace = true, optional = true }
 kagari-vm = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true }
