@@ -1595,6 +1595,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "kagari-debugger"
+version = "0.1.0"
+dependencies = [
+ "kagari-archive",
+ "kagari-bytecode",
+ "kagari-debug",
+ "kagari-engine",
+ "kagari-lang",
+ "kagari-vm",
+ "log",
+ "rustc-hash 2.1.3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "kagari-desktop-runtime"
 version = "0.1.0"
 dependencies = [
