@@ -96,6 +96,8 @@ pub enum Command {
         #[arg(long)]
         no_build: bool,
     },
+    /// Run the debug adapter (Debug Adapter Protocol) over stdio.
+    Dap,
 }
 
 /// What `kagari build` writes besides the bytecode and the archives. The bytecode is the same

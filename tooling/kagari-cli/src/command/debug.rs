@@ -301,7 +301,8 @@ impl Repl {
     }
 }
 
-fn describe(init: &InitializeBody) -> String {
+/// The `initialize` answer as a line for the user.
+pub(crate) fn describe(init: &InitializeBody) -> String {
     let mode = if init.live {
         "a running game"
     } else {
