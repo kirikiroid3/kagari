@@ -124,7 +124,7 @@ fn the_repl_moves_through_the_story_and_navigates() {
         // nav: the path, its draw and a seed.
         "reachable:",
         "push crate::scenario::Pick::Bold crate::scenario::Ride::Coaster",
-        "needs crate::scenario::AmusementPark to draw",
+        "draws: crate::scenario::AmusementPark draws",
         // push follows the path; ls shows the target ahead.
         "selected crate::scenario::Start/mood/crate::scenario::Pick::Bold",
         "selected crate::scenario::AmusementPark/ride/crate::scenario::Ride::Coaster",

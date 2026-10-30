@@ -341,9 +341,11 @@ pub struct SeedSearch {
     pub draws: u32,
     /// One in how many seeds draws them all, if the draws were independent and uniform.
     pub odds: u64,
-    /// Seeds tried, and the most allowed.
+    /// Seeds tried (the current seed first, then 0, 1, …), and the most allowed.
     pub tried: u32,
     pub limit: u32,
+    /// The current seed.
+    pub current: u64,
     /// A seed whose replay of the current trace plus the path reaches the target.
     pub found: Option<u64>,
 }
