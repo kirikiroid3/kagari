@@ -6,8 +6,8 @@ use std::fmt;
 use std::rc::Rc;
 
 use kagari_bytecode::{
-    ConstId, Constant, DecodeError, FuncId, Module, StrId, TypeId, VerifyError, VerifyErrorKind,
-    decode, verify, word_offsets,
+    ConstId, Constant, DecodeError, FnKind, FuncId, Module, StrId, TypeId, VerifyError,
+    VerifyErrorKind, decode, verify, word_offsets,
 };
 use kagari_num::{Decimal, Rat};
 use rustc_hash::FxHashMap;
@@ -194,13 +194,58 @@ impl Program {
     /// `"{file}@{byte_offset}"` of an instruction: the Debug section maps code words to byte
     /// offsets, not lines, and the runtime has no sources. `None` without a Debug entry.
     pub fn location(&self, f: FuncId, instr: u32) -> Option<String> {
+        let offset = self.offset(f, instr)?;
+        let file = self.file(f)?;
+        Some(format!("{file}@{offset}"))
+    }
+
+    /// The byte offset in its source file of instruction `instr` of `f`: the last Debug entry
+    /// at or before it. `None` without one.
+    pub fn offset(&self, f: FuncId, instr: u32) -> Option<u32> {
         let lines = self.lines.get(f.0 as usize)?;
         let at = lines.partition_point(|&(index, _)| index <= instr);
-        let &(_, offset) = lines.get(at.checked_sub(1)?)?;
+        lines.get(at.checked_sub(1)?).map(|&(_, offset)| offset)
+    }
+
+    /// The source file `f`'s Debug entry names; `None` without one.
+    pub fn file(&self, f: FuncId) -> Option<&str> {
         let debug = self.module.debug.as_ref()?;
         let file = debug.functions.get(f.0 as usize)?.file?;
         let path = debug.files.get(file as usize)?;
-        Some(format!("{}@{offset}", self.string(*path)))
+        Some(self.string(*path))
+    }
+
+    /// The instruction index starting at code word `word` of `f`; `None` when no instruction
+    /// starts there.
+    pub fn instr_at_word(&self, f: FuncId, word: u32) -> Option<u32> {
+        let mut at: u32 = 0;
+        for (index, instr) in self.function(f)?.code.iter().enumerate() {
+            if at >= word {
+                return (at == word).then(|| index_u32(index));
+            }
+            at = at.checked_add(instr.words())?;
+        }
+        None
+    }
+
+    /// The code word index of instruction `instr` of `f`; `None` out of range.
+    pub fn word_of_instr(&self, f: FuncId, instr: u32) -> Option<u32> {
+        let code = &self.function(f)?.code;
+        let before = code.get(..instr as usize)?;
+        code.get(instr as usize)?;
+        before
+            .iter()
+            .try_fold(0u32, |at, instr| at.checked_add(instr.words()))
+    }
+
+    /// The kind of `f`; `None` out of range.
+    pub fn kind(&self, f: FuncId) -> Option<FnKind> {
+        self.function(f).map(|function| function.kind)
+    }
+
+    /// The parameter count of `f`; `None` out of range.
+    pub fn params(&self, f: FuncId) -> Option<u16> {
+        self.function(f).map(|function| function.params)
     }
 
     /// The precomputed value of a module constant; `None` out of range.

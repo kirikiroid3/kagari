@@ -1,11 +1,13 @@
 //! The VM: a program, the type table, and the call depth and fuel shared by nested runs.
 
+use std::fmt;
 use std::rc::Rc;
 
 use kagari_bytecode::{FnKind, FuncId};
 
 use crate::FUEL_PER_RUN;
 use crate::exec::{self, Callee, Exit};
+use crate::hook::InstrHook;
 use crate::host::Host;
 use crate::program::Program;
 use crate::refs;
@@ -15,7 +17,6 @@ use crate::value::{Ref, Value};
 
 /// Runs a program's functions. Runs nest: a host import may call back into the VM, and the
 /// nested run shares the call depth and the fuel of the outermost one.
-#[derive(Debug)]
 pub struct Vm {
     program: Rc<Program>,
     types: TypeTable,
@@ -23,6 +24,22 @@ pub struct Vm {
     pub(crate) fuel: u64,
     fuel_per_run: u64,
     nesting: u32,
+    /// A debugger's instruction hook, checked before every instruction while installed.
+    pub(crate) hook: Option<Box<dyn InstrHook>>,
+}
+
+impl fmt::Debug for Vm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Vm")
+            .field("program", &self.program)
+            .field("types", &self.types)
+            .field("depth", &self.depth)
+            .field("fuel", &self.fuel)
+            .field("fuel_per_run", &self.fuel_per_run)
+            .field("nesting", &self.nesting)
+            .field("hook", &self.hook.is_some())
+            .finish()
+    }
 }
 
 impl Vm {
@@ -34,6 +51,7 @@ impl Vm {
             fuel: FUEL_PER_RUN,
             fuel_per_run: FUEL_PER_RUN,
             nesting: 0,
+            hook: None,
         }
     }
 
@@ -146,5 +164,11 @@ impl Vm {
     /// The instruction budget of each top-level run (default [`FUEL_PER_RUN`]).
     pub fn set_fuel_per_run(&mut self, fuel: u64) {
         self.fuel_per_run = fuel;
+    }
+
+    /// Installs (or removes) the instruction hook; returns the previous one. While installed,
+    /// every run (story, call, nested) asks it before each instruction.
+    pub fn set_hook(&mut self, hook: Option<Box<dyn InstrHook>>) -> Option<Box<dyn InstrHook>> {
+        std::mem::replace(&mut self.hook, hook)
     }
 }

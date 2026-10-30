@@ -7,6 +7,7 @@ use std::rc::Rc;
 use kagari_bytecode::{FnKind, FuncId, Instr, StaticId, StaticKind};
 
 use crate::exec::{self, Exit, Frame, StoryCtx};
+use crate::hook::FrameView;
 use crate::host::Host;
 use crate::program::{Program, new_cell};
 use crate::rng::Rng;
@@ -58,6 +59,8 @@ pub struct StoryFiber {
     state: FiberState,
     /// The last step reached, named in the trap of a later panic.
     last_step: Option<StepId>,
+    /// The values RAND produced during the last resume, in order.
+    draws: Vec<Value>,
 }
 
 /// Why a resume stopped.
@@ -92,6 +95,7 @@ impl StoryFiber {
             rng: Rng::from_seed(seed),
             state: FiberState::Fresh,
             last_step: None,
+            draws: Vec::new(),
         })
     }
 
@@ -103,6 +107,7 @@ impl StoryFiber {
         host: &mut dyn Host,
         input: Value,
     ) -> Result<Suspend, Trap> {
+        self.draws.clear();
         match self.state {
             FiberState::Done | FiberState::Failed => return Err(Trap::new(TrapKind::Unreachable)),
             FiberState::Suspended => {
@@ -137,6 +142,7 @@ impl StoryFiber {
             Some(StoryCtx {
                 statics: &self.statics,
                 rng: &mut self.rng,
+                draws: &mut self.draws,
             }),
         );
         vm.leave();
@@ -164,5 +170,22 @@ impl StoryFiber {
 
     pub fn statics(&self) -> &StoryStatics {
         &self.statics
+    }
+
+    /// The fiber's frames, bottom (the entry scene) first; empty once it returned or failed.
+    /// A suspended fiber's top frame is on its STEP, every other frame on its CALL.
+    pub fn frames(&self) -> Vec<FrameView<'_>> {
+        match self.state {
+            FiberState::Done | FiberState::Failed => Vec::new(),
+            FiberState::Fresh | FiberState::Suspended => {
+                self.stack.iter().map(Frame::view).collect()
+            }
+        }
+    }
+
+    /// The values RAND produced during the last `resume`, in order (cleared when a resume
+    /// starts).
+    pub fn draws(&self) -> &[Value] {
+        &self.draws
     }
 }
