@@ -8,6 +8,7 @@
 //! instantiation; every table is interned on first use, so the output is deterministic.
 
 mod codegen;
+mod debug;
 #[cfg(test)]
 mod tests;
 
@@ -21,6 +22,7 @@ use kagari_bytecode::{
     Static, StaticId, StaticKind, StrId, TypeId, Variant, encode, verify, verify_code,
     word_offsets,
 };
+use kagari_debug::{DebugInfo, FunctionDebug};
 use kagari_syntax::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
@@ -59,6 +61,9 @@ pub struct Build {
     /// The shader role of each entry of `module.assets`, parallel to `asset_files`; `None` for
     /// other asset kinds. A file used under two roles has one entry per role.
     pub shader_roles: Vec<Option<ShaderRole>>,
+    /// The debug information of `module` for a debugger, parallel to `module.functions`;
+    /// `Some` exactly when `module` is. It never changes the bytecode.
+    pub debug: Option<DebugInfo>,
 }
 
 /// Checks the program and, without errors, emits, verifies and encodes its bytecode.
@@ -70,6 +75,7 @@ pub fn build(db: &dyn Db, program: Program) -> Build {
         bytes: None,
         asset_files: Vec::new(),
         shader_roles: Vec::new(),
+        debug: None,
     };
     if diagnostics
         .iter()
@@ -81,7 +87,7 @@ pub fn build(db: &dyn Db, program: Program) -> Build {
     validate_mir(db, program);
     let (emitted, has_main, mut errors) = emit(db, program);
     diagnostics.append(&mut errors);
-    let Some((module, asset_files, shader_roles)) = emitted else {
+    let Some((module, asset_files, shader_roles, debug)) = emitted else {
         return failed(diagnostics);
     };
     // Without `main` the entry scenes and statics are still lowered and verified, so their
@@ -117,6 +123,7 @@ pub fn build(db: &dyn Db, program: Program) -> Build {
         bytes: Some(bytes),
         asset_files,
         shader_roles,
+        debug: Some(debug),
     }
 }
 
@@ -164,8 +171,9 @@ fn root_diagnostic(
     )
 }
 
-/// A module and the file and shader role of each of its assets, by index.
-type Emitted = (Module, Vec<FilePath>, Vec<Option<ShaderRole>>);
+/// A module, the file and shader role of each of its assets, by index, and its debug
+/// information.
+type Emitted = (Module, Vec<FilePath>, Vec<Option<ShaderRole>>, DebugInfo);
 
 /// Emits the module of a checked program: the module and its asset files (`None` after an
 /// emission error), whether it has a `main`, and the emission errors.
@@ -208,7 +216,7 @@ enum Instance {
 }
 
 /// A function's source file (index into the Debug files) and its
-/// `(instruction index, byte offset)` lines.
+/// `(code word, byte offset)` lines.
 type FnLines = (Option<u32>, Vec<(u32, u32)>);
 
 struct Emitter<'db> {
@@ -236,8 +244,10 @@ struct Emitter<'db> {
     instance_index: FxHashMap<Instance, FuncId>,
     paths_seen: FxHashMap<String, u32>,
     queue: VecDeque<FuncId>,
-    /// Per function, its source file and `(instruction index, byte offset)` lines.
+    /// Per function, its source file and `(code word, byte offset)` lines.
     lines: Vec<FnLines>,
+    /// Per function, its debug information.
+    debug: Vec<FunctionDebug>,
     files: FxHashMap<String, u32>,
     diagnostics: Vec<Diagnostic>,
 }
@@ -326,6 +336,7 @@ impl<'db> Emitter<'db> {
             paths_seen: FxHashMap::default(),
             queue: VecDeque::new(),
             lines: Vec::new(),
+            debug: Vec::new(),
             files: FxHashMap::default(),
             diagnostics: Vec::new(),
         };
@@ -730,6 +741,7 @@ impl<'db> Emitter<'db> {
             code: Vec::new(),
         });
         self.lines.push((None, Vec::new()));
+        self.debug.push(FunctionDebug::default());
         self.instances.push(instance.clone());
         self.instance_index.insert(instance, id);
         self.queue.push_back(id);
@@ -880,14 +892,14 @@ impl<'db> Emitter<'db> {
                 continue;
             };
             let lowered = codegen::lower_instance(self, &instance);
-            let file = self
+            let shown = self
                 .instance_item(&instance)
                 .filter(|_| !matches!(instance, Instance::Ctor(_) | Instance::Builtin(_)))
-                .map(|item| {
-                    let shown = item.file.path(self.db).display(self.root_dir.as_deref());
-                    let next = index(self.files.len());
-                    *self.files.entry(shown).or_insert(next)
-                });
+                .map(|item| item.file.path(self.db).display(self.root_dir.as_deref()));
+            let file = shown.as_ref().map(|shown| {
+                let next = index(self.files.len());
+                *self.files.entry(shown.clone()).or_insert(next)
+            });
             let path = self
                 .module
                 .functions
@@ -931,12 +943,22 @@ impl<'db> Emitter<'db> {
                 };
                 self.diagnostics.push(diagnostic);
             }
+            let offsets = word_offsets(&lowered.code);
+            let lines = lowered
+                .lines
+                .iter()
+                .filter_map(|(instr, offset)| Some((*offsets.get(*instr as usize)?, *offset)))
+                .collect();
+            let debug = self.function_debug(&instance, path, shown, &lowered.locals, &offsets);
             if let Some(function) = self.module.functions.get_mut(id.0 as usize) {
                 function.regs = lowered.regs.max(function.params);
                 function.code = lowered.code;
             }
             if let Some(slot) = self.lines.get_mut(id.0 as usize) {
-                *slot = (file, lowered.lines);
+                *slot = (file, lines);
+            }
+            if let Some(slot) = self.debug.get_mut(id.0 as usize) {
+                *slot = debug;
             }
         }
     }
@@ -965,24 +987,14 @@ impl<'db> Emitter<'db> {
             .map(|(_, path)| self.string(&path))
             .collect();
         let functions = self
-            .module
-            .functions
-            .iter()
-            .zip(&self.lines)
-            .map(|(function, (file, lines))| {
-                let offsets = word_offsets(&function.code);
-                FnDebug {
-                    file: *file,
-                    lines: lines
-                        .iter()
-                        .filter_map(|(instr, offset)| {
-                            Some((*offsets.get(*instr as usize)?, *offset))
-                        })
-                        .collect(),
-                }
-            })
+            .lines
+            .into_iter()
+            .map(|(file, lines)| FnDebug { file, lines })
             .collect();
         self.module.debug = Some(Debug { files, functions });
-        Ok((self.module, self.asset_files, self.shader_roles))
+        let debug = DebugInfo {
+            functions: self.debug,
+        };
+        Ok((self.module, self.asset_files, self.shader_roles, debug))
     }
 }

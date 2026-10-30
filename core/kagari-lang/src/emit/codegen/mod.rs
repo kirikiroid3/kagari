@@ -20,7 +20,7 @@ use crate::mir::{BasicBlock, Body, Statement, StatementKind, item_mir};
 use crate::ty::FnDefId;
 
 use super::{Emitter, Instance};
-use regalloc::Frame;
+use regalloc::{Frame, Loc};
 
 /// A lowered function.
 pub(super) struct Lowered {
@@ -30,6 +30,18 @@ pub(super) struct Lowered {
     pub too_large: bool,
     /// `(instruction index, byte offset in the source file)`.
     pub lines: Vec<(u32, u32)>,
+    /// Per MIR local, by index: where its register holds it, for the debug info.
+    pub locals: Vec<Option<LocalRange>>,
+}
+
+/// A register holding a MIR local over a half-open range of instructions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct LocalRange {
+    pub start: u32,
+    pub end: u32,
+    pub reg: u32,
+    /// The register holds the local's cell.
+    pub cell: bool,
 }
 
 /// A register while lowering; converted to a `Reg` when an instruction is made.
@@ -62,13 +74,14 @@ pub(super) fn lower_instance(em: &mut Emitter<'_>, instance: &Instance) -> Lower
                 regs: 0,
                 too_large: false,
                 lines: Vec::new(),
+                locals: Vec::new(),
             },
         },
     }
 }
 
 /// The MIR body of an instance with one.
-fn mir_body<'db>(em: &Emitter<'db>, instance: &Instance) -> Option<&'db Body> {
+pub(super) fn mir_body<'db>(em: &Emitter<'db>, instance: &Instance) -> Option<&'db Body> {
     let item = em.instance_item(instance)?;
     let mir = item_mir(em.db, em.program, item).as_ref()?;
     match instance {
@@ -106,6 +119,10 @@ struct FnCodegen<'e, 'db> {
     src: Option<ExprId>,
     /// Its source offset, until an instruction records it.
     pending: Option<u32>,
+    /// Per position of the register allocation's live intervals, the instructions it covers:
+    /// a block's start is empty at its first instruction, a statement's (or terminator's) use
+    /// covers its instructions, its definition is empty at its end.
+    marks: Vec<(u32, u32)>,
 }
 
 impl<'e, 'db> FnCodegen<'e, 'db> {
@@ -136,6 +153,7 @@ impl<'e, 'db> FnCodegen<'e, 'db> {
             source_map,
             src: None,
             pending: None,
+            marks: Vec::new(),
         }
     }
 
@@ -152,6 +170,7 @@ impl<'e, 'db> FnCodegen<'e, 'db> {
                 cells: Vec::new(),
                 window: scratch,
                 scratch,
+                spans: Vec::new(),
             },
             layout: Vec::new(),
             code: Vec::new(),
@@ -162,6 +181,7 @@ impl<'e, 'db> FnCodegen<'e, 'db> {
             source_map: None,
             src: None,
             pending: None,
+            marks: Vec::new(),
         }
     }
 
@@ -177,16 +197,34 @@ impl<'e, 'db> FnCodegen<'e, 'db> {
                 continue;
             };
             self.bind(block_label(*block));
+            let here = self.here();
+            self.marks.push((here, here));
             for stmt in &data.stmts {
+                let start = self.here();
                 self.set_src(stmt.src);
                 self.statement(stmt);
                 self.next = self.frame.scratch;
+                self.mark(start);
             }
+            let start = self.here();
             self.set_src(data.term_src);
             self.terminator(&data.term, layout.get(position.saturating_add(1)).copied());
             self.next = self.frame.scratch;
+            self.mark(start);
         }
         self.finish()
+    }
+
+    /// The index of the next instruction.
+    fn here(&self) -> u32 {
+        u32::try_from(self.code.len()).unwrap_or(u32::MAX)
+    }
+
+    /// The use and definition positions of the statement whose code starts at `start`.
+    fn mark(&mut self, start: u32) {
+        let end = self.here();
+        self.marks.push((start, end));
+        self.marks.push((end, end));
     }
 
     /// Creates the cells of the celled locals.
@@ -263,7 +301,44 @@ impl<'e, 'db> FnCodegen<'e, 'db> {
         }
     }
 
+    /// Where each MIR local's register holds it: arguments and cells over the whole function,
+    /// the others over the instructions of their live interval.
+    fn local_ranges(&self) -> Vec<Option<LocalRange>> {
+        let len = self.here();
+        let args = self.body.map_or(0, |body| body.arg_count as usize);
+        let whole = |reg, cell| {
+            (len > 0).then_some(LocalRange {
+                start: 0,
+                end: len,
+                reg,
+                cell,
+            })
+        };
+        self.frame
+            .locs
+            .iter()
+            .enumerate()
+            .map(|(index, loc)| match *loc {
+                Loc::Cell(reg) => whole(reg, true),
+                Loc::Reg(reg) if (1..=args).contains(&index) => whole(reg, false),
+                Loc::Reg(reg) => {
+                    let (from, to) = self.frame.spans.get(index).copied().flatten()?;
+                    let start = self.marks.get(from as usize)?.0;
+                    let end = self.marks.get(to as usize)?.1;
+                    (start < end).then_some(LocalRange {
+                        start,
+                        end,
+                        reg,
+                        cell: false,
+                    })
+                }
+                Loc::Dead => None,
+            })
+            .collect()
+    }
+
     fn finish(self) -> Lowered {
+        let locals = self.local_ranges();
         let labels = self.labels;
         let target =
             |label: Label| Label(labels.get(label.0 as usize).copied().flatten().unwrap_or(0));
@@ -296,6 +371,7 @@ impl<'e, 'db> FnCodegen<'e, 'db> {
             regs: reg(self.high),
             too_large: self.high > u32::from(u16::MAX),
             lines: self.lines,
+            locals,
         }
     }
 

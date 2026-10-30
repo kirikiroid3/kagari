@@ -44,6 +44,9 @@ pub(super) struct Frame {
     pub window: R,
     /// The first scratch register.
     pub scratch: R,
+    /// Per local, by index, its live interval in positions of the layout (see `intervals`);
+    /// the debug info maps it to code.
+    pub spans: Vec<Option<(u32, u32)>>,
 }
 
 impl Frame {
@@ -361,6 +364,7 @@ pub(super) fn allocate(body: &Body, layout: &[BasicBlock]) -> Frame {
         cells,
         window,
         scratch,
+        spans: spans.spans,
     }
 }
 

@@ -2,6 +2,7 @@
 //! screens hold.
 
 use std::fmt::Write as _;
+use std::path::Path;
 
 use crate::db::Db;
 use crate::hir::ExprId;
@@ -252,20 +253,79 @@ pub(crate) fn adt_variants(db: &dyn Db, item: ItemId) -> Vec<(String, Shape)> {
 /// `Point { x: 1, y: 2 }`, `"Mio"`.
 pub fn display_value(db: &dyn Db, value: &ConstValue) -> String {
     let mut out = String::new();
-    write_value(db, value, &mut out);
+    write_value(db, value, Style::Short, &mut out);
     out
 }
 
-fn write_list(db: &dyn Db, items: &imbl::Vector<ConstValue>, out: &mut String) {
+/// [`display_value`] without loss, for fingerprints: rich texts keep their readings and
+/// effects, and asset paths are relative to `base`.
+pub fn display_value_exact(db: &dyn Db, value: &ConstValue, base: Option<&Path>) -> String {
+    let mut out = String::new();
+    write_value(db, value, Style::Exact { base }, &mut out);
+    out
+}
+
+#[derive(Clone, Copy)]
+enum Style<'a> {
+    /// Texts by their base characters, absolute asset paths.
+    Short,
+    Exact {
+        base: Option<&'a Path>,
+    },
+}
+
+fn write_list(db: &dyn Db, items: &imbl::Vector<ConstValue>, style: Style<'_>, out: &mut String) {
     for (index, item) in items.iter().enumerate() {
         if index > 0 {
             out.push_str(", ");
         }
-        write_value(db, item, out);
+        write_value(db, item, style, out);
     }
 }
 
-fn write_value(db: &dyn Db, value: &ConstValue, out: &mut String) {
+fn write_text(db: &dyn Db, text: &Text, style: Style<'_>, out: &mut String) {
+    let texts = |items: &imbl::Vector<Text>, out: &mut String| {
+        for (index, item) in items.iter().enumerate() {
+            if index > 0 {
+                out.push_str(", ");
+            }
+            write_text(db, item, style, out);
+        }
+    };
+    match text {
+        Text::Plain(text) => {
+            let _ = write!(out, "{text:?}");
+        }
+        Text::Ruby { base, reading } => {
+            out.push_str("ruby(");
+            write_text(db, base, style, out);
+            out.push_str(", ");
+            write_text(db, reading, style, out);
+            out.push(')');
+        }
+        Text::MonoRuby { base, readings } => {
+            out.push_str("mono_ruby(");
+            write_text(db, base, style, out);
+            out.push_str(", [");
+            texts(readings, out);
+            out.push_str("])");
+        }
+        Text::Effect { base, effect } => {
+            out.push_str("effect(");
+            write_text(db, base, style, out);
+            out.push_str(", ");
+            write_value(db, effect, style, out);
+            out.push(')');
+        }
+        Text::Concat(items) => {
+            out.push_str("concat([");
+            texts(items, out);
+            out.push_str("])");
+        }
+    }
+}
+
+fn write_value(db: &dyn Db, value: &ConstValue, style: Style<'_>, out: &mut String) {
     match value {
         ConstValue::Bool(value) => {
             let _ = write!(out, "{value}");
@@ -279,15 +339,18 @@ fn write_value(db: &dyn Db, value: &ConstValue, out: &mut String) {
         ConstValue::Rat(value) => {
             let _ = write!(out, "{value}");
         }
-        ConstValue::Text(text) => {
-            let _ = write!(out, "{:?}", text.base_string());
-        }
+        ConstValue::Text(text) => match style {
+            Style::Short => {
+                let _ = write!(out, "{:?}", text.base_string());
+            }
+            Style::Exact { .. } => write_text(db, text, style, out),
+        },
         ConstValue::String(text) => {
             let _ = write!(out, "{text:?}");
         }
         ConstValue::Tuple(items) => {
             out.push('(');
-            write_list(db, items, out);
+            write_list(db, items, style, out);
             if items.len() == 1 {
                 out.push(',');
             }
@@ -295,12 +358,12 @@ fn write_value(db: &dyn Db, value: &ConstValue, out: &mut String) {
         }
         ConstValue::Array(items) => {
             out.push('[');
-            write_list(db, items, out);
+            write_list(db, items, style, out);
             out.push(']');
         }
         ConstValue::Vec(items) => {
             out.push_str("Vec[");
-            write_list(db, items, out);
+            write_list(db, items, style, out);
             out.push(']');
         }
         ConstValue::Adt {
@@ -329,7 +392,7 @@ fn write_value(db: &dyn Db, value: &ConstValue, out: &mut String) {
                 Shape::Unit => {}
                 Shape::Tuple(_) => {
                     out.push('(');
-                    write_list(db, fields, out);
+                    write_list(db, fields, style, out);
                     out.push(')');
                 }
                 Shape::Record(names) => {
@@ -339,14 +402,18 @@ fn write_value(db: &dyn Db, value: &ConstValue, out: &mut String) {
                             out.push_str(", ");
                         }
                         let _ = write!(out, "{field}: ");
-                        write_value(db, value, out);
+                        write_value(db, value, style, out);
                     }
                     out.push_str(" }");
                 }
             }
         }
         ConstValue::Asset { kind, path } => {
-            let _ = write!(out, "{}({:?})", kind.type_name(), path.display(None));
+            let base = match style {
+                Style::Short => None,
+                Style::Exact { base } => base,
+            };
+            let _ = write!(out, "{}({:?})", kind.type_name(), path.display(base));
         }
         ConstValue::Fn(fn_ref) => match fn_ref.def {
             FnDefId::Item(item) | FnDefId::StructCtor(item) => {
