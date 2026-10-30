@@ -3,7 +3,7 @@ name = "Kagari"
 version = "0.1.0"
 schema_version = 1
 authors = ["Nikaidou Haruki"]
-description = "Kagari (.kis/.kix) syntax highlighting and language server"
+description = "Kagari (.kis/.kix) syntax highlighting, language server and story debugger"
 repository = "https://github.com/kirikiroid3/kagari"
 
 [grammars.kagari]
@@ -14,3 +14,5 @@ path = "tooling/tree-sitter-kagari"
 [language_servers.kagari]
 name = "Kagari Language Server"
 languages = ["Kagari"]
+
+[debug_adapters.Kagari]

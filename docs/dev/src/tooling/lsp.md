@@ -6,7 +6,7 @@ Editor support has three parts with different jobs:
 | ---- | --- | ------------------- |
 | `kagari-lsp` (run by `kagari lsp`) | Semantic features over LSP: diagnostics, formatting, go to definition, hover, document symbols | Meaning (it runs the real compiler) |
 | `tree-sitter-kagari` | An approximate, error-tolerant grammar for highlighting, brackets, indentation and outlines | Nothing; it follows `kagari-syntax` |
-| `zed-kagari` | Zed extension: wires the grammar, query files and `kagari lsp` together | Zed integration only |
+| `zed-kagari` | Zed extension: wires the grammar, query files, `kagari lsp` and the `kagari dap` debug adapter together | Zed integration only |
 | `mdbook-kagari` (run by `mdbook build`) | Highlights the Develop Guide's Kagari code with the grammar and `highlights.scm` | Nothing; it reuses the grammar and the queries |
 | `textmate-kagari` | The canonical TextMate grammar (Shiki); the documentation site highlights with a copy of it | Nothing; it follows the tree-sitter grammar and `highlights.scm` |
 
@@ -34,8 +34,9 @@ they support it. The user-facing setup is in the Reference's
 | `tooling/tree-sitter-kagari/src/tree_sitter/*.h` | Runtime headers copied by tree-sitter; marked `linguist-vendored` |
 | `tooling/tree-sitter-kagari/test/corpus/*.txt` | Grammar tests (`tree-sitter test`) |
 | `tooling/tree-sitter-kagari/tree-sitter.json` | Grammar metadata; all language bindings disabled |
-| `tooling/zed-kagari/extension.toml` | Extension manifest: grammar repository/rev/path, language server id |
-| `tooling/zed-kagari/src/lib.rs` | Finds and launches `kagari lsp` |
+| `tooling/zed-kagari/extension.toml` | Extension manifest: grammar repository/rev/path, language server id, debug adapter `Kagari` |
+| `tooling/zed-kagari/src/lib.rs` | Finds and launches `kagari lsp`; starts `kagari dap` for `Kagari` debug sessions |
+| `tooling/zed-kagari/debug_adapter_schemas/Kagari.json` | JSON schema of the `launch`/`attach` configurations in `.zed/debug.json` |
 | `tooling/zed-kagari/languages/kagari/*.scm`, `config.toml` | Highlight, outline, indent and bracket queries; language config |
 | `tooling/mdbook-kagari/` | Book highlighting with the same grammar and `highlights.scm`; see [Documentation](../process/docs.md#code-highlighting) |
 | `.gitattributes` | Hides the generated parser from diffs and language statistics |
@@ -253,6 +254,42 @@ dependency does not enter the workspace lock file.
   `["lsp"]` (overridable through `lsp.kagari.binary.arguments`); the environment is the
   worktree's shell environment. Without a binary it fails with a message suggesting
   `cargo install --path tooling/kagari-cli`.
+- **Debug adapter.** `[debug_adapters.Kagari]` declares the adapter `Kagari`; Zed requires a
+  schema and reads it from the default location `debug_adapter_schemas/Kagari.json`. Zed puts
+  that schema under an `if adapter == "Kagari"` branch of the `.zed/debug.json` schema, next to
+  its own keys `label`, `adapter`, `build` (a task to run first) and `tcp_connection`; every other
+  key of an entry is the adapter's configuration. The schema therefore sets no
+  `additionalProperties: false` and uses no Zed key: the "build before launching" flag is
+  `buildFirst`, because `build` is Zed's. `src/lib.rs` implements:
+
+  | Method | Behaviour |
+  | ------ | --------- |
+  | `dap_request_kind` | The configuration's `request`: `"launch"` or `"attach"`; anything else is an error |
+  | `get_dap_binary` | `kagari dap` (the user's debug adapter path if Zed passes one, else `kagari` on the worktree's `PATH`), cwd the worktree root, the worktree's shell environment, DAP over stdin/stdout (`connection: None`). The configuration JSON is passed unchanged as the `launch`/`attach` arguments. A `tcp_connection` is refused: the game's debug port is reached with `attach`, not by Zed |
+  | `dap_config_to_scenario` | Zed's new-session form: a launch in `"mode": "window"`. The program is `manifestPath` if it ends in `.toml`, else `runtime`; arguments become `runtimeArgs`, the cwd `cwd`, "stop on entry" `stopOnEntry`. Environment variables and attaching by process are refused (a game is attached to by `--debug-port`) |
+
+  The configurations (all keys optional except `request`, and `port` for `attach`):
+
+  | Key | Request | Meaning |
+  | --- | ------- | ------- |
+  | `manifestPath` | both | `kagari.toml`; default the nearest one from `cwd` |
+  | `target` | both | Build target; default the first of `build.targets` |
+  | `cwd` | launch | Working directory |
+  | `mode` | launch | `"window"` (default): run `kagari-desktop-runtime`; `"headless"`: the query engine, no window |
+  | `runtime`, `runtimeArgs` | launch, window | The runtime (default next to `kagari`, else on `PATH`) and extra arguments |
+  | `entry`, `seed` | launch, headless | Entry scene (default the first) and PRNG seed (default 1) |
+  | `buildFirst` | launch | Run `kagari build --profile debug` first; default `true` |
+  | `stopOnEntry` | launch, window | Hold the story at its first step; default `false` |
+  | `port`, `host` | attach | The game's `kagari-desktop-runtime <dir> --debug-port <port>`; host default `127.0.0.1` |
+
+  ```text
+  [
+    { "label": "Kagari: run", "adapter": "Kagari", "request": "launch" },
+    { "label": "Kagari: headless", "adapter": "Kagari", "request": "launch",
+      "mode": "headless", "entry": "crate::Start" },
+    { "label": "Kagari: attach", "adapter": "Kagari", "request": "attach", "port": 4711 }
+  ]
+  ```
 
 To try local changes, use Zed's "Install Dev Extension" on `tooling/zed-kagari`. `/target/`,
 `/extension.wasm` and `/grammars/` (Zed's grammar checkout) are ignored.
@@ -270,7 +307,8 @@ To try local changes, use Zed's "Install Dev Extension" on `tooling/zed-kagari`.
 - Every file that got diagnostics gets an empty publication once it has none.
 - The tree-sitter grammar accepts everything `kagari-syntax` accepts. Generated grammar files are
   only ever produced by `tree-sitter generate` from the committed `grammar.js`.
-- `zed-kagari` stays out of the Cargo workspace.
+- `zed-kagari` stays out of the Cargo workspace. The debug adapter's configuration keys never
+  collide with Zed's own `debug.json` keys (`label`, `adapter`, `build`, `tcp_connection`).
 
 ## When you change this
 
@@ -287,7 +325,10 @@ To try local changes, use Zed's "Install Dev Extension" on `tooling/zed-kagari`.
   [Editor Support](https://kagari.suitsu31.club/en/reference/tools/editors/) (en and ja).
 - **New watched file kind** (a new manifest-like file): extend `register_watchers` and
   `did_change_watched_files`.
-- **Changing how the Zed extension finds or starts the server**: update the Reference editor page
-  (en and ja), which documents `lsp.kagari.binary.path`.
+- **Changing how the Zed extension finds or starts the server or the debug adapter**: update the
+  Reference editor page (en and ja), which documents `lsp.kagari.binary.path`.
+- **New or changed `kagari dap` configuration keys**: update
+  `tooling/zed-kagari/debug_adapter_schemas/Kagari.json`, the configuration table above and
+  `dap_config_to_scenario` if the new-session form should set the key.
 - Verify with `cargo test -p kagari-lsp -p kagari-lang`; for the grammar, `tree-sitter test` in
   `tooling/tree-sitter-kagari`.
