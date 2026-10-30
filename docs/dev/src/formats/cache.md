@@ -10,7 +10,7 @@ Where in the code:
 | ---- | -------- |
 | `core/kagari-debug/src/lib.rs` | `EXTENSION`, `ANALYSIS_FILE`, `DEBUG_FILE`, `SCHEMA`, `Error` |
 | `core/kagari-debug/src/file.rs` | `AnalysisCache`, `DebugArtifact`, `DiagnosticRecord`, the root tables |
-| `core/kagari-debug/src/graph.rs` | `StoryGraph` and its walk (`reached`, `reached_steps`, `step_id`, `locals`, `vars`) |
+| `core/kagari-debug/src/graph.rs` | `StoryGraph` and its walk (`reached`, `reached_steps`, `step_id`, `locals`, `vars`, `is_keyframe`) |
 | `core/kagari-debug/src/value.rs` | `Value`, `Text` and their cells |
 | `core/kagari-debug/src/debug_info.rs` | `DebugInfo` and its tables |
 | `core/kagari-debug/src/codec.rs` | Typed field access over `kagari_archive::save` |
@@ -57,7 +57,7 @@ debugger must reject a debug artifact whose script hash is not that of the bytec
 | Field | Type | Kinds | Meaning |
 | ----- | ---- | ----- | ------- |
 | `kind` | String | both | `analysis` or `debug`; another value is `Error::Kind` |
-| `schema` | I64 | both | `SCHEMA` (1); another value is `Error::Schema` |
+| `schema` | I64 | both | `SCHEMA` (2); another value is `Error::Schema` |
 | `toolchain` | String | both | The `kagari-lang` version that wrote the file |
 | `fingerprint` | String | both | The source fingerprint |
 | `diagnostics` | Array of tables | `analysis` | The stage-5 diagnostics, resolved (below) |
@@ -102,6 +102,7 @@ to by index.
 | `scenes` | Array of `{path, points}` | Per scene its item path and `points`: `{block, locals}` per suspension block some node is at, ascending by block; `locals` are the names of the kept locals in frame order (`""` for a temporary) |
 | `contexts` | Array of tables | Below |
 | `roots` | Array of I64 | The contexts of the entry scenes, one per argument value |
+| `keyframes` | Array of I64 | The value indices of the render functions nodes refer to (`render`) that are keyframe renders (their output does not depend on the input screen), ascending and unique; any other render a node refers to is a delta render |
 
 Context: `scene` (index into `scenes`), `path` (the instance path as the bytecode names the
 function, generic arguments included), `args` (value indices), `globals` (at entry), `entry`
@@ -122,7 +123,7 @@ Node: `kind`, `block`, `frame`, `globals`, `next` (an array of targets), and per
 the bytecode, the runtime and diagnostics use. An **arm ID** is the arm value's variant path
 (`crate::Pick::A`) or `#{index}` of the arm in the arm list, exactly as saves record choices
 ([Saves, Traces and Snapshots](../runtime/saves.md)). `render` is the index of the step's render
-function value, or Null.
+function value, or Null; `StoryGraph::is_keyframe(render)` tells whether it is a keyframe render.
 
 A **target** is a cell: node `n` of the same context is I64 `n`, exit `e` is I64 `-1 - e`, and a
 dead end (a fault, or a path the analysis gave up) is Null.

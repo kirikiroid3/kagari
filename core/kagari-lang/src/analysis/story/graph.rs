@@ -1,7 +1,9 @@
 //! The explored state space as the persisted story graph ([`kagari_debug::StoryGraph`]):
 //! values named by path the way saves store them, steps by step ID (the context's instance
 //! path and the step's ordinal), choice outcomes by arm ID. Indices of values, frames,
-//! story-variable sets, contexts, nodes and exits are those of [`Explored`].
+//! story-variable sets, contexts, nodes and exits are those of [`Explored`]. The keyframe
+//! flag of every render a node refers to comes from const evaluation
+//! ([`crate::eval::RenderInfo::keyframe`]), whether or not the keyframe check runs.
 
 use kagari_debug as kd;
 use rustc_hash::FxHashMap;
@@ -10,7 +12,7 @@ use crate::assets;
 use crate::db::Db;
 use crate::def_map::{Def, DefMaps, def_maps};
 use crate::diagnostic::{Diag, DiagnosticCode};
-use crate::eval::{ConstValue, Text};
+use crate::eval::{ConstValue, RenderId, RenderInfo, Text, const_eval};
 use crate::input::Program;
 use crate::item_tree::ItemId;
 use crate::mir::{BasicBlock, LocalKind, Terminator, item_mir};
@@ -20,6 +22,7 @@ use crate::signatures::{ProgramSignatures, program_signatures};
 use crate::ty::{FnDefId, FnRef};
 
 use super::explore::{Context, Explored, Node, NodeKind, Target};
+use super::keyframes::is_keyframe;
 use super::liveness::scene_kept;
 
 struct Converter<'a> {
@@ -28,9 +31,12 @@ struct Converter<'a> {
     maps: &'a DefMaps,
     sigs: &'a ProgramSignatures,
     explored: &'a Explored,
+    renders: &'a FxHashMap<RenderId, RenderInfo>,
     /// The converted values: those of `explored`, then renders that were never interned.
     values: Vec<kd::Value>,
     extra: FxHashMap<ConstValue, u32>,
+    /// The values of the keyframe renders nodes refer to, in the order met.
+    keyframes: Vec<u32>,
 }
 
 pub(super) fn convert(
@@ -46,8 +52,10 @@ pub(super) fn convert(
         maps: def_maps(db, program),
         sigs: program_signatures(db, program),
         explored,
+        renders: &const_eval(db, program).renders,
         values: Vec::new(),
         extra: FxHashMap::default(),
+        keyframes: Vec::new(),
     };
     cv.values = explored
         .values
@@ -75,6 +83,8 @@ pub(super) fn convert(
         .iter()
         .map(|context| cv.context(scenes, context))
         .collect();
+    cv.keyframes.sort_unstable();
+    cv.keyframes.dedup();
     kd::StoryGraph {
         complete: explored.complete,
         incomplete,
@@ -103,6 +113,7 @@ pub(super) fn convert(
         contexts,
         roots: explored.roots.iter().map(|root| root.0).collect(),
         values: cv.values,
+        keyframes: cv.keyframes,
     }
 }
 
@@ -206,7 +217,13 @@ impl Converter<'_> {
                 ..
             } => {
                 let step = self.step(scene, node.block);
-                let render = render.as_ref().map(|render| self.value_id(render));
+                let render = render.as_ref().map(|render| {
+                    let id = self.value_id(render);
+                    if is_keyframe(self.renders, Some(render)) {
+                        self.keyframes.push(id);
+                    }
+                    id
+                });
                 if *choice {
                     kd::NodeKind::Choice {
                         step,

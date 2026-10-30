@@ -160,6 +160,8 @@ fn sample_graph() -> StoryGraph {
             context(1, "crate::unused", vec![node(say(0, Target::Exit(0)))]),
         ],
         roots: vec![0, 1],
+        // `crate::render_room`; the closure (14) is a delta render.
+        keyframes: vec![13],
     }
 }
 
@@ -289,6 +291,8 @@ fn walks_from_the_roots() {
         graph.vars(0, 0),
         vec![("crate::AFFECTION", Some(&Value::Int(-(1_i128 << 100))))]
     );
+    assert!(graph.is_keyframe(13));
+    assert!(!graph.is_keyframe(14));
 }
 
 #[test]
@@ -309,6 +313,14 @@ fn rejects_another_kind_or_schema() {
     assert_eq!(
         AnalysisCache::from_bytes(save.into_bytes()),
         Err(Error::Schema(SCHEMA + 1))
+    );
+
+    let mut save = Save::from_bytes(sample_cache().to_bytes().unwrap()).unwrap();
+    save.root_mut().set("schema", Scalar::I64(1)).unwrap();
+    assert_eq!(
+        AnalysisCache::from_bytes(save.into_bytes()),
+        Err(Error::Schema(1)),
+        "schema 1 has no keyframes"
     );
 
     assert!(matches!(
@@ -344,5 +356,21 @@ fn rejects_malformed_nodes() {
     assert_eq!(
         AnalysisCache::from_bytes(save.into_bytes()),
         Err(Error::Malformed("roots"))
+    );
+
+    let mut save = Save::from_bytes(sample_cache().to_bytes().unwrap()).unwrap();
+    {
+        let mut root = save.root_mut();
+        let mut story = root.table("story").unwrap();
+        // Keyframes are ascending and unique.
+        story
+            .array("keyframes")
+            .unwrap()
+            .push(Scalar::I64(13))
+            .unwrap();
+    }
+    assert_eq!(
+        AnalysisCache::from_bytes(save.into_bytes()),
+        Err(Error::Malformed("keyframes"))
     );
 }

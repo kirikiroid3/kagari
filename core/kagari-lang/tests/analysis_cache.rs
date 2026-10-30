@@ -166,6 +166,60 @@ fn the_graph_names_steps_arms_draws_and_locals() {
 }
 
 #[test]
+fn the_graph_flags_keyframe_renders() {
+    let source = r#"
+enum Answer { Yes, No }
+const A: EntityId = EntityId(1);
+const fn delta(mut screen: Screen) -> Screen {
+    screen.entity(A).opacity().change(0.5).apply_animation(instant());
+    screen
+}
+const fn key(_screen: Screen) -> Screen {
+    Screen::empty()
+}
+
+#[entry]
+#[scene]
+pushdown fn Start() {
+    s!(render = key, t!["a"]);
+    s!(render = delta, t!["b"]);
+    let _ = choice!{ id = "c", render = key, t!["Yes"] => Answer::Yes, t!["No"] => Answer::No };
+    s!(t!["c"]);
+}
+"#;
+    // Without the opt-in keyframe check: the graph flags keyframes regardless.
+    let (db, program) = database(source, None);
+    let errors: Vec<_> = check(&db, program)
+        .iter()
+        .filter(|diag| diag.code.as_str().starts_with('E'))
+        .collect();
+    assert!(errors.is_empty(), "{errors:#?}");
+    let graph = story_graph(&db, program).unwrap();
+    let mut renders = Vec::new();
+    for (context, node) in graph.reached() {
+        let (step, render) = match &graph.node(context, node).unwrap().kind {
+            NodeKind::Say { step, render, .. } | NodeKind::Choice { step, render, .. } => {
+                (*step, *render)
+            }
+            _ => continue,
+        };
+        let flagged = render.map(|id| (graph.value(id).cloned().unwrap(), graph.is_keyframe(id)));
+        renders.push((step, flagged));
+    }
+    let render = |name: &str, keyframe| Some((Value::Fn(format!("crate::{name}")), keyframe));
+    assert_eq!(
+        renders,
+        [
+            (0, render("key", true)),
+            (1, render("delta", false)),
+            (2, render("key", true)),
+            (3, None),
+        ]
+    );
+    assert_eq!(graph.keyframes.len(), 1, "one keyframe render value");
+}
+
+#[test]
 fn an_unchanged_program_reuses_the_cached_analysis() {
     let cache = fresh_cache(STORY);
     let unreachable = |diags: &[kagari_lang::Diagnostic]| {
