@@ -85,9 +85,14 @@ impl Project {
         self.root.join(&self.manifest.asset_dir)
     }
 
+    /// The output directory (`build.out-dir`): the analysis cache and one directory per target.
+    pub fn build_dir(&self) -> PathBuf {
+        self.root.join(&self.manifest.out_dir)
+    }
+
     /// Where `kagari build` writes the output of `target`.
     pub fn out_dir(&self, target: Target) -> PathBuf {
-        self.root.join(&self.manifest.out_dir).join(target.as_str())
+        self.build_dir().join(target.as_str())
     }
 
     /// The project's program in `db`. `system_font("…")` searches this machine's system font
