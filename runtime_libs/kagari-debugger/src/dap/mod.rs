@@ -8,7 +8,8 @@
 //! editor's configuration into a [`launch::Prepared`] runtime, which this module connects.
 //! `editor.rs` serves the editor's requests, `answers.rs` the runtime's answers and events,
 //! `breakpoints.rs` keeps the breakpoints of every file, `frames.rs` converts stacks and
-//! variables, and `stepping.rs` repeats code steps until the line changes.
+//! variables, `stepping.rs` repeats code steps until the line changes, and `swap.rs` rebuilds
+//! and hot swaps the game (`kagari/swap`, `watch`).
 
 mod answers;
 mod breakpoints;
@@ -16,17 +17,18 @@ mod editor;
 mod frames;
 mod launch;
 mod stepping;
+mod swap;
 #[cfg(test)]
 mod tests;
 
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::sync::mpsc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
-use crate::client::{Attached, Locator};
+use crate::client::{Attached, Locator, Watcher};
 use crate::protocol::{Message, StoppedBody, command};
 use crate::transport::{Connection, Link};
 use answers::Waiting;
@@ -84,6 +86,11 @@ struct Session {
     /// Kept alive: dropping it ends a launched game.
     attached: Attached,
     locator: Locator,
+    /// Where the project is: `kagari/swap` builds it again.
+    place: Place,
+    /// `watch`: the project's files, polled every [`swap::WATCH_INTERVAL`].
+    watcher: Option<Watcher>,
+    polled: Instant,
 }
 
 struct Adapter<'l> {
@@ -145,6 +152,7 @@ impl<'l> Adapter<'l> {
                 }
                 None => {}
             }
+            self.watch();
         }
     }
 

@@ -289,12 +289,17 @@ bytes, and the bytecode snapshots do not see it.
 | ----- | ------------ |
 | `path` | The function's path in the module (with a `#n` suffix for a repeated path) |
 | `file` | The same display string the Debug section uses (relative to the root file's directory); `None` for constructors and builtins |
-| `body_hash` | Lowercase hex SHA-256 of `mir::pretty::dump_body` of the instance's MIR body, headed by the path (generic arguments included). The dump has no offsets or `ExprId`s, and in this mode shows constants without loss (rich texts with readings and effects, asset paths relative to the root directory). Comments, layout and other items' bodies do not change it. Constructors and builtins hash their path |
+| `body_hash` | Lowercase hex SHA-256 of `mir::pretty::dump_body` of the instance's MIR body, headed by the path (generic arguments included); for a function or closure of an item, followed by the dump of each of the item's promoted bodies (the body names them only as `const {promoted#N}`, and they hold its step records and texts). The dump has no offsets or `ExprId`s, and in this mode shows constants without loss (rich texts with readings and effects, asset paths relative to the root directory). Comments, layout and other items' bodies do not change it. Constructors and builtins hash their path |
 | `scopes` | HIR of the owning item, ranges from its body source map, in preorder (parents first). Scope 0 is the body: its root expression plus the parameter patterns (for a closure, the closure expression). Then every nested block, `match` arm (pattern to arm body), `if let`/`while let` (pattern to the branch or loop body) and `for` (pattern to body). The body's own root block is scope 0; nested closures are separate functions and add no scope |
 | `locals` | MIR locals with `LocalKind::User`, one per source binding (sorted by the resolver's `LocalId`, which is declaration order); the name from `body_resolution`; the scope is the innermost one containing the binding's pattern (scope 0 for `self` and for captures declared outside a closure) |
 | `ranges` | The register allocation (`Frame::locs`): an argument's register and a celled local's cell register cover the whole function. Any other register local covers its live interval: while emitting, `FnCodegen` records for each interval position the instructions it covers (a block start is empty at its first instruction, a statement's use covers its instructions, its definition is empty at its end), and the interval `[from, to]` becomes the instructions from the start of `from` to the end of `to`, then code words through `word_offsets`. Locals that are never read (`Loc::Dead`) have no range. Ranges of one binding are sorted, clipped so they do not overlap, and joined when they touch on the same register |
 
 Promoted constants, constructors and builtins have no scopes or locals.
+
+`DebugInfo::statics` has one `StaticDebug` per entry of `module.statics`, in the same order
+(`Emitter::statics`): the static's path and its type from `ItemSig::Static`, printed by
+`display_ty_qualified` (every item by its full path), which hot swap compares to find story
+variables whose type changed.
 
 ## Diagnostics
 

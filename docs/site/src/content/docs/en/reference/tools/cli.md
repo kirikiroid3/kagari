@@ -308,14 +308,15 @@ start it; you do not run it by hand. See [Editor Support](./editors.md#the-langu
 ## `kagari debug`
 
 ```text
-kagari debug [--manifest-path <PATH>] [--target <TARGET>] [--entry <PATH>] [--seed <N>] [--no-build]
-kagari debug --window [--runtime <PATH>] [--manifest-path <PATH>] [--target <TARGET>] [--no-build]
-kagari debug --attach <ADDRESS> [--manifest-path <PATH>] [--target <TARGET>]
+kagari debug [--manifest-path <PATH>] [--target <TARGET>] [--entry <PATH>] [--seed <N>] [--no-build] [--watch]
+kagari debug --window [--runtime <PATH>] [--manifest-path <PATH>] [--target <TARGET>] [--no-build] [--watch]
+kagari debug --attach <ADDRESS> [--manifest-path <PATH>] [--target <TARGET>] [--watch]
 ```
 
 Builds the project in the debug profile and debugs its story: by default on the query engine
 (the game without a window), with `--window` in a window, with `--attach` in a game already
-running with `--debug-port`. It reads one command per line from stdin. The options and the
+running with `--debug-port`. It reads one command per line from stdin; `--watch` rebuilds and hot
+swaps the game whenever a project file changes. The options and the
 commands are in [The Debugger](./debugger.md#kagari-debug). The status is 0 after the input ends
 or `quit`, and 2 when the project cannot be built or the game cannot be reached.
 

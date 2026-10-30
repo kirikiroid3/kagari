@@ -27,7 +27,8 @@ between std declarations and these imports is in [Builtins and the Host ABI](../
 | `input/` | `InputEvent`, `Key`, `MouseButton`, `PadButton`, dispatch (`mod.rs`) and `System::bindings` (`bindings.rs`) |
 | `store/` | `settings.kisave` and `meta.kisave` (`mod.rs`), VM values as `.kisave` tables (`value.rs`) |
 | `saves/` | slots, saving, autosave and loading (`mod.rs`), the file layout and choice IDs (`trace.rs`), replay, the drive loop and `Divergence` (`replay.rs`) |
-| `debug.rs` | what a debugger needs: `GameView`, `Pilot`, `debug_probe`/`debug_jump`/`debug_step`, the hold, live step breakpoints, the instruction hook ([below](#debugger-access)) |
+| `debug.rs` | what a debugger needs: `GameView`, `Pilot`, `debug_probe`/`debug_jump`/`debug_step`, the hold, live step breakpoints, the instruction hook, call recording ([below](#debugger-access)) |
+| `swap.rs` | scene hot swap: `Engine::debug_swap`, `SwapPlan`, `SwapOutcome` ([below](#hot-swap)) |
 | `values/` | `STD_ADTS` (`table.rs`, the std types the engine reads or builds, in declaration order), `StdTypes`, typed decoders (`decode.rs`), shader arguments (`shader_args.rs`) |
 | `assets.rs` | `AssetStore`: lazily decoded images, fonts, shader sources, audio lengths, save thumbnails |
 | `frame.rs` | the `Frame` draw list |
@@ -92,6 +93,7 @@ The `Platform` trait is everything the engine asks of the machine:
 | `local_time` | the save timestamp |
 | `random_seed` | the PRNG seed of a new story (`nav::start`) |
 | `set_title` | called once after `main` returned, before the first store access (the desktop data directory depends on the title) |
+| `program_changed` | a debugger swapped in a rebuilt program, before it boots: drop open archives and decoded assets (textures, sounds); nothing by default |
 
 **Decision.** The engine has no platform code; a `Platform` implementation, a renderer for
 `Frame` and a player for `AudioCommand` make a runtime.
@@ -390,12 +392,56 @@ loop.
   `debug_take_stop` reports a stop the live game made by itself; `debug_release` ends the hold.
 - **The instruction hook** (`set_instr_hook`) is the VM's ([The VM](./vm.md)); the engine only
   passes it through.
+- **Call recording** (`debug_record_calls`): every story fiber the engine starts from then on
+  (a new game, a load, a debugger's drive) and the running one record call snapshots
+  ([The VM](./vm.md#call-snapshots)). Before each resume, `driver::resume` sets the fiber's call
+  mark to a `CallMark`: the trace position and the screen the next step's render receives
+  (`ScreenRuntime::render_input`). A runtime turns recording on only when a debugger channel is
+  open on a debug build.
 
 **Decision.** The debugger moves the story only by replaying traces through the save replay loop.
 **Why.** What the debugger shows must be what play reaches: a trace is already the witness of a
 position, and replay is already deterministic and free of side effects.
 **Consequences.** A move costs a replay from the entry scene (`debug_step` avoids it by steering
 the live game on). Snapshots would make moves cheaper ([Saves](./saves.md#snapshots-and-the-script-hash)).
+
+### Hot swap {#hot-swap}
+
+`Engine::debug_swap(bytes, platform, now, plan)` replaces the running program with a rebuild;
+the debugger computes the `SwapPlan` from the two debug artifacts: `changed(old function)` (its
+code, or a non-scene function it runs in its frame, changed), `same_code(old, new)` and a
+`restart` reason (story variables added, removed or retyped).
+
+1. The dirty stores are written, `Platform::program_changed` drops the old build's assets, and the
+   new program boots like a fresh start (`main`, stores, fonts, `System::start`). A boot failure
+   returns the `BootError` and keeps the running program. The instruction hook, the pause flag and
+   call recording carry over; step breakpoints do not (the debugger sets them again).
+2. Without a game at a step, the new program stays at `System::start` (`NoGame`).
+3. Otherwise the outermost frame whose code changed is found, widened to the scene frame that runs
+   it. The story **restarts** from its entry with the same arguments and seed (`drive_trace`,
+   installed like a jump) when the plan says so, when that frame is the entry scene, or when its
+   call has no snapshot (the game started before recording, or a reference argument into a host
+   part).
+4. Else the fiber is unwound to that call (`unwind_to_call`; with no changed frame, nothing is
+   unwound and the current step is entered again) and moved to the new program with `Remap`:
+   the fiber (`transplant`), the screen of the call's mark (`ScreenObj` implements
+   `HostObject::remap`; only a screen at a step's entry moves), the entry and its arguments, the
+   exit handler (dropped when it cannot move) and the backlog before the call (lines that cannot
+   move are dropped). Any `RemapError` restarts from the entry, with its text as the reason: a
+   type whose definition changed, an asset or static that is gone, a closure whose code changed.
+5. A new `GameFrame` with the trace cut at the mark's position runs under `replaying`: the fiber
+   resumes (executing the call again) or `driver::reenter` enters the current step again; the
+   result is installed with `NavOp::Restore` and held, so the new state shows at once without
+   animations. A trap or a return there restarts from the entry instead. When even the restart
+   fails, the outcome is `Reset` and the game is at `System::start`.
+6. The old engine's audio stops before anything the new one plays (`AudioModel::take_over`), and
+   the new engine replaces the old one.
+
+**Decision.** A swap boots the new program from scratch and moves only the story over; the mode
+stack is not kept. **Why.** `main` decides the whole system (`System`, settings, bindings), and the
+UI's reactive graph, signals and mounted components hold the old program's functions; rebuilding
+them is a boot. **Consequences.** Menus open over the game are closed by a swap; the game is shown
+held, like after a debugger move.
 
 ## Screen state and the timeline
 

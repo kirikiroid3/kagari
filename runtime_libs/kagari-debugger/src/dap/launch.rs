@@ -3,13 +3,14 @@
 //! connects ([`Adapter::start`]).
 
 use std::path::PathBuf;
+use std::time::Instant;
 
 use serde::Deserialize;
 use serde_json::Value;
 
 use super::answers::Waiting;
 use super::{Adapter, Session};
-use crate::client::{Backend, Locator};
+use crate::client::{Backend, Locator, Watcher};
 use crate::headless::{BYTECODE_FILE, StartOptions};
 use crate::protocol::command;
 use crate::transport::Connection;
@@ -31,6 +32,22 @@ pub struct Opened {
     pub game_dir: PathBuf,
     /// The directory the bytecode's source file names are relative to.
     pub source_root: PathBuf,
+    /// The project's directory: what a `watch` session watches.
+    pub project_root: PathBuf,
+    /// The project's output directories, which a `watch` session does not watch.
+    pub outputs: Vec<PathBuf>,
+}
+
+impl Opened {
+    /// The game's sources, with `game.kagari` for line breakpoints.
+    pub fn locator(&self) -> Locator {
+        Locator::new(&self.source_root, Some(&self.game_dir.join(BYTECODE_FILE)))
+    }
+
+    /// A watcher of the project's files, from now on.
+    pub fn watcher(&self) -> Watcher {
+        Watcher::new(vec![self.project_root.clone()], self.outputs.clone())
+    }
 }
 
 /// What the adapter needs of the front end that runs it: projects.
@@ -61,6 +78,7 @@ pub(super) struct LaunchArgs {
     seed: Option<u64>,
     build_first: Option<bool>,
     stop_on_entry: bool,
+    watch: bool,
 }
 
 /// `attach` arguments.
@@ -71,21 +89,18 @@ pub(super) struct AttachArgs {
     place: Place,
     host: Option<String>,
     port: Option<u16>,
+    watch: bool,
 }
 
 /// A runtime to connect to, with the sources of its game.
 pub(super) struct Prepared {
     backend: Backend,
+    place: Place,
     locator: Locator,
     /// Send `pause` once connected (`stopOnEntry`).
     pause: bool,
-}
-
-fn locator(opened: &Opened) -> Locator {
-    Locator::new(
-        &opened.source_root,
-        Some(&opened.game_dir.join(BYTECODE_FILE)),
-    )
+    /// `watch`: the project's files.
+    watcher: Option<Watcher>,
 }
 
 impl Adapter<'_> {
@@ -102,6 +117,7 @@ impl Adapter<'_> {
                 super::output(editor, format!("{line}\n"))
             })?;
         let dir = opened.game_dir.clone();
+        let watcher = a.watch.then(|| opened.watcher());
         let backend = if window {
             let runtime = match (a.runtime, a.place.cwd.as_deref()) {
                 (Some(runtime), Some(cwd))
@@ -128,8 +144,10 @@ impl Adapter<'_> {
         };
         Ok(Prepared {
             backend,
-            locator: locator(&opened),
+            locator: opened.locator(),
+            place: a.place,
             pause: window && a.stop_on_entry,
+            watcher,
         })
     }
 
@@ -144,8 +162,10 @@ impl Adapter<'_> {
         let opened = self.launcher.open(&a.place, false, &mut |_| {})?;
         Ok(Prepared {
             backend: Backend::Attach { address },
-            locator: locator(&opened),
+            locator: opened.locator(),
+            place: a.place,
             pause: false,
+            watcher: a.watch.then(|| opened.watcher()),
         })
     }
 
@@ -161,6 +181,9 @@ impl Adapter<'_> {
             runtime: Connection::new(link),
             attached,
             locator: prepared.locator,
+            place: prepared.place,
+            watcher: prepared.watcher,
+            polled: Instant::now(),
         });
         self.held = Some(Vec::new());
         let started = Waiting::Started {

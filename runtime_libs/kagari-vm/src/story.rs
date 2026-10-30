@@ -174,6 +174,10 @@ pub enum Suspend {
     Returned(Value),
 }
 
+/// Rebuilds a host's call mark for another program ([`StoryFiber::transplant`]).
+pub type MarkRemap<'a> =
+    dyn FnMut(&Rc<dyn Any>, &mut Remap<'_>) -> Result<Rc<dyn Any>, RemapError> + 'a;
+
 impl StoryFiber {
     /// A fiber at the start of the entry scene `entry`; nothing runs yet.
     pub fn start(
@@ -319,7 +323,7 @@ impl StoryFiber {
     pub fn transplant(
         &self,
         remap: &mut Remap<'_>,
-        mark: &mut dyn FnMut(&Rc<dyn Any>, &mut Remap<'_>) -> Result<Rc<dyn Any>, RemapError>,
+        mark: &mut MarkRemap<'_>,
     ) -> Result<StoryFiber, RemapError> {
         let old = remap.old();
         let new = remap.new_program();

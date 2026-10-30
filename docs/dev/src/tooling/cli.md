@@ -279,7 +279,7 @@ error becomes a `Failure`.
 ### `kagari debug` and `kagari dap`
 
 ```text
-kagari debug [--manifest-path PATH] [--target TARGET] [--entry PATH] [--seed N] [--no-build]
+kagari debug [--manifest-path PATH] [--target TARGET] [--entry PATH] [--seed N] [--no-build] [--watch]
 kagari debug --window [--runtime PATH] … | --attach ADDRESS …
 kagari dap
 ```
@@ -294,7 +294,9 @@ connection to `--debug-port`. The source root is the root file's directory, whic
 bytecode's source file names are relative to; `Projects` offers `open` to the adapter as its
 `Launcher`. Locations, line breakpoints and the commands as text come from
 `kagari_debugger::client`. The REPL exits 0 at the end of its input or on `quit`; `dap` exits
-when the editor disconnects.
+when the editor disconnects. The REPL's `swap` and `--watch` (and the adapter's `kagari/swap` and
+`watch`) rebuild through the same `debugger::open` and hot swap the game; `Opened` names the
+project root to watch and its output directory to skip.
 
 ### `kagari init`
 
@@ -328,8 +330,8 @@ that.
 | `tooling/kagari-cli/tests/check.rs` | Fresh project has no diagnostics (also from a subdirectory), assets outside the asset dir, `system-fonts = false`, missing manifest (2), toolchain mismatch (2) |
 | `tooling/kagari-cli/tests/build.rs` | Bytecode decodes and verifies, archive names and contents, stale archive removal, unlisted target (2), rejected image/audio/video formats (1, no bytecode written), invalid WGSL (1, `error: shader … line`), std shaders packed into `std.kiarchive`, `disasm` of the result |
 | `tooling/kagari-cli/tests/debug.rs` | A debug build writes `game.kagari-cache` (script hash, one debug entry per function, every reached step is a bytecode step) and the same bytecode as a release build, which removes the artifact; `check` and `build` reuse a cached analysis (a diagnostic only the cache holds is printed) until a source edit, and replace an invalid cache; `clean` removes outputs and caches only |
-| `tooling/kagari-cli/tests/debugger.rs` | `kagari debug` on a story with scene calls, a guarded choice and a draw: `ls`, `nav` and the `push` that follows it, `goto`, `stack`, `pop`, `detail`, `seed`; breakpoints by step ID and by `file:line` |
-| `tooling/kagari-cli/tests/dap.rs` | `kagari dap` end to end over DAP: launch headless, breakpoints by line, stack trace, `kagari/push` and `kagari/nav`, `evaluate`, continue to a breakpoint |
+| `tooling/kagari-cli/tests/debugger.rs` | `kagari debug` on a story with scene calls, a guarded choice and a draw: `ls`, `nav` and the `push` that follows it, `goto`, `stack`, `pop`, `detail`, `seed`; breakpoints by step ID and by `file:line`; `swap` after a source edit rebuilds and moves the story onto the new sources |
+| `tooling/kagari-cli/tests/dap.rs` | `kagari dap` end to end over DAP: launch headless, breakpoints by line, stack trace, `kagari/push` and `kagari/nav`, `evaluate`, continue to a breakpoint; `kagari/swap` rebuilds, calls the changed scene again and sets the breakpoints again |
 | `tooling/kagari-cli/tests/fmt.rs` | Fresh project is formatted, rewriting, syntax errors |
 
 The integration tests run the real binary (`env!("CARGO_BIN_EXE_kagari")`) through

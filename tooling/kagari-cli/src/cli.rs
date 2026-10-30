@@ -95,6 +95,10 @@ pub enum Command {
         /// Do not run `kagari build --profile debug` first.
         #[arg(long)]
         no_build: bool,
+        /// Watch the project's files: on a change, rebuild the debug profile and hot swap the
+        /// game, as the `swap` command does.
+        #[arg(long)]
+        watch: bool,
     },
     /// Run the debug adapter (Debug Adapter Protocol) over stdio.
     Dap,

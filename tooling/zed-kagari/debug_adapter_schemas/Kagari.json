@@ -16,6 +16,11 @@
     "target": {
       "type": "string",
       "description": "The build target to debug, e.g. `v0` (default: the first of `build.targets`)."
+    },
+    "watch": {
+      "type": "boolean",
+      "description": "Watch the project's files: on a change, rebuild the debug profile and hot swap the game (as the `kagari/swap` request does). Breakpoints are set again on the new sources.",
+      "default": false
     }
   },
   "allOf": [

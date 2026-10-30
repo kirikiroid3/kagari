@@ -281,6 +281,7 @@ dependency does not enter the workspace lock file.
   | `buildFirst` | launch | Run `kagari build --profile debug` first; default `true` |
   | `stopOnEntry` | launch, window | Hold the story at its first step; default `false` |
   | `port`, `host` | attach | The game's `kagari-desktop-runtime <dir> --debug-port <port>`; host default `127.0.0.1` |
+  | `watch` | both | Watch the project's files and hot swap on a change (`kagari/swap`); default `false` |
 
   ```text
   [

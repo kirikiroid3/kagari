@@ -40,7 +40,7 @@ kagari-desktop-runtime [OPTIONS] [GAME_DIR]
 | `--script <FILE>` | The headless input script. Requires `--headless`. |
 | `--out <DIR>` | The directory for headless captures (and saves, without `--data-dir`). Requires `--headless`. |
 | `--seed <N>` | The random seed of every new story in headless mode. Default `1`. Requires `--headless`. |
-| `--debug-port <PORT>` | Accept a debugger on `127.0.0.1:PORT` (`0` picks a free port and logs it). Not with `--headless`. See [The Debugger](./debugger.md#window). |
+| `--debug-port <PORT>` | Accept a debugger on `127.0.0.1:PORT` (`0` picks a free port and logs it). Not with `--headless`. See [The Debugger](./debugger.md#window). With a debug build, the game records what [hot swap](./debugger.md#hot-swap) needs from its start (this flag and `--debug-stdio`). |
 | `--debug-stdio` | Talk to a debugger over standard input and output (how `kagari debug --window` and `kagari dap` start a game). Not with `--headless` or `--debug-port`. |
 | `-h`, `--help` | Print the help. |
 | `-V`, `--version` | Print the version. |

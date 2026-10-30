@@ -12,7 +12,7 @@ both over the Debug Adapter Protocol. The user-facing description is the Referen
 
 | Path | Contents |
 | ---- | -------- |
-| `runtime_libs/kagari-debugger/src/session/` | `Debugger`: state, starting, breakpoints, stack and scopes (`mod.rs`, with the `probe`/`jump`/`step` drive helpers); `ls`, `goto`, `detail`, `push`, `pop`, `seed` (`moves.rs`); `nav` and the seed search (`navigate.rs`); step-level execution (`exec.rs`); the pilots that steer the drives (`pilots.rs`); details, `ls` lines and the Step scope (`views.rs`) |
+| `runtime_libs/kagari-debugger/src/session/` | `Debugger`: state, starting, breakpoints, stack and scopes (`mod.rs`, with the `probe`/`jump`/`step` drive helpers); `ls`, `goto`, `detail`, `push`, `pop`, `seed` (`moves.rs`); `nav` and the seed search (`navigate.rs`); step-level execution (`exec.rs`); hot swap (`swap.rs`); the pilots that steer the drives (`pilots.rs`); details, `ls` lines and the Step scope (`views.rs`) |
 | `runtime_libs/kagari-debugger/src/tracker.rs` | `Tracker`: the story's node in the story graph, followed in lockstep |
 | `runtime_libs/kagari-debugger/src/nav.rs` | `Summaries`, `shortest`: shortest paths through the story graph |
 | `runtime_libs/kagari-debugger/src/hook.rs` | `HookState`, `Hook`: instruction breakpoints and code stepping (the VM's `InstrHook`) |
@@ -192,12 +192,42 @@ directory, or `std/…`) and a byte `offset`.
 | `kagari/pop` | — | a position |
 | `kagari/nav` | `step`, `seeds` | `answer`, `reason`, `path` (choices and draws), `push`, `length`, `seed` (the search) |
 | `kagari/seed` | `seed` | `seed` |
+| `kagari/swap` | — | `outcome` (`kept`, `recalled`, `restarted`, `reset`, `none`), `scene`, `reason`, `thrown`, `position`, `scriptHash` |
 | `disconnect` | — | — (the runtime removes the hook and the breakpoints and releases the story) |
 
 Events: `stopped` (`reason`: `entry`, `breakpoint`, `step`, `pause`, `choice`, `end`, `goto` after
-a move, `error`; `step`; `description`; `inCode`), `continued`, `output`. A value is a `Var`:
-`name`, its display (`crate::Pick::B`, `crate::Point { x: 1, y: 2 }`, `t!["…"]`) and its parts as
-children. `kagari/swap` (scene hot swap) is not part of the protocol yet.
+a move, `swap` after a hot swap, `error`; `step`; `description`; `inCode`), `continued`, `output`.
+A value is a `Var`: `name`, its display (`crate::Pick::B`, `crate::Point { x: 1, y: 2 }`,
+`t!["…"]`) and its parts as children.
+
+## Hot swap {#hot-swap}
+
+`kagari/swap` replaces the running program with a rebuild without leaving the story. The runtime
+reads `game.kagari` and its debug artifact again from its game directory (the `Server` knows it:
+`with_game_dir`); the artifact must belong to the new bytecode, and the running game's artifact
+must be loaded too, since only the two artifacts say what changed (`session/swap.rs`):
+
+- **Changed code** (`Changes::of`): a function changed when the new program has no function at
+  its path, of the same kind and arity, with the same body hash. A frame of a function cannot
+  survive when its function changed or any non-scene function it reaches without entering a
+  scene does (calls, function pointers, closures and function constants in its code: instant
+  procedures, `const fn`, renders), since that code runs inside its frame.
+- **Story variables** are compared by path and by the type the artifact records
+  ([`.kagari-cache` Files](../formats/cache.md#debug)); one added, removed or retyped restarts the
+  story from its entry.
+
+The engine then moves the story ([The Engine](./engine.md#hot-swap)): the outermost changed scene
+frame and the frames above it are thrown off and its call runs again from the call snapshot,
+or the story restarts from its entry. Afterwards the debugger drops its story-graph state (the
+tracker, the summaries) and the instruction breakpoints (they name code words of old functions),
+moves the step breakpoints by function path, installs the hook again with the new artifact, and
+answers with where the story is; a held game gets a `stopped` event with reason `swap`. Front ends
+send their breakpoints again, resolved against the new sources.
+
+Call snapshots exist only when the runtime records them: a window with a debug channel on a debug
+build (`--debug-port`, `--debug-stdio`, from the boot on), and the headless query engine with a
+debug artifact. A frame called before recording started cannot be called again, and the swap
+restarts the story instead.
 
 ## Front ends
 
@@ -207,7 +237,16 @@ runtime is launched with `--debug-stdio`) or a running game (`--attach PORT`). I
 thread and prints responses and events as they arrive; `break` takes step IDs or `file:line`
 (the steps on the line, else the first code word on it of each story function), `vars` shows a
 frame's scopes. The headless story starts at the story graph's first root (or `--entry`) with the
-graph's arguments; without a graph, at an entry scene without parameters.
+graph's arguments; without a graph, at an entry scene without parameters. `swap` runs `kagari
+build --profile debug` again (even after `--attach` or `--no-build`), sends `kagari/swap`, prints
+the body's `summary`, then reads the new sources (`Locator`) and sends every breakpoint again;
+`--watch` does the same when `client::Watcher` sees a change.
+
+**Watching.** `client::Watcher` polls the project root (skipping the output directories and hidden
+directories; `Opened::project_root`, `Opened::outputs`) about every 500 ms and fingerprints the
+files by path, length and modification time; it reports a change once the new fingerprint held
+for one poll, so a save that writes several files rebuilds once. After every swap build the
+front end calls `settle`, so its own build output does not trigger another.
 
 **`kagari dap`** is the adapter of the feature `dap`; `kagari-cli` only runs it on stdio with its
 `Launcher`. The adapter knows no projects: for a `launch` or `attach` it reads the configuration
@@ -218,13 +257,14 @@ and the default runtime); `launch.rs` turns the answer into a `Prepared` runtime
 
 | DAP | Kagari |
 | --- | ------ |
-| `launch` (`mode`: `window` or `headless`; `buildFirst`, `stopOnEntry`, …), `attach` (`host`, `port`) | a backend as above; `stopOnEntry` sends `pause` |
+| `launch` (`mode`: `window` or `headless`; `buildFirst`, `stopOnEntry`, `watch`, …), `attach` (`host`, `port`, `watch`) | a backend as above; `stopOnEntry` sends `pause`; `watch` polls a `Watcher` in the adapter's loop |
 | `threads` | one thread, the story |
 | `setBreakpoints` | per line: the step IDs of its step forms, else instruction breakpoints; lines in `fn` or without code are unverified with the reason |
 | `stackTrace`, `scopes`, `variables` | `stackTrace` and `scopes`, with lines from the sources and variable references for the parts |
 | `continue`, `next`, `stepIn`, `stepOut`, `pause` | the same requests (code steps repeated to whole lines) |
-| `evaluate` | a query command as text (`ls`, `nav …`), answered as text |
-| `kagari/*` | forwarded unchanged |
+| `evaluate` | a query command as text (`ls`, `nav …`, `swap`), answered as text |
+| `kagari/swap` | rebuild through the `Launcher` (the session's `Place`; a build failure is the answer), forward `kagari/swap`; on success the new sources replace the `Locator`, variable references and code positions are dropped, every line breakpoint is resolved again (`breakpoint` events with reason `changed`) and sent to the runtime, and the summary goes to the console (`dap/swap.rs`) |
+| other `kagari/*` | forwarded unchanged |
 | `disconnect`, `terminate` | `disconnect`; a launched window is ended |
 
 ## Decisions
@@ -243,7 +283,8 @@ archives (`ArchiveDir`), not a window or a separate binary.
 
 ## Invariants
 
-- The debugger moves the story only through engine drives; it never writes story state.
+- The debugger moves the story only through engine drives and, for a hot swap, through the
+  engine's swap; it never writes story state itself.
 - Replaying moves never stop in code; only `push` and execution run with the hook armed.
 - `nav` claims `unreachable` only for a complete graph and a tracked state; otherwise `unknown`.
 - A debug artifact is used only when its script hash is the running bytecode's.

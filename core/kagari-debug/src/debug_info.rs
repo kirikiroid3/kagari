@@ -5,7 +5,7 @@
 //! is the rest, kept out of the bytecode so that a debug and a release build emit the same
 //! `game.kagari`.
 
-use kagari_archive::save::{Scalar, TableMut, TableRef, ValueRef};
+use kagari_archive::save::{ArrayMut, Scalar, TableMut, TableRef, ValueRef};
 
 use crate::Error;
 use crate::codec::{
@@ -80,7 +80,20 @@ pub struct RegisterRange {
 
 impl DebugInfo {
     pub(crate) fn put(&self, t: &mut TableMut<'_>) -> Result<(), Error> {
-        let mut functions = t.array("functions")?;
+        {
+            let mut functions = t.array("functions")?;
+            self.put_functions(&mut functions)?;
+        }
+        let mut statics = t.array("statics")?;
+        for s in &self.statics {
+            let mut table = statics.push_table()?;
+            table.set("path", Scalar::String(&s.path))?;
+            table.set("type", Scalar::String(&s.ty))?;
+        }
+        Ok(())
+    }
+
+    fn put_functions(&self, functions: &mut ArrayMut<'_>) -> Result<(), Error> {
         for function in &self.functions {
             let mut f = functions.push_table()?;
             f.set("path", Scalar::String(&function.path))?;
@@ -112,13 +125,6 @@ impl DebugInfo {
                     r.set("cell", Scalar::Bool(range.cell))?;
                 }
             }
-        }
-        drop(functions);
-        let mut statics = t.array("statics")?;
-        for s in &self.statics {
-            let mut table = statics.push_table()?;
-            table.set("path", Scalar::String(&s.path))?;
-            table.set("type", Scalar::String(&s.ty))?;
         }
         Ok(())
     }

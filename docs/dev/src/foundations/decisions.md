@@ -327,8 +327,9 @@ state layout then never has to stay stable across versions.
   `Divergence` at the first ID that no longer resolves.
 - Implemented: the script hash is the lowercase hex SHA-256 of the bytecode. Today it decides only
   whether a closure exit handler recorded in the save can be trusted.
-- Planned: snapshots at choices, replay bounded by keyframes, and preview/hot reload. Today every
-  load and rewind replays from the start with every render. See [Saves, Traces and
+- Planned: snapshots at choices, replay bounded by keyframes, and preview. Today every load and
+  rewind replays from the start with every render. Debug builds have in-memory call snapshots
+  for scene hot swap only; they never reach a save. See [Saves, Traces and
   Snapshots](../runtime/saves.md).
 - The story PRNG (xoroshiro128++, seeded from the trace) is the only randomness; only scenes draw
   (`E3024`), and the analysis explores every outcome.

@@ -4,9 +4,12 @@
 
 mod common;
 
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
-use std::process::{Command, Output, Stdio};
+use std::process::{Child, ChildStdin, Command, Output, Stdio};
+use std::sync::mpsc::{self, Receiver};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use common::{font_home, game, init_project, stderr, stdout};
 
@@ -91,6 +94,89 @@ fn story_project() -> tempfile::TempDir {
     let tmp = init_project();
     std::fs::write(game(&tmp).join("src/scenario/mod.kix"), STORY).unwrap();
     tmp
+}
+
+/// The 1-based line of the first line of `STORY` containing `needle`.
+fn line_of(needle: &str) -> usize {
+    STORY.lines().position(|l| l.contains(needle)).unwrap() + 1
+}
+
+/// An interactive `kagari debug`: commands are written as the test goes.
+struct Repl {
+    child: Child,
+    stdin: ChildStdin,
+    lines: Receiver<String>,
+    /// Everything printed so far.
+    out: String,
+}
+
+impl Repl {
+    fn start(dir: &Path, args: &[&str]) -> Repl {
+        let home = font_home();
+        let mut child = Command::new(env!("CARGO_BIN_EXE_kagari"))
+            .arg("debug")
+            .args(args)
+            .current_dir(dir)
+            .env("HOME", &home)
+            .env("XDG_DATA_HOME", &home)
+            .env("XDG_DATA_DIRS", &home)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .expect("run kagari debug");
+        let stdin = child.stdin.take().unwrap();
+        let stdout = child.stdout.take().unwrap();
+        let (tx, lines) = mpsc::channel();
+        thread::spawn(move || {
+            for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+                if tx.send(line).is_err() {
+                    return;
+                }
+            }
+        });
+        Repl {
+            child,
+            stdin,
+            lines,
+            out: String::new(),
+        }
+    }
+
+    fn send(&mut self, commands: &str) {
+        self.stdin.write_all(commands.as_bytes()).unwrap();
+        self.stdin.flush().unwrap();
+    }
+
+    /// Reads the output up to a line containing `needle`.
+    fn until(&mut self, needle: &str) {
+        let deadline = Instant::now() + Duration::from_secs(300);
+        loop {
+            let left = deadline.saturating_duration_since(Instant::now());
+            let line = self
+                .lines
+                .recv_timeout(left)
+                .unwrap_or_else(|_| panic!("no `{needle}` in\n{}", self.out));
+            self.out.push_str(&line);
+            self.out.push('\n');
+            if line.contains(needle) {
+                return;
+            }
+        }
+    }
+
+    /// Quits; the whole output.
+    fn quit(mut self) -> String {
+        self.send("quit\n");
+        drop(self.stdin);
+        for line in self.lines.iter() {
+            self.out.push_str(&line);
+            self.out.push('\n');
+        }
+        let status = self.child.wait().unwrap();
+        assert!(status.success(), "{}", self.out);
+        self.out
+    }
 }
 
 #[test]
@@ -178,4 +264,45 @@ fn breakpoints_by_line_and_by_step() {
     for line in expect {
         assert!(out.contains(line), "missing `{line}` in\n{out}");
     }
+}
+
+#[test]
+fn swap_rebuilds_and_moves_the_story_onto_the_new_sources() {
+    let tmp = story_project();
+    let dir = game(&tmp);
+    let greet = line_of("Nice to meet you.");
+    let gate = line_of("At the gate.");
+    let mut repl = Repl::start(&dir, &[]);
+    repl.send(&format!(
+        "break scenario/mod.kix:{greet} scenario/mod.kix:{gate}\npush Shy\ncontinue\n"
+    ));
+    repl.until("stopped (breakpoint) at crate::scenario::Greet#0");
+
+    // The scene the story is in changes: `swap` rebuilds, and its caller calls it again.
+    std::fs::write(
+        dir.join("src/scenario/mod.kix"),
+        STORY.replace("Nice to meet you.", "Nice to see you."),
+    )
+    .unwrap();
+    repl.send("swap\n");
+    repl.until("swapped;");
+    repl.send("detail\ncontinue\n");
+    repl.until("stopped (breakpoint) at crate::scenario::Start#3");
+    let out = repl.quit();
+    let expect = [
+        "swapped; called `crate::scenario::Greet` again",
+        "now at crate::scenario::Greet#0",
+        "stopped (swap) at crate::scenario::Greet#0",
+        "text:     Nice to see you.",
+    ];
+    for line in expect {
+        assert!(out.contains(line), "missing `{line}` in\n{out}");
+    }
+    // The build ran again for `swap`.
+    assert_eq!(
+        out.matches("wrote target/v0/game.kagari-cache").count(),
+        2,
+        "{out}"
+    );
+    assert!(!out.contains("rejected a breakpoint"), "{out}");
 }

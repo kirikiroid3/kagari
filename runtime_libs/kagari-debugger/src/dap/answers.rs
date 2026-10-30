@@ -4,8 +4,9 @@
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 
+use super::swap::SwapFor;
 use super::{Adapter, THREAD};
-use crate::client::text;
+use crate::client::{Locator, text};
 use crate::protocol::{
     BreakpointsBody, InitializeBody, Message, OutputBody, StoppedBody, command, event,
 };
@@ -50,6 +51,11 @@ pub(super) enum Waiting {
     StepCheck(StoppedBody),
     /// A code step sent again; the stop to show if it fails.
     Restep(StoppedBody),
+    /// `kagari/swap`; `locator` reads the rebuilt game's sources.
+    Swap {
+        swap_for: SwapFor,
+        locator: Box<Locator>,
+    },
 }
 
 impl Waiting {
@@ -62,6 +68,7 @@ impl Waiting {
             Waiting::StackTrace { seq, .. } => Some((*seq, "stackTrace")),
             Waiting::Scopes { seq } => Some((*seq, "scopes")),
             Waiting::Evaluate { seq, .. } => Some((*seq, "evaluate")),
+            Waiting::Swap { swap_for, .. } => swap_for.editor_request(),
             Waiting::Breakpoints
             | Waiting::Silent
             | Waiting::CodeStop
@@ -192,6 +199,7 @@ impl Adapter<'_> {
                     self.show_stopped(stopped, true);
                 }
             }
+            Waiting::Swap { swap_for, locator } => self.swapped(swap_for, *locator, result),
         }
     }
 

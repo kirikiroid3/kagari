@@ -6,6 +6,7 @@ use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 
 use super::answers::Waiting;
+use super::swap::SwapFor;
 use super::{Adapter, THREAD};
 use crate::client::text::{self, Parsed};
 use crate::protocol::{Message, command};
@@ -102,6 +103,7 @@ impl Adapter<'_> {
             "launch" | "attach" if self.session.is_some() => {
                 return Err("a game is already being debugged".to_owned());
             }
+            command::SWAP => return self.swap(SwapFor::Request(seq)).map(|()| None),
             "launch" => {
                 let prepared = self.prepare_launch(args(arguments)?)?;
                 return self.start(seq, name, prepared).map(|()| None);
@@ -199,6 +201,7 @@ impl Adapter<'_> {
             Parsed::Break(_) | Parsed::Breakpoints | Parsed::Delete => {
                 Err("set breakpoints in the editor".to_owned())
             }
+            Parsed::Swap => self.swap(SwapFor::Evaluate(seq)).map(|()| None),
             Parsed::Help => Ok(Some(shown(text::HELP))),
             Parsed::Quit => Err("end the debug session in the editor".to_owned()),
             Parsed::Nothing => Ok(Some(shown(""))),

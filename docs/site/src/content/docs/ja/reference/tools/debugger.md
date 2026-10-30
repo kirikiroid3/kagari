@@ -17,9 +17,9 @@ title: "デバッガー"
 ## `kagari debug` {#kagari-debug}
 
 ```text
-kagari debug [--manifest-path <PATH>] [--target <TARGET>] [--entry <PATH>] [--seed <N>] [--no-build]
-kagari debug --window [--runtime <PATH>] [--manifest-path <PATH>] [--target <TARGET>] [--no-build]
-kagari debug --attach <ADDRESS> [--manifest-path <PATH>] [--target <TARGET>]
+kagari debug [--manifest-path <PATH>] [--target <TARGET>] [--entry <PATH>] [--seed <N>] [--no-build] [--watch]
+kagari debug --window [--runtime <PATH>] [--manifest-path <PATH>] [--target <TARGET>] [--no-build] [--watch]
+kagari debug --attach <ADDRESS> [--manifest-path <PATH>] [--target <TARGET>] [--watch]
 ```
 
 `kagari debug` はプロジェクトをデバッグプロファイルでビルドし、ゲームを起動して、1 行に 1 つずつコマンドを読みます。既定ではクエリエンジンを実行します。物語は、物語のグラフが最初に挙げるエントリーシーン（または `--entry`）から、グラフにあるその引数とシード `--seed`（既定は `1`）で始まり、最初のステップで停止します。
@@ -34,6 +34,7 @@ kagari debug --attach <ADDRESS> [--manifest-path <PATH>] [--target <TARGET>]
 | `--runtime <PATH>` | `--window` が起動するランタイム。 |
 | `--attach <ADDRESS>` | `--debug-port` 付きで起動したゲームに接続します。`PORT` または `HOST:PORT`。何もビルドしません。 |
 | `--no-build` | 先にビルドせず、ターゲットディレクトリにすでにあるファイルを使います。 |
+| `--watch` | プロジェクトのファイルを（約 0.5 秒ごとに）監視します。変更があると `source changed: rebuilding` と表示し、`swap` と同じことを行います。 |
 
 場所は `file:line:column` で表示され、ファイルはプロジェクトのルートファイルのディレクトリからの相対パスです。コマンドはパイプで渡せます（`kagari debug < commands.txt`）。デバッガーは順に答え、入力の終わりで終了します。
 
@@ -57,6 +58,7 @@ kagari debug --attach <ADDRESS> [--manifest-path <PATH>] [--target <TARGET>]
 | `vars [<frame>]` | フレーム（`0` が最も内側）の引数、ローカル変数、物語変数と、現在のステップのレコード。 |
 | `break <step \| file:line>...` | ブレークポイントを追加します。`break` だけなら一覧を表示します。 |
 | `delete` | すべてのブレークポイントを削除します。 |
+| `swap` | デバッグプロファイルで再ビルドし、新しいゲームを[ホットスワップ](#hot-swap)して、新しいソースにブレークポイントを設定し直します。 |
 | `help`、`quit` | |
 
 選択肢にはアームが必要なので（`push` を使います）、`continue`、`next`、`step`、`out` は選択肢で停止します。物語が終わるときは、最後のステップで停止してそのことを伝えます。
@@ -100,6 +102,29 @@ kagari debug --attach 4711
 
 デバッガーが物語を停止している間、プレイヤーの物語の入力（送り、選択肢、オート、スキップ）は無視されます。メニュー、セーブ、バックログは引き続き動作し、ロードやニューゲームで停止は終わります。`continue` は物語をプレイヤーに返し、ゲームはブレークポイントで、または `pause` が要求されたときに再び停止します。移動のたびに、間のアニメーションなしで新しい状態がすぐに表示されます。現在のステップ自身のアニメーションはもう一度再生されます。
 
+## ホットスワップ {#hot-swap}
+
+ホットスワップは、物語から離れずに、実行中のゲームを再ビルドしたゲームに置き換えます。シーンを編集し、`swap` を実行します（または `--watch` に任せます）。ゲームはデバッグプロファイルで再ビルドされ、ランタイムは 2 つのデバッグビルドを比べて、変わったコードを見つけます。ホットスワップはデバッグのための機能です。両方のゲームのデバッグビルドが必要で、デバッガーなしで実行するゲームには負担がかかりません。
+
+コードが変わったシーンは**スタックから外されます**。シーンの本体が変わったとき（ステップのテキストも含みます）、またはその中で実行されるコード、つまりシーンが使う `pushdown fn`、`const fn`、レンダーが変わったとき、そのシーンは変わったとみなされます。エントリーシーンからコールスタックをたどり、最初に見つかった変わったシーンとその上のすべてのシーンが外され、そのシーンは呼び出し元から同じ引数で**呼び直され**ます。シーンは新しいコードで最初のステップから始まります。呼び出し元は位置とローカル変数を保ちます。物語変数、`&mut` 引数の先の値、乱数の状態、位置、画面は呼び出した時点の状態に戻るので、外されたシーンが行ったことは取り消されます。新しいステップはすぐに表示され、物語はそこで停止します。
+
+```text
+(kagari) swap
+wrote target/v0/game.kagari
+swapped; called `crate::story::Greet` again (thrown off: crate::story::Greet), now at crate::story::Greet#0
+stopped (swap) at crate::story::Greet#0
+```
+
+スタック上で何も変わっていなければ、物語はそのステップにとどまり（`nothing on the stack changed`）、変わったシーンは呼び出されたときに新しいコードを実行します。次の場合、物語は同じ引数とシードでエントリーシーンから**やり直し**、その理由を表示します。
+
+- エントリーシーン自体が変わった。
+- 物語変数が追加された、削除された、または型が変わった。
+- 残る物語が持つ値を引き継げない。その型が定義し直された、またはその値が指すアセットや `Setting`、`Meta` がなくなった。
+- 呼び直すシーンが、ゲームが呼び出しを記録し始める前に始まっていた。ウィンドウは、デバッグビルドを `--debug-port` または `--debug-stdio` 付きで実行すると起動時から記録します。クエリエンジンは常に記録します。
+- 新しいコードがすぐにエラーで止まった。
+
+物語をやり直すこともできないとき（エントリーシーンがなくなった、またはその引数が合わなくなった）は、ゲームは開始ページに戻ります。ゲームの上に開いていたメニューはスワップで閉じられ、アセットは再ビルドされたアーカイブから読み直されます。スワップ後の位置は通常の位置です。その後に作ったセーブは、新しいゲームでの再生によって読み込めます。
+
 ## エディタ {#editors}
 
 `kagari dap` はデバッグアダプターで、標準入出力で Debug Adapter Protocol を話します。Zed 拡張機能はこれをアダプター `Kagari` として登録します（[Zed](./editors.md#debugging-in-zed) を参照してください）。launch の設定はゲームを起動し、既定ではウィンドウで起動します。
@@ -114,5 +139,6 @@ kagari debug --attach 4711
 | `buildFirst` | 先にデバッグプロファイルでビルドします。既定は `true`。 |
 | `stopOnEntry` | ウィンドウ: 物語が最初に入ったステップで停止します。 |
 | `host`、`port` | attach: ゲームが待ち受ける場所（`--debug-port`）。 |
+| `watch` | プロジェクトのファイルを監視し、変更があると `kagari debug --watch` と同じように[ホットスワップ](#hot-swap)します。既定は `false`。 |
 
-エディタの表示は物語に対応します。1 つのスレッド（物語）、シーンのコールスタック、各フレームの変数と物語変数、行のブレークポイント、そして上で述べた continue、ステップオーバー、ステップイン、ステップアウトです。デバッグコンソールはこのページのコマンド（`ls`、`nav crate::Start#9`、`push B`）を評価します。物語コマンドは、構造化された結果を返すカスタムリクエスト `kagari/stack`、`kagari/ls`、`kagari/goto`、`kagari/push`、`kagari/pop`、`kagari/detail`、`kagari/nav`、`kagari/seed` としても使えます。条件付きブレークポイント、関数ブレークポイント、例外ブレークポイントには対応していません。
+エディタの表示は物語に対応します。1 つのスレッド（物語）、シーンのコールスタック、各フレームの変数と物語変数、行のブレークポイント、そして上で述べた continue、ステップオーバー、ステップイン、ステップアウトです。デバッグコンソールはこのページのコマンド（`ls`、`nav crate::Start#9`、`push B`、`swap`）を評価します。物語コマンドは、構造化された結果を返すカスタムリクエスト `kagari/stack`、`kagari/ls`、`kagari/goto`、`kagari/push`、`kagari/pop`、`kagari/detail`、`kagari/nav`、`kagari/seed` としても使えます。カスタムリクエスト `kagari/swap` は、ゲームを再ビルドしてホットスワップし、行のブレークポイントを設定し直して、結果（`kept`、`recalled`、`restarted`、`reset`）、呼び直したシーン、理由、外されたシーン、新しい位置を返します。条件付きブレークポイント、関数ブレークポイント、例外ブレークポイントには対応していません。

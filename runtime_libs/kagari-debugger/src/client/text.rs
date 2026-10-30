@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use super::locate::Locator;
 use crate::protocol::{
     Detail, InitializeBody, LsBody, NavBody, PathItem, Position, PushBody, ScopesBody, SeedBody,
-    StackBody, StoppedBody, Var, command,
+    StackBody, StoppedBody, SwapBody, Var, command,
 };
 
 /// The `initialize` answer as a line for the user.
@@ -42,6 +42,8 @@ pub enum Parsed {
     Breakpoints,
     /// `delete`: clear every breakpoint.
     Delete,
+    /// `swap`: rebuild the debug profile and hot swap the new game in (`kagari/swap`).
+    Swap,
     Help,
     Quit,
     /// An empty line.
@@ -67,6 +69,7 @@ Running:
   vars [<frame>]             the variables of a frame (0: the innermost)
   break <step|file:line>...  add breakpoints (`break` alone lists them)
   delete                     remove every breakpoint
+  swap                       rebuild the game and hot swap it in, then set the breakpoints again
   help, quit";
 
 /// Parses a command line.
@@ -144,6 +147,8 @@ pub fn parse(line: &str) -> Result<Parsed, String> {
             rest.iter().map(|s| (*s).to_owned()).collect(),
         )),
         "delete" => Ok(Parsed::Delete),
+        "swap" if rest.is_empty() => Ok(Parsed::Swap),
+        "swap" => Err("`swap` takes no arguments".to_owned()),
         "help" | "h" | "?" => Ok(Parsed::Help),
         "quit" | "q" | "exit" => Ok(Parsed::Quit),
         other => Err(format!("unknown command `{other}` (try `help`)")),
@@ -175,6 +180,7 @@ pub fn format(command: &str, body: &Value, loc: &Locator) -> String {
             let seed: SeedBody = de(body);
             format!("seed {}", seed.seed)
         }
+        command::SWAP => de::<SwapBody>(body).summary(),
         _ => String::new(),
     }
 }
