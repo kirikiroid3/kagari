@@ -28,13 +28,13 @@ pub enum Message {
         command: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         message: Option<String>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Value::is_null")]
         body: Value,
     },
     Event {
         seq: i64,
         event: String,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Value::is_null")]
         body: Value,
     },
 }
