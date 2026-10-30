@@ -26,7 +26,7 @@ and [Headless Mode](https://kagari.suitsu31.club/en/reference/tools/headless/).
 | `audio.rs`, `sounds.rs` | the kira backend and the decoded-sound cache |
 | `input.rs`, `pads.rs` | winit keyboard and mouse mapping, gilrs gamepads |
 | `headless/mod.rs`, `headless/script.rs` | headless sessions and the script parser |
-| `tests.rs` | key mapping, script parsing, store naming, audio spans |
+| `tests.rs` | key mapping, script parsing, store naming, audio spans, WAV sizes past the end of the file |
 
 Build-time system dependencies are declared in the repository's `flake.nix`.
 
@@ -151,6 +151,11 @@ flag that every frame checks; the device is never recreated.
 - `SoundCache` keeps decoded sounds by asset path, evicting the least recently used beyond
   256 MiB (counted as 8 bytes per frame). Playing sounds hold their own reference, so eviction
   never cuts one off. A path that fails to decode is remembered and logged once.
+- Before decoding, `fit_wav_sizes` lowers a WAV's RIFF and `data` chunk sizes that run past the
+  end of the file to the bytes present. Streaming encoders write `0xFFFFFFFF` there; symphonia
+  then reads the `data` chunk until it runs out of bytes and fails the whole decode, while the
+  `kagari-compat` sniffer (which reads only the `fmt ` chunk) accepts the file, so `kagari build`
+  and the runtime would disagree.
 
 ### Gamepads
 

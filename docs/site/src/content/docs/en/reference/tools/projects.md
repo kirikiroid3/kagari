@@ -202,6 +202,10 @@ The only profile is `native_v0`, the [desktop runtime](./runtime.md):
 | Shader | WGSL source (UTF-8 text) |
 | Video | none |
 
+A WAV whose RIFF or `data` chunk size runs past the end of the file, such as the `0xFFFFFFFF`
+placeholder that streaming encoders (ffmpeg writing to a pipe, TTS services) leave, plays to the
+end of the file.
+
 Everything else is rejected: animated WebP, JPEG with arithmetic, lossless, hierarchical or
 12-bit coding, GIF, BMP, AVIF, JPEG XL, Ogg Opus, Ogg FLAC, Ogg with another codec, compressed
 WAV, AAC/M4A, WOFF and WOFF2. Video assets are rejected whatever their content. Each problem
