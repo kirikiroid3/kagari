@@ -171,6 +171,10 @@ flowchart LR
 4. Restores the live game and the `replaying` flag whatever the outcome, and returns the replayed
    frame with the next generation number.
 
+The loop in step 3 is the engine's drive loop: a debugger uses the same loop to follow a trace and
+then steer the story on ([The Engine](./engine.md#debugger-access)), so a debugger's moves and a
+load reach the same states.
+
 On success `load_slot` pushes `NavOp::Restore(frame)`; `settle` unmounts every mode, installs the
 frame with a fresh story clock, mounts the game view, syncs every audio channel to the logical
 screen without fades, and restarts the current line's voice. The current step's timeline starts

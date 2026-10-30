@@ -21,6 +21,8 @@ pub(crate) struct GameFrame {
     pub fiber: Option<StoryFiber>,
     pub screen: ScreenRuntime,
     pub current: Current,
+    /// The render function of the current step, as its record named it.
+    pub render: Option<Value>,
     pub step_serial: u64,
     /// Story ms of the current step's entry.
     pub step_entered: u64,
@@ -53,6 +55,7 @@ impl GameFrame {
             fiber: Some(fiber),
             screen,
             current: Current::None,
+            render: None,
             step_serial: 0,
             step_entered: 0,
             reveal: RevealRun::empty(0),
@@ -131,7 +134,8 @@ pub(crate) struct SayStep {
 }
 
 pub(crate) struct ChoiceStep {
-    pub func: FuncId,
+    /// The step ID; `step.func` is the function the choice ID names.
+    pub step: StepId,
     pub id: String,
     pub arms: Vec<ChoiceArmStep>,
     pub disabled: Vec<(u32, Text)>,
@@ -145,13 +149,17 @@ pub(crate) struct ChoiceArmStep {
     pub arm_id: String,
 }
 
-/// What a save records: how to reach the current step again.
+/// What a save records: how to reach the current step again. A debugger moves the story by
+/// replaying a changed trace (see [`crate::debug`]).
 #[derive(Clone, Debug)]
-pub(crate) struct Trace {
+pub struct Trace {
+    /// The path of the `#[entry]` scene.
     pub entry: String,
     pub args: Vec<Value>,
     pub seed: u64,
+    /// The choice ID of every selection, in order.
     pub choices: Vec<String>,
+    /// `Say` steps advanced since the last selection (or the start).
     pub steps_after_last_choice: u32,
 }
 

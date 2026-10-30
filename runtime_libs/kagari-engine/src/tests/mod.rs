@@ -3,6 +3,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+mod debug;
 mod focus;
 mod reactive;
 mod reveal;
