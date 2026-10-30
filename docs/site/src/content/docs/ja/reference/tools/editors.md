@@ -4,13 +4,14 @@ sidebar:
   label: "エディタ支援"
 ---
 
-Kagari はエディタ向けに 3 つの部品を提供します。
+Kagari はエディタ向けに 4 つの部品を提供します。
 
 | 部品 | 提供するもの | 場所 |
 | ---- | ------------ | ---- |
 | 言語サーバー | 診断、整形、定義へ移動、ホバー、ドキュメントのアウトライン | `kagari lsp` |
+| デバッグアダプター | ブレークポイント、ステップ実行、物語のコールスタックと変数、デバッガーのコマンド | `kagari dap` |
 | tree-sitter 文法 | `.kis` と `.kix` の構文ハイライトと構造 | `tooling/tree-sitter-kagari` |
-| Zed 拡張機能 | 上の 2 つを Zed にそのまま導入できる形にしたもの | `tooling/zed-kagari` |
+| Zed 拡張機能 | 上のすべてを Zed にそのまま導入できる形にしたもの | `tooling/zed-kagari` |
 
 いずれも `kagari` 実行ファイルが必要です。[インストール](./cli.md#installing)を参照してください。
 
@@ -81,8 +82,39 @@ std のソースはコンパイラに内蔵されています。定義へ移動�
 
 `kagari` が設定されておらず `PATH` にもない場合、Zed は `` `kagari` was not found on PATH `` と報告します。
 
+### Zed でのデバッグ {#debugging-in-zed}
+
+拡張機能はデバッグアダプター `Kagari` も登録します。これはワークツリーで `kagari dap` を実行します（すべての設定は[デバッガー](./debugger.md#editors)を参照してください）。デバッグシナリオを `.zed/debug.json` に追加します。
+
+```json
+[
+  {
+    "label": "Kagari: run in a window",
+    "adapter": "Kagari",
+    "request": "launch",
+    "mode": "window",
+    "stopOnEntry": true
+  },
+  {
+    "label": "Kagari: query engine",
+    "adapter": "Kagari",
+    "request": "launch",
+    "mode": "headless",
+    "seed": 1
+  },
+  {
+    "label": "Kagari: attach",
+    "adapter": "Kagari",
+    "request": "attach",
+    "port": 4711
+  }
+]
+```
+
+launch はまずデバッグプロファイルでビルドします（`"buildFirst": false` で省略できます）。ブレークポイントは行をクリックして設定します。`s!(…)` や `choice!{…}` のある行は、物語がそのステップに入ったときに止まります。物語のコードのそれ以外の行は、そのコードが実行される前に止まります。デバッグコンソールは `ls` や `nav crate::story::Ending#0` などのデバッガーのコマンドを受け付けます。
+
 ## その他のエディタ {#other-editors}
 
-LSP クライアントを持つエディタなら言語サーバーを使えます。ファイル拡張子 `kis` と `kix` に対してコマンド `kagari lsp` を登録してください。
+LSP クライアントを持つエディタなら言語サーバーを使えます。ファイル拡張子 `kis` と `kix` に対してコマンド `kagari lsp` を登録してください。Debug Adapter Protocol クライアントを持つエディタならデバッグアダプターを使えます。[デバッガー](./debugger.md#editors)の launch と attach の設定で、`kagari dap` を stdio で起動してください。
 
 構文ハイライトには `tooling/tree-sitter-kagari` の tree-sitter 文法（`grammar.js` と、`src/` の生成済みパーサー）を使います。スコープは `source.kagari` で、`.kis` と `.kix` の両方を扱います。この文法向けのハイライト・アウトライン・インデント・括弧のクエリは `tooling/zed-kagari/languages/kagari/`（`highlights.scm`、`outline.scm`、`indents.scm`、`brackets.scm`）にあります。Neovim や Helix などのエディタでも、キャプチャ名をそのエディタの慣習に合わせて調整すれば再利用できます。

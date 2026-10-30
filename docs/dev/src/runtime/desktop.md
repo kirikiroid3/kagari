@@ -19,6 +19,7 @@ and [Headless Mode](https://kagari.suitsu31.club/en/reference/tools/headless/).
 | `exit.rs` | exit statuses and `Failure` |
 | `game.rs` | the game directory, reading `game.kagari`, `boot`, thumbnail uploads |
 | `app.rs` | the windowed runtime: the winit `ApplicationHandler`, the frame, surface handling |
+| `debug.rs` | `DebugPort`: the debug channel (`--debug-port`, `--debug-stdio`) |
 | `gpu.rs` | adapter, device and `Renderer` creation; out-of-memory and device-lost tracking |
 | `platform.rs` | `DesktopPlatform`: the engine's `Platform` |
 | `store.rs` | settings and saves on disk |
@@ -42,7 +43,7 @@ becomes the exit status.
 | Status | Constant | Cause |
 | -----: | -------- | ----- |
 | 0 | | normal end: the window closed, `nav::quit`, or the headless script finished |
-| 2 | `USAGE` | clap usage errors, no `game.kagari` in the game directory, any `BootError` other than a trap (invalid bytecode, unsupported import, a font that fails to load) |
+| 2 | `USAGE` | clap usage errors, no `game.kagari` in the game directory, any `BootError` other than a trap (invalid bytecode, unsupported import, a font that fails to load), a `--debug-port` that cannot be bound |
 | 3 | `STOPPED` | the game trapped, during boot or later (`game stopped: <message>`); in a window, the status is reported when the window closes |
 | 4 | `WINDOW` | no event loop or window, no surface, no usable adapter, device creation failed, GPU out of memory, device lost |
 | 5 | `SCRIPT` | headless only: the script cannot be read or parsed, `expect-crash` without a crash, a capture cannot be written or read back |
@@ -199,6 +200,26 @@ stops early when the game quits.
 identical on every run ([Saves](./saves.md#determinism)). Captured pixels can differ slightly
 between GPU adapters and drivers (rasterization and floating-point blending are the adapter's);
 compare captures made on the same machine.
+
+## The debug channel
+
+`--debug-port PORT` and `--debug-stdio` (windowed only; they conflict with `--headless` and with
+each other) open a channel for a debugger ([The Debugger](./debugger.md)). Without them nothing
+listens.
+
+- `--debug-port PORT` listens on `127.0.0.1:PORT` (0 picks a free port) on a background thread,
+  logs `debugger: listening on <address>` under `kagari::debug`, and hands each accepted client to
+  the frame loop; one debugger is attached at a time, and the next waits until it detaches. A
+  port that cannot be bound exits with status 2.
+- `--debug-stdio` talks to one debugger over standard input and output (how `kagari dap` and
+  `kagari debug --window` launch a game); the runtime writes nothing else to stdout.
+
+`DebugPort::poll` runs at the start of every frame, before `Engine::update`: it attaches a waiting
+debugger (reading `game.kagari-cache` from the game directory when its script hash matches, else
+with a warning that `nav` and local names are unavailable) and polls the live
+`kagari_debugger::Server`, which applies the requests and reports the engine's own stops. A stop
+inside code blocks the frame loop until the debugger goes on, so the window does not redraw
+meanwhile.
 
 ## Platform notes
 

@@ -40,6 +40,8 @@ kagari-desktop-runtime [OPTIONS] [GAME_DIR]
 | `--script <FILE>` | The headless input script. Requires `--headless`. |
 | `--out <DIR>` | The directory for headless captures (and saves, without `--data-dir`). Requires `--headless`. |
 | `--seed <N>` | The random seed of every new story in headless mode. Default `1`. Requires `--headless`. |
+| `--debug-port <PORT>` | Accept a debugger on `127.0.0.1:PORT` (`0` picks a free port and logs it). Not with `--headless`. See [The Debugger](./debugger.md#window). |
+| `--debug-stdio` | Talk to a debugger over standard input and output (how `kagari debug --window` and `kagari dap` start a game). Not with `--headless` or `--debug-port`. |
 | `-h`, `--help` | Print the help. |
 | `-V`, `--version` | Print the version. |
 
@@ -49,6 +51,10 @@ directory written by `kagari build`, such as `target/v0`.
 Because `GAME_DIR` defaults to the executable's directory, a shipped game puts the executable
 next to `game.kagari` and the archives; players then start it without arguments. See
 [Shipping a game](./projects.md#shipping-a-game).
+
+Without `--debug-port` or `--debug-stdio` the runtime opens no debug channel. With one, a
+debugger can stop the story, move it and inspect it; it reads `game.kagari-cache` from the game
+directory when a debug build wrote it (see [The Debugger](./debugger.md)).
 
 ## The window
 
@@ -142,7 +148,7 @@ exits with status 2 and prints `kagari-desktop-runtime: cannot start the game: <
 | Status | Meaning |
 | -----: | ------- |
 | 0 | The game ended normally. |
-| 2 | Usage error, no `game.kagari` in the game directory, or the game cannot start: an invalid `.kagari` file, an import of a builtin this runtime lacks, or a font (or other text-style asset) that fails to load. See [When the game stops with an error](#when-the-game-stops-with-an-error). |
+| 2 | Usage error, no `game.kagari` in the game directory, a `--debug-port` that cannot be opened, or the game cannot start: an invalid `.kagari` file, an import of a builtin this runtime lacks, or a font (or other text-style asset) that fails to load. See [When the game stops with an error](#when-the-game-stops-with-an-error). |
 | 3 | The game stopped with an error. |
 | 4 | A window or GPU failure: no window, no usable GPU adapter, the GPU ran out of memory or was lost. |
 | 5 | A headless script error (headless mode only). |
