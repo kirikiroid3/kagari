@@ -3,7 +3,10 @@
 
 use crate::db::Db;
 use crate::def_map::{CrateId, Def, DefMaps, ModuleId, TypeKey};
+use crate::hir::{Expr, ExprId};
 use crate::item_tree::{ItemId, ItemKind, ItemParent, item_tree};
+use crate::signatures::{ProgramSignatures, display_ty_qualified};
+use crate::ty::{Const, GenericArg};
 
 /// `crate::a::b`, `std::screen`.
 pub fn module_path(_db: &dyn Db, maps: &DefMaps, module: ModuleId) -> String {
@@ -79,4 +82,41 @@ pub fn assoc_path(db: &dyn Db, maps: &DefMaps, item: ItemId) -> String {
         _ => return item_path(db, maps, item),
     };
     format!("{owner}::{name}")
+}
+
+/// `::<…>` with an instance's generic arguments, every type named by its full path, so that
+/// two instances of one function never share a path: a monomorphized scene has its own step
+/// IDs and read flags. Empty without arguments.
+pub fn generic_args_suffix(
+    db: &dyn Db,
+    sigs: &ProgramSignatures,
+    maps: &DefMaps,
+    args: &[GenericArg],
+) -> String {
+    if args.is_empty() {
+        return String::new();
+    }
+    let shown: Vec<String> = args
+        .iter()
+        .map(|arg| match arg {
+            GenericArg::Type(ty) => display_ty_qualified(db, sigs, maps, ty),
+            GenericArg::Const(Const::Value(value)) => value.to_string(),
+            GenericArg::Const(_) => "_".to_owned(),
+        })
+        .collect();
+    format!("::<{}>", shown.join(", "))
+}
+
+/// The number `N` of a closure in its path `{owner}::{closure#N}`: its position among the
+/// closure expressions of the owner's body.
+pub fn closure_number(db: &dyn Db, owner: ItemId, expr: ExprId) -> usize {
+    crate::hir::body_of(db, owner)
+        .and_then(|body| {
+            body.store
+                .exprs
+                .iter()
+                .filter(|(_, data)| matches!(data, Expr::Closure { .. }))
+                .position(|(id, _)| id == expr)
+        })
+        .unwrap_or(0)
 }

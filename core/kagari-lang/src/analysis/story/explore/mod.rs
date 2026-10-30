@@ -518,6 +518,11 @@ impl Explorer<'_, '_> {
                     self.stuck.entry((scene_index, expr)).or_insert(globals);
                 }
                 let choice = matches!(&record, ConstValue::Adt { item, .. } if *item == self.cx.std.choice.item);
+                let outcomes: Box<[(u32, ValueId)]> = outcomes
+                    .into_iter()
+                    .map(|(arm, value)| (arm, self.out.values.intern(value)))
+                    .collect();
+                let tasks = outcomes.len();
                 let id = self.add_node(
                     ctx,
                     Node {
@@ -528,12 +533,12 @@ impl Explorer<'_, '_> {
                             expr,
                             render,
                             choice,
-                            succ: vec![Target::Dead; outcomes.len()],
+                            outcomes: outcomes.clone(),
+                            succ: vec![Target::Dead; tasks],
                         },
                     },
                 );
-                for (outcome, value) in outcomes.into_iter().enumerate() {
-                    let value = self.out.values.intern(value);
+                for (outcome, &(_, value)) in outcomes.iter().enumerate() {
                     self.tasks.push(Task::Step {
                         ctx,
                         node: id,
@@ -555,6 +560,10 @@ impl Explorer<'_, '_> {
                     self.too_many_draws(scene_index, self.term_src(ctx, block));
                     return Target::Dead;
                 };
+                let draws: Box<[ValueId]> = values
+                    .into_iter()
+                    .map(|value| self.out.values.intern(value))
+                    .collect();
                 let id = self.add_node(
                     ctx,
                     Node {
@@ -562,12 +571,12 @@ impl Explorer<'_, '_> {
                         frame,
                         globals,
                         kind: NodeKind::Rng {
-                            succ: vec![Target::Dead; values.len()],
+                            draws: draws.clone(),
+                            succ: vec![Target::Dead; draws.len()],
                         },
                     },
                 );
-                for (outcome, value) in values.into_iter().enumerate() {
-                    let value = self.out.values.intern(value);
+                for (outcome, &value) in draws.iter().enumerate() {
                     self.tasks.push(Task::Step {
                         ctx,
                         node: id,
@@ -677,9 +686,13 @@ impl Explorer<'_, '_> {
         id
     }
 
-    /// The render of a step record and the values it can resume with: `()` for a `Say`,
-    /// the value of each shown arm for a `Choice`.
-    fn step_outcomes(&self, record: &ConstValue) -> Option<(Option<ConstValue>, Vec<ConstValue>)> {
+    /// The render of a step record and the values it can resume with, each with its arm's
+    /// position in the arm list: `(0, ())` for a `Say`, each shown arm for a `Choice`.
+    #[allow(clippy::type_complexity)]
+    fn step_outcomes(
+        &self,
+        record: &ConstValue,
+    ) -> Option<(Option<ConstValue>, Vec<(u32, ConstValue)>)> {
         let std = self.cx.std;
         let ConstValue::Adt { item, fields, .. } = record else {
             return None;
@@ -689,7 +702,10 @@ impl Explorer<'_, '_> {
             std.as_option(value).flatten().cloned()
         };
         if *item == std.say.item {
-            return Some((render_of(std.say.field("render")), vec![ConstValue::unit()]));
+            return Some((
+                render_of(std.say.field("render")),
+                vec![(0, ConstValue::unit())],
+            ));
         }
         if *item != std.choice.item {
             return None;
@@ -701,9 +717,10 @@ impl Explorer<'_, '_> {
         let shown = std.choice_arm.field("shown")?;
         let value = std.choice_arm.field("value")?;
         let mut outcomes = Vec::new();
-        for arm in arms {
+        for (index, arm) in arms.iter().enumerate() {
             if arm.field(shown)?.as_bool()? {
-                outcomes.push(arm.field(value)?.clone());
+                let index = u32::try_from(index).ok()?;
+                outcomes.push((index, arm.field(value)?.clone()));
             }
         }
         Some((render, outcomes))

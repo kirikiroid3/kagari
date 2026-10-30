@@ -129,7 +129,7 @@ impl First<'_> {
                             self.steps.push(step);
                         }
                     }
-                    Some(NodeKind::Rng { succ }) => {
+                    Some(NodeKind::Rng { succ, .. }) => {
                         for next in succ {
                             for exit in self.from(ctx, *next) {
                                 if !exits.contains(&exit) {

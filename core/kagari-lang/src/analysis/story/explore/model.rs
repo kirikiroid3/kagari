@@ -83,6 +83,16 @@ impl<T: Clone + Eq + Hash> Interner<T> {
     pub fn get(&self, id: u32) -> Option<&T> {
         self.items.get(id as usize)
     }
+
+    /// Every value in id order.
+    pub fn items(&self) -> &[T] {
+        &self.items
+    }
+
+    /// The id of `value`, when it is stored.
+    pub fn find(&self, value: &T) -> Option<u32> {
+        self.index.get(value).copied()
+    }
 }
 
 /// The values of the exploration, each stored once.
@@ -95,6 +105,15 @@ impl ValueInterner {
 
     pub fn get(&self, id: ValueId) -> Option<&ConstValue> {
         self.0.get(id.0)
+    }
+
+    /// Every value in id order.
+    pub fn items(&self) -> &[ConstValue] {
+        self.0.items()
+    }
+
+    pub fn find(&self, value: &ConstValue) -> Option<ValueId> {
+        self.0.find(value).map(ValueId)
     }
 }
 
@@ -120,6 +139,9 @@ pub(in crate::analysis::story) enum NodeKind {
         render: Option<ConstValue>,
         /// Whether the step is a `choice!`.
         choice: bool,
+        /// Per outcome: the arm's position in the choice's arm list and the value the step
+        /// resumes with (`(0, ())` for a `Say`).
+        outcomes: Box<[(u32, ValueId)]>,
         succ: Vec<Target>,
     },
     /// A scene call: the callee's context and, per exit of it, where the caller goes next.
@@ -127,8 +149,12 @@ pub(in crate::analysis::story) enum NodeKind {
         callee: CtxId,
         succ: Vec<(ExitId, Target)>,
     },
-    /// A random draw (`rng_choose`): per value of the drawn type, where the story goes next.
-    Rng { succ: Vec<Target> },
+    /// A random draw (`rng_choose`): per value of the drawn type (`draws`), where the story
+    /// goes next.
+    Rng {
+        draws: Box<[ValueId]>,
+        succ: Vec<Target>,
+    },
 }
 
 pub(in crate::analysis::story) struct Node {

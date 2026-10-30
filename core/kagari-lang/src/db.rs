@@ -108,6 +108,7 @@ impl RootDatabase {
             asset_root,
             font_dirs.into(),
             options,
+            None,
         )
     }
 

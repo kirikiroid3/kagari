@@ -27,8 +27,15 @@ pub struct Analysis {
 
 #[salsa::tracked(returns(ref))]
 pub fn analysis(db: &dyn Db, program: Program) -> Analysis {
-    let mut diagnostics = story::check(db, program);
+    let mut diagnostics = story::story_analysis(db, program).diagnostics.clone();
     diagnostics.extend(influence::check(db, program));
     diagnostics.extend(system::check(db, program));
     Analysis { diagnostics }
+}
+
+/// The explored story graph, as `.kagari-cache` files store it; `None` when the story
+/// analysis explored nothing. Runs (or reuses) the story analysis: call it only for a
+/// program whose stages 1–4 reported no error, as [`analysis`] requires.
+pub fn story_graph(db: &dyn Db, program: Program) -> Option<kagari_debug::StoryGraph> {
+    story::graph(db, program)
 }
