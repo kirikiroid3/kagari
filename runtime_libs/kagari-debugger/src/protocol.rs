@@ -152,7 +152,7 @@ pub struct InstructionBreakpointsArgs {
     pub points: Vec<InstructionPoint>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InstructionPoint {
     /// The function's path in the bytecode.
     pub function: String,

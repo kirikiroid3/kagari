@@ -8,7 +8,13 @@ use common::{game, init_project, kagari, stderr, stdout};
 fn fresh_project_is_formatted() {
     let tmp = init_project();
     let output = kagari(&["fmt", "--check"], &game(&tmp));
-    assert_eq!(output.status.code(), Some(0), "{}{}", stdout(&output), stderr(&output));
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}{}",
+        stdout(&output),
+        stderr(&output)
+    );
     assert_eq!(stdout(&output), "");
 }
 
@@ -23,12 +29,19 @@ fn fmt_rewrites_unformatted_files() {
 
     let check = kagari(&["fmt", "--check"], &dir);
     assert_eq!(check.status.code(), Some(1));
-    assert!(stdout(&check).contains("src/scripts/mod.kis"), "{}", stdout(&check));
+    assert!(
+        stdout(&check).contains("src/scripts/mod.kis"),
+        "{}",
+        stdout(&check)
+    );
 
     let format = kagari(&["fmt"], &dir);
     assert_eq!(format.status.code(), Some(0), "{}", stderr(&format));
     let formatted = std::fs::read_to_string(&path).unwrap();
-    assert!(formatted.contains("fn helper() -> u32 {\n    1\n}"), "{formatted}");
+    assert!(
+        formatted.contains("fn helper() -> u32 {\n    1\n}"),
+        "{formatted}"
+    );
 
     let again = kagari(&["fmt", "--check"], &dir);
     assert_eq!(again.status.code(), Some(0), "{}", stdout(&again));
@@ -41,5 +54,9 @@ fn fmt_reports_syntax_errors() {
     std::fs::write(&path, "fn broken( {\n").unwrap();
     let output = kagari(&["fmt", "broken.kis"], tmp.path());
     assert_eq!(output.status.code(), Some(1));
-    assert!(stdout(&output).contains("cannot format"), "{}", stdout(&output));
+    assert!(
+        stdout(&output).contains("cannot format"),
+        "{}",
+        stdout(&output)
+    );
 }

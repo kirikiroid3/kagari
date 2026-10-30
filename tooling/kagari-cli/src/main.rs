@@ -1,4 +1,9 @@
-#![deny(clippy::unwrap_used, clippy::panic, clippy::expect_used, clippy::arithmetic_side_effects)]
+#![deny(
+    clippy::unwrap_used,
+    clippy::panic,
+    clippy::expect_used,
+    clippy::arithmetic_side_effects
+)]
 
 //! The `kagari` command: create, check, build, clean and format Kagari projects, disassemble
 //! bytecode, and run the language server.
@@ -6,6 +11,7 @@
 mod analysis_cache;
 mod cli;
 mod command;
+mod debugger;
 mod failure;
 mod outputs;
 mod workspace;
@@ -37,6 +43,25 @@ fn main() -> ExitCode {
         } => command::fmt::run(check, manifest_path.as_deref(), &files),
         Command::Disasm { file, all } => command::disasm::run(&file, all),
         Command::Lsp => command::lsp::run(),
+        Command::Debug {
+            manifest_path,
+            target,
+            attach,
+            window,
+            runtime,
+            entry,
+            seed,
+            no_build,
+        } => command::debug::run(&command::debug::Options {
+            manifest_path: manifest_path.as_deref(),
+            target: target.as_deref(),
+            attach: attach.as_deref(),
+            window,
+            runtime: runtime.as_deref(),
+            entry: entry.as_deref(),
+            seed,
+            no_build,
+        }),
     };
     match result {
         Ok(code) => code,

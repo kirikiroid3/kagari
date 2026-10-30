@@ -40,7 +40,11 @@ fn init_refuses_to_overwrite() {
     let tmp = init_project();
     let output = kagari(&["init", "game"], tmp.path());
     assert_eq!(output.status.code(), Some(2));
-    assert!(stderr(&output).contains("already exists"), "{}", stderr(&output));
+    assert!(
+        stderr(&output).contains("already exists"),
+        "{}",
+        stderr(&output)
+    );
 }
 
 #[test]

@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 kagari-archive = { workspace = true }
 kagari-bytecode = { workspace = true }
+kagari-debugger = { workspace = true }
 kagari-compat = { workspace = true }
 kagari-fmt = { workspace = true }
 kagari-lang = { workspace = true }
@@ -21,6 +22,8 @@ kagari-shader = { workspace = true, features = ["validate"] }
 kagari-std = { workspace = true }
 kagari-syntax = { workspace = true }
 clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 sha2 = { workspace = true }
 
 [dev-dependencies]

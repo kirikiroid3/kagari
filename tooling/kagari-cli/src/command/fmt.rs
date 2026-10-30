@@ -9,7 +9,11 @@ use kagari_syntax::{SourceKind, SyntaxError};
 use crate::failure::{Failure, exit, io};
 use crate::workspace::{self, shown};
 
-pub fn run(check: bool, manifest_path: Option<&Path>, files: &[PathBuf]) -> Result<ExitCode, Failure> {
+pub fn run(
+    check: bool,
+    manifest_path: Option<&Path>,
+    files: &[PathBuf],
+) -> Result<ExitCode, Failure> {
     let files = if files.is_empty() {
         let project = workspace::load(manifest_path)?;
         let entry = project.entry_path();
