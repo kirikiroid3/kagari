@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/site/public/logo.svg" alt="Kagari logo" width="128" height="128">
+</p>
+
 # Kagari Visual Novel Engine
 
 Kagari is a visual novel engine with its own Rust-like language. The story is written as
