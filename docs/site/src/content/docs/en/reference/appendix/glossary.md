@@ -96,6 +96,9 @@ it. Terms of the standard library link to the *STD Reference*.
   [Steps](../concepts/steps.md)
 - **Headless mode.** Running a game without a window, audio device or gamepads, driven by a
   script. [Headless Mode](../tools/headless.md)
+- **Hot swap.** Putting a rebuilt game in place of a running one from the debugger: scenes whose
+  code changed are called again with the new code, the rest of the story keeps its position.
+  [The Debugger](../tools/debugger.md#hot-swap)
 - **Instant procedure.** A `pushdown fn` without `#[scene]`: it never steps, never recurses and
   loops only a constant number of times, so it always finishes without input.
   [Scenes and Instant Procedures](../concepts/scenes.md)

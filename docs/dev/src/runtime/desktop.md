@@ -61,6 +61,7 @@ becomes the exit status.
 | `local_time` | `jiff::Zoned::now()`, or the fixed headless time |
 | `random_seed` | system time in nanoseconds XOR the process id, or the fixed headless seed |
 | `set_title` | resolves the data directory from the title, unless it is fixed |
+| `program_changed` | after a hot swap: opens the archives again, drops the decoded sounds and creates the `Renderer` again (its textures and pipelines are keyed by the old build's asset ids) |
 
 ### Archives
 
@@ -214,12 +215,17 @@ listens.
 - `--debug-stdio` talks to one debugger over standard input and output (how `kagari dap` and
   `kagari debug --window` launch a game); the runtime writes nothing else to stdout.
 
+`DebugPort::open` runs right after the boot. When `game.kagari-cache` in the game directory
+belongs to this `game.kagari` (a debug build), it turns on the engine's call recording
+(`Engine::debug_record_calls`), so games started from then on can be hot swapped
+([The Debugger](./debugger.md#hot-swap)); the artifact is kept for the first debugger.
+
 `DebugPort::poll` runs at the start of every frame, before `Engine::update`: it attaches a waiting
-debugger (reading `game.kagari-cache` from the game directory when its script hash matches, else
-with a warning that `nav` and local names are unavailable) and polls the live
-`kagari_debugger::Server`, which applies the requests and reports the engine's own stops. A stop
-inside code blocks the frame loop until the debugger goes on, so the window does not redraw
-meanwhile.
+debugger (with that artifact, or `game.kagari-cache` read again when its script hash matches, else
+with a warning that `nav`, local names and hot swap are unavailable) and polls the live
+`kagari_debugger::Server`, which applies the requests and reports the engine's own stops; the
+server reloads the game directory for `kagari/swap`. A stop inside code blocks the frame loop
+until the debugger goes on, so the window does not redraw meanwhile.
 
 ## Platform notes
 

@@ -1,5 +1,6 @@
 //! `kagari debug`: the query engine's REPL, on the headless query engine, a game launched in a
-//! window, or a running game (`--attach`).
+//! window, or a running game (`--attach`). `swap` (and `--watch`, on a change of the project's
+//! files) rebuilds the debug profile and hot swaps the game.
 
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
@@ -7,12 +8,12 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use kagari_debugger::Connection;
 use kagari_debugger::client::text::{self, Parsed};
-use kagari_debugger::client::{Backend, Locator};
-use kagari_debugger::headless::{BYTECODE_FILE, StartOptions};
+use kagari_debugger::client::{Backend, Locator, Watcher};
+use kagari_debugger::headless::StartOptions;
 use kagari_debugger::protocol::{
     BreakpointsBody, InitializeBody, Message, OutputBody, StoppedBody, command, event,
 };
@@ -20,6 +21,9 @@ use serde_json::{Value, json};
 
 use crate::debugger;
 use crate::failure::Failure;
+
+/// How often `--watch` looks at the project's files.
+const WATCH_INTERVAL: Duration = Duration::from_millis(500);
 
 /// The options of `kagari debug`.
 pub struct Options<'a> {
@@ -31,6 +35,7 @@ pub struct Options<'a> {
     pub entry: Option<&'a str>,
     pub seed: u64,
     pub no_build: bool,
+    pub watch: bool,
 }
 
 pub fn run(options: &Options<'_>) -> Result<ExitCode, Failure> {
@@ -39,7 +44,7 @@ pub fn run(options: &Options<'_>) -> Result<ExitCode, Failure> {
         println!("{line}");
     })
     .map_err(Failure)?;
-    let dir = opened.game_dir;
+    let dir = opened.game_dir.clone();
     let chosen = match options.attach {
         Some(address) => Backend::Attach {
             address: if address.contains(':') {
@@ -70,10 +75,14 @@ pub fn run(options: &Options<'_>) -> Result<ExitCode, Failure> {
         .ok_or_else(|| Failure("no connection".to_owned()))?;
     let mut repl = Repl {
         conn: Connection::new(link),
-        loc: Locator::new(&opened.source_root, Some(&dir.join(BYTECODE_FILE))),
+        loc: opened.locator(),
         root: opened.source_root.clone(),
         pending: HashMap::new(),
         breakpoints: Vec::new(),
+        manifest_path: options.manifest_path.map(Path::to_path_buf),
+        target: options.target.map(str::to_owned),
+        watcher: options.watch.then(|| opened.watcher()),
+        polled: Instant::now(),
     };
     repl.send(command::INITIALIZE, Value::Null);
     repl.run();
@@ -88,6 +97,8 @@ enum Waiting {
     Initialize,
     /// A breakpoint update; reported by `break` itself.
     Silent,
+    /// `kagari/swap`; the locator reads the rebuilt game's sources.
+    Swap(Box<Locator>),
 }
 
 struct Repl {
@@ -97,6 +108,12 @@ struct Repl {
     pending: HashMap<i64, Waiting>,
     /// The `break` arguments, in order.
     breakpoints: Vec<String>,
+    /// The project and target `swap` builds.
+    manifest_path: Option<PathBuf>,
+    target: Option<String>,
+    /// `--watch`: the project's files, polled every [`WATCH_INTERVAL`].
+    watcher: Option<Watcher>,
+    polled: Instant,
 }
 
 impl Repl {
@@ -153,6 +170,9 @@ impl Repl {
                 Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => eof = true,
             }
+            if !quitting && self.watched() {
+                prompted = false;
+            }
         }
         let bye = self.conn.request(command::DISCONNECT, Value::Null);
         // Wait briefly for the runtime to let go of the story.
@@ -198,9 +218,53 @@ impl Repl {
                 self.sync_breakpoints();
                 println!("no breakpoints");
             }
+            Ok(Parsed::Swap) => self.swap(),
             Err(error) => println!("error: {error}"),
         }
         false
+    }
+
+    /// `--watch`: at most every [`WATCH_INTERVAL`], looks at the project's files; a change
+    /// rebuilds and swaps as `swap` does. Whether it did.
+    fn watched(&mut self) -> bool {
+        let Some(watcher) = self.watcher.as_mut() else {
+            return false;
+        };
+        if self.polled.elapsed() < WATCH_INTERVAL {
+            return false;
+        }
+        self.polled = Instant::now();
+        if !watcher.changed() {
+            return false;
+        }
+        println!("source changed: rebuilding");
+        self.swap();
+        true
+    }
+
+    /// `swap`: rebuilds the debug profile and asks the runtime to swap the new game in; the
+    /// breakpoints are sent again once it has.
+    fn swap(&mut self) {
+        let opened = debugger::open(
+            self.manifest_path.as_deref(),
+            self.target.as_deref(),
+            true,
+            &mut |line| println!("{line}"),
+        );
+        let opened = match opened {
+            Ok(opened) => opened,
+            Err(error) => {
+                println!("error: {error}");
+                return;
+            }
+        };
+        // The build has seen the files as they are.
+        if let Some(watcher) = self.watcher.as_mut() {
+            watcher.settle();
+        }
+        let seq = self.conn.request(command::SWAP, Value::Null);
+        self.pending
+            .insert(seq, Waiting::Swap(Box::new(opened.locator())));
     }
 
     /// What a `break` argument stops at, or why it cannot.
@@ -282,11 +346,20 @@ impl Repl {
                         println!("warning: the runtime rejected a breakpoint");
                     }
                 }
+                Some(Waiting::Swap(loc)) => {
+                    self.loc = *loc;
+                    println!("{}", text::format(command::SWAP, &body, &self.loc));
+                    self.sync_breakpoints();
+                }
                 None => {}
             },
             Message::Event { event, body, .. } => match event.as_str() {
                 event::STOPPED => {
-                    let stopped: StoppedBody = serde_json::from_value(body).unwrap_or_default();
+                    let mut stopped: StoppedBody = serde_json::from_value(body).unwrap_or_default();
+                    if stopped.reason == "swap" {
+                        // The summary is the answer to `swap`.
+                        stopped.description = None;
+                    }
                     println!("{}", text::stopped(&stopped));
                 }
                 event::CONTINUED => println!("running"),

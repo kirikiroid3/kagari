@@ -62,6 +62,8 @@ pub fn open(
     Ok(Opened {
         game_dir: project.out_dir(target),
         source_root,
+        outputs: vec![project.build_dir()],
+        project_root: project.root,
     })
 }
 

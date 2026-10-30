@@ -248,12 +248,12 @@ kagari lsp
 ## `kagari debug` {#kagari-debug}
 
 ```text
-kagari debug [--manifest-path <PATH>] [--target <TARGET>] [--entry <PATH>] [--seed <N>] [--no-build]
-kagari debug --window [--runtime <PATH>] [--manifest-path <PATH>] [--target <TARGET>] [--no-build]
-kagari debug --attach <ADDRESS> [--manifest-path <PATH>] [--target <TARGET>]
+kagari debug [--manifest-path <PATH>] [--target <TARGET>] [--entry <PATH>] [--seed <N>] [--no-build] [--watch]
+kagari debug --window [--runtime <PATH>] [--manifest-path <PATH>] [--target <TARGET>] [--no-build] [--watch]
+kagari debug --attach <ADDRESS> [--manifest-path <PATH>] [--target <TARGET>] [--watch]
 ```
 
-プロジェクトをデバッグプロファイルでビルドし、その物語をデバッグします。既定ではクエリエンジン（ウィンドウなしのゲーム）上で、`--window` ではウィンドウで、`--attach` では `--debug-port` 付きですでに実行中のゲームでデバッグします。stdin から 1 行に 1 コマンドを読みます。オプションとコマンドは[デバッガー](./debugger.md#kagari-debug)にあります。入力が終わるか `quit` の後はステータス 0、プロジェクトをビルドできないかゲームに接続できないときはステータス 2 です。
+プロジェクトをデバッグプロファイルでビルドし、その物語をデバッグします。既定ではクエリエンジン（ウィンドウなしのゲーム）上で、`--window` ではウィンドウで、`--attach` では `--debug-port` 付きですでに実行中のゲームでデバッグします。stdin から 1 行に 1 コマンドを読みます。`--watch` は、プロジェクトのファイルが変わるたびにゲームを再ビルドしてホットスワップします。オプションとコマンドは[デバッガー](./debugger.md#kagari-debug)にあります。入力が終わるか `quit` の後はステータス 0、プロジェクトをビルドできないかゲームに接続できないときはステータス 2 です。
 
 ## `kagari dap` {#kagari-dap}
 

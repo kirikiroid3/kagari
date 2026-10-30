@@ -37,7 +37,7 @@ kagari-desktop-runtime [OPTIONS] [GAME_DIR]
 | `--script <FILE>` | ヘッドレスの入力スクリプト。`--headless` が必要です。 |
 | `--out <DIR>` | ヘッドレスのキャプチャ（と、`--data-dir` がなければセーブ）の出力先。`--headless` が必要です。 |
 | `--seed <N>` | ヘッドレスモードで新しい物語すべてに使う乱数シード。既定は `1`。`--headless` が必要です。 |
-| `--debug-port <PORT>` | `127.0.0.1:PORT` でデバッガーを受け付けます（`0` は空きポートを選んでログに出します）。`--headless` とは併用できません。[デバッガー](./debugger.md#window)を参照してください。 |
+| `--debug-port <PORT>` | `127.0.0.1:PORT` でデバッガーを受け付けます（`0` は空きポートを選んでログに出します）。`--headless` とは併用できません。[デバッガー](./debugger.md#window)を参照してください。デバッグビルドでは、ゲームは[ホットスワップ](./debugger.md#hot-swap)に必要なものを起動時から記録します（このフラグと `--debug-stdio`）。 |
 | `--debug-stdio` | 標準入出力でデバッガーと通信します（`kagari debug --window` と `kagari dap` はこの方法でゲームを起動します）。`--headless` や `--debug-port` とは併用できません。 |
 | `-h`、`--help` | ヘルプを表示します。 |
 | `-V`、`--version` | バージョンを表示します。 |

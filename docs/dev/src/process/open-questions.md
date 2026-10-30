@@ -73,9 +73,11 @@ is that acceptable in practice?
 
 ## Runtime
 
-- **Snapshots, preview and hot reload.** Saves are traces only; every load and rewind replays from
-  the entry scene with every render. Choice-point snapshots, keyframe-bounded replay, preview at the
-  cursor and hot reload are planned (see [Relation to the Proposal](../foundations/proposal.md#what-preview-costs)).
+- **Snapshots and preview.** Saves are traces only; every load and rewind replays from the entry
+  scene with every render. Choice-point snapshots, keyframe-bounded replay and preview at the
+  cursor are planned (see [Relation to the Proposal](../foundations/proposal.md#what-preview-costs)).
+  Scene hot swap exists for debugging ([The Debugger](../runtime/debugger.md#hot-swap)); it keeps
+  in-memory call snapshots only and does not keep menus open over the game.
 - **VM limits.** A heap cap, and cooperative scheduling where a run that exhausts its instruction
   budget yields instead of trapping (needed for a browser runtime).
 - **Extension types.** Studio-defined screen data with native engine systems, identified by path

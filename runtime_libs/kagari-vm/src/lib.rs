@@ -34,7 +34,7 @@ pub use kagari_num::{Decimal, Rat};
 pub use ops::value_eq;
 pub use program::{LoadError, Program};
 pub use remap::{Remap, RemapError};
-pub use story::{StoryFiber, StoryStatics, Suspend};
+pub use story::{MarkRemap, StoryFiber, StoryStatics, Suspend};
 pub use trap::{StepId, Trap, TrapKind};
 pub use types::TypeTable;
 pub use value::{Adt, AdtTy, Closure, Proj, Ref, RefRoot, Text, Value};

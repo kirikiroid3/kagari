@@ -110,8 +110,13 @@ fn build_with_helpers(helpers: &str) -> (String, super::Build) {
         "fn main() -> System {",
         &format!("{helpers}fn main() -> System {{\n    let _ = helper(3);\n    let _ = other();"),
     );
+    (source.clone(), build_source(source))
+}
+
+/// Builds `source` as `/game/main.kix`; it must have no errors.
+fn build_source(source: String) -> super::Build {
     let mut files = FxHashMap::default();
-    files.insert(PathBuf::from("/game/main.kix"), source.clone());
+    files.insert(PathBuf::from("/game/main.kix"), source);
     files.insert(PathBuf::from("/game/font.ttf"), String::new());
     let db = RootDatabase::new(Arc::new(MemoryFileSystem(files)));
     let program = db.program(FilePath::disk("/game/main.kix"));
@@ -121,7 +126,7 @@ fn build_with_helpers(helpers: &str) -> (String, super::Build) {
         "{}",
         crate::render_diagnostics(&db, &result.diagnostics, None)
     );
-    (source, result)
+    result
 }
 
 fn function<'a>(debug: &'a kagari_debug::DebugInfo, path: &str) -> &'a kagari_debug::FunctionDebug {
@@ -216,4 +221,42 @@ fn body_hash_follows_the_body_only() {
     assert_eq!(hash(&elsewhere), original);
     let changed = HELPERS.replace("doubled + 1", "doubled + 2");
     assert_ne!(hash(&changed), original);
+}
+
+/// A step's text lives in a promoted constant, which the scene's hash covers.
+#[test]
+fn body_hash_covers_step_texts() {
+    let hash = |from: &str, to: &str| {
+        let source = include_str!("../../tests/bytecode/005__story/main.kix").replace(from, to);
+        let debug = build_source(source).debug.unwrap();
+        let start = function(&debug, "crate::Start").body_hash.clone();
+        let visit = function(&debug, "crate::Visit").body_hash.clone();
+        (start, visit)
+    };
+    let (start, visit) = hash("It begins.", "It begins.");
+    let edited = hash("It begins.", "It starts.");
+    assert_ne!(edited.0, start);
+    assert_eq!(edited.1, visit);
+}
+
+/// The static types are parallel to the static table, with paths in full.
+#[test]
+fn debug_info_names_static_types() {
+    let (_, result) = build_with_helpers(HELPERS);
+    let module = result.module.as_ref().unwrap();
+    let debug = result.debug.as_ref().unwrap();
+    assert_eq!(debug.statics.len(), module.statics.len());
+    for (s, info) in module.statics.iter().zip(&debug.statics) {
+        assert_eq!(module.strings[s.path.0 as usize], info.path);
+    }
+    let ty = |path: &str| {
+        debug
+            .statics
+            .iter()
+            .find(|s| s.path == path)
+            .map(|s| s.ty.as_str())
+    };
+    assert_eq!(ty("crate::VISITS"), Some("Int<0, 3>"));
+    assert_eq!(ty("crate::ROUTE"), Some("crate::Route"));
+    assert_eq!(ty("crate::SEEN_END"), Some("std::narrative::Meta<bool>"));
 }

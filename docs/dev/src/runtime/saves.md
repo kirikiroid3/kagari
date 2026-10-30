@@ -219,10 +219,20 @@ The proposal pairs the trace with a **snapshot**: the position, call stack, stor
 state and screen, used as a cache that is trusted only when the script hash matches, and rebuilt
 by replay otherwise. Keyframes bound how many renders a replay must run.
 
-**Status.** Snapshots are not implemented. Every load and every rewind replays the trace from the
-entry scene and runs every render on the way. The `script_hash` is recorded in every save, but the
-only thing it gates today is restoring a closure `on_exit` handler. The old design notes describe
-the planned cache; implementing it needs:
+**Status.** Save snapshots are not implemented. Every load and every rewind replays the trace from
+the entry scene and runs every render on the way. The `script_hash` is recorded in every save, but
+the only thing it gates today is restoring a closure `on_exit` handler.
+
+In-memory **call snapshots** exist for debugging: when a runtime opens a debugger channel on a
+debug build, the fiber records the story variables, the values behind `&mut` arguments, the
+PRNG, the trace position and the screen at every scene call
+([The VM](./vm.md#call-snapshots)). Scene hot swap
+unwinds to one to call a changed scene again ([The Engine](./engine.md#hot-swap)). They are never
+written and never used by a load. After a swap the live trace is cut at the call, so it stays a
+witness: a save made after a swap loads on the new program by normal replay, as long as the code
+the trace passes before the call has not changed what it reaches.
+
+The old design notes describe the planned save cache; implementing it needs:
 
 - a serialized form of the fiber (frames, story-variable cells, PRNG) and of the screen that is
   stable for one script hash;

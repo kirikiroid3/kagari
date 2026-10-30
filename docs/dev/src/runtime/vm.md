@@ -16,7 +16,10 @@ Where in the code:
 - `src/value.rs`: `Value`, `Adt`, `AdtTy`, `Closure`, `Text`, `Ref`, `RefRoot`, `Proj`.
 - `src/refs.rs`: reference resolution, reads, copy-on-write writes.
 - `src/int.rs`, `src/ops.rs`: integer, Decimal, Rat, comparison and TOTEXT semantics.
-- `src/story.rs`: `StoryFiber`, `StoryStatics`, `Suspend`. `src/rng.rs`: the PRNG.
+- `src/story.rs`: `StoryFiber` (with its call snapshots), `StoryStatics`, `Suspend`.
+  `src/rng.rs`: the PRNG.
+- `src/remap.rs`: `Remap`, `RemapError`: values of one program rebuilt for another (scene hot
+  swap, see [Moving to another program](#remap)).
 - `src/hook.rs`: `FrameView`, `InstrHook`, `HookStop` (see [Debugger access](#debugger)).
 - `src/host.rs`: `Host`, `HostObj`, `HostObject`, `HostFn`. `src/types.rs`: `TypeTable`.
 - `src/trap.rs`: `Trap`, `TrapKind`.
@@ -165,6 +168,51 @@ Detached, the hook costs one `Option` check per instruction: the check and stop 
 median of 5 runs, repeated 4 times interleaved): 23.2 ns/instruction before the hook existed,
 23.0 ns/instruction with it detached, −0.9 %, within run-to-run noise.
 
+## Call snapshots {#call-snapshots}
+
+Scene hot swap ([The Debugger](./debugger.md#hot-swap)) throws changed scene frames off the
+stack and runs their call again. For that, a fiber can record a **call snapshot** at every scene
+call: `StoryFiber::record_calls` turns it on (the engine does so only for a debugger). Recording
+lives in the story run's `StoryCtx`: after CALL or CALLVAL pushes a scene frame, `CallLog::called`
+records, under the new frame's stack index,
+
+- the value of every story variable (an O(1) clone each: aggregates are copied on write);
+- every reference argument of the call with the value behind it (`refs::read`); a reference into
+  a host part cannot be read, and the snapshot is then marked incomplete;
+- the PRNG state and the fiber's last step;
+- the host's **mark**, an opaque `Rc<dyn Any>` the host set before the resume
+  (`set_call_mark`); the engine stores where the resume started (trace position and screen).
+
+RET drops the snapshots of the frames that returned (`CallLog::returned`), so the log always
+matches the scene frames on the stack. The entry frame has none: it was not called. Memory grows
+with the call depth only; this is a debugging aid and the engine never records for players.
+
+`unwind_to_call(program, depth)` restores the snapshot of frame `depth`: it truncates the stack to
+the caller (whose `pc` is still on its CALL), writes the story variables and the reference
+targets back, restores the PRNG and the last step, drops the snapshots from there up, and leaves
+the fiber `Fresh`, so the next `resume` executes the CALL again with the caller's registers (the
+callee never writes them) and records a new snapshot. It returns the call's mark.
+`has_call_snapshot`, `call_mark` and `step_record` (the record of the STEP a suspended fiber is
+at) are what the engine's swap asks of a fiber.
+
+## Moving to another program {#remap}
+
+Function, type, asset and static indices differ between two builds, so `Remap` rebuilds values
+for the new program **by path**, as saves store them: a function must exist with the same kind
+and arity; a type must have the same definition (enum or struct, variant names, field names;
+`TypeTable::shape`), and module and synthetic types map onto each other through
+`TypeTable::resolve`; assets and statics must exist with the same kind. A closure moves only when
+its function's code is unchanged (`same_code`, from the debug artifact's body hashes): closure
+paths are positional. Cells keep their aliasing (one new cell per old cell, registered before its
+value is rebuilt, so a self-referential cell terminates). Host objects move through
+`HostObject::remap` (default: they cannot); the engine implements it for `Screen`.
+
+`StoryFiber::transplant(remap, mark)` builds the fiber for the new program: the story variables
+by path (one added or removed is `RemapError::StoryVariable`), every frame's function by path
+(the new function must have the same code length, register count and opcodes, else
+`RemapError::Frame`; the caller keeps only frames whose code is unchanged, so `pc` and registers
+stay valid), every register value, and the call snapshots with their marks rebuilt by `mark`.
+
 ## Budgets {#budgets}
 
 | Limit | Value | Where | On excess |
@@ -253,6 +301,7 @@ arguments and trap with `Host` or `TagMismatch`.
 ## Invariants
 
 - No `unsafe`, no panics: every failure is a `Trap` or a `LoadError`.
+- Call snapshots never change what a run computes; a fiber without them runs identically.
 - Values have value semantics: only `Ref` aliases. Any new aggregate or host object must
   copy on write.
 - A STEP's step id and the function path are what the engine records about the story's

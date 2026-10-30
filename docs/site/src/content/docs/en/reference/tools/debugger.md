@@ -33,9 +33,9 @@ where it arrived; `continue` goes on.
 ## `kagari debug` {#kagari-debug}
 
 ```text
-kagari debug [--manifest-path <PATH>] [--target <TARGET>] [--entry <PATH>] [--seed <N>] [--no-build]
-kagari debug --window [--runtime <PATH>] [--manifest-path <PATH>] [--target <TARGET>] [--no-build]
-kagari debug --attach <ADDRESS> [--manifest-path <PATH>] [--target <TARGET>]
+kagari debug [--manifest-path <PATH>] [--target <TARGET>] [--entry <PATH>] [--seed <N>] [--no-build] [--watch]
+kagari debug --window [--runtime <PATH>] [--manifest-path <PATH>] [--target <TARGET>] [--no-build] [--watch]
+kagari debug --attach <ADDRESS> [--manifest-path <PATH>] [--target <TARGET>] [--watch]
 ```
 
 `kagari debug` builds the project in the debug profile, starts the game and reads commands, one
@@ -53,6 +53,7 @@ graph lists first (or `--entry`), with the arguments the graph has for it, and t
 | `--runtime <PATH>` | The runtime `--window` starts. |
 | `--attach <ADDRESS>` | Attach to a game started with `--debug-port`: `PORT` or `HOST:PORT`. Nothing is built. |
 | `--no-build` | Do not build first; use the files already in the target directory. |
+| `--watch` | Watch the project's files (about every half second): on a change, print `source changed: rebuilding` and do what `swap` does. |
 
 Locations are shown as `file:line:column`, with files relative to the directory of the project's
 root file. Commands can be piped in (`kagari debug < commands.txt`); the debugger answers them in
@@ -78,6 +79,7 @@ order and exits at the end of the input.
 | `vars [<frame>]` | The arguments, locals and story variables of a frame (`0` is the innermost), and the current step's record. |
 | `break <step \| file:line>...` | Add breakpoints; `break` alone lists them. |
 | `delete` | Remove every breakpoint. |
+| `swap` | Rebuild the debug profile and [hot swap](#hot-swap) the new game in, then set the breakpoints again on the new sources. |
 | `help`, `quit` | |
 
 `continue`, `next`, `step` and `out` stop at a choice, since a choice needs an arm (use `push`).
@@ -143,6 +145,47 @@ skip) is ignored; menus, saves and the backlog still work, and a load or a new g
 `pause` is requested. Every move shows the new state at once, without the animations in between;
 the current step's own animations play again.
 
+## Hot swap {#hot-swap}
+
+Hot swap puts a rebuilt game in place of the running one without leaving the story: edit a scene,
+then `swap` (or let `--watch` do it). The game is rebuilt in the debug profile, and the runtime
+compares the two debug builds to find the code that changed. Hot swap is a debugging aid; it needs
+debug builds of both games, and a game run without a debugger never pays for it.
+
+Scenes whose code changed are **thrown off the stack**. A scene counts as changed when its body
+changed (a step's text included), or when code that runs inside it changed: a `pushdown fn`, a
+`const fn` or a render it uses. Walking the call stack from the entry scene, the first changed
+scene and every scene above it are thrown off, and that scene is **called again** by its caller
+with the same arguments: it starts from its first step with the new code. The callers keep their
+position and their locals. Story variables, the values behind `&mut` arguments, the random state,
+the position and the screen go back to what they were when the call was made, so what the thrown
+scenes did is undone. The new step shows at once and the story stops there.
+
+```text
+(kagari) swap
+wrote target/v0/game.kagari
+swapped; called `crate::story::Greet` again (thrown off: crate::story::Greet), now at crate::story::Greet#0
+stopped (swap) at crate::story::Greet#0
+```
+
+When nothing on the stack changed, the story stays at its step (`nothing on the stack changed`),
+and the changed scenes run their new code when they are called. The story **restarts** from its
+entry scene, with the same arguments and seed, and the reason is shown, when:
+
+- the entry scene itself changed;
+- a story variable was added, removed, or changed type;
+- a value the surviving story holds can no longer be carried over: its type was redefined, or an
+  asset or a `Setting` or `Meta` it names is gone;
+- the scene to call again was entered before the game recorded its calls. A window records them
+  from its start when it runs a debug build with `--debug-port` or `--debug-stdio`; the query
+  engine always does;
+- the new code stops with an error right away.
+
+When the story cannot restart either (the entry scene is gone, or its arguments no longer fit),
+the game goes back to its start page. Menus that were open over the game are closed by a swap, and
+assets are read again from the rebuilt archives. The position after a swap is a normal position:
+a save made afterwards loads by replaying it on the new game.
+
 ## Editors {#editors}
 
 `kagari dap` is a debug adapter: it speaks the Debug Adapter Protocol over standard input and
@@ -160,11 +203,14 @@ window:
 | `buildFirst` | Build the debug profile first. Default `true`. |
 | `stopOnEntry` | Window: stop at the first step the story enters. |
 | `host`, `port` | Attach: where the game listens (`--debug-port`). |
+| `watch` | Watch the project's files and [hot swap](#hot-swap) on a change, as `kagari debug --watch`. Default `false`. |
 
 The editor's views map onto the story: one thread (the story), the call stack of scenes, the
 variables of each frame and the story variables, breakpoints on lines, and continue, step over,
 step into and step out as above. The debug console evaluates the commands of this page (`ls`,
-`nav crate::Start#9`, `push B`). The story commands are also custom requests `kagari/stack`,
-`kagari/ls`, `kagari/goto`, `kagari/push`, `kagari/pop`, `kagari/detail`, `kagari/nav` and
-`kagari/seed`, with structured results. Conditional, function and exception breakpoints are not
-supported.
+`nav crate::Start#9`, `push B`, `swap`). The story commands are also custom requests
+`kagari/stack`, `kagari/ls`, `kagari/goto`, `kagari/push`, `kagari/pop`, `kagari/detail`,
+`kagari/nav` and `kagari/seed`, with structured results. The custom request `kagari/swap` rebuilds
+and hot swaps the game, sets the line breakpoints again and answers with the outcome (`kept`,
+`recalled`, `restarted` or `reset`), the scene called again, the reason, the scenes thrown off and
+the new position. Conditional, function and exception breakpoints are not supported.

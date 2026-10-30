@@ -117,7 +117,8 @@ worktree (see [The Debugger](./debugger.md#editors) for every setting). Add debu
     "adapter": "Kagari",
     "request": "launch",
     "mode": "window",
-    "stopOnEntry": true
+    "stopOnEntry": true,
+    "watch": true
   },
   {
     "label": "Kagari: query engine",
@@ -138,7 +139,9 @@ worktree (see [The Debugger](./debugger.md#editors) for every setting). Add debu
 A launch builds the debug profile first (`"buildFirst": false` skips it). Set breakpoints by
 clicking a line: a line with `s!(…)` or `choice!{…}` stops when the story enters that step; another
 line in story code stops before its code runs. The debug console takes the debugger's commands,
-such as `ls` or `nav crate::story::Ending#0`.
+such as `ls` or `nav crate::story::Ending#0`. With `"watch": true`, saving a source file rebuilds
+the game and [hot swaps](./debugger.md#hot-swap) it into the running session; `swap` in the debug
+console does the same on demand.
 
 ## Other editors
 

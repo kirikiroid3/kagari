@@ -57,7 +57,7 @@ debugger must reject a debug artifact whose script hash is not that of the bytec
 | Field | Type | Kinds | Meaning |
 | ----- | ---- | ----- | ------- |
 | `kind` | String | both | `analysis` or `debug`; another value is `Error::Kind` |
-| `schema` | I64 | both | `SCHEMA` (2); another value is `Error::Schema` |
+| `schema` | I64 | both | `SCHEMA` (3); another value is `Error::Schema` |
 | `toolchain` | String | both | The `kagari-lang` version that wrote the file |
 | `fingerprint` | String | both | The source fingerprint |
 | `diagnostics` | Array of tables | `analysis` | The stage-5 diagnostics, resolved (below) |
@@ -156,9 +156,17 @@ field `"$"`. Functions, closures and screens, which saves cannot hold, get their
 | ----- | ---- | ------- |
 | `path` | String | The function's path in the bytecode |
 | `file` | String or Null | Its source file as the bytecode's Debug section names it; Null for constructors and builtins |
-| `body_hash` | String | Hex SHA-256 of the body as the compiler sees it, unchanged by comments, layout and edits elsewhere (for hot swap) |
+| `body_hash` | String | Hex SHA-256 of the body as the compiler sees it, with its item's promoted constants (its step records and texts), unchanged by comments, layout and edits elsewhere (for hot swap) |
 | `scopes` | Array of `{parent, start, end}` | Lexical scopes as source byte ranges; a parent comes before its children |
 | `locals` | Array of `{name, scope, ranges}` | Named locals, parameters included; `ranges`: `{start, end, register, cell}` per register holding the local over the half-open code-word range `start..end` (`cell`: the register holds a reference to the local's heap cell) |
+
+`debug.statics` is parallel to the bytecode's static table (story variables, then `Setting` and
+`Meta` handles). Per static:
+
+| Field | Type | Meaning |
+| ----- | ---- | ------- |
+| `path` | String | The static's path in the bytecode |
+| `type` | String | Its type with every item fully qualified (`Int<0, 9>`, `std::Option<crate::Mood>`); hot swap restarts the story when a story variable's type changes |
 
 How the emitter derives each field is in
 [Emitting Bytecode](../compiler/emit.md#debug-information). The bytecode itself is the same in a

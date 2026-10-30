@@ -429,3 +429,80 @@ fn a_line_without_a_step_breaks_in_code_and_next_leaves_the_line() {
 
     finish(client);
 }
+
+#[test]
+fn kagari_swap_rebuilds_and_sets_the_breakpoints_again() {
+    let tmp = init_project();
+    let dir = game(&tmp);
+    let source = dir.join("src/scenario/mod.kix");
+    std::fs::write(&source, STORY).unwrap();
+    let mut client = Client::start(&dir);
+    client.request("initialize", json!({ "adapterID": "kagari" }));
+    client.request(
+        "launch",
+        json!({ "mode": "headless", "manifestPath": "kagari.toml", "cwd": dir }),
+    );
+    client.event("initialized");
+    assert_eq!(client.event("stopped")["reason"], "entry");
+
+    let greet = line_of(r#"s!(t!["Nice to meet you."])"#);
+    let set = client.request(
+        "setBreakpoints",
+        json!({ "source": { "path": source }, "breakpoints": [{ "line": greet }] }),
+    );
+    let id = set["breakpoints"][0]["id"].clone();
+    client.request("configurationDone", Value::Null);
+    client.request("kagari/push", json!({ "arms": ["Shy"] }));
+    assert_eq!(client.event("stopped")["reason"], "goto");
+    client.request("continue", json!({ "threadId": 1 }));
+    assert_eq!(client.event("stopped")["reason"], "breakpoint");
+
+    // The scene the story is in changes: its caller calls it again.
+    std::fs::write(
+        &source,
+        STORY.replace("Nice to meet you.", "Nice to see you."),
+    )
+    .unwrap();
+    let swapped = client.request("kagari/swap", Value::Null);
+    assert_eq!(swapped["outcome"], "recalled", "{swapped}");
+    assert_eq!(swapped["scene"], "crate::scenario::Greet", "{swapped}");
+    assert_eq!(
+        swapped["position"]["step"], "crate::scenario::Greet#0",
+        "{swapped}"
+    );
+    let stopped = client.event("stopped");
+    assert_eq!(stopped["reason"], "swap", "{stopped}");
+    assert!(
+        stopped["description"]
+            .as_str()
+            .unwrap()
+            .contains("called `crate::scenario::Greet` again"),
+        "{stopped}"
+    );
+    // The line breakpoint, resolved again on the new sources.
+    let changed = client.event("breakpoint");
+    assert_eq!(changed["reason"], "changed", "{changed}");
+    assert_eq!(changed["breakpoint"]["id"], id, "{changed}");
+    assert_eq!(changed["breakpoint"]["verified"], true, "{changed}");
+    client.wait("the summary in the console", |m| {
+        matches!(m, Message::Event { event, body, .. }
+            if event == "output" && body["output"].as_str().unwrap_or("").starts_with("swapped;"))
+    });
+
+    // The story shows the new text.
+    let detail = client.request(
+        "evaluate",
+        json!({ "expression": "detail", "context": "repl" }),
+    );
+    assert!(
+        detail["result"]
+            .as_str()
+            .unwrap()
+            .contains("Nice to see you."),
+        "{detail}"
+    );
+    let trace = client.request("stackTrace", json!({ "threadId": 1 }));
+    assert_eq!(trace["stackFrames"][0]["line"], greet, "{trace}");
+
+    finish(client);
+}

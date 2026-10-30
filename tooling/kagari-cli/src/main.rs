@@ -53,6 +53,7 @@ fn main() -> ExitCode {
             entry,
             seed,
             no_build,
+            watch,
         } => command::debug::run(&command::debug::Options {
             manifest_path: manifest_path.as_deref(),
             target: target.as_deref(),
@@ -62,6 +63,7 @@ fn main() -> ExitCode {
             entry: entry.as_deref(),
             seed,
             no_build,
+            watch,
         }),
     };
     match result {
