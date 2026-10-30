@@ -27,9 +27,11 @@ my-game/
 │       ├── image/normal.png
 │       └── voice/0001.wav
 └── target/                     build output (`build.out-dir`)
+    ├── analysis.kagari-cache   the analysis cache
     └── v0/
         ├── game.kagari
-        └── *.kiarchive
+        ├── *.kiarchive
+        └── game.kagari-cache   debug builds only
 ```
 
 必須なのは `kagari.toml` とルートファイルだけです。モジュールツリーはルートファイルから広がります。[ソースファイルとモジュール](../syntax/modules.md)を参照してください。`src/` と `assets/` の下のディレクトリ名はテンプレートの慣習であり、規則ではありません。
@@ -141,7 +143,9 @@ target/v0/
 └── system-fonts.kiarchive
 ```
 
-（これは `example/test_game1` の出力です。）`kagari build` は書き出す前に、以前のビルドがそのディレクトリに残した `game.kagari` とすべての `.kiarchive` を削除します。それ以外のファイルには触れません。
+（これは `example/test_game1` の出力です。）`kagari build` は書き出す前に、以前のビルドがそのディレクトリに残した `game.kagari`、すべての `.kiarchive`、すべての `.kagari-cache` を削除します。それ以外のファイルには触れません。[デバッグビルド](./cli.md#build-profiles)（`kagari build --profile debug`）では、デバッグ用成果物 `game.kagari-cache` もそこに書き出します。
+
+出力ディレクトリの直下には、`kagari check` と `kagari build` が[解析キャッシュ](./cli.md#the-analysis-cache) `analysis.kagari-cache` を保存します。[`kagari clean`](./cli.md#kagari-clean) は解析キャッシュとすべてのターゲットのビルド出力を削除します。新しいプロジェクトの `.gitignore` は、既定の出力ディレクトリである `/target` を無視します。
 
 ## アセットとアーカイブ {#assets-and-archives}
 

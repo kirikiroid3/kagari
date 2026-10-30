@@ -237,6 +237,9 @@ statics, read flags, seen sets, the next autosave slot) and `save-manual-N.kisav
 `save-quick.kisave`, `save-auto-N.kisave` (story traces). How VM values map to cells is in
 [Saves, Traces and Snapshots](../runtime/saves.md).
 
+The CLI writes `.kagari-cache` files in the same container: the analysis cache and the debug
+artifact of a debug build ([`.kagari-cache` Files](./cache.md)).
+
 ## Compatibility {#compatibility}
 
 - Both formats carry their version in the last 4 magic bytes (`V000`). A reader reports another

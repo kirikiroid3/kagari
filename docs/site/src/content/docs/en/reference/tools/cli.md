@@ -2,8 +2,8 @@
 title: "The kagari CLI"
 ---
 
-`kagari` is the Kagari toolchain: it creates, checks, builds and formats projects, disassembles
-`.kagari` files, and runs the language server.
+`kagari` is the Kagari toolchain: it creates, checks, builds, cleans and formats projects,
+disassembles `.kagari` files, and runs the language server.
 
 ```text
 kagari <COMMAND>
@@ -12,6 +12,7 @@ Commands:
   init    Create a new project in PATH
   check   Check the project and print its diagnostics
   build   Build the project's bytecode and asset archives
+  clean   Delete the build outputs and the analysis cache
   fmt     Format the project's source files, or the given files
   disasm  Disassemble a `.kagari` bytecode file
   lsp     Run the language server over stdio
@@ -34,9 +35,9 @@ also run it without installing: `cargo run -p kagari-cli -- <COMMAND>`.
 
 ## Finding the project
 
-`check`, `build` and `fmt` (without files) work on a project. They use the `kagari.toml` given by
-`--manifest-path <PATH>`, or else the first `kagari.toml` found in the current directory or one of
-its parents. See [Projects](./projects.md) for the manifest.
+`check`, `build`, `clean` and `fmt` (without files) work on a project. They use the `kagari.toml`
+given by `--manifest-path <PATH>`, or else the first `kagari.toml` found in the current directory
+or one of its parents. See [Projects](./projects.md) for the manifest.
 
 ## Exit statuses
 
@@ -61,6 +62,33 @@ The compiler has no command-line flags. Its options are keys in `kagari.toml`, s
 | `[assets] system-fonts` | `true` | Lets `system_font("…")` name installed fonts (`E1031` when off). |
 
 See [Compiler options](./projects.md#compiler-options) for details.
+
+## The analysis cache
+
+The story analysis is the slowest part of compiling a project: it explores every story state to
+check termination, reachability, stuck choices, screens and their consistency, keyframes and the
+game system ([Story Analysis](../../diagnostics/analysis.md),
+[Game System](../../diagnostics/system.md)). `kagari check` and `kagari build` keep its result in
+`<out-dir>/analysis.kagari-cache` (`target/analysis.kagari-cache` by default) and reuse it while
+nothing it depends on has changed:
+
+- the text of every source file of the program, the standard library included;
+- the [compiler options](#compiler-options) (`state-cap`, `recursion-depth`, `keyframe-check`,
+  `system-fonts`);
+- the location of the asset directory and of the system font directories;
+- the toolchain version.
+
+When all of these are unchanged since the file was written, the analysis does not run again and
+its diagnostics are taken from the file; the output is the same as with a fresh analysis.
+Otherwise the analysis runs and the file is rewritten. The analysis, and therefore the file, is
+skipped while an earlier check reports an error. So `kagari check` writes into the output directory
+too.
+
+A missing, unreadable or invalid file is ignored and replaced. When the file cannot be written,
+`kagari: warning: cannot write the analysis cache: <reason>` goes to stderr and the command
+continues with the same exit status. [`kagari clean`](#kagari-clean) deletes the file. If you work
+on the compiler itself and change it without changing its version, run `kagari clean`, because the
+cache cannot tell the two compilers apart.
 
 ## `kagari init`
 
@@ -100,7 +128,8 @@ kagari init --name "My Game"
 kagari check [--manifest-path <PATH>] [--resolutions]
 ```
 
-Compiles the project without writing anything and prints every diagnostic to stdout.
+Compiles the project and prints every diagnostic to stdout. It writes no build output, only the
+[analysis cache](#the-analysis-cache).
 
 | Option | Meaning |
 | ------ | ------- |
@@ -113,26 +142,30 @@ codes are listed in [Diagnostics](../../diagnostics/index.md).
 ## `kagari build`
 
 ```text
-kagari build [--manifest-path <PATH>] [--target <TARGET>]...
+kagari build [--manifest-path <PATH>] [--target <TARGET>]... [--profile <PROFILE>]
 ```
 
 Compiles the project and writes, for each target, `<out-dir>/<target>/game.kagari` and the asset
-archives. See [Targets and output directories](./projects.md#targets-and-output-directories) and
-[Assets and archives](./projects.md#assets-and-archives).
+archives; with `--profile debug` also `game.kagari-cache`. See
+[Targets and output directories](./projects.md#targets-and-output-directories) and
+[Assets and archives](./projects.md#assets-and-archives). Like `kagari check`, it reuses and
+updates the [analysis cache](#the-analysis-cache).
 
 | Option | Meaning |
 | ------ | ------- |
 | `--manifest-path <PATH>` | The project's `kagari.toml`. |
 | `--target <TARGET>` | Build only this target. Repeatable. Each must be listed in `build.targets`, else status 2. Default: every target of `build.targets`. |
+| `--profile <PROFILE>` | `release` or `debug`; see [Build profiles](#build-profiles). Default `release`. |
 
 The steps, in order:
 
 1. Compile. Diagnostics are printed to stderr. On an error diagnostic, stop with status 1.
 2. Check every referenced asset against `build.runtime-compatibility`
-   ([Runtime profiles](./projects.md#runtime-profiles)). On a problem, stop with status 1. Nothing
-   has been written or deleted yet.
-3. For each target: create the output directory, delete the old `game.kagari` and `.kiarchive`
-   files there, write `game.kagari`, then the archives. Each written file is printed:
+   ([Runtime profiles](./projects.md#runtime-profiles)). On a problem, stop with status 1. No
+   build output has been written or deleted yet; only the analysis cache may have been updated.
+3. For each target: create the output directory, delete the old `game.kagari`, `.kiarchive` and
+   `.kagari-cache` files there, write `game.kagari`, then the archives, then (debug profile only)
+   `game.kagari-cache`. Each written file is printed:
 
 ```text
 wrote target/v0/game.kagari
@@ -143,6 +176,73 @@ wrote target/v0/bgimage.kiarchive (3 files)
 kagari build
 kagari build --manifest-path example/test_game1/kagari.toml
 kagari build --target v0
+kagari build --profile debug
+```
+
+### Build profiles
+
+The profile decides what `kagari build` writes besides the bytecode and the archives. The
+`game.kagari` file is byte for byte the same in both profiles, so a debug build plays exactly like
+a release build.
+
+| Profile | Writes |
+| ------- | ------ |
+| `release` (default) | `game.kagari` and the archives. |
+| `debug` | The same, plus `game.kagari-cache`, the debug artifact. |
+
+The debug artifact is for debugging tools and holds:
+
+- the explored story graph: every reachable story state the analysis found, per scene and calling
+  context, with the steps (by [step ID](../concepts/steps.md#step-ids)), scene calls and random
+  draws, the locals and story variables kept in each state, and the successors of each state for
+  every choice arm, drawn value and scene exit;
+- debug information for every function: the names of its local variables, where they live over
+  the function's code, and its lexical scopes;
+- the hash of the matching `game.kagari`, so that a stale artifact is rejected rather than read
+  against another build.
+
+It is printed after the archives:
+
+```text
+wrote target/v0/game.kagari
+wrote target/v0/bgimage.kiarchive (3 files)
+wrote target/v0/game.kagari-cache
+```
+
+A release build deletes a `game.kagari-cache` an earlier debug build left in the target directory.
+The runtime does not read `game.kagari-cache`, so a shipped game does not need it.
+
+## `kagari clean`
+
+```text
+kagari clean [--manifest-path <PATH>]
+```
+
+Deletes what `kagari check` and `kagari build` wrote into the output directory (`build.out-dir`):
+
+- the [analysis cache](#the-analysis-cache): every `.kagari-cache` file directly in the output
+  directory;
+- in the directory of every target (`v0`), listed in `build.targets` or not: `game.kagari`, every
+  `.kiarchive` file and every `.kagari-cache` file.
+
+Then it removes the target directories and the output directory if they are left empty. Other
+files stay, and so do the directories that hold them.
+
+| Option | Meaning |
+| ------ | ------- |
+| `--manifest-path <PATH>` | The project's `kagari.toml`. |
+
+It prints how many files it removed, with the output directory relative to the project directory:
+
+```text
+removed 4 files from target
+```
+
+Exits with 0, or with 2 when it cannot run (no `kagari.toml`, an IO error).
+
+```sh
+kagari clean
+kagari clean --manifest-path example/test_game1/kagari.toml
 ```
 
 ## `kagari fmt`

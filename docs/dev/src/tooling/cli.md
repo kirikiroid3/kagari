@@ -10,7 +10,7 @@ the outcome to output and an exit code. No compiler logic lives in the CLI.
 | ---- | -------- |
 | `tooling/kagari-project/src/lib.rs` | `MANIFEST_FILE` (`kagari.toml`), `TOOLCHAIN_VERSION` (the crate version) and re-exports |
 | `tooling/kagari-project/src/manifest.rs` | `RawManifest` (serde) → validated `Manifest`; `parse_manifest` |
-| `tooling/kagari-project/src/project.rs` | `Project::{load, find, entry_path, asset_dir, out_dir, program}` |
+| `tooling/kagari-project/src/project.rs` | `Project::{load, find, entry_path, asset_dir, build_dir, out_dir, program}` |
 | `tooling/kagari-project/src/target.rs` | `Target` (`v0`) |
 | `tooling/kagari-project/src/fonts.rs` | `system_font_dirs()` per platform |
 | `tooling/kagari-project/src/error.rs` | `ProjectError` |
@@ -19,8 +19,10 @@ the outcome to output and an exit code. No compiler logic lives in the CLI.
 | `tooling/kagari-cli/src/main.rs` | Dispatch and the exit-code mapping |
 | `tooling/kagari-cli/src/failure.rs` | `Failure` (exit 2), `io()`, `exit(failed)` (exit 0/1) |
 | `tooling/kagari-cli/src/workspace.rs` | `load(--manifest-path)`, `shown(path, base)` |
-| `tooling/kagari-cli/src/command/{check,disasm,fmt,lsp}.rs` | One module per subcommand |
-| `tooling/kagari-cli/src/command/build/{mod,archives,compat}.rs` | `kagari build`, archive packing, runtime-profile check |
+| `tooling/kagari-cli/src/analysis_cache.rs` | `path`, `offer`, `store`: the analysis cache shared by `check` and `build` |
+| `tooling/kagari-cli/src/outputs.rs` | `BYTECODE_FILE`, removing build outputs and caches, removing empty directories |
+| `tooling/kagari-cli/src/command/{check,clean,disasm,fmt,lsp}.rs` | One module per subcommand |
+| `tooling/kagari-cli/src/command/build/{mod,archives,compat,shaders}.rs` | `kagari build` and its profiles, archive packing, runtime-profile check, shader check |
 | `tooling/kagari-cli/src/command/init/{mod,template,font}.rs` | `kagari init`, embedded template, default-font choice |
 | `tooling/kagari-cli/template/` | The new-project template (`_gitignore` becomes `.gitignore`) |
 | `tooling/kagari-cli/tests/` | Integration tests running the built binary |
@@ -65,8 +67,8 @@ rejected too). The compile options end up in `kagari_lang::CompileOptions`, whic
 - `Project::find(start)` walks `start.ancestors()` and loads the first `kagari.toml` it finds;
   none is `ProjectError::NotFound`. The CLI starts at the current directory; the language server
   starts at an opened file's directory.
-- Every manifest path is resolved against `root`: `entry_path()`, `asset_dir()`, and
-  `out_dir(target) = root/<out-dir>/<target>` (e.g. `target/v0`).
+- Every manifest path is resolved against `root`: `entry_path()`, `asset_dir()`,
+  `build_dir() = root/<out-dir>` and `out_dir(target) = root/<out-dir>/<target>` (e.g. `target/v0`).
 
 ### The project's program
 
@@ -130,24 +132,46 @@ Scripts and CI rely on it.
 kagari check [--manifest-path PATH] [--resolutions]
 ```
 
-Loads the project, runs `kagari_lang::check(db, program)` (every stage, including analysis when
-stages 1–4 had no error) and prints `render_diagnostics(…, Some(&project.root))` to **stdout**
+Loads the project, offers the analysis cache (see [The analysis cache](#the-analysis-cache)), runs
+`kagari_lang::check(db, program)` (every stage, including analysis when stages 1–4 had no error),
+stores the cache, and prints `render_diagnostics(…, Some(&project.root))` to **stdout**
 (`no diagnostics` when empty). `--resolutions` appends `debug::resolution_dump`, which prints what
 every name resolves to; it is a compiler debugging aid. Exit 1 iff any diagnostic has
 `Severity::Error`.
 
+### The analysis cache
+
+`check` and `build` share the story analysis of the previous run through
+`<out-dir>/analysis.kagari-cache` (`analysis_cache.rs`; format in
+[`.kagari-cache` Files](../formats/cache.md)):
+
+1. `offer`: read the file and `kagari_lang::cache::offer_analysis_cache`. A missing, unreadable,
+   invalid or refused file is ignored.
+2. The command runs `check` or `build` as usual; the compiler reuses the offered diagnostics when
+   the program's source fingerprint equals the file's, and otherwise analyzes
+   ([Reusing the analysis](../compiler/analysis.md#reusing-the-analysis)).
+3. `store`: `kagari_lang::cache::analysis_cache_use` says `NotRun` (nothing to do), `Reused` (the
+   offered cache is this run's analysis) or `Fresh(cache)`: write it, creating the output
+   directory. A file that cannot be encoded or written prints
+   `kagari: warning: cannot write the analysis cache: …` to stderr; the exit code does not change.
+
+The cache is written whenever the analysis runs, also by a `build` that later fails (for
+example in emission or the runtime-profile check): it is a cache, not a build output.
+
 ### `kagari build`
 
 ```text
-kagari build [--manifest-path PATH] [--target TARGET]...
+kagari build [--manifest-path PATH] [--target TARGET]... [--profile debug|release]
 ```
 
 1. Load the project; choose targets: every `--target` must parse **and** be listed in
-   `build.targets` (else exit 2); without `--target`, all of `build.targets`.
-2. `kagari_lang::build(db, program)` returns `Build { diagnostics, module, bytes, asset_files, shader_roles }`:
+   `build.targets` (else exit 2); without `--target`, all of `build.targets`. `--profile`
+   (`cli::Profile`) defaults to `release`.
+2. Offer the analysis cache; `kagari_lang::build(db, program)` returns `Build { diagnostics, module, bytes, asset_files, shader_roles, debug }`:
    the diagnostics of `check` plus emission, the verified `kagari_bytecode::Module` and its
-   encoding (both `None` on any error), and the `FilePath` behind each `module.assets` entry.
-   Non-empty diagnostics are printed to **stderr**. No module → exit 1.
+   encoding (both `None` on any error), the `FilePath` behind each `module.assets` entry, and
+   the `kagari_debug::DebugInfo` of the module. Store the analysis cache. Non-empty diagnostics
+   are printed to **stderr**. No module → exit 1.
 3. **Runtime-profile check** (`build/compat.rs`), before anything is written: for each asset and
    each profile in `build.runtime-compatibility`, read at most 1 MiB, `kagari_compat::sniff` the
    format by content (never by extension), and print one line per unsupported kind
@@ -168,8 +192,15 @@ kagari build [--manifest-path PATH] [--target TARGET]...
    error prints `error: shader `{path}` ({role.name()}): {ShaderError}` (`line N: message`, line
    relative to the user file). Any error → exit 1, nothing written. A file used under two roles
    has two assets, so it is validated once per role.
-5. For each target: create `out_dir(target)`, delete the previous `game.kagari` and every
-   `*.kiarchive` in it (other files are left alone), write `game.kagari`, then the archives.
+5. **Debug profile only:** encode the debug artifact once (`DebugArtifact`): the toolchain
+   version, the source fingerprint and story graph of this run's analysis (fresh or reused), the
+   script hash (SHA-256 of `bytes`, lowercase hex, as the engine computes it) and `Build::debug`.
+6. For each target: create `out_dir(target)`, delete the previous `game.kagari`, every
+   `*.kiarchive` and every `*.kagari-cache` in it (`outputs::remove_target_outputs`; other files
+   are left alone), write `game.kagari`, the archives, then (debug profile) `game.kagari-cache`.
+
+The profile changes nothing in the compilation: `game.kagari` is byte-identical in both, and a
+release build removes the artifact an earlier debug build left.
 
 Archive packing (`build/archives.rs`) groups the referenced assets by
 `kagari_archive::archive::archive_stem(path)`: the first `/`-separated segment of the asset path
@@ -191,6 +222,20 @@ Consequences:
 
 The archive format itself is described in [Archives and Save Databases](../formats/archive.md),
 the bytecode in [The `.kagari` Format](../formats/kagari.md).
+
+### `kagari clean`
+
+```text
+kagari clean [--manifest-path PATH]
+```
+
+Deletes what `check` and `build` write and nothing else: the `*.kagari-cache` files directly in
+`build_dir()` (the analysis cache), and in `out_dir(target)` for **every** `Target::ALL` (listed in
+`build.targets` or not) the `game.kagari`, `*.kiarchive` and `*.kagari-cache` files. Then it
+removes each target directory and the output directory if they are empty. It prints
+`removed N files from <out-dir>` and exits 0; an I/O error is a `Failure` (exit 2). It never
+deletes the output directory wholesale, because `build.out-dir` may name a directory that holds
+other files.
 
 ### `kagari fmt`
 
@@ -261,6 +306,7 @@ that.
 | `tooling/kagari-cli/tests/init.rs` | Template files, refusal to overwrite, name escaping, system-font choice and the no-font fallback |
 | `tooling/kagari-cli/tests/check.rs` | Fresh project has no diagnostics (also from a subdirectory), assets outside the asset dir, `system-fonts = false`, missing manifest (2), toolchain mismatch (2) |
 | `tooling/kagari-cli/tests/build.rs` | Bytecode decodes and verifies, archive names and contents, stale archive removal, unlisted target (2), rejected image/audio/video formats (1, no bytecode written), invalid WGSL (1, `error: shader … line`), std shaders packed into `std.kiarchive`, `disasm` of the result |
+| `tooling/kagari-cli/tests/debug.rs` | A debug build writes `game.kagari-cache` (script hash, one debug entry per function, every reached step is a bytecode step) and the same bytecode as a release build, which removes the artifact; `check` and `build` reuse a cached analysis (a diagnostic only the cache holds is printed) until a source edit, and replace an invalid cache; `clean` removes outputs and caches only |
 | `tooling/kagari-cli/tests/fmt.rs` | Fresh project is formatted, rewriting, syntax errors |
 
 The integration tests run the real binary (`env!("CARGO_BIN_EXE_kagari")`) through
@@ -273,7 +319,12 @@ The integration tests run the real binary (`env!("CARGO_BIN_EXE_kagari")`) throu
   from `kagari_fmt`, bytecode handling from `kagari_bytecode`. The language server must see the
   same project as the CLI, so both go through `Project::find`/`load` and `Project::program`.
 - Exit codes: 0 success, 1 problems found, 2 cannot run.
-- `kagari build` writes nothing when compilation or the runtime-profile check fails.
+- `kagari build` writes no build output when compilation or the runtime-profile check fails (the
+  analysis cache is written whenever the analysis ran).
+- The bytecode does not depend on the build profile.
+- An analysis cache is used only for the inputs it was computed from (the compiler compares
+  source fingerprints); the CLI never interprets it.
+- `kagari clean` deletes only files the CLI writes.
 - Archive entry names equal bytecode asset paths, and archives are grouped by `archive_stem`. The
   runtime depends on both.
 - Manifest parsing stays strict (`deny_unknown_fields`) and every path key stays relative to the

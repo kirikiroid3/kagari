@@ -5,6 +5,9 @@ title: "Glossary"
 Terms used in this reference, in alphabetical order. Each entry links to the chapter that defines
 it. Terms of the standard library link to the *STD Reference*.
 
+- **Analysis cache.** The file `<out-dir>/analysis.kagari-cache` in which `kagari check` and
+  `kagari build` keep the result of the story analysis, to reuse it while the sources, the
+  compiler options and the toolchain are unchanged. [The `kagari` CLI](../tools/cli.md#the-analysis-cache)
 - **Arm.** One option of a `choice!`, written `t![…] => V` or `t![…] if cond => V`; selecting it
   makes the choice evaluate to `V`. Also a branch of a `match`.
   [Steps](../concepts/steps.md)
@@ -41,6 +44,9 @@ it. Terms of the standard library link to the *STD Reference*.
   [Constant Expressions](../syntax/constants.md)
 - **Cursor.** The point on a step's timeline at which a render schedules the next animation.
   [`std::screen`](../../std/screen.md)
+- **Debug build.** A build with `kagari build --profile debug`: the same `game.kagari` as a
+  release build, plus `game.kagari-cache` with the explored story graph and debug information for
+  debugging tools. [The `kagari` CLI](../tools/cli.md#build-profiles)
 - **Decidable.** Of a question about programs: answerable by an algorithm for every program. Story
   reachability in Kagari is decidable. [Philosophy](../overview/philosophy.md)
 - **Deferred reference.** A setting handle used in a render; the render cannot read its value and

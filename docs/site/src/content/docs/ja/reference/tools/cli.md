@@ -2,7 +2,7 @@
 title: "kagari CLI"
 ---
 
-`kagari` は Kagari のツールチェインです。プロジェクトの作成・検査・ビルド・整形、`.kagari` ファイルの逆アセンブル、言語サーバーの実行を行います。
+`kagari` は Kagari のツールチェインです。プロジェクトの作成・検査・ビルド・掃除・整形、`.kagari` ファイルの逆アセンブル、言語サーバーの実行を行います。
 
 ```text
 kagari <COMMAND>
@@ -11,6 +11,7 @@ Commands:
   init    Create a new project in PATH
   check   Check the project and print its diagnostics
   build   Build the project's bytecode and asset archives
+  clean   Delete the build outputs and the analysis cache
   fmt     Format the project's source files, or the given files
   disasm  Disassemble a `.kagari` bytecode file
   lsp     Run the language server over stdio
@@ -31,7 +32,7 @@ cargo install --path tooling/kagari-cli
 
 ## プロジェクトの探索 {#finding-the-project}
 
-`check`、`build`、（ファイル指定なしの）`fmt` はプロジェクトに対して動作します。`--manifest-path <PATH>` で指定された `kagari.toml` を使い、指定がなければカレントディレクトリとその親ディレクトリで最初に見つかった `kagari.toml` を使います。マニフェストについては[プロジェクト](./projects.md)を参照してください。
+`check`、`build`、`clean`、（ファイル指定なしの）`fmt` はプロジェクトに対して動作します。`--manifest-path <PATH>` で指定された `kagari.toml` を使い、指定がなければカレントディレクトリとその親ディレクトリで最初に見つかった `kagari.toml` を使います。マニフェストについては[プロジェクト](./projects.md)を参照してください。
 
 ## 終了ステータス {#exit-statuses}
 
@@ -55,6 +56,19 @@ cargo install --path tooling/kagari-cli
 | `[assets] system-fonts` | `true` | `system_font("…")` がインストール済みフォントを指せるようにする（オフのときは `E1031`）。 |
 
 詳しくは[コンパイラオプション](./projects.md#compiler-options)を参照してください。
+
+## 解析キャッシュ {#the-analysis-cache}
+
+物語の解析は、プロジェクトのコンパイルで最も時間のかかる部分です。停止性、到達可能性、行き詰まり選択肢、画面とその一貫性、キーフレーム、ゲームシステムを検査するために、物語のすべての状態を探索します（[物語の解析](../../diagnostics/analysis.md)、[ゲームシステム](../../diagnostics/system.md)）。`kagari check` と `kagari build` はその結果を `<out-dir>/analysis.kagari-cache`（既定では `target/analysis.kagari-cache`）に保存し、解析が依存するものが変わらない間はそれを再利用します。
+
+- プログラムのすべてのソースファイルの内容（標準ライブラリを含む）
+- [コンパイラオプション](#compiler-options)（`state-cap`、`recursion-depth`、`keyframe-check`、`system-fonts`）
+- アセットディレクトリとシステムフォントのディレクトリの場所
+- ツールチェインのバージョン
+
+ファイルを書き出した時点からこれらがすべて変わっていなければ、解析は再実行されず、その診断はファイルから取り出されます。出力は新たに解析した場合と同じです。そうでなければ解析が実行され、ファイルは書き直されます。それより前の検査がエラーを報告している間は、解析もファイルの書き出しも行われません。このため、`kagari check` も出力ディレクトリに書き込みます。
+
+ファイルが存在しない、読めない、または不正な場合は無視され、置き換えられます。ファイルを書き出せないときは `kagari: warning: cannot write the analysis cache: <reason>` を stderr に出力し、終了ステータスを変えずにコマンドを続けます。ファイルは [`kagari clean`](#kagari-clean) で削除できます。コンパイラ自体を開発していて、バージョンを変えずにコンパイラを変更した場合は `kagari clean` を実行してください。キャッシュは 2 つのコンパイラを区別できないためです。
 
 ## `kagari init` {#kagari-init}
 
@@ -84,7 +98,7 @@ kagari init --name "My Game"
 kagari check [--manifest-path <PATH>] [--resolutions]
 ```
 
-何も書き出さずにプロジェクトをコンパイルし、すべての診断を stdout に出力します。
+プロジェクトをコンパイルし、すべての診断を stdout に出力します。ビルド出力は書き出さず、書き出すのは[解析キャッシュ](#the-analysis-cache)だけです。
 
 | オプション | 意味 |
 | ---------- | ---- |
@@ -96,21 +110,22 @@ kagari check [--manifest-path <PATH>] [--resolutions]
 ## `kagari build` {#kagari-build}
 
 ```text
-kagari build [--manifest-path <PATH>] [--target <TARGET>]...
+kagari build [--manifest-path <PATH>] [--target <TARGET>]... [--profile <PROFILE>]
 ```
 
-プロジェクトをコンパイルし、ターゲットごとに `<out-dir>/<target>/game.kagari` とアセットアーカイブを書き出します。[ターゲットと出力ディレクトリ](./projects.md#targets-and-output-directories)と[アセットとアーカイブ](./projects.md#assets-and-archives)を参照してください。
+プロジェクトをコンパイルし、ターゲットごとに `<out-dir>/<target>/game.kagari` とアセットアーカイブを書き出します。`--profile debug` のときは `game.kagari-cache` も書き出します。[ターゲットと出力ディレクトリ](./projects.md#targets-and-output-directories)と[アセットとアーカイブ](./projects.md#assets-and-archives)を参照してください。`kagari check` と同じく、[解析キャッシュ](#the-analysis-cache)を再利用・更新します。
 
 | オプション | 意味 |
 | ---------- | ---- |
 | `--manifest-path <PATH>` | プロジェクトの `kagari.toml`。 |
 | `--target <TARGET>` | このターゲットだけをビルドします。複数回指定できます。それぞれ `build.targets` に含まれている必要があり、含まれていなければステータス 2 です。既定は `build.targets` のすべてのターゲット。 |
+| `--profile <PROFILE>` | `release` または `debug`。[ビルドプロファイル](#build-profiles)を参照してください。既定は `release`。 |
 
 処理の順序:
 
 1. コンパイルします。診断は stderr に出力されます。エラーの診断があればステータス 1 で止まります。
-2. 参照されるすべてのアセットを `build.runtime-compatibility` に照らして検査します（[ランタイムプロファイル](./projects.md#runtime-profiles)）。問題があればステータス 1 で止まります。この時点ではまだ何も書き出しも削除もしていません。
-3. ターゲットごとに、出力ディレクトリを作り、そこにある古い `game.kagari` と `.kiarchive` ファイルを削除し、`game.kagari`、続いてアーカイブを書き出します。書き出したファイルは 1 つずつ表示されます。
+2. 参照されるすべてのアセットを `build.runtime-compatibility` に照らして検査します（[ランタイムプロファイル](./projects.md#runtime-profiles)）。問題があればステータス 1 で止まります。この時点ではまだビルド出力を何も書き出しも削除もしていません。更新されている可能性があるのは解析キャッシュだけです。
+3. ターゲットごとに、出力ディレクトリを作り、そこにある古い `game.kagari`、`.kiarchive`、`.kagari-cache` ファイルを削除し、`game.kagari`、続いてアーカイブ、（デバッグプロファイルのときだけ）`game.kagari-cache` を書き出します。書き出したファイルは 1 つずつ表示されます。
 
 ```text
 wrote target/v0/game.kagari
@@ -121,6 +136,62 @@ wrote target/v0/bgimage.kiarchive (3 files)
 kagari build
 kagari build --manifest-path example/test_game1/kagari.toml
 kagari build --target v0
+kagari build --profile debug
+```
+
+### ビルドプロファイル {#build-profiles}
+
+プロファイルは、`kagari build` がバイトコードとアーカイブのほかに何を書き出すかを決めます。`game.kagari` ファイルはどちらのプロファイルでもバイト単位で同一なので、デバッグビルドはリリースビルドとまったく同じように動作します。
+
+| プロファイル | 書き出すもの |
+| ------------ | ------------ |
+| `release`（既定） | `game.kagari` とアーカイブ。 |
+| `debug` | 同じものに加えて、デバッグ用成果物 `game.kagari-cache`。 |
+
+デバッグ用成果物はデバッグツールのためのもので、次の内容を収めます。
+
+- 探索された物語のグラフ。解析が見つけた到達可能なすべての物語状態を、シーンと呼び出し文脈ごとに収めます。各状態には、ステップ（[ステップ ID](../concepts/steps.md#step-ids) で示します）、シーン呼び出し、乱数の抽選、その状態で保持されるローカル変数と物語変数、選択肢のアーム・抽選された値・シーンの終了ごとの後続状態が含まれます。
+- すべての関数のデバッグ情報。ローカル変数の名前、関数のコード上でそれらが置かれる場所、レキシカルスコープです。
+- 対応する `game.kagari` のハッシュ。古い成果物を別のビルドに対して読まず、拒否できるようにするためのものです。
+
+これはアーカイブの後に表示されます。
+
+```text
+wrote target/v0/game.kagari
+wrote target/v0/bgimage.kiarchive (3 files)
+wrote target/v0/game.kagari-cache
+```
+
+リリースビルドは、以前のデバッグビルドがターゲットディレクトリに残した `game.kagari-cache` を削除します。ランタイムは `game.kagari-cache` を読まないので、出荷するゲームには不要です。
+
+## `kagari clean` {#kagari-clean}
+
+```text
+kagari clean [--manifest-path <PATH>]
+```
+
+`kagari check` と `kagari build` が出力ディレクトリ（`build.out-dir`）に書き出したものを削除します。
+
+- [解析キャッシュ](#the-analysis-cache)。出力ディレクトリ直下のすべての `.kagari-cache` ファイルです。
+- すべてのターゲット（`v0`）のディレクトリにある `game.kagari`、すべての `.kiarchive` ファイル、すべての `.kagari-cache` ファイル。ターゲットが `build.targets` に含まれているかどうかは問いません。
+
+その後、空になったターゲットのディレクトリと出力ディレクトリを削除します。それ以外のファイルは残り、それを収めたディレクトリも残ります。
+
+| オプション | 意味 |
+| ---------- | ---- |
+| `--manifest-path <PATH>` | プロジェクトの `kagari.toml`。 |
+
+削除したファイルの数を、プロジェクトのディレクトリからの相対パスで示した出力ディレクトリとともに表示します。
+
+```text
+removed 4 files from target
+```
+
+ステータス 0 で終了します。実行できないとき（`kagari.toml` が見つからない、IO エラー）はステータス 2 です。
+
+```sh
+kagari clean
+kagari clean --manifest-path example/test_game1/kagari.toml
 ```
 
 ## `kagari fmt` {#kagari-fmt}

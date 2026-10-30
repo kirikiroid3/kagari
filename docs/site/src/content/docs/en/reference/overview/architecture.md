@@ -45,9 +45,13 @@ build; warnings do not. The result goes to `<out-dir>/<target>/`, `target/v0/` b
 | `game.kagari` | The compiled program: story, renders and game system |
 | `*.kiarchive` | The assets the program references, one archive per top-level directory of the asset directory, `data.kiarchive` for files directly in it, `system-fonts.kiarchive` for installed fonts the game names, and `std.kiarchive` for the std shaders it uses |
 
-Before it writes anything, the build checks that every runtime profile listed in the manifest can
-decode every referenced asset. `kagari check` reports the same diagnostics without writing output,
-and the language server shows them in the [editor](../tools/editors.md) as you type.
+A [debug build](../tools/cli.md#build-profiles) also writes `game.kagari-cache` there, for
+debugging tools. Before it writes any of these files, the build checks that every runtime profile
+listed in the manifest can decode every referenced asset. `kagari check` reports the same
+diagnostics without writing build output (it keeps only the
+[analysis cache](../tools/cli.md#the-analysis-cache), which both commands reuse while the sources
+are unchanged), and the language server shows them in the [editor](../tools/editors.md) as you
+type.
 The build also validates every shader the program uses against its role, and fails on a shader
 that does not validate.
 

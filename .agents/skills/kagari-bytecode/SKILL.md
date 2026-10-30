@@ -1,6 +1,6 @@
 ---
 name: kagari-bytecode
-description: Load when changing core/kagari-bytecode (the .kagari format, opcodes, verifier, disassembler), runtime_libs/kagari-vm (interpreter, values, traps, budgets, story fiber, PRNG), core/kagari-archive (.kiarchive/.kisave), or the shape of what core/kagari-lang/src/emit produces.
+description: Load when changing core/kagari-bytecode (the .kagari format, opcodes, verifier, disassembler), runtime_libs/kagari-vm (interpreter, values, traps, budgets, story fiber, PRNG), core/kagari-archive (.kiarchive/.kisave), core/kagari-debug (.kagari-cache files), or the shape of what core/kagari-lang/src/emit produces.
 ---
 
 # Kagari bytecode, VM and binary formats
@@ -14,6 +14,7 @@ description: Load when changing core/kagari-bytecode (the .kagari format, opcode
 | `core/kagari-bytecode/src/{encode,decode,verify,disasm}.rs` | file encoding, decoding (`DecodeError`), verifier (`VerifyErrorKind`), `kagari disasm` |
 | `runtime_libs/kagari-vm/src/` | `Program::load`, `Vm`, `exec/` loop, `refs`, `int`/`ops`, `story` (fiber), `rng`, `host` (`Host` trait), `trap` |
 | `core/kagari-archive/src/{archive,save}/` | `.kiarchive` (blocks, index, patches), `.kisave` (paged tree, `compact`) |
+| `core/kagari-debug/src/` | `.kagari-cache` files over the `.kisave` container (uncompressed): `StoryGraph` (`graph.rs`), `DebugInfo` (`debug_info.rs`), `AnalysisCache` / `DebugArtifact` (`file.rs`), `codec.rs`; `SCHEMA`, `ANALYSIS_FILE`, `DEBUG_FILE` in `lib.rs` |
 | `core/kagari-lang/src/emit/` | producer of `Module` (intrinsics vs imports in `codegen/call.rs`) |
 
 ## Read first
@@ -22,6 +23,7 @@ description: Load when changing core/kagari-bytecode (the .kagari format, opcode
   compatibility policy.
 - `docs/dev/src/runtime/vm.md` — load, frames, fiber, budgets, host interface, verifier reliance.
 - `docs/dev/src/formats/archive.md` — `.kiarchive` and `.kisave` layouts and invariants.
+- `docs/dev/src/formats/cache.md` — `.kagari-cache` files: analysis cache, debug artifact, schema.
 - `docs/dev/src/compiler/emit.md` — how MIR becomes bytecode.
 
 ## Invariants
@@ -49,6 +51,9 @@ description: Load when changing core/kagari-bytecode (the .kagari format, opcode
 - `.kisave`: every `Save` is valid (eager `validate`, edits preserve it); data is a tree.
   `.kiarchive`: names sorted/unique, blocks contiguous, file ends at the last block, CRC32 on
   index and every block.
+- `.kagari-cache`: a reader rejects any other `SCHEMA`; a change to the stored shape bumps
+  `kagari_debug::SCHEMA`. The debug info never changes the bytecode (`game.kagari` is the same in
+  the debug and release profiles); the debug artifact carries the SHA-256 of its `game.kagari`.
 
 ## Workflows
 
@@ -88,6 +93,7 @@ description: Load when changing core/kagari-bytecode (the .kagari format, opcode
 cargo test -p kagari-bytecode          # round trip, rejections, disasm, corruption fuzz
 cargo test -p kagari-vm                # interpreter, story fiber, PRNG
 cargo test -p kagari-archive           # archives, patches, saves, compact
+cargo test -p kagari-debug             # .kagari-cache round trips and rejections
 cargo test -p kagari-lang emit::       # emitter output verifies
 cargo test -p kagari-engine            # engine over real compiled programs
 cargo clippy --workspace --all-targets
@@ -98,6 +104,7 @@ Inspect output: `target/debug/kagari build` in a project, then
 
 ## Docs to update
 
-- `docs/dev/src/formats/kagari.md`, `docs/dev/src/formats/archive.md`, `docs/dev/src/runtime/vm.md`.
+- `docs/dev/src/formats/kagari.md`, `docs/dev/src/formats/archive.md`, `docs/dev/src/formats/cache.md`,
+  `docs/dev/src/runtime/vm.md`.
 - `docs/dev/src/compiler/emit.md` when emission changes.
 - Reference (en + ja) only for user-visible effects (limits, panic messages); never opcode detail.

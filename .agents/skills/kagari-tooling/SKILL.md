@@ -10,7 +10,7 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
 | Path | What |
 | ---- | ---- |
 | `tooling/kagari-project` | `kagari.toml` parsing/validation, project discovery, `Project::program`, targets, system font dirs |
-| `tooling/kagari-cli` | The `kagari` binary: `init`, `check`, `build`, `fmt`, `disasm`, `lsp`; new-project `template/` |
+| `tooling/kagari-cli` | The `kagari` binary: `init`, `check`, `build` (`--profile debug`/`release`), `clean`, `fmt`, `disasm`, `lsp`; `analysis_cache.rs`, `outputs.rs` (what is written/removed in `out-dir`); new-project `template/` |
 | `tooling/kagari-fmt` | Width-based formatter (`MAX_WIDTH` 100, `INDENT` 4, not configurable) |
 | `tooling/kagari-lsp` | Language server (lsp-server, crossbeam, salsa snapshots) |
 | `core/kagari-lang/src/ide` | Go to definition, hover, file symbols over salsa queries |
@@ -22,6 +22,7 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
 ## Read first
 
 - `docs/dev/src/tooling/cli.md` — projects, manifest keys, subcommands, exit codes, archives.
+- `docs/dev/src/formats/cache.md` — `.kagari-cache` files: analysis cache, debug artifact.
 - `docs/dev/src/tooling/fmt.md` — Doc model, printer, comments, verify, idempotence.
 - `docs/dev/src/tooling/lsp.md` — server threads, sync, diagnostics, grammar, Zed.
 - `docs/dev/src/compiler/ide.md` — `reference_at`, definition, hover, symbols.
@@ -36,8 +37,15 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
   `core/kagari-syntax/src/cst/parser/exprs.rs`, `KEYWORDS` the lexer. Never hand-edit the
   generated files (`.gitattributes` marks them).
 - **CLI exit codes**: 0 ok, 1 problems found (`failure::exit(true)`), 2 cannot run (`Failure`).
-- `kagari build` writes nothing if compilation or the runtime-profile check fails; archive entry
-  names = bytecode asset paths, grouped by `archive_stem`.
+- `kagari build` writes no build output (bytecode, archives, debug artifact) and deletes nothing
+  in a target directory if compilation, the runtime-profile check or the shader check fails;
+  archive entry names = bytecode asset paths, grouped by `archive_stem`. `game.kagari` is
+  byte-identical in the `debug` and `release` profiles; only `debug` writes `game.kagari-cache`.
+- `check` and `build` maintain `<out-dir>/analysis.kagari-cache` (`analysis_cache::offer` before,
+  `store` after compiling; written only when stage 5 ran). A cache that cannot be read is
+  ignored, one that cannot be written is a stderr warning, never a failure. `kagari clean`
+  removes only `*.kagari-cache` in `out-dir` and `game.kagari`/`*.kiarchive`/`*.kagari-cache`
+  in every target directory (`outputs.rs`), then empty directories.
 - The CLI and the LSP build programs only through `kagari_project::Project::program`.
 - Manifest parsing stays `deny_unknown_fields`, kebab-case, paths relative to the project root.
 - LSP: only the main thread writes the db; each write → `diagnostics::refresh`; background work
@@ -97,6 +105,7 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
 
 ```sh
 cargo test -p kagari-project -p kagari-cli      # manifest + CLI integration (runs the binary)
+cargo test -p kagari-cli --test debug           # tests/debug.rs: debug builds, analysis cache, clean
 cargo test -p kagari-fmt                        # fixtures, idempotence, corpus stability
 cargo test -p kagari-lsp                        # end-to-end server test, line index
 cargo test -p kagari-lang ide::                 # IDE queries

@@ -29,9 +29,11 @@ my-game/
 │       ├── image/normal.png
 │       └── voice/0001.wav
 └── target/                     build output (`build.out-dir`)
+    ├── analysis.kagari-cache   the analysis cache
     └── v0/
         ├── game.kagari
-        └── *.kiarchive
+        ├── *.kiarchive
+        └── game.kagari-cache   debug builds only
 ```
 
 Only `kagari.toml` and the root file are required. The module tree grows from the root file; see
@@ -155,8 +157,14 @@ target/v0/
 ```
 
 (This is the output of `example/test_game1`.) Before writing, `kagari build` deletes the
-`game.kagari` and every `.kiarchive` an earlier build left in that directory. It leaves other
-files alone.
+`game.kagari`, every `.kiarchive` and every `.kagari-cache` an earlier build left in that
+directory. It leaves other files alone. A [debug build](./cli.md#build-profiles)
+(`kagari build --profile debug`) also writes `game.kagari-cache` there, the debug artifact.
+
+Directly in the output directory, `kagari check` and `kagari build` keep the
+[analysis cache](./cli.md#the-analysis-cache), `analysis.kagari-cache`.
+[`kagari clean`](./cli.md#kagari-clean) deletes the analysis cache and the build outputs of every
+target. The `.gitignore` of a new project ignores `/target`, the default output directory.
 
 ## Assets and archives
 
