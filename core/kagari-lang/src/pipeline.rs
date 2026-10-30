@@ -1,7 +1,7 @@
 //! The front-end pipeline: stages 1–5 (parse, item trees, HIR lowering, name resolution,
 //! signatures and type inference, pattern and kind checks, const evaluation, analysis).
 
-use crate::analysis::analysis;
+use crate::cache::analysis_diagnostics;
 use crate::db::Db;
 use crate::def_map::def_maps;
 use crate::diagnostic::{Diagnostic, DiagnosticCode, Severity};
@@ -19,6 +19,40 @@ use crate::typeck::kinds::{instant_recursion, kind_checks};
 /// analyses execute the story and assume it is well-typed and well-kinded.
 #[salsa::tracked(returns(ref))]
 pub fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
+    let mut diags = front_diagnostics(db, program).clone();
+    if analysis_runs(db, program) {
+        diags.extend(analysis_diagnostics(db, program).iter().cloned());
+    }
+    diags.sort_by(|a, b| {
+        (
+            &a.file,
+            a.range.start(),
+            a.range.end(),
+            a.code.as_str(),
+            &a.message,
+        )
+            .cmp(&(
+                &b.file,
+                b.range.start(),
+                b.range.end(),
+                b.code.as_str(),
+                &b.message,
+            ))
+    });
+    diags.dedup();
+    diags
+}
+
+/// Whether stage 5 runs: stages 1–4 reported no error.
+pub(crate) fn analysis_runs(db: &dyn Db, program: Program) -> bool {
+    !front_diagnostics(db, program)
+        .iter()
+        .any(|diag| diag.severity == Severity::Error)
+}
+
+/// The diagnostics of stages 1–4, unsorted.
+#[salsa::tracked(returns(ref))]
+fn front_diagnostics(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
     let maps = def_maps(db, program);
     let mut diags: Vec<Diagnostic> = maps
         .diagnostics
@@ -78,30 +112,5 @@ pub fn check(db: &dyn Db, program: Program) -> Vec<Diagnostic> {
             .iter()
             .map(|diag| diag.resolve(db)),
     );
-    if !diags.iter().any(|diag| diag.severity == Severity::Error) {
-        diags.extend(
-            analysis(db, program)
-                .diagnostics
-                .iter()
-                .map(|diag| diag.resolve(db)),
-        );
-    }
-    diags.sort_by(|a, b| {
-        (
-            &a.file,
-            a.range.start(),
-            a.range.end(),
-            a.code.as_str(),
-            &a.message,
-        )
-            .cmp(&(
-                &b.file,
-                b.range.start(),
-                b.range.end(),
-                b.code.as_str(),
-                &b.message,
-            ))
-    });
-    diags.dedup();
     diags
 }

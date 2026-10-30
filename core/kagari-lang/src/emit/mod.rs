@@ -32,14 +32,14 @@ use crate::eval::machine::value::GenericEnv;
 use crate::eval::queries::static_value;
 use crate::eval::std_items::{StdTable, std_table};
 use crate::eval::{AssetKind, ConstValue, HandleKind, Text};
-use crate::hir::{Expr, ExprId};
+use crate::hir::ExprId;
 use crate::input::{FilePath, Program};
 use crate::item_tree::ItemIndex;
 use crate::item_tree::{FnKind, ItemId, ItemKind, item_tree};
 use crate::mir::{BodyKind, item_mir};
 use crate::paths;
 use crate::pipeline::check;
-use crate::signatures::{ProgramSignatures, display_ty_qualified, program_signatures};
+use crate::signatures::{ProgramSignatures, program_signatures};
 use crate::thir::PromotedId;
 use crate::ty::{Const, FnDefId, FnRef, GenericArg, GenericArgs, IntTy, Ty, TyKind};
 
@@ -809,22 +809,9 @@ impl<'db> Emitter<'db> {
         }
     }
 
-    /// `::<…>` with the instance's generic arguments, every type named by its full path, so
-    /// that two instances of one function never share a path: a monomorphized scene has
-    /// its own step IDs and read flags.
+    /// `::<…>` with the instance's generic arguments (see [`paths::generic_args_suffix`]).
     fn args_suffix(&self, args: &[GenericArg]) -> String {
-        if args.is_empty() {
-            return String::new();
-        }
-        let shown: Vec<String> = args
-            .iter()
-            .map(|arg| match arg {
-                GenericArg::Type(ty) => display_ty_qualified(self.db, self.sigs, self.maps, ty),
-                GenericArg::Const(Const::Value(value)) => value.to_string(),
-                GenericArg::Const(_) => "_".to_owned(),
-            })
-            .collect();
-        format!("::<{}>", shown.join(", "))
+        paths::generic_args_suffix(self.db, self.sigs, self.maps, args)
     }
 
     fn instance_path(&self, instance: &Instance) -> String {
@@ -852,15 +839,7 @@ impl<'db> Emitter<'db> {
             Instance::Closure { owner, expr } => {
                 let number = self
                     .instance_item(owner)
-                    .and_then(|item| crate::hir::body_of(self.db, item))
-                    .and_then(|body| {
-                        body.store
-                            .exprs
-                            .iter()
-                            .filter(|(_, data)| matches!(data, Expr::Closure { .. }))
-                            .position(|(id, _)| id == *expr)
-                    })
-                    .unwrap_or(0);
+                    .map_or(0, |item| paths::closure_number(self.db, item, *expr));
                 format!("{}::{{closure#{number}}}", self.instance_path(owner))
             }
             Instance::Promoted(owner, index) => {

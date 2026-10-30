@@ -14,6 +14,7 @@
 //!    the story state (consistency).
 
 mod explore;
+mod graph;
 mod keyframes;
 mod liveness;
 mod screens;
@@ -36,7 +37,7 @@ use crate::mir::{BasicBlock, ItemMir, LocalSet, StepId, Terminator, item_mir};
 use crate::paths;
 use crate::signatures::program_signatures;
 
-use explore::StoryCx;
+use explore::{Explored, StoryCx};
 use liveness::scene_kept;
 use segment::SceneBody;
 
@@ -122,9 +123,42 @@ struct Scenes<'db> {
     pub index: FxHashMap<ItemId, usize>,
 }
 
-pub(super) fn check(db: &dyn Db, program: Program) -> Vec<Diag> {
+/// The story analysis of a program: its diagnostics, and the explored state space that
+/// [`graph`] turns into the persisted story graph.
+pub(crate) struct StoryAnalysis {
+    pub diagnostics: Vec<Diag>,
+    /// The item of every scene, by `Context::scene` index.
+    scenes: Vec<ItemId>,
+    explored: Option<Explored>,
+}
+
+impl std::fmt::Debug for StoryAnalysis {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StoryAnalysis")
+            .field("diagnostics", &self.diagnostics)
+            .field("scenes", &self.scenes)
+            .field(
+                "contexts",
+                &self
+                    .explored
+                    .as_ref()
+                    .map(|explored| explored.contexts.len()),
+            )
+            .finish()
+    }
+}
+
+/// Runs the story analysis. Not compared for backdating: the explored states are large and
+/// every source change that reaches them changes the diagnostics too.
+#[salsa::tracked(returns(ref), no_eq)]
+pub(crate) fn story_analysis(db: &dyn Db, program: Program) -> StoryAnalysis {
+    let mut result = StoryAnalysis {
+        diagnostics: Vec::new(),
+        scenes: Vec::new(),
+        explored: None,
+    };
     let Some(std) = std_table(db, program).as_ref() else {
-        return Vec::new();
+        return result;
     };
     let sigs = program_signatures(db, program);
     let cx = StoryCx {
@@ -171,18 +205,34 @@ pub(super) fn check(db: &dyn Db, program: Program) -> Vec<Diag> {
             }
         }
     }
-    let mut out = Vec::new();
-    if !termination::check(db, program, &scenes, sigs, &mut out) {
+    result.scenes = scenes.list.iter().map(|scene| scene.item).collect();
+    let out = &mut result.diagnostics;
+    if !termination::check(db, program, &scenes, sigs, out) {
         // The other analyses run the story, which must reach its steps.
-        return out;
+        return result;
     }
-    let explored = explore::explore(cx, &scenes, &vars, &mut out);
-    if let Some(explored) = explored {
-        screens::check(cx, &scenes, &explored, &mut out);
-        explored.report_reachability(db, program, &scenes, &mut out);
+    let explored = explore::explore(cx, &scenes, &vars, out);
+    if let Some(explored) = &explored {
+        screens::check(cx, &scenes, explored, out);
+        explored.report_reachability(db, program, &scenes, out);
         if program.options(db).keyframe_check {
-            out.extend(keyframes::check(db, program, &explored, &scenes));
+            out.extend(keyframes::check(db, program, explored, &scenes));
         }
     }
-    out
+    result.explored = explored;
+    result
+}
+
+/// The explored story graph of the program, in the form `.kagari-cache` files store; `None`
+/// when the story analysis explored nothing (no entry scene, or a termination error).
+pub(crate) fn graph(db: &dyn Db, program: Program) -> Option<kagari_debug::StoryGraph> {
+    let analysis = story_analysis(db, program);
+    let explored = analysis.explored.as_ref()?;
+    Some(graph::convert(
+        db,
+        program,
+        &analysis.scenes,
+        explored,
+        &analysis.diagnostics,
+    ))
 }

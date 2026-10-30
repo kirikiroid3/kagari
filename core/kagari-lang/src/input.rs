@@ -191,6 +191,11 @@ pub struct Program {
     #[returns(ref)]
     pub font_dirs: Arc<[FilePath]>,
     pub options: CompileOptions,
+    /// The analysis of an earlier run, offered by a tool
+    /// ([`offer_analysis_cache`](crate::cache::offer_analysis_cache)); stage 5 reuses it while
+    /// the sources match its fingerprint. `None` by default.
+    #[returns(ref)]
+    pub analysis_cache: Option<Arc<crate::cache::CachedAnalysis>>,
 }
 
 #[cfg(test)]

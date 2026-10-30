@@ -19,6 +19,7 @@
 //! inside one item re-runs the queries of that item and of the code that uses it.
 
 mod assets;
+pub mod cache;
 mod callee;
 mod db;
 mod diagnostic;
@@ -61,5 +62,6 @@ pub use input::{
     AssetFile, CompileOptions, DEFAULT_RECURSION_DEPTH, DEFAULT_STATE_CAP, FilePath, Program,
     SourceFile,
 };
+pub use kagari_debug;
 pub use parse_query::parse;
 pub use pipeline::check;
