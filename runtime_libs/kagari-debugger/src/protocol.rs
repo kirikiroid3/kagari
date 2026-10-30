@@ -175,6 +175,17 @@ pub struct Var {
     pub children: Vec<Var>,
 }
 
+impl Var {
+    /// A value without parts.
+    pub fn leaf(name: impl Into<String>, value: impl Into<String>) -> Var {
+        Var {
+            name: name.into(),
+            value: value.into(),
+            children: Vec::new(),
+        }
+    }
+}
+
 /// A frame of the story's call stack.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct FrameInfo {
