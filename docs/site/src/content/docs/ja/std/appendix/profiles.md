@@ -43,7 +43,7 @@ runtime-compatibility = ["native_v0"]
 
 |アセット型|対応する形式|対応しない形式|
 |---|---|---|
-|`ImageAsset`|PNG、ベースラインおよびプログレッシブ JPEG、非可逆・可逆・拡張（アルファまたはメタデータ付き）WebP|算術・可逆・階層・12 ビット符号化の JPEG、アニメーション WebP、GIF、BMP、AVIF、JPEG XL|
+|`ImageAsset`|PNG、ベースラインおよびプログレッシブ JPEG、非可逆・可逆・拡張（アルファまたはメタデータ付き）WebP、BMP（非圧縮、RLE またはビットフィールド）、静止画の JPEG XL（RGB またはグレースケール）|算術・可逆・階層・12 ビット符号化の JPEG、アニメーション WebP、GIF、JPEG または PNG を埋め込んだ BMP や CMYK の BMP、AVIF、アニメーションまたは CMYK の JPEG XL|
 |`AudioAsset`、`VoiceAsset`|Ogg Vorbis、FLAC、WAV（PCM）、WAV（IEEE 浮動小数点）、MP3|Ogg Opus、Ogg FLAC、その他の Ogg コーデック、圧縮 WAV、AAC/M4A|
 |`FontAsset`|TrueType、OpenType（CFF）、TrueType/OpenType コレクション（`.ttc`）|WOFF、WOFF2|
 |`VideoAsset`|—|すべての形式：動画アセットには対応していません|
@@ -56,7 +56,7 @@ runtime-compatibility = ["native_v0"]
 ```text
 error: asset `movie/intro.webm` (video): video assets are not supported by runtime profile `native_v0`
 error: asset `music/theme.ogg` (audio): Ogg Opus is not supported by runtime profile `native_v0`
-error: asset `bgimage/bad.jxl` (image): JPEG XL is not supported by runtime profile `native_v0`
+error: asset `bgimage/title.gif` (image): GIF is not supported by runtime profile `native_v0`
 ```
 
 したがって、`native_v0` を対象とするゲームは `VideoAsset` の定数をどこにも使えません。その他のアセットは対応する形式に変換してください。動画アセットを受け取るアイテムについては次のとおりです。

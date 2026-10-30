@@ -19,8 +19,12 @@ pub enum AssetFormat {
     WebpAnimated,
     Gif,
     Bmp,
+    /// Embedded JPEG or PNG, CMYK, or an unknown header or pixel layout.
+    BmpUnsupported,
     Avif,
     Jxl,
+    /// Animation, CMYK colour, or a header that does not parse.
+    JxlUnsupported,
     OggVorbis,
     OggOpus,
     OggFlac,
@@ -55,8 +59,14 @@ pub fn describe(format: AssetFormat) -> &'static str {
         AssetFormat::WebpAnimated => "animated WebP",
         AssetFormat::Gif => "GIF",
         AssetFormat::Bmp => "BMP",
+        AssetFormat::BmpUnsupported => {
+            "BMP with embedded JPEG or PNG, CMYK, or an unknown header or pixel layout"
+        }
         AssetFormat::Avif => "AVIF",
         AssetFormat::Jxl => "JPEG XL",
+        AssetFormat::JxlUnsupported => {
+            "JPEG XL with animation, CMYK colour or an unreadable header"
+        }
         AssetFormat::OggVorbis => "Ogg Vorbis",
         AssetFormat::OggOpus => "Ogg Opus",
         AssetFormat::OggFlac => "Ogg FLAC",
@@ -97,6 +107,8 @@ pub fn supports(profile: RuntimeProfile, kind: AssetKind, format: AssetFormat) -
                     | F::WebpLossy
                     | F::WebpLossless
                     | F::WebpExtended
+                    | F::Bmp
+                    | F::Jxl
             ),
             AssetKind::Audio | AssetKind::Voice => matches!(
                 format,

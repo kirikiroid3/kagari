@@ -168,7 +168,7 @@ target/v0/
 
 | アセットの種類 | `native_v0` がデコードできる形式 |
 | -------------- | -------------------------------- |
-| 画像 | PNG（APNG は既定の画像を表示）、ベースラインおよびプログレッシブ JPEG、非可逆・可逆・拡張（アルファまたはメタデータ付き）WebP |
+| 画像 | PNG（APNG は既定の画像を表示）、ベースラインおよびプログレッシブ JPEG、非可逆・可逆・拡張（アルファまたはメタデータ付き）WebP、BMP（非圧縮、RLE またはビットフィールド）、静止画の JPEG XL（RGB またはグレースケール） |
 | オーディオ、ボイス | Ogg Vorbis、FLAC、WAV（PCM または IEEE 浮動小数点）、MP3 |
 | フォント | TrueType、OpenType（CFF）、TrueType/OpenType コレクション |
 | シェーダー | WGSL ソース（UTF-8 テキスト） |
@@ -176,10 +176,10 @@ target/v0/
 
 RIFF または `data` チャンクのサイズがファイルの終端を越える WAV（ストリーミング用のエンコーダー、たとえばパイプへ書き出す ffmpeg や TTS サービスが残す `0xFFFFFFFF` のプレースホルダーなど）は、ファイルの終端まで再生されます。
 
-それ以外はすべて拒否されます。アニメーション WebP、算術・可逆・階層・12 ビット符号化の JPEG、GIF、BMP、AVIF、JPEG XL、Ogg Opus、Ogg FLAC、その他のコーデックの Ogg、圧縮 WAV、AAC/M4A、WOFF、WOFF2 です。動画のアセットは内容にかかわらず拒否されます。問題はアセットとプロファイルの組ごとに 1 行ずつ出力されます。
+それ以外はすべて拒否されます。アニメーション WebP、算術・可逆・階層・12 ビット符号化の JPEG、GIF、JPEG または PNG を埋め込んだ BMP や CMYK の BMP、AVIF、アニメーションまたは CMYK の JPEG XL、Ogg Opus、Ogg FLAC、その他のコーデックの Ogg、圧縮 WAV、AAC/M4A、WOFF、WOFF2 です。動画のアセットは内容にかかわらず拒否されます。問題はアセットとプロファイルの組ごとに 1 行ずつ出力されます。
 
 ```text
-error: asset `bgimage/bad.jxl` (image): JPEG XL is not supported by runtime profile `native_v0`
+error: asset `bgimage/title.gif` (image): GIF is not supported by runtime profile `native_v0`
 error: asset `movie/intro.webm` (video): video assets are not supported by runtime profile `native_v0`
 ```
 

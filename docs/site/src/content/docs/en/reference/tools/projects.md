@@ -196,7 +196,7 @@ The only profile is `native_v0`, the [desktop runtime](./runtime.md):
 
 | Asset kind | Formats `native_v0` decodes |
 | ---------- | --------------------------- |
-| Image | PNG (APNG shows its default image), baseline and progressive JPEG, lossy, lossless and extended (alpha or metadata) WebP |
+| Image | PNG (APNG shows its default image), baseline and progressive JPEG, lossy, lossless and extended (alpha or metadata) WebP, BMP (uncompressed, RLE or bitfields), still JPEG XL (RGB or greyscale) |
 | Audio, voice | Ogg Vorbis, FLAC, WAV (PCM or IEEE float), MP3 |
 | Font | TrueType, OpenType (CFF), TrueType/OpenType collections |
 | Shader | WGSL source (UTF-8 text) |
@@ -207,12 +207,12 @@ placeholder that streaming encoders (ffmpeg writing to a pipe, TTS services) lea
 end of the file.
 
 Everything else is rejected: animated WebP, JPEG with arithmetic, lossless, hierarchical or
-12-bit coding, GIF, BMP, AVIF, JPEG XL, Ogg Opus, Ogg FLAC, Ogg with another codec, compressed
-WAV, AAC/M4A, WOFF and WOFF2. Video assets are rejected whatever their content. Each problem
-prints one line per asset and profile:
+12-bit coding, GIF, BMP with embedded JPEG or PNG or CMYK pixels, AVIF, animated or CMYK JPEG XL,
+Ogg Opus, Ogg FLAC, Ogg with another codec, compressed WAV, AAC/M4A, WOFF and WOFF2. Video assets
+are rejected whatever their content. Each problem prints one line per asset and profile:
 
 ```text
-error: asset `bgimage/bad.jxl` (image): JPEG XL is not supported by runtime profile `native_v0`
+error: asset `bgimage/title.gif` (image): GIF is not supported by runtime profile `native_v0`
 error: asset `movie/intro.webm` (video): video assets are not supported by runtime profile `native_v0`
 ```
 

@@ -27,14 +27,14 @@ pub fn sniff(kind: AssetKind, bytes: &[u8]) -> AssetFormat {
         return AssetFormat::Gif;
     }
     if kind == AssetKind::Image && bytes.starts_with(b"BM") {
-        return AssetFormat::Bmp;
+        return bmp(bytes);
     }
     if bytes.starts_with(&[0xFF, 0x0A])
         || bytes.starts_with(&[
             0x00, 0x00, 0x00, 0x0C, b'J', b'X', b'L', b' ', 0x0D, 0x0A, 0x87, 0x0A,
         ])
     {
-        return AssetFormat::Jxl;
+        return jxl(bytes);
     }
     if bytes.get(4..8) == Some(b"ftyp") {
         return iso_bmff(kind, bytes);
@@ -102,6 +102,62 @@ fn jpeg_frame(bytes: &[u8]) -> Option<AssetFormat> {
             });
         }
         i = i.checked_add(len)?;
+    }
+}
+
+/// Mirrors what the `image` BMP decoder accepts: a known DIB header size, one plane, and an
+/// uncompressed, RLE or bitfields pixel layout (top-down images only uncompressed or bitfields).
+/// It refuses embedded JPEG or PNG and CMYK.
+fn bmp(bytes: &[u8]) -> AssetFormat {
+    if bmp_decodable(bytes) == Some(true) {
+        AssetFormat::Bmp
+    } else {
+        AssetFormat::BmpUnsupported
+    }
+}
+
+fn bmp_decodable(bytes: &[u8]) -> Option<bool> {
+    let header = u32_le(bytes, 14)?;
+    if header == 12 {
+        let bits = u16_le(bytes, 24)?;
+        return Some(u16_le(bytes, 22)? == 1 && matches!(bits, 1 | 4 | 8 | 24));
+    }
+    if !matches!(header, 40 | 52 | 56 | 108 | 124) {
+        return Some(false);
+    }
+    let top_down = u32_le(bytes, 22)? >> 31 == 1;
+    let bits = u16_le(bytes, 28)?;
+    let compression = u32_le(bytes, 30)?;
+    let layout = match compression {
+        0 => matches!(bits, 1 | 2 | 4 | 8 | 16 | 24 | 32),
+        1 => bits == 8 && !top_down,
+        2 => bits == 4 && !top_down,
+        3 => matches!(bits, 16 | 32),
+        _ => false,
+    };
+    Some(u16_le(bytes, 26)? == 1 && layout)
+}
+
+/// Parses the image header (container boxes, size, metadata, ICC profile) with the same decoder
+/// the runtime uses. The runtime renders only the first frame and has no colour management to
+/// turn CMYK into RGB, so animations and CMYK are refused, as is a header that does not parse
+/// within `bytes`.
+fn jxl(bytes: &[u8]) -> AssetFormat {
+    let decodable = (|| {
+        let mut uninit = jxl_oxide::JxlImage::builder().build_uninit();
+        uninit.feed_bytes(bytes).ok()?;
+        match uninit.try_init().ok()? {
+            jxl_oxide::InitializeResult::Initialized(image) => Some(
+                image.image_header().metadata.animation.is_none()
+                    && !image.pixel_format().has_black(),
+            ),
+            jxl_oxide::InitializeResult::NeedMoreData(_) => None,
+        }
+    })();
+    if decodable == Some(true) {
+        AssetFormat::Jxl
+    } else {
+        AssetFormat::JxlUnsupported
     }
 }
 

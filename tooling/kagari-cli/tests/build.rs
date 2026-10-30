@@ -133,11 +133,11 @@ fn rejected(path: &str, bytes: &[u8], decl: &str, expr: &str, expected: &str) {
 #[test]
 fn incompatible_image_formats_fail_the_build() {
     rejected(
-        "bgimage/bad.jxl",
-        &[0xFF, 0x0A, 0x00, 0x00],
-        "const BAD: ImageAsset = asset(\"bgimage/bad.jxl\");",
-        "std::system::seen_image(BAD)",
-        "error: asset `bgimage/bad.jxl` (image): JPEG XL is not supported by runtime profile `native_v0`",
+        "bgimage/anim.jxl",
+        include_bytes!("../../../runtime_libs/kagari-compat/tests/fixtures/animated.jxl"),
+        "const ANIM: ImageAsset = asset(\"bgimage/anim.jxl\");",
+        "std::system::seen_image(ANIM)",
+        "error: asset `bgimage/anim.jxl` (image): JPEG XL with animation, CMYK colour or an unreadable header is not supported by runtime profile `native_v0`",
     );
 }
 

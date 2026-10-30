@@ -179,7 +179,7 @@ kagari build [--manifest-path PATH] [--target TARGET]... [--profile debug|releas
    (`supports_kind`) or format (`supports`):
 
    ```text
-   error: asset `bgimage/bad.jxl` (image): JPEG XL is not supported by runtime profile `native_v0`
+   error: asset `bgimage/title.gif` (image): GIF is not supported by runtime profile `native_v0`
    error: asset `movie/intro.webm` (video): video assets are not supported by runtime profile `native_v0`
    ```
 

@@ -2,6 +2,7 @@
 //! load lazily from the platform on first use and stay cached for the process lifetime.
 
 use std::collections::HashMap;
+use std::io::Cursor;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -172,7 +173,7 @@ impl AssetStore {
         }
         self.check_kind(id, |k| k == AssetKind::Image, "an image")?;
         let bytes = self.read(id, p)?;
-        let decoded = image::load_from_memory(&bytes)
+        let decoded = decode_image(&bytes)
             .map_err(|e| self.error(id, format!("decode failed: {e}")))?
             .into_rgba8();
         let (width, height) = decoded.dimensions();
@@ -242,5 +243,52 @@ impl AssetStore {
             *slot = Some(duration);
         }
         Ok(duration)
+    }
+}
+
+/// Decodes an image asset. `image` has no JPEG XL decoder, so JPEG XL goes to `jxl-oxide`
+/// directly (not through `image::hooks`, which are process-wide), under the same default
+/// allocation limit `load_from_memory` applies.
+fn decode_image(bytes: &[u8]) -> image::ImageResult<image::DynamicImage> {
+    const JXL_CODESTREAM: &[u8] = &[0xFF, 0x0A];
+    const JXL_CONTAINER: &[u8] = &[
+        0x00, 0x00, 0x00, 0x0C, b'J', b'X', b'L', b' ', 0x0D, 0x0A, 0x87, 0x0A,
+    ];
+    if bytes.starts_with(JXL_CODESTREAM) || bytes.starts_with(JXL_CONTAINER) {
+        let mut decoder = jxl_oxide::integration::JxlDecoder::new(Cursor::new(bytes))?;
+        image::ImageDecoder::set_limits(&mut decoder, image::Limits::default())?;
+        return image::DynamicImage::from_decoder(decoder);
+    }
+    image::load_from_memory(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use std::io::Cursor;
+
+    use super::decode_image;
+
+    #[test]
+    fn decodes_bmp() {
+        let mut source = image::RgbaImage::new(3, 2);
+        source.put_pixel(2, 1, image::Rgba([10, 20, 30, 255]));
+        let mut bytes = Vec::new();
+        source
+            .write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Bmp)
+            .unwrap();
+        let decoded = decode_image(&bytes).unwrap().into_rgba8();
+        assert_eq!(decoded, source);
+    }
+
+    #[test]
+    fn decodes_jxl() {
+        let bytes = include_bytes!("../../kagari-compat/tests/fixtures/still.jxl");
+        let decoded = decode_image(bytes).unwrap().into_rgba8();
+        assert_eq!(decoded.dimensions(), (3, 2));
+        assert_eq!(decoded.get_pixel(0, 0).0, [255, 0, 0, 128]);
+        assert_eq!(decoded.get_pixel(1, 0).0, [0, 255, 0, 255]);
+        assert_eq!(decoded.get_pixel(2, 1).0, [128, 128, 128, 255]);
     }
 }

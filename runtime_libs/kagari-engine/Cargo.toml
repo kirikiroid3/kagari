@@ -12,6 +12,7 @@ kagari-vm = { workspace = true }
 kagari-shader = { workspace = true }
 kagari-text = { workspace = true }
 image = { workspace = true }
+jxl-oxide = { workspace = true, features = ["image"] }
 log = { workspace = true }
 kagari-archive = { workspace = true }
 sha2 = { workspace = true }

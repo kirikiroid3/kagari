@@ -46,7 +46,7 @@ Formats are recognized by file content, not by extension.
 
 |Asset type|Supported formats|Not supported|
 |---|---|---|
-|`ImageAsset`|PNG; baseline and progressive JPEG; lossy, lossless and extended (alpha or metadata) WebP|JPEG with arithmetic, lossless, hierarchical or 12-bit coding; animated WebP; GIF; BMP; AVIF; JPEG XL|
+|`ImageAsset`|PNG; baseline and progressive JPEG; lossy, lossless and extended (alpha or metadata) WebP; BMP (uncompressed, RLE or bitfields); still JPEG XL (RGB or greyscale)|JPEG with arithmetic, lossless, hierarchical or 12-bit coding; animated WebP; GIF; BMP with embedded JPEG or PNG, or CMYK; AVIF; animated or CMYK JPEG XL|
 |`AudioAsset`, `VoiceAsset`|Ogg Vorbis; FLAC; WAV (PCM); WAV (IEEE float); MP3|Ogg Opus; Ogg FLAC; other Ogg codecs; compressed WAV; AAC/M4A|
 |`FontAsset`|TrueType; OpenType (CFF); TrueType/OpenType collections (`.ttc`)|WOFF; WOFF2|
 |`VideoAsset`|—|every format: video assets are not supported|
@@ -60,7 +60,7 @@ cannot decode, `kagari build` prints one error and produces no output:
 ```text
 error: asset `movie/intro.webm` (video): video assets are not supported by runtime profile `native_v0`
 error: asset `music/theme.ogg` (audio): Ogg Opus is not supported by runtime profile `native_v0`
-error: asset `bgimage/bad.jxl` (image): JPEG XL is not supported by runtime profile `native_v0`
+error: asset `bgimage/title.gif` (image): GIF is not supported by runtime profile `native_v0`
 ```
 
 So a game that targets `native_v0` cannot use a `VideoAsset` constant anywhere. Convert other

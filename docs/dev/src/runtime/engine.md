@@ -626,7 +626,9 @@ starts. Read flags, seen sets and meta are never reverted by a load or a rewind.
 ## Assets
 
 `AssetStore` decodes on first use and keeps everything for the process lifetime: images
-(`image` crate, to straight-alpha RGBA8), fonts (all loaded at boot, in asset order, into
+(`decode_image`: JPEG XL by signature through `jxl_oxide::integration::JxlDecoder` under
+`image::Limits::default()`, everything else through `image::load_from_memory`; both to
+straight-alpha RGBA8, without colour management), fonts (all loaded at boot, in asset order, into
 `kagari_text::Fonts`), shader sources (UTF-8 WGSL), audio lengths (through
 `Platform::audio_duration_ms`, cached) and save thumbnails (with a generation counter so the
 renderer can tell a replaced thumbnail). A step's images, shaders, transition contents and rule
@@ -645,14 +647,20 @@ not consult it.
 
 | Kind | `native_v0` decodes | Implemented by |
 | ---- | ------------------- | -------------- |
-| Image | PNG, baseline and progressive JPEG, lossy, lossless and extended WebP | `image` with features `png`, `jpeg`, `webp` (engine) |
+| Image | PNG, baseline and progressive JPEG, lossy, lossless and extended WebP, BMP, still RGB or greyscale JPEG XL | `image` with features `png`, `jpeg`, `webp`, `bmp`; `jxl-oxide` with feature `image`, no CMS (engine) |
 | Audio, voice | Ogg Vorbis, FLAC, WAV (PCM, IEEE float), MP3 | `kira` with features `ogg`, `vorbis`, `flac`, `wav`, `pcm`, `mp3` (desktop) |
 | Font | TrueType, OpenType (CFF), collections (face 0) | `skrifa` (`kagari-text`) |
 | Shader | WGSL of the six roles | `kagari-shader` (preludes, validation), `kagari-render` (pipelines) |
 | Video | none | movies are modelled in the screen but never drawn |
 
 The table and the decoder features must agree: a format `supports` accepts must decode at run
-time. `watched` is never set by `native_v0`, since no movie plays.
+time. Where a decoder refuses some files of a format, the sniffer splits the format so the build
+refuses them too: `BmpUnsupported` mirrors the `image` BMP decoder (known DIB header size, one
+plane, uncompressed/RLE/bitfields layouts; no embedded JPEG or PNG, no CMYK), and
+`JxlUnsupported` comes from parsing the header with `jxl-oxide` itself (animation, which the
+runtime would show as one frame; CMYK, which needs a CMS the build does not enable; or a header
+that does not parse within the 1 MiB `kagari build` reads). `watched` is never set by
+`native_v0`, since no movie plays.
 
 ## Errors: traps and the Crashed state
 

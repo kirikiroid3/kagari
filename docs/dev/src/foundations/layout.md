@@ -74,10 +74,10 @@ The graph omits edges that other edges imply (for example `kagari-cli` also depe
 | `kagari-lsp` | `kagari-lang`, `kagari-syntax`, `kagari-std`, `kagari-fmt`, `kagari-project` | `lsp-server`, `lsp-types`, `salsa` |
 | `kagari-cli` | `kagari-archive`, `kagari-bytecode`, `kagari-compat`, `kagari-debugger` (feature `dap`), `kagari-fmt`, `kagari-lang`, `kagari-lsp`, `kagari-project`, `kagari-syntax` | `clap`, `serde_json`, `sha2` |
 | `mdbook-kagari` | — | `mdbook-preprocessor`, `mdbook-markdown`, `tree-sitter`, `cc` (build) |
-| `kagari-compat` | `kagari-bytecode` | — |
+| `kagari-compat` | `kagari-bytecode` | `jxl-oxide` (header parsing) |
 | `kagari-vm` | `kagari-bytecode`, `kagari-num` (dev: `kagari-lang`) | — |
 | `kagari-text` | — | `harfrust`, `skrifa`, `zeno`, `unicode-linebreak`, `unicode-segmentation` |
-| `kagari-engine` | `kagari-bytecode`, `kagari-vm`, `kagari-text`, `kagari-archive` (dev: `kagari-lang`) | `image`, `png`, `sha2` |
+| `kagari-engine` | `kagari-bytecode`, `kagari-vm`, `kagari-text`, `kagari-archive` (dev: `kagari-lang`) | `image`, `jxl-oxide`, `png`, `sha2` |
 | `kagari-render` | `kagari-bytecode`, `kagari-engine`, `kagari-text` | `wgpu`, `bytemuck` |
 | `kagari-debugger` | `kagari-archive`, `kagari-bytecode`, `kagari-debug`, `kagari-engine`, `kagari-vm`, `kagari-std` (feature `client`) (dev: `kagari-lang`) | `serde`, `serde_json`, `log` |
 | `kagari-desktop-runtime` | `kagari-archive`, `kagari-debugger`, `kagari-engine`, `kagari-render` | `winit`, `wgpu`, `kira`, `gilrs`, `directories`, `clap`, `jiff` |

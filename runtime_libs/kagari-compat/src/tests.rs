@@ -41,6 +41,57 @@ fn webp_extended() {
     );
 }
 
+/// A BMP file header and the start of a DIB header of `size` bytes.
+fn bmp(size: u32, height: i32, bits: u16, compression: u32) -> Vec<u8> {
+    let mut bytes = b"BM\0\0\0\0\0\0\0\0\0\0\0\0".to_vec();
+    bytes.extend_from_slice(&size.to_le_bytes());
+    bytes.extend_from_slice(&2i32.to_le_bytes());
+    bytes.extend_from_slice(&height.to_le_bytes());
+    bytes.extend_from_slice(&1u16.to_le_bytes());
+    bytes.extend_from_slice(&bits.to_le_bytes());
+    bytes.extend_from_slice(&compression.to_le_bytes());
+    bytes
+}
+
+#[test]
+fn bmp_layouts() {
+    let image = |bytes: Vec<u8>| sniff(AssetKind::Image, &bytes);
+    assert_eq!(image(bmp(40, 2, 24, 0)), AssetFormat::Bmp);
+    assert_eq!(image(bmp(124, 2, 32, 3)), AssetFormat::Bmp);
+    assert_eq!(image(bmp(40, 2, 8, 1)), AssetFormat::Bmp);
+    assert_eq!(image(bmp(40, -2, 24, 0)), AssetFormat::Bmp);
+    // BITMAPCOREHEADER: u16 width, height, planes, bit count.
+    let core = b"BM\0\0\0\0\0\0\0\0\0\0\0\0\x0C\0\0\0\x02\0\x02\0\x01\0\x18\0".to_vec();
+    assert_eq!(image(core), AssetFormat::Bmp);
+
+    assert_eq!(image(bmp(40, 2, 24, 4)), AssetFormat::BmpUnsupported);
+    assert_eq!(image(bmp(40, 2, 24, 5)), AssetFormat::BmpUnsupported);
+    assert_eq!(image(bmp(40, 2, 32, 11)), AssetFormat::BmpUnsupported);
+    assert_eq!(image(bmp(40, -2, 8, 1)), AssetFormat::BmpUnsupported);
+    assert_eq!(image(bmp(40, 2, 24, 1)), AssetFormat::BmpUnsupported);
+    assert_eq!(image(bmp(64, 2, 24, 0)), AssetFormat::BmpUnsupported);
+    assert_eq!(image(b"BM\0\0".to_vec()), AssetFormat::BmpUnsupported);
+}
+
+#[test]
+fn jxl_headers() {
+    let still = include_bytes!("../tests/fixtures/still.jxl");
+    let animated = include_bytes!("../tests/fixtures/animated.jxl");
+    assert_eq!(sniff(AssetKind::Image, still), AssetFormat::Jxl);
+    assert_eq!(
+        sniff(AssetKind::Image, animated),
+        AssetFormat::JxlUnsupported
+    );
+    assert_eq!(
+        sniff(AssetKind::Image, &still[..24]),
+        AssetFormat::JxlUnsupported
+    );
+    assert_eq!(
+        sniff(AssetKind::Image, &[0xFF, 0x0A, 0x00, 0x00]),
+        AssetFormat::JxlUnsupported
+    );
+}
+
 /// A WAV whose `fmt ` chunk has `size` bytes and starts with `tag`; for `0xFFFE`, the
 /// sub-format at data+24 is `sub`.
 fn wav(tag: u16, size: u32, sub: u16) -> Vec<u8> {
@@ -122,6 +173,10 @@ fn fonts() {
 fn native_v0_support() {
     let p = RuntimeProfile::NativeV0;
     assert!(!supports(p, AssetKind::Image, AssetFormat::WebpAnimated));
+    assert!(supports(p, AssetKind::Image, AssetFormat::Bmp));
+    assert!(!supports(p, AssetKind::Image, AssetFormat::BmpUnsupported));
+    assert!(supports(p, AssetKind::Image, AssetFormat::Jxl));
+    assert!(!supports(p, AssetKind::Image, AssetFormat::JxlUnsupported));
     assert!(supports(p, AssetKind::Voice, AssetFormat::Mp3));
     assert!(supports(p, AssetKind::Font, AssetFormat::FontCollection));
     assert!(!supports(p, AssetKind::Video, AssetFormat::Unknown));
