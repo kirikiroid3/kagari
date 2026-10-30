@@ -166,4 +166,5 @@ variables of each frame and the story variables, breakpoints on lines, and conti
 step into and step out as above. The debug console evaluates the commands of this page (`ls`,
 `nav crate::Start#9`, `push B`). The story commands are also custom requests `kagari/stack`,
 `kagari/ls`, `kagari/goto`, `kagari/push`, `kagari/pop`, `kagari/detail`, `kagari/nav` and
-`kagari/seed`, with structured results.
+`kagari/seed`, with structured results. Conditional, function and exception breakpoints are not
+supported.
