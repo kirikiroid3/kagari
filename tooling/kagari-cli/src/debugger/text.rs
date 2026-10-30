@@ -323,12 +323,15 @@ fn nav(n: &NavBody) -> String {
                 } = item
                 {
                     out.push(format!(
-                        "  needs {scene} to draw {value} (one of {outcomes})"
+                        "  draws: {scene} draws {value} (one of {outcomes})"
                     ));
                 }
             }
             if let Some(search) = &n.seed {
                 out.push(match search.found {
+                    Some(seed) if seed == search.current => {
+                        "  the current seed already gives a path there: `push` it".to_owned()
+                    }
                     Some(seed) => format!(
                         "  seed {seed} realizes the draws (tried {} seeds; the draws come out \
                          this way about 1 in {} seeds): `seed {seed}`, then `push`",

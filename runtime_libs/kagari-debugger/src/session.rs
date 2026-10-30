@@ -587,10 +587,15 @@ impl Debugger {
                 odds,
                 tried: 0,
                 limit,
+                current: trace.seed,
                 found: None,
             };
             let budget = path.length.saturating_add(64);
-            for seed in 0..u64::from(limit) {
+            // The current seed first: the draws may already come out this way.
+            let seeds = std::iter::once(trace.seed)
+                .chain((0..u64::MAX).filter(|s| *s != trace.seed))
+                .take(limit as usize);
+            for seed in seeds {
                 search.tried = search.tried.saturating_add(1);
                 let mut attempt = trace.clone();
                 attempt.seed = seed;
