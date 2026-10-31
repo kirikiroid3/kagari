@@ -10,7 +10,7 @@ title: "標準ライブラリの使い方"
 
 |モジュール|内容|種別|ページ|
 |---|---|---|---|
-|`std`|`String`、`Vec`、`Range`、`Rat`、`Decimal`、`Option`、`Result`、`Eq`、`Integer`、`RandChoose`、`Asset`、アセット型、`asset`、`system_font`|`const fn`|[std](./std.md)|
+|`std`|`String`、`Vec`、`Range`、`Rat`、`Decimal`、`Option`、`Result`、`Eq`、`Integer`、`FromInteger`、`RandChoose`、`Asset`、アセット型、`asset`、`system_font`|`const fn`|[std](./std.md)|
 |`std::prelude`|すべてのモジュールにインポートされる名前|—|[std::prelude](./prelude.md)|
 |`std::time`|`Duration`、`ZERO`、`ms`、`secs`|`const fn`|[std::time](./time.md)|
 |`std::narrative`|`Step`、`push_step`、`rng_choose`、`Say`、`Choice`、`Meta`、`Narrative` とそのレコード|`pushdown fn`（`push_step`、`rng_choose`、`Meta::write`）、`fn`（`Narrative`、`Meta::get`/`set`）、`const fn`（`meta`）|[std::narrative](./narrative.md)|
@@ -59,7 +59,7 @@ use std::narrative::text::speed;
    - タイムライン、予約されたアニメーション、ワンショットのサウンド、選択肢メニューはそのステップだけのもので、論理画面には含まれません。
    - したがって、クリック（ステップのタイムラインを完了させる）、スキップ、`animations` 設定のオフが論理画面を変えることはありません。
 6. **コンポーネントの集合は固定です。** スタジオはコンポーネントを追加しません。`const fn` のヘルパーと定数データでライブラリを拡張します。[`std::stage`](./stage.md) はそのような層の例です。
-7. **オーバーロードや型変換なしで型検査できます。** アセット型を受け取る関数はトレイト境界を使い、補間もトレイト境界を使います。少数の特別なシグネチャ（`nav::start`）は [std アイテムのコンパイラ規則](./appendix/rules.md) に記載しています。トレイトを宣言するのは `std` だけで、すべて `#[builtin]` です：`Eq`、`Integer`、`RandChoose`、`Asset`、`Step`、`ToText`、`ShaderArg`、`Shader`。ゲームがこれらを実装することはありません。`Eq` は自動で、`ShaderArg` は `#[shader_arg]` で得られます。
+7. **オーバーロードや型変換なしで型検査できます。** アセット型を受け取る関数はトレイト境界を使い、補間もトレイト境界を使います。少数の特別なシグネチャ（`nav::start`）は [std アイテムのコンパイラ規則](./appendix/rules.md) に記載しています。トレイトを宣言するのは `std` だけで、すべて `#[builtin]` です：`Eq`、`Integer`、`FromInteger`、`RandChoose`、`Asset`、`Step`、`ToText`、`ShaderArg`、`Shader`。ゲームがこれらを実装することはありません。`Eq` は自動で、`ShaderArg` は `#[shader_arg]` で得られます。
 8. **参照**は共有ポインタです。`const fn` と `fn` のコードではローカル変数に束縛できるので、レンダーはエンティティを一度名指しして、複数の文で変更できます。`pushdown fn` では引数としてのみ使えます。
 
 例：

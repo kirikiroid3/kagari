@@ -173,7 +173,7 @@ The standard library is the module `std`. Its items are described in the
 
 | Module | Contents | STD Reference |
 | ------ | -------- | ------------- |
-| `std` | `String`, `Vec`, `Range`, `Rat`, `Decimal`, `Option`, `Result`; the traits `Eq`, `Integer`, `RandChoose` and `Asset`; the asset types, `asset` and `system_font` | [std](../../std/std.md) |
+| `std` | `String`, `Vec`, `Range`, `Rat`, `Decimal`, `Option`, `Result`; the traits `Eq`, `Integer`, `FromInteger`, `RandChoose` and `Asset`; the asset types, `asset` and `system_font` | [std](../../std/std.md) |
 | `std::prelude` | the names imported into every module | [std::prelude](../../std/prelude.md) |
 | `std::time` | `Duration` (whole milliseconds), `ms`, `secs` | [std::time](../../std/time.md) |
 | `std::narrative` | steps (`Step`, `push_step`, `Say`, `Choice`), `rng_choose`, meta fields, the `Narrative` handle | [std::narrative](../../std/narrative.md) |

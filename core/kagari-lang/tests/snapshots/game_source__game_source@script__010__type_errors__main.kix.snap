@@ -16,18 +16,19 @@ script/010__type_errors/main.kix:48:13: error[E2013]: literal out of range for `
 script/010__type_errors/main.kix:55:20: error[E2018]: `u32` does not always fit in `u8`; use `.saturate()` to clamp it
 script/010__type_errors/main.kix:58:16: error[E2019]: there are no `as` casts; use `.into()` or `.saturate()`
 script/010__type_errors/main.kix:59:28: error[E2018]: `Int<0, 5>` does not always fit in `Int<0, 3>`; use `.saturate()` to clamp it
-script/010__type_errors/main.kix:63:19: error[E2021]: missing field `y` in initializer of `Point`
-script/010__type_errors/main.kix:64:42: error[E2020]: `Point` has no field named `z`
-script/010__type_errors/main.kix:65:5: error[E2020]: no field `z` on type `Point`
-script/010__type_errors/main.kix:69:5: error[E2022]: no method named `frobnicate` found for `Point`
-script/010__type_errors/main.kix:74:5: error[E2017]: `==` needs `Eq`, but closures such as `Fn() -> u32` are never `Eq`
-script/010__type_errors/main.kix:78:5: error[E2024]: this function takes 1 argument but 2 were supplied
-script/010__type_errors/main.kix:86:5: error[E2026]: the trait bound `Fn() -> u32: Eq` is not satisfied
-script/010__type_errors/main.kix:90:16: error[E2027]: the first argument of `nav::start` must name an `#[entry]` scene
-script/010__type_errors/main.kix:91:23: error[E2001]: mismatched types: expected `bool`, found `u32`
-script/010__type_errors/main.kix:95:33: error[E2028]: the path of `asset` must be a string literal
-script/010__type_errors/main.kix:98:16: error[E2029]: type annotations needed: cannot infer the type `Vec<_>`
-script/010__type_errors/main.kix:102:5: error[E2001]: mismatched types: expected `u32`, found `()`
+script/010__type_errors/main.kix:61:32: error[E2026]: the trait bound `Decimal: Integer` is not satisfied
+script/010__type_errors/main.kix:65:19: error[E2021]: missing field `y` in initializer of `Point`
+script/010__type_errors/main.kix:66:42: error[E2020]: `Point` has no field named `z`
+script/010__type_errors/main.kix:67:5: error[E2020]: no field `z` on type `Point`
+script/010__type_errors/main.kix:71:5: error[E2022]: no method named `frobnicate` found for `Point`
+script/010__type_errors/main.kix:76:5: error[E2017]: `==` needs `Eq`, but closures such as `Fn() -> u32` are never `Eq`
+script/010__type_errors/main.kix:80:5: error[E2024]: this function takes 1 argument but 2 were supplied
+script/010__type_errors/main.kix:88:5: error[E2026]: the trait bound `Fn() -> u32: Eq` is not satisfied
+script/010__type_errors/main.kix:92:16: error[E2027]: the first argument of `nav::start` must name an `#[entry]` scene
+script/010__type_errors/main.kix:93:23: error[E2001]: mismatched types: expected `bool`, found `u32`
+script/010__type_errors/main.kix:97:33: error[E2028]: the path of `asset` must be a string literal
+script/010__type_errors/main.kix:100:16: error[E2029]: type annotations needed: cannot infer the type `Vec<_>`
+script/010__type_errors/main.kix:104:5: error[E2001]: mismatched types: expected `u32`, found `()`
 --- resolutions ---
 script/010__type_errors/main.kix:3:19 u32 -> prim u32
 script/010__type_errors/main.kix:3:27 u32 -> prim u32
@@ -95,50 +96,56 @@ script/010__type_errors/main.kix:58:24 u8 -> prim u8
 script/010__type_errors/main.kix:59:9 lossy -> local lossy@59:9
 script/010__type_errors/main.kix:59:16 Int -> prim Int
 script/010__type_errors/main.kix:59:28 narrow -> local narrow@54:27
-script/010__type_errors/main.kix:62:11 p -> local p@62:11
-script/010__type_errors/main.kix:62:14 Point -> struct crate::Point
-script/010__type_errors/main.kix:62:24 u32 -> prim u32
-script/010__type_errors/main.kix:63:9 missing -> local missing@63:9
-script/010__type_errors/main.kix:63:19 Point -> struct crate::Point
-script/010__type_errors/main.kix:64:9 unknown -> local unknown@64:9
-script/010__type_errors/main.kix:64:19 Point -> struct crate::Point
-script/010__type_errors/main.kix:65:5 p -> local p@62:11
-script/010__type_errors/main.kix:68:12 p -> local p@68:12
-script/010__type_errors/main.kix:68:15 Point -> struct crate::Point
-script/010__type_errors/main.kix:69:5 p -> local p@68:12
-script/010__type_errors/main.kix:72:18 bool -> prim bool
-script/010__type_errors/main.kix:73:9 f -> local f@73:9
-script/010__type_errors/main.kix:74:5 f -> local f@73:9
-script/010__type_errors/main.kix:74:10 f -> local f@73:9
-script/010__type_errors/main.kix:77:10 x -> local x@77:10
-script/010__type_errors/main.kix:77:13 u32 -> prim u32
-script/010__type_errors/main.kix:77:21 u32 -> prim u32
-script/010__type_errors/main.kix:78:5 arity -> fn crate::arity
-script/010__type_errors/main.kix:78:11 x -> local x@77:10
-script/010__type_errors/main.kix:78:14 x -> local x@77:10
-script/010__type_errors/main.kix:81:12 Eq -> trait std::Eq
-script/010__type_errors/main.kix:81:16 a -> local a@81:16
-script/010__type_errors/main.kix:81:19 T -> generic T
-script/010__type_errors/main.kix:81:22 b -> local b@81:22
-script/010__type_errors/main.kix:81:25 T -> generic T
-script/010__type_errors/main.kix:81:31 bool -> prim bool
-script/010__type_errors/main.kix:82:5 a -> local a@81:16
-script/010__type_errors/main.kix:82:10 b -> local b@81:22
-script/010__type_errors/main.kix:85:16 bool -> prim bool
-script/010__type_errors/main.kix:86:5 same -> fn crate::same
-script/010__type_errors/main.kix:90:5 nav::start -> fn std::system::nav::start
-script/010__type_errors/main.kix:90:16 Side -> fn crate::Side
-script/010__type_errors/main.kix:90:26 on_exit -> fn crate::on_exit
-script/010__type_errors/main.kix:91:5 nav::start -> fn std::system::nav::start
-script/010__type_errors/main.kix:91:16 Main -> fn crate::Main
-script/010__type_errors/main.kix:91:31 on_exit -> fn crate::on_exit
-script/010__type_errors/main.kix:94:13 Text -> struct std::narrative::text::Text
-script/010__type_errors/main.kix:95:14 ImageAsset -> struct std::ImageAsset
-script/010__type_errors/main.kix:95:27 asset -> fn std::asset
-script/010__type_errors/main.kix:95:33 PATH -> const crate::PATH
-script/010__type_errors/main.kix:98:9 list -> local list@98:9
-script/010__type_errors/main.kix:98:16 Vec::new -> fn std::Vec::new
-script/010__type_errors/main.kix:101:13 flag -> local flag@101:13
-script/010__type_errors/main.kix:101:19 bool -> prim bool
-script/010__type_errors/main.kix:101:28 u32 -> prim u32
-script/010__type_errors/main.kix:102:8 flag -> local flag@101:13
+script/010__type_errors/main.kix:60:9 exact -> local exact@60:9
+script/010__type_errors/main.kix:60:16 Decimal -> struct std::Decimal
+script/010__type_errors/main.kix:60:26 wide -> local wide@54:16
+script/010__type_errors/main.kix:61:9 not_integer -> local not_integer@61:9
+script/010__type_errors/main.kix:61:22 Decimal -> struct std::Decimal
+script/010__type_errors/main.kix:61:32 wide -> local wide@54:16
+script/010__type_errors/main.kix:64:11 p -> local p@64:11
+script/010__type_errors/main.kix:64:14 Point -> struct crate::Point
+script/010__type_errors/main.kix:64:24 u32 -> prim u32
+script/010__type_errors/main.kix:65:9 missing -> local missing@65:9
+script/010__type_errors/main.kix:65:19 Point -> struct crate::Point
+script/010__type_errors/main.kix:66:9 unknown -> local unknown@66:9
+script/010__type_errors/main.kix:66:19 Point -> struct crate::Point
+script/010__type_errors/main.kix:67:5 p -> local p@64:11
+script/010__type_errors/main.kix:70:12 p -> local p@70:12
+script/010__type_errors/main.kix:70:15 Point -> struct crate::Point
+script/010__type_errors/main.kix:71:5 p -> local p@70:12
+script/010__type_errors/main.kix:74:18 bool -> prim bool
+script/010__type_errors/main.kix:75:9 f -> local f@75:9
+script/010__type_errors/main.kix:76:5 f -> local f@75:9
+script/010__type_errors/main.kix:76:10 f -> local f@75:9
+script/010__type_errors/main.kix:79:10 x -> local x@79:10
+script/010__type_errors/main.kix:79:13 u32 -> prim u32
+script/010__type_errors/main.kix:79:21 u32 -> prim u32
+script/010__type_errors/main.kix:80:5 arity -> fn crate::arity
+script/010__type_errors/main.kix:80:11 x -> local x@79:10
+script/010__type_errors/main.kix:80:14 x -> local x@79:10
+script/010__type_errors/main.kix:83:12 Eq -> trait std::Eq
+script/010__type_errors/main.kix:83:16 a -> local a@83:16
+script/010__type_errors/main.kix:83:19 T -> generic T
+script/010__type_errors/main.kix:83:22 b -> local b@83:22
+script/010__type_errors/main.kix:83:25 T -> generic T
+script/010__type_errors/main.kix:83:31 bool -> prim bool
+script/010__type_errors/main.kix:84:5 a -> local a@83:16
+script/010__type_errors/main.kix:84:10 b -> local b@83:22
+script/010__type_errors/main.kix:87:16 bool -> prim bool
+script/010__type_errors/main.kix:88:5 same -> fn crate::same
+script/010__type_errors/main.kix:92:5 nav::start -> fn std::system::nav::start
+script/010__type_errors/main.kix:92:16 Side -> fn crate::Side
+script/010__type_errors/main.kix:92:26 on_exit -> fn crate::on_exit
+script/010__type_errors/main.kix:93:5 nav::start -> fn std::system::nav::start
+script/010__type_errors/main.kix:93:16 Main -> fn crate::Main
+script/010__type_errors/main.kix:93:31 on_exit -> fn crate::on_exit
+script/010__type_errors/main.kix:96:13 Text -> struct std::narrative::text::Text
+script/010__type_errors/main.kix:97:14 ImageAsset -> struct std::ImageAsset
+script/010__type_errors/main.kix:97:27 asset -> fn std::asset
+script/010__type_errors/main.kix:97:33 PATH -> const crate::PATH
+script/010__type_errors/main.kix:100:9 list -> local list@100:9
+script/010__type_errors/main.kix:100:16 Vec::new -> fn std::Vec::new
+script/010__type_errors/main.kix:103:13 flag -> local flag@103:13
+script/010__type_errors/main.kix:103:19 bool -> prim bool
+script/010__type_errors/main.kix:103:28 u32 -> prim u32
+script/010__type_errors/main.kix:104:8 flag -> local flag@103:13

@@ -6,7 +6,7 @@ use rustc_hash::FxHashSet;
 use crate::diagnostic::{Anchor, DiagnosticCode, Owner};
 use crate::ty::{FnRef, GenericArg, Ty, TyKind};
 
-use kagari_num::Rat;
+use kagari_num::{Decimal, Rat};
 
 use super::super::Fault;
 use super::super::std_items::{Builtin, StdTable};
@@ -285,7 +285,14 @@ impl Machine<'_> {
                 items.push_back(value);
                 Ok(Value::unit())
             }
-            Builtin::IntegerInto => Ok(Value::Int(self.int_arg(&args, 0)?)),
+            Builtin::IntegerInto => {
+                let value = self.int_arg(&args, 0)?;
+                Ok(if std.targets_decimal(fn_ref) {
+                    Value::Decimal(Decimal::from_int(value))
+                } else {
+                    Value::Int(value)
+                })
+            }
             Builtin::IntegerSaturate => {
                 let value = self.int_arg(&args, 0)?;
                 Ok(Value::Int(match site.ty.as_ref().and_then(int_range) {
@@ -687,6 +694,9 @@ impl Machine<'_> {
                         format!("`{value}` overflows `Decimal`"),
                     )
                 })
+            }
+            Builtin::DecimalFromInt => {
+                Ok(Value::Decimal(Decimal::from_int(self.int_arg(&args, 0)?)))
             }
             Builtin::Setting | Builtin::Meta => {
                 let init = self.deref_value(Self::arg(&args, 0)?.clone())?;

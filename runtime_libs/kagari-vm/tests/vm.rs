@@ -160,6 +160,34 @@ fn decimal_division() {
     assert_eq!(trap.kind, TrapKind::DivisionByZero);
 }
 
+#[test]
+fn integers_convert_to_decimal_exactly() {
+    let program = compile(
+        "use std::FromInteger;\n\
+         fn via_into(x: i64) -> Decimal { x.into() }\n\
+         fn via_from_int(x: u32) -> Decimal { Decimal::from_int(x) }\n\
+         fn generic<T: FromInteger>(x: i64) -> T { x.into() }\n\
+         fn via_generic(x: i64) -> (Decimal, i128) { (generic(x), generic(x)) }\n\
+         fn keep() { let _ = (via_into(1), via_from_int(2), via_generic(3)); }",
+    );
+    let via_into = func(&program, "crate::via_into");
+    let via_from_int = func(&program, "crate::via_from_int");
+    let via_generic = func(&program, "crate::via_generic");
+    let mut vm = Vm::new(program);
+    let mut host = TestHost::default();
+    let min = i128::from(i64::MIN);
+    let into = vm.call(&mut host, via_into, ints(&[min])).unwrap();
+    assert!(matches!(into, Value::Decimal(d) if d == Decimal::from_int(min)));
+    let from_int = vm.call(&mut host, via_from_int, ints(&[120])).unwrap();
+    assert!(matches!(from_int, Value::Decimal(d) if d == Decimal::new(120, 0)));
+    // One generic body, instantiated for `Decimal` and for `i128`.
+    let Value::Tuple(pair) = vm.call(&mut host, via_generic, ints(&[-7])).unwrap() else {
+        panic!("expected a tuple");
+    };
+    assert!(matches!(pair[0], Value::Decimal(d) if d == Decimal::new(-7, 0)));
+    assert_eq!(int(&pair[1]), -7);
+}
+
 fn plain(value: &Value) -> &str {
     match value {
         Value::Text(Text::Plain(s)) => s,

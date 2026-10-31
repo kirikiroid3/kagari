@@ -92,8 +92,8 @@ pushdown fn praise() {
 
 | メソッド | 結果 |
 | -------- | ---- |
-| `x.into()` | 同じ値。変換元の型のすべての値が変換先の型に収まらなければコンパイルエラーです（[`E2018`](../../diagnostics/types.md#e2018)） |
-| `x.saturate()` | 変換先の型の範囲に切り詰めた値 |
+| `x.into()` | 同じ値を整数型か `Decimal` として返します。変換元の型のすべての値が変換先の型に収まらなければコンパイルエラーです（[`E2018`](../../diagnostics/types.md#e2018)）。整数はすべて `Decimal` に収まります |
+| `x.saturate()` | 変換先の型の範囲に切り詰めた値。変換先は整数型でなければなりません |
 
 ```kis
 const fn label_width(chars: Int<0, 40>) -> u32 {
@@ -105,9 +105,14 @@ fn set_level(level: u32) {
     let level: Int<0, 100> = level.saturate();
     MUSIC.set(volume(level));
 }
+
+const fn moon_angle(day: Int<0, 7>) -> Decimal {
+    let back: Decimal = (7 - day).into();       // exact
+    back * 5.0 + Decimal::from_int(day)         // the same conversion
+}
 ```
 
-`as` によるキャストはありません（[`E2019`](../../diagnostics/types.md#e2019)）。整数と `Decimal` の間の変換はありません。`Rat::new` は 2 つの `i128` から `Rat` を作り、`Rat::to_decimal` は `Rat` を `Decimal` に変換します。
+`as` によるキャストはありません（[`E2019`](../../diagnostics/types.md#e2019)）。`Decimal::from_int(x)` は任意の整数を正確に `Decimal` に変換します。変換先が `Decimal` の `x.into()` と同じです。`Rat::new` は 2 つの `i128` から `Rat` を作り、`Rat::to_decimal` は `Rat` を `Decimal` に変換します。`Decimal` や `Rat` を整数に変換する方法はありません。
 
 ## Rust の整数 {#rust-integers}
 

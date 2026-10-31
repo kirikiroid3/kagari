@@ -220,10 +220,10 @@ exists, otherwise a host call:
 | `screen::shader::erase_shader`, `erase_args` | `MOVE` (they only forget a type) |
 | `Vec::new`, `len`, `get`, `set`, `push` | `VECNEW`, `LEN`, `VECGET` (with the `Option` type), `VECSET`, `VECPUSH` |
 | `Vec::is_empty` | `LEN`, `INT 0`, `EQ` |
-| `Integer::into` | `MOVE` |
+| `Integer::into` | `MOVE`; `INTDEC` when the target is `Decimal` |
 | `Integer::saturate` | `ICLAMP` to the result type |
 | `ruby`, `mono_ruby`, `effect`, `concat`, `to_text` | `RUBY`, `MRUBY`, `EFFECT`, `CONCAT`, `TOTEXT` |
-| `Rat::new`, `Rat::to_decimal` | `RATNEW`, `RATDEC` |
+| `Rat::new`, `Rat::to_decimal`, `Decimal::from_int` | `RATNEW`, `RATDEC`, `INTDEC` |
 | `std::ui::slider::<LO, HI>` | `CALLIMP` with three arguments: `props`, then `LO` and `HI` loaded by `INT` (imports carry no generic arguments) |
 | Every other builtin (the screen API, `setting`, `meta`, `Meta::write`, runtime builtins) | `CALLIMP` of an import named by its std path; arguments must be consecutive registers, so they are moved into the window unless they already are |
 

@@ -181,7 +181,8 @@ load-time checks of bytecode cheap.
 
 - `Decimal` and `Rat` live in `kagari-num`, shared by the compiler and the VM, so const
   evaluation and run time compute the same values. Both are `i128` based; `Rat::to_decimal` and
-  `Decimal` division truncate to 7 digits.
+  `Decimal` division truncate to 7 digits. Every integer converts to `Decimal` exactly
+  (`into`, `Decimal::from_int`).
 - Overflow, division by zero and out-of-range results are const-evaluation errors (`E4001`,
   `E4002`) and VM panics at run time. Compound assignment on `Int<lo, hi>` saturates.
 - There is no default `Int` range and no prelude alias for one.
@@ -191,9 +192,10 @@ load-time checks of bytecode cheap.
 
 *Status: Implemented.*
 
-**Decision.** Only `std` declares traits, all `#[builtin]` (`Eq`, `Integer`, `RandChoose`, `Asset`,
-`Step`, `ToText`), and only `std` implements them. `Eq` is automatic for every type whose fields are
-all `Eq`; closures are never `Eq`. User-declared generics exist; user traits do not.
+**Decision.** Only `std` declares traits, all `#[builtin]` (`Eq`, `Integer`, `FromInteger`,
+`RandChoose`, `Asset`, `Step`, `ToText`), and only `std` implements them. `Eq` is automatic for
+every type whose fields are all `Eq`; closures are never `Eq`. User-declared generics exist; user
+traits do not.
 
 **Why.** Traits interact with kind checking and tabulation in ways the design has not worked out,
 and no studio use case needed them. Automatic structural `Eq` is what screen comparison and

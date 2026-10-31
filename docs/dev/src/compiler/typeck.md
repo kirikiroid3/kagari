@@ -15,7 +15,7 @@ instant-recursion check, which reads MIR edges (see
 | `core/kagari-lang/src/signatures/collect.rs` | Computes every item signature; finds std items by role |
 | `core/kagari-lang/src/signatures/lower.rs` | `TyLowerer`: HIR `TypeRef` → `Ty` (aliases, `Int<lo, hi>`, generic arguments) |
 | `core/kagari-lang/src/signatures/consts.rs` | The type-level constant folder (array lengths, `Int` bounds, const arguments) |
-| `core/kagari-lang/src/signatures/traits.rs` | `TraitSolver`: explicit std impls, bounds, structural `Eq`, `RandChoose`, `ShaderArg`; projections |
+| `core/kagari-lang/src/signatures/traits.rs` | `TraitSolver`: explicit std impls, bounds, structural `Eq`, `RandChoose`, `ShaderArg`, `FromInteger` (every `Integer`); projections |
 | `core/kagari-lang/src/signatures/subst.rs`, `display.rs` | Substitution and matching; the diagnostic text of types |
 | `core/kagari-lang/src/infer/` | `infer` query: `ctx.rs` (context, coercion, joins, instantiation), `table.rs` (unification), `expr.rs`, `ops.rs`, `call.rs`, `path.rs`, `pat.rs`, `finish.rs`, `walk.rs` |
 | `core/kagari-lang/src/callee.rs` | `CalleeKind`: what kind of function a call calls |
@@ -54,7 +54,7 @@ blocks, const parameters and `const` items; anything else is `E2002`, overflow `
 
 **Std items by role.** `StdItems` finds the std items the checker refers to (`Text`, `Decimal`,
 `Rat`, `Vec`, `Range`, `Option`, `Screen`, `Setting`, `Meta`, `Say`, `Choice`, the asset types,
-the traits `Eq`, `Integer`, `Asset`, `Step`, `RandChoose`, `ShaderArg`, `ToText`, the std structs a
+the traits `Eq`, `Integer`, `FromInteger`, `Asset`, `Step`, `RandChoose`, `ShaderArg`, `ToText`, the std structs a
 `#[shader_arg]` field may have (`shader_arg_std`), and the functions
 `push_step`, `rng_choose`, `asset`, `system_font`, `concat`, `ruby`, `mono_ruby`, `effect`,
 `nav::start`, `signal`, `Integer::into`, `Integer::saturate`). This is the compiler's half of the
@@ -105,7 +105,8 @@ bounded integers `Int<lo, hi>`. Mixing them is never implicit.
 - Compound assignment on an `Int` place saturates at run time, so any `Int` right side is
   accepted.
 - `x.into()` (`Integer::into`) records an *into check*: the source range must fit in the target
-  range, else `E2018` (use `.saturate()`).
+  range, else `E2018` (use `.saturate()`). A `Decimal` target (`FromInteger`) has no range and
+  always fits.
 - `as` casts parse but are always `E2019`.
 
 At the end (`finish`): projections are normalized, links resolved, a literal bound to

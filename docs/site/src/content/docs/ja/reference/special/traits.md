@@ -12,6 +12,7 @@ Kagari のトレイトはゲームのための道具ではありません。標�
 | -------- | -------- | ------------ | ---------- | -------- |
 | [`Eq`](#eq) | `std` | あり | プリミティブ、関数ポインタ、構成要素がすべて `Eq` の型（構造的に）、一部のビルトイン型 | `==`、`!=`、`ui::select` |
 | [`Integer`](#integer) | `std` | あり | `Int<lo, hi>` と Rust の整数 | `into`、`saturate` |
+| [`FromInteger`](#frominteger) | `std` | なし | `Int<lo, hi>`、Rust の整数、`Decimal` | `into` の変換先 |
 | [`ToText`](#totext) | `std::narrative::text` | なし | `Text`、`String`、整数、`Rat`、`Decimal` | `t![…]` の `{expr}`、`to_text` |
 | [`RandChoose`](#randchoose) | `std` | あり | `Int<lo, hi>` とフィールドのないすべての列挙型 | `rng_choose` |
 | [`Asset`](#asset) | `std` | なし | 5 つのファイルのアセット型と 6 つのシェーダー型 | `asset` |
@@ -77,7 +78,7 @@ const fn describe<T: Eq + ToText>(a: T, b: T) -> Text {
 
 ```kis
 #[builtin] pub trait Integer {
-    const fn into<T: Integer>(self) -> T;
+    const fn into<T: FromInteger>(self) -> T;
     const fn saturate<T: Integer>(self) -> T;
 }
 ```
@@ -86,8 +87,8 @@ const fn describe<T: Eq + ToText>(a: T, b: T) -> Text {
 
 | メソッド | 結果 |
 | -------- | ---- |
-| `x.into()` | 同じ値。変換元の型のすべての値が変換先の型に収まらなければコンパイルエラー（`E2018`） |
-| `x.saturate()` | 変換先の型の範囲に切り詰めた値 |
+| `x.into()` | 同じ値を整数型か `Decimal`（[`FromInteger`](#frominteger)）として返します。変換元の型のすべての値が変換先の型に収まらなければコンパイルエラー（`E2018`） |
+| `x.saturate()` | 変換先の型（整数型）の範囲に切り詰めた値 |
 
 ```kis
 static MUSIC: Setting<Volume> = setting(volume(60));
@@ -101,9 +102,22 @@ const fn label_width(chars: Int<0, 40>) -> u32 {
     let n: u32 = chars.into();
     n * 16
 }
+
+const fn half_width(chars: Int<0, 40>) -> Decimal {
+    let n: Decimal = chars.into();
+    n * 0.5
+}
 ```
 
 `as` キャストはありません（`E2019`）。[数値](../syntax/numbers.md)を参照してください。
+
+## `FromInteger` {#frominteger}
+
+```kis
+#[builtin] pub trait FromInteger {}
+```
+
+`FromInteger` は `Integer::into` の変換先を表します：`Integer` を実装するすべての型と `Decimal` です。整数はすべて `Decimal` に収まるので、`Decimal` への `into` は常にコンパイルできます。これは `Decimal::from_int` と同じ変換です。`saturate` の境界は `Integer` のままなので、`Decimal` への `saturate` は `E2026` です。
 
 ## `ToText` {#totext}
 

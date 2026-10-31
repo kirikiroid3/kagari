@@ -122,8 +122,8 @@ with a turbofish (`x.into::<u32>()`):
 
 | Method | Result |
 | ------ | ------ |
-| `x.into()` | The same value. A compile error unless every value of the source type fits in the target type ([`E2018`](../../diagnostics/types.md#e2018)) |
-| `x.saturate()` | The value clamped to the range of the target type |
+| `x.into()` | The same value, as an integer type or as `Decimal`. A compile error unless every value of the source type fits in the target type ([`E2018`](../../diagnostics/types.md#e2018)); every integer fits in a `Decimal` |
+| `x.saturate()` | The value clamped to the range of the target type, which must be an integer type |
 
 ```kis
 const fn label_width(chars: Int<0, 40>) -> u32 {
@@ -135,11 +135,17 @@ fn set_level(level: u32) {
     let level: Int<0, 100> = level.saturate();
     MUSIC.set(volume(level));
 }
+
+const fn moon_angle(day: Int<0, 7>) -> Decimal {
+    let back: Decimal = (7 - day).into();       // exact
+    back * 5.0 + Decimal::from_int(day)         // the same conversion
+}
 ```
 
-There are no `as` casts ([`E2019`](../../diagnostics/types.md#e2019)). There is no conversion
-between integers and `Decimal`; `Rat::new` builds a `Rat` from two `i128`, and `Rat::to_decimal`
-converts a `Rat` to a `Decimal`.
+There are no `as` casts ([`E2019`](../../diagnostics/types.md#e2019)). `Decimal::from_int(x)`
+converts any integer to a `Decimal` exactly, like `x.into()` with a `Decimal` target. `Rat::new`
+builds a `Rat` from two `i128`, and `Rat::to_decimal` converts a `Rat` to a `Decimal`. Nothing
+converts a `Decimal` or a `Rat` to an integer.
 
 ## Rust integers
 

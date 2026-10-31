@@ -115,6 +115,7 @@ static mut DOUBLE: Int<0, { MAX * 2 }> = 0;
 | -------- | ---------- | ---------- |
 | `Eq` | 構造的な等価性を持つすべての型。[等価性](#equality)を参照 | `==`、`!=` |
 | `Integer` | `Int<lo, hi>` と Rust の整数 | `into`、`saturate`。[変換](./numbers.md#conversions)を参照 |
+| `FromInteger` | 整数型と `Decimal` | `into` の変換先 |
 | `RandChoose` | フィールドなし列挙型と `Int<lo, hi>` | `rng_choose::<T>()` |
 | `Asset` | アセット型 | `asset::<A>(…)` |
 | `Step` | ステップ `Say` と `Choice` | `push_step`。関連型 `Output` |

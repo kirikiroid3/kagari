@@ -202,6 +202,8 @@ pub struct StdItems {
     // Traits.
     pub eq: Option<ItemId>,
     pub integer: Option<ItemId>,
+    /// `FromInteger`: every `Integer` type (bounds included), plus its explicit impls.
+    pub from_integer: Option<ItemId>,
     pub asset: Option<ItemId>,
     pub step: Option<ItemId>,
     pub rand_choose: Option<ItemId>,

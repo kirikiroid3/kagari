@@ -341,6 +341,7 @@ fn std_items(db: &dyn Db, maps: &DefMaps) -> StdItems {
         .collect(),
         eq: ty(&["Eq"]),
         integer,
+        from_integer: ty(&["FromInteger"]),
         asset: ty(&["Asset"]),
         step: ty(&["narrative", "Step"]),
         rand_choose: ty(&["RandChoose"]),

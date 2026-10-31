@@ -306,6 +306,7 @@ impl FnCodegen<'_, '_> {
                     count: 0,
                 }
             }
+            Builtin::IntegerInto if std.targets_decimal(fn_ref) => Instr::IntDec { dst: d, src: a },
             Builtin::IntegerInto => {
                 self.mov(dst, args.first().copied().unwrap_or(0));
                 return;
@@ -345,6 +346,7 @@ impl FnCodegen<'_, '_> {
                 den: b1,
             },
             Builtin::RatToDecimal => Instr::RatDec { dst: d, src: a },
+            Builtin::DecimalFromInt => Instr::IntDec { dst: d, src: a },
             _ => self.import_call(item, args, dst),
         };
         self.emit(instr);

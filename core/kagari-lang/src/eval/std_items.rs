@@ -8,6 +8,7 @@ use crate::def_map::{CrateId, TypeKey, def_maps};
 use crate::input::{FilePath, Program, SourceFile};
 use crate::item_tree::ItemIndex;
 use crate::item_tree::{FnKind, ItemId, ItemKind, ItemParent, Shape, item_tree};
+use crate::ty::{FnRef, GenericArg, TyKind};
 
 use kagari_shader::ShaderRole;
 
@@ -30,6 +31,7 @@ pub enum Builtin {
     IntegerSaturate,
     RatNew,
     RatToDecimal,
+    DecimalFromInt,
     ScreenEmpty,
     ScreenEntity,
     ScreenContains,
@@ -138,6 +140,7 @@ const BUILTINS: &[(&str, &str, &str, Builtin)] = &[
     ("mod.kis", "Integer", "saturate", Builtin::IntegerSaturate),
     ("mod.kis", "Rat", "new", Builtin::RatNew),
     ("mod.kis", "Rat", "to_decimal", Builtin::RatToDecimal),
+    ("mod.kis", "Decimal", "from_int", Builtin::DecimalFromInt),
     ("screen.kis", "Screen", "empty", Builtin::ScreenEmpty),
     ("screen.kis", "Screen", "entity", Builtin::ScreenEntity),
     ("screen.kis", "Screen", "contains", Builtin::ScreenContains),
@@ -387,6 +390,8 @@ pub struct StdTable {
     pub result: AdtInfo,
     pub range: AdtInfo,
     pub text: ItemId,
+    /// `Decimal`, the one target of `Integer::into` that is not an integer.
+    pub decimal: ItemId,
     pub screen: ItemId,
     pub entity_id: AdtInfo,
     pub part: AdtInfo,
@@ -531,6 +536,7 @@ pub fn std_table(db: &dyn Db, program: Program) -> Option<StdTable> {
         result: adt("mod.kis", "Result")?,
         range: adt("mod.kis", "Range")?,
         text: find("narrative/text.kis", "Text")?,
+        decimal: find("mod.kis", "Decimal")?,
         screen: find("screen.kis", "Screen")?,
         entity_id: adt("screen.kis", "EntityId")?,
         part: adt("screen.kis", "Part")?,
@@ -572,6 +578,14 @@ pub fn std_table(db: &dyn Db, program: Program) -> Option<StdTable> {
 impl StdTable {
     pub fn builtin(&self, item: ItemId) -> Option<Builtin> {
         self.builtins.get(&item).copied()
+    }
+
+    /// Whether `fn_ref`, a call of `Integer::into`, converts to `Decimal` (its `T`, substituted).
+    pub fn targets_decimal(&self, fn_ref: &FnRef) -> bool {
+        matches!(
+            fn_ref.args.first(),
+            Some(GenericArg::Type(ty)) if matches!(ty.kind(), TyKind::Adt { item, .. } if *item == self.decimal)
+        )
     }
 
     pub fn asset_kind(&self, item: ItemId) -> Option<AssetKind> {

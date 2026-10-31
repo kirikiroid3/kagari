@@ -92,9 +92,10 @@ order). Field order in `.kis` files is therefore ABI.
 1. `push_step` → STEP; `rng_choose::<T>` → RAND; `std::ui::slider::<LO, HI>` → CALLIMP with
    `LO` and `HI` appended as `Int` arguments.
 2. Intrinsics by `Builtin`: `asset`/`system_font` whose argument is a constant string → CONST
-   of an Asset constant (otherwise a CALLIMP); `Vec` methods → VECNEW/LEN/VECGET/VECSET/VECPUSH; `Integer::into` → MOVE;
-   `Integer::saturate` → ICLAMP; text builders → RUBY/MRUBY/EFFECT/CONCAT/TOTEXT;
-   `Rat::new`/`to_decimal` → RATNEW/RATDEC.
+   of an Asset constant (otherwise a CALLIMP); `Vec` methods → VECNEW/LEN/VECGET/VECSET/VECPUSH; `Integer::into` → MOVE
+   (INTDEC when the target is `Decimal`); `Integer::saturate` → ICLAMP; text builders →
+   RUBY/MRUBY/EFFECT/CONCAT/TOTEXT; `Rat::new`/`to_decimal` → RATNEW/RATDEC;
+   `Decimal::from_int` → INTDEC.
 3. Everything else → `CALLIMP` of the import for that item, created on first use by
    `Emitter::import` with the path, the kind (`fn` → 0, `const fn` → 1, `pushdown fn` → 2) and
    the parameter count including `self`.

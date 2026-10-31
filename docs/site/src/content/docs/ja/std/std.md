@@ -34,6 +34,7 @@ pub mod shaders;
 |[`Result<T, E>`](#enum-resultt-e)|列挙型|成功値またはエラー値|
 |[`Eq`](#trait-eq)|ビルトイントレイト|構造的な等価性|
 |[`Integer`](#trait-integer)|ビルトイントレイト|整数型|
+|[`FromInteger`](#trait-frominteger)|ビルトイントレイト|`Integer::into` の変換先|
 |[`RandChoose`](#trait-randchoose)|ビルトイントレイト|物語が乱択できる型|
 |[`Asset`](#trait-asset)|ビルトイントレイト|アセット型|
 |[`ImageAsset` … `ShaderAsset`](#asset-types)|ビルトイン構造体|アセットファイルの種類ごとの型|
@@ -174,6 +175,24 @@ const fn first_three() -> Vec<u32> {
 
 - Kind: — · Builtin: yes
 
+### `Decimal::from_int(value)` {#decimalfrom_intvalue}
+
+```kis
+#[builtin] pub const fn from_int<I: Integer>(value: I) -> Decimal;
+```
+
+- `value` `I` — 任意の整数。
+- Returns: `Decimal` — `value` そのもの（正確な値）。
+- Kind: `const fn` · Builtin: yes
+
+整数はすべて収まるので、この変換は失敗しません。変換先が `Decimal` の `value.into()` と同じです。`Decimal::from_int(3u32)` は `3.0` です。
+
+```kis
+const fn moon_angle(day: u32) -> Decimal {
+    Decimal::from_int(day) * 5.0
+}
+```
+
 ## Struct: `Range<T>` {#struct-ranget}
 
 ```kis
@@ -245,7 +264,7 @@ impl Eq for screen::Screen {}
 
 ```kis
 #[builtin] pub trait Integer {
-    const fn into<T: Integer>(self) -> T;
+    const fn into<T: FromInteger>(self) -> T;
     const fn saturate<T: Integer>(self) -> T;
 }
 impl Integer for u8 {}
@@ -270,13 +289,13 @@ impl<const LO: i64, const HI: i64> Integer for Int<LO, HI> {}
 ### `Integer::into(self)` {#integerintoself}
 
 ```kis
-const fn into<T: Integer>(self) -> T;
+const fn into<T: FromInteger>(self) -> T;
 ```
 
 - Returns: `T` — `T` としてのこの値。
 - Kind: `const fn` · Builtin: yes
 
-損失のない変換です。`Self` のすべての値が `T` に収まらない限りコンパイルエラー（[`E2018`](../diagnostics/types.md#e2018)）です：`Int<0, 5>` は `u8` や `Int<0, 10>` に変換できますが、`u8` から `Int<0, 5>` への変換はコンパイルできません。
+別の整数型か `Decimal` への損失のない変換です。`Self` のすべての値が `T` に収まらない限りコンパイルエラー（[`E2018`](../diagnostics/types.md#e2018)）です：`Int<0, 5>` は `u8` や `Int<0, 10>` に変換できますが、`u8` から `Int<0, 5>` への変換はコンパイルできません。整数はすべて `Decimal` に収まります：`7u8.into::<Decimal>()` は `7.0` です。
 
 ### `Integer::saturate(self)` {#integersaturateself}
 
@@ -294,6 +313,17 @@ const fn level(n: u32) -> Int<0, 10> {
     n.saturate()
 }
 ```
+
+## Trait: `FromInteger` {#trait-frominteger}
+
+```kis
+#[builtin] pub trait FromInteger {}
+impl FromInteger for Decimal {}
+```
+
+[`Integer::into`](#integerintoself) で整数を変換できる型です：すべての `Integer` 型（暗黙に）と `Decimal`。`Integer` を境界に持つ型パラメータも `FromInteger` なので、`T: Integer` で書いたジェネリックなコードは `x.into::<T>()` を呼べます。`Integer::saturate` の変換先は整数型だけなので、`Decimal` への `saturate` は [`E2026`](../diagnostics/types.md#e2026) です。プレリュードは `FromInteger` をインポートしないので、ジェネリック関数では `std::FromInteger` と書きます。
+
+- Kind: — · Builtin: yes
 
 ## Trait: `RandChoose` {#trait-randchoose}
 

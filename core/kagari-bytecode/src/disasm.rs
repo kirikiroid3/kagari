@@ -333,6 +333,7 @@ impl Disasm<'_> {
             Instr::Move { dst, src }
             | Instr::Not { dst, src }
             | Instr::DecNeg { dst, src }
+            | Instr::IntDec { dst, src }
             | Instr::RatNeg { dst, src }
             | Instr::RatDec { dst, src }
             | Instr::Len { dst, src }

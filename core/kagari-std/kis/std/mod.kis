@@ -30,6 +30,11 @@ impl Rat {
 /// An exact decimal number, written `0.5`: the exact replacement for floats.
 #[builtin]
 pub struct Decimal;
+impl Decimal {
+    /// `value` as a `Decimal`, exactly: every integer fits.
+    #[builtin]
+    pub const fn from_int<I: Integer>(value: I) -> Decimal;
+}
 
 /// `start..end` (`inclusive` false) or `start..=end` (`inclusive` true).
 pub struct Range<T> {
@@ -91,7 +96,7 @@ impl Eq for screen::Screen {}
 #[builtin]
 pub trait Integer {
     /// This value as `T`; a compile error unless every value of `Self` fits in `T`.
-    const fn into<T: Integer>(self) -> T;
+    const fn into<T: FromInteger>(self) -> T;
     /// This value clamped to the range of `T`.
     const fn saturate<T: Integer>(self) -> T;
 }
@@ -108,6 +113,12 @@ impl Integer for i128 {}
 impl Integer for usize {}
 impl Integer for isize {}
 impl<const LO: i64, const HI: i64> Integer for Int<LO, HI> {}
+
+/// The types an integer converts to with `Integer::into`: every `Integer` type (implicitly, so
+/// a parameter bounded by `Integer` is one too) and `Decimal`.
+#[builtin]
+pub trait FromInteger {}
+impl FromInteger for Decimal {}
 
 /// Types a story can draw at random: fieldless enums and `Int<lo, hi>`.
 #[builtin]

@@ -65,8 +65,9 @@ Every std item follows these rules. They are what makes the checker's special ca
    helpers and constant data; `std::stage` is the reference example of such a layer.
 7. **Type-checkable without overloading or coercion.** Asset-typed functions use a trait bound
    (`A: Asset`); interpolation uses a trait bound. The few special signatures are listed below.
-   Only std declares traits, all `#[builtin]`: `Eq`, `Integer`, `RandChoose`, `Asset`, `Step`,
-   `ToText`, `ShaderArg` and `Shader`. Users never implement them; `Eq` is structural.
+   Only std declares traits, all `#[builtin]`: `Eq`, `Integer`, `FromInteger`, `RandChoose`,
+   `Asset`, `Step`, `ToText`, `ShaderArg` and `Shader`. Users never implement them; `Eq` is
+   structural.
 8. **References** are shared pointers. In `const fn` and `fn` code they may be bound to locals,
    so a render names an entity once and changes it in several statements. In a `pushdown fn`
    they are parameters only.
@@ -126,7 +127,7 @@ tabulated like any `const fn` call, so a line stays a finite function of the sto
 | `{expr}` in `t![…]` is `to_text(expr)`, so `expr: T` needs `T: ToText` (`Text`, `String`, `Int<lo, hi>`) | `hir/forms.rs`, trait solver | `E2026` |
 | An `#[entry]` scene's parameter and return types must not contain `Text` (`fn` code can build runtime text) | `typeck/kinds.rs` | `E3009` |
 | `a..b` and `a..=b` have type `Range<T>` with `T` a type both bounds convert to (`0..7` is `Range<Int<0, 7>>`); `a..`, `..b` and `..` exist only in patterns | `infer/expr.rs` | `E2030` |
-| `x.into()` from `S` to `T`, both `Integer`, needs every value of `S` to fit in `T`; `x.saturate()` has no such condition | `infer/call.rs`, `infer/finish.rs` | `E2018` |
+| `x.into()` from an `Integer` `S` to a `FromInteger` `T` (an integer type or `Decimal`) needs every value of `S` to fit in `T` (always true for `Decimal`); `x.saturate()` targets an `Integer` and has no such condition | `infer/call.rs`, `infer/finish.rs` | `E2018`, `E2026` |
 | Arithmetic and ordering accept integers, `Decimal` and `Rat` (no mixing); negation needs a signed integer, `Decimal` or `Rat` | `infer/ops.rs` | `E2014`, `E2015` |
 | The readings of `mono_ruby` are an array literal with one reading per character of a string-literal base; the base of a ruby is a string literal | `typeck/kinds/forms.rs` | `E3021` |
 | The effect of a text effect is a constant expression | `typeck/kinds/forms.rs` | `E3022` |
@@ -145,8 +146,13 @@ tabulated like any `const fn` call, so a line stays a finite function of the sto
 - `ShaderArg` holds for `()` and for structs with `#[shader_arg]`; the field rules (`E3025`,
   `E3026`) make every such type packable into the WGSL storage layout the engine uses.
   `Shader` holds only through the explicit impls on the six role types.
-- `Integer`, `Asset` and `ToText` hold only through their explicit impls in std. `Step` is
-  implemented by `Say` and `Choice<A, N>`; its `Output` is the step's result type.
+- `Integer`, `Asset` and `ToText` hold only through their explicit impls in std.
+  `FromInteger` holds for every type that is `Integer` (a parameter bounded by `Integer`
+  included: `signatures/traits.rs` checks `Integer` first) and through its one explicit impl,
+  `Decimal`, whose `i128` mantissa holds every integer value exactly. The evaluator and the
+  emitter (INTDEC) pick the `Decimal` form of `Integer::into` by its substituted `T`
+  (`StdTable::targets_decimal`). `Step` is implemented by `Say` and `Choice<A, N>`; its
+  `Output` is the step's result type.
 
 ## Special signatures {#special-signatures}
 

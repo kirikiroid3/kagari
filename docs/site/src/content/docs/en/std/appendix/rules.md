@@ -57,9 +57,11 @@ result must be finite.
   is a `Range<i32>` unless its use expects another integer type, and with `last: Int<0, 7>`,
   `0..last` is a `Range<Int<0, 7>>`. A range expression needs both bounds: `a..`, `..b` and `..`
   exist only in patterns ([`E2030`](../../diagnostics/types.md#e2030)).
-- `x.into()` with `x: S` and target `T`, both `Integer`, needs every value of `S` to fit in `T`
-  ([`E2018`](../../diagnostics/types.md#e2018)). `x.saturate()` has no
-  such condition.
+- `x.into()` with `x: S` (an `Integer`) and target `T` (a `FromInteger`: an integer type or
+  `Decimal`) needs every value of `S` to fit in `T`
+  ([`E2018`](../../diagnostics/types.md#e2018)); every integer fits in a `Decimal`.
+  `x.saturate()` has no such condition, but its target must be an `Integer`
+  ([`E2026`](../../diagnostics/types.md#e2026)).
 
 ## Forms
 

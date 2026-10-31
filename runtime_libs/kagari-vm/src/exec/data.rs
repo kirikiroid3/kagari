@@ -4,6 +4,7 @@
 use std::rc::Rc;
 
 use kagari_bytecode::Instr;
+use kagari_num::Decimal;
 
 use super::{Frame, int_operands, raw_range, reg, set, val};
 use crate::int;
@@ -120,6 +121,10 @@ pub(super) fn exec(
             let a = ops::decimal(&*val(regs, src)?)?;
             let r = a.checked_neg().ok_or(Trap::new(TrapKind::Overflow))?;
             set(regs, dst, Value::Decimal(r))
+        }
+        Instr::IntDec { dst, src } => {
+            let a = int::int(&*val(regs, src)?)?;
+            set(regs, dst, Value::Decimal(Decimal::from_int(a)))
         }
         Instr::RatBin { op, dst, lhs, rhs } => {
             let a = ops::rat(&*val(regs, lhs)?)?;

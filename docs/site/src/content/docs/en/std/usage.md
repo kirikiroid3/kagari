@@ -14,7 +14,7 @@ other engines leave to studio macros, `std` provides as typed, checked values.
 
 |Module|Contents|Kind|Page|
 |---|---|---|---|
-|`std`|`String`, `Vec`, `Range`, `Rat`, `Decimal`, `Option`, `Result`, `Eq`, `Integer`, `RandChoose`, `Asset`, the asset types, `asset`, `system_font`|`const fn`|[std](./std.md)|
+|`std`|`String`, `Vec`, `Range`, `Rat`, `Decimal`, `Option`, `Result`, `Eq`, `Integer`, `FromInteger`, `RandChoose`, `Asset`, the asset types, `asset`, `system_font`|`const fn`|[std](./std.md)|
 |`std::prelude`|the names imported into every module|—|[std::prelude](./prelude.md)|
 |`std::time`|`Duration`, `ZERO`, `ms`, `secs`|`const fn`|[std::time](./time.md)|
 |`std::narrative`|`Step`, `push_step`, `rng_choose`, `Say`, `Choice`, `Meta`, `Narrative` and its records|`pushdown fn` (`push_step`, `rng_choose`, `Meta::write`); `fn` (`Narrative`, `Meta::get`/`set`); `const fn` (`meta`)|[std::narrative](./narrative.md)|
@@ -87,9 +87,9 @@ not looked up yet.
 7. **Type-checkable without overloading or coercion.** Asset-typed functions use a trait bound;
    interpolation uses a trait bound. The few special signatures (`nav::start`) are listed in
    [Compiler Rules for std Items](./appendix/rules.md). Only `std` declares traits, all
-   `#[builtin]`: `Eq`, `Integer`, `RandChoose`, `Asset`, `Step`, `ToText`, `ShaderArg` and
-   `Shader`. Games never implement them; `Eq` is automatic, and `ShaderArg` comes with
-   `#[shader_arg]`.
+   `#[builtin]`: `Eq`, `Integer`, `FromInteger`, `RandChoose`, `Asset`, `Step`, `ToText`,
+   `ShaderArg` and `Shader`. Games never implement them; `Eq` is automatic, and `ShaderArg`
+   comes with `#[shader_arg]`.
 8. **References** are shared pointers. In `const fn` and `fn` code they may be bound to locals, so
    a render names an entity once and changes it in several statements. In a `pushdown fn` they are
    parameters only.

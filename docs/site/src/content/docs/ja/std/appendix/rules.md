@@ -36,7 +36,7 @@ sidebar:
 - 物語の中では、有限型の実行時の値に対する `to_text` は他の `const fn` 呼び出しと同じく表化されるので、行は物語の状態の有限な関数のままです。
 - `#[entry]` シーンの引数と戻り値の型は `Text` を含んではなりません。`fn` のコードが `to_text` で実行時のテキストを作れるからです（[`E3009`](../../diagnostics/kinds.md#e3009)）。
 - `a..b` と `a..=b` の型は `Range<T>` で、`T` は `a` と `b` の両方が変換できる型です：`0..7` は使い方が別の整数型を期待しない限り `Range<i32>`、`last: Int<0, 7>` なら `0..last` は `Range<Int<0, 7>>` です。範囲式には両端が必要で、`a..`、`..b`、`..` はパターンにのみ書けます（[`E2030`](../../diagnostics/types.md#e2030)）。
-- `x: S` を `T` に変換する `x.into()`（どちらも `Integer`）には、`S` のすべての値が `T` に収まることが必要です（[`E2018`](../../diagnostics/types.md#e2018)）。`x.saturate()` にはその条件はありません。
+- `x: S`（`Integer`）を `T`（`FromInteger`：整数型か `Decimal`）に変換する `x.into()` には、`S` のすべての値が `T` に収まることが必要です（[`E2018`](../../diagnostics/types.md#e2018)）。整数はすべて `Decimal` に収まります。`x.saturate()` にはその条件はありませんが、変換先は `Integer` でなければなりません（[`E2026`](../../diagnostics/types.md#e2026)）。
 
 ## フォーム {#forms}
 

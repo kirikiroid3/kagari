@@ -137,7 +137,7 @@ pub mod AZUSA {
 
 | モジュール | 内容 | STD リファレンス |
 | ---------- | ---- | ---------------- |
-| `std` | `String`、`Vec`、`Range`、`Rat`、`Decimal`、`Option`、`Result`。トレイト `Eq`、`Integer`、`RandChoose`、`Asset`。アセット型、`asset`、`system_font` | [std](../../std/std.md) |
+| `std` | `String`、`Vec`、`Range`、`Rat`、`Decimal`、`Option`、`Result`。トレイト `Eq`、`Integer`、`FromInteger`、`RandChoose`、`Asset`。アセット型、`asset`、`system_font` | [std](../../std/std.md) |
 | `std::prelude` | すべてのモジュールにインポートされる名前 | [std::prelude](../../std/prelude.md) |
 | `std::time` | `Duration`（ミリ秒単位の整数）、`ms`、`secs` | [std::time](../../std/time.md) |
 | `std::narrative` | ステップ（`Step`、`push_step`、`Say`、`Choice`）、`rng_choose`、メタフィールド、`Narrative` ハンドル | [std::narrative](../../std/narrative.md) |

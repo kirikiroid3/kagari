@@ -17,6 +17,7 @@ them, `Eq` and `RandChoose`, also hold automatically for suitable types a game d
 | ----- | ----------- | -------------- | -------------- | ------- |
 | [`Eq`](#eq) | `std` | yes | primitives, function pointers, and structurally every type whose parts are `Eq`; some builtin types | `==`, `!=`, `ui::select` |
 | [`Integer`](#integer) | `std` | yes | `Int<lo, hi>` and the Rust integers | `into`, `saturate` |
+| [`FromInteger`](#frominteger) | `std` | no | `Int<lo, hi>`, the Rust integers and `Decimal` | the target of `into` |
 | [`ToText`](#totext) | `std::narrative::text` | no | `Text`, `String`, integers, `Rat`, `Decimal` | `{expr}` in `t![…]`, `to_text` |
 | [`RandChoose`](#randchoose) | `std` | yes | `Int<lo, hi>` and every fieldless enum | `rng_choose` |
 | [`Asset`](#asset) | `std` | no | the five file asset types and the six shader types | `asset` |
@@ -95,7 +96,7 @@ contains one of them. There are no floats in Kagari partly so that every number 
 
 ```kis
 #[builtin] pub trait Integer {
-    const fn into<T: Integer>(self) -> T;
+    const fn into<T: FromInteger>(self) -> T;
     const fn saturate<T: Integer>(self) -> T;
 }
 ```
@@ -106,8 +107,8 @@ types; the target type is inferred from context.
 
 | Method | Result |
 | ------ | ------ |
-| `x.into()` | The same value. A compile error (`E2018`) unless every value of the source type fits in the target type |
-| `x.saturate()` | The value clamped to the range of the target type |
+| `x.into()` | The same value, as an integer type or as `Decimal` (a [`FromInteger`](#frominteger)). A compile error (`E2018`) unless every value of the source type fits in the target type |
+| `x.saturate()` | The value clamped to the range of the target type, an integer type |
 
 ```kis
 static MUSIC: Setting<Volume> = setting(volume(60));
@@ -121,9 +122,25 @@ const fn label_width(chars: Int<0, 40>) -> u32 {
     let n: u32 = chars.into();
     n * 16
 }
+
+const fn half_width(chars: Int<0, 40>) -> Decimal {
+    let n: Decimal = chars.into();
+    n * 0.5
+}
 ```
 
 There are no `as` casts (`E2019`). See [Numbers](../syntax/numbers.md).
+
+## `FromInteger`
+
+```kis
+#[builtin] pub trait FromInteger {}
+```
+
+`FromInteger` marks the targets of `Integer::into`: every type that implements `Integer`, and
+`Decimal`. Every integer fits in a `Decimal`, so `into` to `Decimal` always compiles; it is the
+same conversion as `Decimal::from_int`. `saturate` keeps the bound `Integer`, so `saturate` into
+`Decimal` is `E2026`.
 
 ## `ToText`
 

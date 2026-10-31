@@ -63,21 +63,32 @@ fn crate::bounded(_1: u32) -> Int<0, 255> {
     }
 }
 
-fn crate::decimals(_1: Decimal) -> Decimal {
+fn crate::decimals(_1: Decimal, _2: u32) -> Decimal {
     let mut _0: Decimal; // return
     let _1: Decimal; // x
-    let _2: Decimal; // third
-    let _3: Decimal; // r
-    let _4: Rat; // temp
-    let _5: Decimal; // temp
-    let _6: Decimal; // temp
+    let _2: u32; // steps
+    let _3: Decimal; // third
+    let _4: Decimal; // r
+    let _5: Rat; // temp
+    let _6: Decimal; // angle
+    let _7: u32; // temp
+    let _8: Decimal; // temp
+    let _9: Decimal; // temp
+    let _10: Decimal; // temp
+    let _11: Decimal; // temp
+    let _12: Decimal; // temp
     bb0 (entry): {
-        _2 = DecBin(Div, const 1.0, const 3.0);
-        _4 = builtin[RatNew] std::Rat::new(const 1, const 3);
-        _3 = builtin[RatToDecimal] std::Rat::to_decimal(copy _4);
-        _6 = DecBin(Mul, copy _1, const 0.5);
-        _5 = DecBin(Add, copy _6, copy _2);
-        _0 = DecBin(Sub, copy _5, copy _3);
+        _3 = DecBin(Div, const 1.0, const 3.0);
+        _5 = builtin[RatNew] std::Rat::new(const 1, const 3);
+        _4 = builtin[RatToDecimal] std::Rat::to_decimal(copy _5);
+        _7 = IntBin::<u32>(Mul, copy _2, const 5);
+        _6 = builtin[IntegerInto] <u32 as std::Integer::into>::<Decimal>(copy _7);
+        _11 = DecBin(Mul, copy _1, const 0.5);
+        _10 = DecBin(Add, copy _11, copy _3);
+        _9 = DecBin(Sub, copy _10, copy _4);
+        _8 = DecBin(Add, copy _9, copy _6);
+        _12 = builtin[DecimalFromInt] std::Decimal::from_int::<u32>(copy _2);
+        _0 = DecBin(Sub, copy _8, copy _12);
         return;
     }
 }
@@ -305,7 +316,7 @@ fn crate::main() -> System {
     bb0 (entry): {
         _2 = crate::ints(const 3, const 7);
         _3 = crate::bounded(const 9);
-        _4 = crate::decimals(const 1.5);
+        _4 = crate::decimals(const 1.5, const 2);
         _5 = crate::rats();
         _6 = crate::compare(const 1, const 2, const 0.5);
         _1 = (copy _2, copy _3, copy _4, copy _5, copy _6);

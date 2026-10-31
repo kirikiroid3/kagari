@@ -3,7 +3,7 @@ source: core/kagari-lang/tests/bytecode.rs
 expression: out
 input_file: core/kagari-lang/tests/bytecode/001__arith/main.kix
 ---
-001__arith/main.kix:92:4: warning[W6001]: the game is never started: no reachable mode calls `nav::start` or `nav::load`
+001__arith/main.kix:93:4: warning[W6001]: the game is never started: no reachable mode calls `nav::start` or `nav::load`
 --- bytecode ---
 fn crate::main [fn, main] params=0 regs=18
   0000 INT r4, 3
@@ -12,50 +12,51 @@ fn crate::main [fn, main] params=0 regs=18
   0003 INT r4, 9
   0004 CALL r1, (r4), crate::bounded
   0005 CONST r4, #12 1.5
-  0006 CALL r2, (r4), crate::decimals
-  0007 CALL r3, (), crate::rats
-  0008 INT r4, 1
-  0009 INT r5, 2
-  0010 CONST r6, #13 0.5
-  0011 CALL r8, (r4, r5, r6), crate::compare
-  0012 MOVE r4, r0
-  0013 MOVE r5, r1
-  0014 MOVE r6, r2
-  0015 MOVE r7, r3
-  0016 TUPLE r17, (r4, r5, r6, r7, r8)
-  0017 INT r4, 1280
-  0018 INT r5, 720
-  0019 CALL r0, (r4, r5), std::screen::size
-  0020 INT r4, 26
-  0021 CONST r5, #15 std::screen::Color {255, 255, 255, 255}
-  0022 CALL r1, (r4, r5), std::narrative::text::text_style
-  0023 CONST r4, #16 crate::TEXT_SPEED
-  0024 CONST r5, #17 crate::AUTO_DELAY
-  0025 CONST r6, #18 crate::AUTO_DELAY_PER_CHAR
-  0026 CONST r7, #19 crate::SKIP_UNREAD
-  0027 CONST r8, #20 crate::MASTER
-  0028 CONST r9, #21 crate::MUSIC
-  0029 CONST r10, #22 crate::SOUND
-  0030 CONST r11, #23 crate::VOICE
-  0031 CONST r12, #24 crate::VOICE_SUSTAIN
-  0032 CONST r13, #25 crate::WAIT_FOR_VOICE
-  0033 CONST r14, #26 crate::WINDOW_OPACITY
-  0034 CONST r15, #27 crate::FULLSCREEN
-  0035 CONST r16, #28 crate::ANIMATIONS
-  0036 ADT r2, (r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16), std::system::Settings
-  0037 CALL r14, (), std::system::default_bindings
-  0038 CONST r4, #29 "Arithmetic"
-  0039 MOVE r5, r0
-  0040 FUNC r6, crate::Title
-  0041 FUNC r7, crate::GameView
-  0042 INT r8, 20
-  0043 INT r9, 3
-  0044 INT r10, 200
-  0045 CONST r11, #30 font "font.ttf"
-  0046 MOVE r12, r1
-  0047 MOVE r13, r2
-  0048 ADT r0, (r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14), std::system::System
-  0049 RET r0
+  0006 INT r5, 2
+  0007 CALL r2, (r4, r5), crate::decimals
+  0008 CALL r3, (), crate::rats
+  0009 INT r4, 1
+  0010 INT r5, 2
+  0011 CONST r6, #13 0.5
+  0012 CALL r8, (r4, r5, r6), crate::compare
+  0013 MOVE r4, r0
+  0014 MOVE r5, r1
+  0015 MOVE r6, r2
+  0016 MOVE r7, r3
+  0017 TUPLE r17, (r4, r5, r6, r7, r8)
+  0018 INT r4, 1280
+  0019 INT r5, 720
+  0020 CALL r0, (r4, r5), std::screen::size
+  0021 INT r4, 26
+  0022 CONST r5, #15 std::screen::Color {255, 255, 255, 255}
+  0023 CALL r1, (r4, r5), std::narrative::text::text_style
+  0024 CONST r4, #16 crate::TEXT_SPEED
+  0025 CONST r5, #17 crate::AUTO_DELAY
+  0026 CONST r6, #18 crate::AUTO_DELAY_PER_CHAR
+  0027 CONST r7, #19 crate::SKIP_UNREAD
+  0028 CONST r8, #20 crate::MASTER
+  0029 CONST r9, #21 crate::MUSIC
+  0030 CONST r10, #22 crate::SOUND
+  0031 CONST r11, #23 crate::VOICE
+  0032 CONST r12, #24 crate::VOICE_SUSTAIN
+  0033 CONST r13, #25 crate::WAIT_FOR_VOICE
+  0034 CONST r14, #26 crate::WINDOW_OPACITY
+  0035 CONST r15, #27 crate::FULLSCREEN
+  0036 CONST r16, #28 crate::ANIMATIONS
+  0037 ADT r2, (r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16), std::system::Settings
+  0038 CALL r14, (), std::system::default_bindings
+  0039 CONST r4, #29 "Arithmetic"
+  0040 MOVE r5, r0
+  0041 FUNC r6, crate::Title
+  0042 FUNC r7, crate::GameView
+  0043 INT r8, 20
+  0044 INT r9, 3
+  0045 INT r10, 200
+  0046 CONST r11, #30 font "font.ttf"
+  0047 MOVE r12, r1
+  0048 MOVE r13, r2
+  0049 ADT r0, (r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14), std::system::System
+  0050 RET r0
 
 fn crate::ints [fn] params=2 regs=9
   0000 INT r8, 2
@@ -93,19 +94,25 @@ fn crate::bounded [fn] params=1 regs=5
   0005 MOVE r1, r3
   0006 RET r1
 
-fn crate::decimals [fn] params=1 regs=8
-  0000 CONST r6, #31 1.0
-  0001 CONST r7, #32 3.0
-  0002 DDIV r1, r6, r7
-  0003 INT r6, 1
-  0004 INT r7, 3
-  0005 RATNEW r4, r6, r7
-  0006 RATDEC r2, r4
-  0007 CONST r6, #13 0.5
-  0008 DMUL r3, r0, r6
-  0009 DADD r1, r3, r1
-  0010 DSUB r1, r1, r2
-  0011 RET r1
+fn crate::decimals [fn] params=2 regs=10
+  0000 CONST r8, #31 1.0
+  0001 CONST r9, #32 3.0
+  0002 DDIV r2, r8, r9
+  0003 INT r8, 1
+  0004 INT r9, 3
+  0005 RATNEW r6, r8, r9
+  0006 RATDEC r3, r6
+  0007 INT r8, 5
+  0008 IMUL r6, r1, r8, u32
+  0009 INTDEC r4, r6
+  0010 CONST r8, #13 0.5
+  0011 DMUL r5, r0, r8
+  0012 DADD r2, r5, r2
+  0013 DSUB r2, r2, r3
+  0014 DADD r2, r2, r4
+  0015 INTDEC r3, r1
+  0016 DSUB r2, r2, r3
+  0017 RET r2
 
 fn crate::rats [fn] params=0 regs=7
   0000 INT r5, 1

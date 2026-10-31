@@ -41,6 +41,7 @@ only integer type the story may hold at runtime. See
 |[`Result<T, E>`](#enum-resultt-e)|enum|A success value or an error value|
 |[`Eq`](#trait-eq)|builtin trait|Structural equality|
 |[`Integer`](#trait-integer)|builtin trait|The integer types|
+|[`FromInteger`](#trait-frominteger)|builtin trait|The targets of `Integer::into`|
 |[`RandChoose`](#trait-randchoose)|builtin trait|Types the story can draw at random|
 |[`Asset`](#trait-asset)|builtin trait|The asset types|
 |[`ImageAsset` … `ShaderAsset`](#asset-types)|builtin structs|One type per kind of asset file|
@@ -195,6 +196,25 @@ exactly). It is not finite.
 
 - Kind: — · Builtin: yes
 
+### `Decimal::from_int(value)`
+
+```kis
+#[builtin] pub const fn from_int<I: Integer>(value: I) -> Decimal;
+```
+
+- `value` `I` — any integer.
+- Returns: `Decimal` — `value`, exactly.
+- Kind: `const fn` · Builtin: yes
+
+Every integer fits, so the conversion never fails; it is the same as `value.into()` with a
+`Decimal` target. `Decimal::from_int(3u32)` is `3.0`.
+
+```kis
+const fn moon_angle(day: u32) -> Decimal {
+    Decimal::from_int(day) * 5.0
+}
+```
+
 ## Struct: `Range<T>`
 
 ```kis
@@ -277,7 +297,7 @@ closures are not. Comparing values of a non-`Eq` type is
 
 ```kis
 #[builtin] pub trait Integer {
-    const fn into<T: Integer>(self) -> T;
+    const fn into<T: FromInteger>(self) -> T;
     const fn saturate<T: Integer>(self) -> T;
 }
 impl Integer for u8 {}
@@ -302,16 +322,16 @@ The integer types: `Int<lo, hi>` and Rust's integers.
 ### `Integer::into(self)`
 
 ```kis
-const fn into<T: Integer>(self) -> T;
+const fn into<T: FromInteger>(self) -> T;
 ```
 
 - Returns: `T` — this value as `T`.
 - Kind: `const fn` · Builtin: yes
 
-Lossless conversion. It is a compile error
+Lossless conversion to another integer type or to `Decimal`. It is a compile error
 ([`E2018`](../diagnostics/types.md#e2018)) unless every value of `Self`
 fits in `T`: `Int<0, 5>` converts to `u8` or `Int<0, 10>`, but `u8` into `Int<0, 5>` does not
-compile.
+compile. Every integer fits in a `Decimal`: `7u8.into::<Decimal>()` is `7.0`.
 
 ### `Integer::saturate(self)`
 
@@ -329,6 +349,21 @@ const fn level(n: u32) -> Int<0, 10> {
     n.saturate()
 }
 ```
+
+## Trait: `FromInteger`
+
+```kis
+#[builtin] pub trait FromInteger {}
+impl FromInteger for Decimal {}
+```
+
+The types an integer converts to with [`Integer::into`](#integerintoself): every `Integer` type,
+implicitly, and `Decimal`. A type parameter bounded by `Integer` is a `FromInteger` too, so
+generic code written with `T: Integer` can call `x.into::<T>()`. `Integer::saturate` targets only
+integer types, so `saturate` into `Decimal` is [`E2026`](../diagnostics/types.md#e2026). The
+prelude does not import `FromInteger`; a generic function names it as `std::FromInteger`.
+
+- Kind: — · Builtin: yes
 
 ## Trait: `RandChoose`
 

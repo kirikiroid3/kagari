@@ -124,6 +124,8 @@ pub enum Instr {
     },
     /// 0x2C `DNEG a, b`.
     DecNeg { dst: Reg, src: Reg },
+    /// 0x2D `INTDEC a, b`: Int → Decimal, exact.
+    IntDec { dst: Reg, src: Reg },
     /// 0x30–0x33 `RADD RSUB RMUL RDIV a, b, c`.
     RatBin {
         op: ArithOp,
@@ -339,6 +341,7 @@ impl Instr {
             Instr::BoolBin { op, .. } => 0x21u16.wrapping_add(position(&BOOL_BIN, op)),
             Instr::DecBin { op, .. } => 0x28u16.wrapping_add(position(&ARITH, op)),
             Instr::DecNeg { .. } => 0x2C,
+            Instr::IntDec { .. } => 0x2D,
             Instr::RatBin { op, .. } => 0x30u16.wrapping_add(position(&ARITH, op)),
             Instr::RatNeg { .. } => 0x34,
             Instr::RatNew { .. } => 0x35,
@@ -407,6 +410,7 @@ impl Instr {
             Instr::BoolBin { op, .. } => pick(&BOOL_NAMES, position(&BOOL_BIN, op)),
             Instr::DecBin { op, .. } => pick(&DEC_NAMES, position(&ARITH, op)),
             Instr::DecNeg { .. } => "DNEG",
+            Instr::IntDec { .. } => "INTDEC",
             Instr::RatBin { op, .. } => pick(&RAT_NAMES, position(&ARITH, op)),
             Instr::RatNeg { .. } => "RNEG",
             Instr::RatNew { .. } => "RATNEW",
@@ -493,6 +497,7 @@ impl Instr {
             | Instr::IntUn { dst, src, .. }
             | Instr::Not { dst, src }
             | Instr::DecNeg { dst, src }
+            | Instr::IntDec { dst, src }
             | Instr::RatNeg { dst, src }
             | Instr::RatDec { dst, src }
             | Instr::Field { dst, src, .. }
@@ -607,6 +612,7 @@ impl Instr {
             Instr::Move { dst, src }
             | Instr::Not { dst, src }
             | Instr::DecNeg { dst, src }
+            | Instr::IntDec { dst, src }
             | Instr::RatNeg { dst, src }
             | Instr::RatDec { dst, src }
             | Instr::Len { dst, src }
@@ -802,6 +808,7 @@ impl Instr {
                 rhs: c,
             },
             0x2C => Instr::DecNeg { dst: a, src: b },
+            0x2D => Instr::IntDec { dst: a, src: b },
             0x30..=0x33 => Instr::RatBin {
                 op: op_in(&ARITH, 0x30, op).ok_or(InstrError::UnknownOpcode(op))?,
                 dst: a,

@@ -1697,6 +1697,47 @@ fn rat_builtins() {
 }
 
 #[test]
+fn integers_convert_to_decimal() {
+    let source = "
+        const fn generic<T: std::FromInteger>(x: i32) -> T { x.into() }
+        const fn widen<T: Integer>(x: u8) -> T { x.into() }
+        const WIDENED: u32 = widen(200);
+        const MAX: Decimal = 18446744073709551615u64.into();
+        const SUM: Decimal = Decimal::from_int(-7i8) + 0.5;
+        const GENERIC: Decimal = generic(12);
+        const WIDE: i64 = generic(12);
+        struct Pair { d: Decimal, n: u8 }
+        const fn field(n: u8) -> Pair {
+            let mut p = Pair { d: 0.0, n };
+            p.d = n.into();
+            p
+        }
+        const FIELD: Pair = field(3);
+    ";
+    let (db, program) = setup(source);
+    let eval = const_eval(&db, program);
+    let value = |name: &str| eval.consts.get(&item(&db, program, name)).cloned();
+    assert_eq!(
+        value("MAX"),
+        Some(ConstValue::Decimal(dec("18446744073709551615")))
+    );
+    assert_eq!(
+        value("SUM"),
+        Some(ConstValue::Decimal(dec("6.5").checked_neg().unwrap()))
+    );
+    assert_eq!(value("GENERIC"), Some(ConstValue::Decimal(dec("12"))));
+    assert_eq!(value("WIDE"), Some(ConstValue::Int(12)));
+    // A parameter bounded by `Integer` is a `FromInteger` without a second bound.
+    assert_eq!(value("WIDENED"), Some(ConstValue::Int(200)));
+    // A projected destination: the result type comes from the call, not the place.
+    let Some(ConstValue::Adt { fields, .. }) = value("FIELD") else {
+        panic!("expected a struct");
+    };
+    assert_eq!(fields.front(), Some(&ConstValue::Decimal(dec("3"))));
+    assert!(eval.diagnostics.is_empty());
+}
+
+#[test]
 fn constant_cycles_are_errors() {
     let source = "
         const A: u32 = A;

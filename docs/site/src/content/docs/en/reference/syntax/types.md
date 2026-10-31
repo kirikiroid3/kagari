@@ -150,6 +150,7 @@ require them:
 | ----- | -------------- | ----- |
 | `Eq` | every type with structural equality, see [Equality](#equality) | `==`, `!=` |
 | `Integer` | `Int<lo, hi>` and the Rust integers | `into`, `saturate`; see [Conversions](./numbers.md#conversions) |
+| `FromInteger` | the integer types and `Decimal` | the target of `into` |
 | `RandChoose` | fieldless enums and `Int<lo, hi>` | `rng_choose::<T>()` |
 | `Asset` | the asset types | `asset::<A>(…)` |
 | `Step` | the steps `Say` and `Choice` | `push_step`, with the associated type `Output` |

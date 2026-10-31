@@ -109,6 +109,7 @@ fn main_code() -> Vec<Instr> {
         });
     }
     code.push(Instr::DecNeg { dst: 0, src: 1 });
+    code.push(Instr::IntDec { dst: 0, src: 1 });
     code.push(Instr::RatNeg { dst: 0, src: 1 });
     code.push(Instr::RatNew {
         dst: 0,
@@ -544,7 +545,7 @@ fn full_module_uses_every_opcode_and_tag() {
             )
         })
         .collect();
-    assert_eq!(known.len(), 75);
+    assert_eq!(known.len(), 76);
     assert_eq!(used, known);
     let tags: BTreeSet<u32> = m.constants.iter().map(Constant::tag).collect();
     assert_eq!(tags, (0..=16).collect());
@@ -848,10 +849,11 @@ fn crate::Start [scene, entry] params=0 regs=2
         "  0001 CONST r0, #14 crate::Point {-5, -5}\n",
         "  0006 IADD r0, r1, r2, u8\n",
         "  0016 INEG r0, r1, Int<0,5>\n",
-        "  0046 CALLIMP r0, (r1, r2), std::narrative::Meta::write\n",
-        "  0048 CLOSURE r4, (r1, r2), crate::main::{closure#0}\n",
-        "  0052 ADT r0, (r1, r2), crate::Point\n",
-        "  0054 ISVAR r0, r1, std::option::Option::Some\n",
+        "  0032 INTDEC r0, r1\n",
+        "  0047 CALLIMP r0, (r1, r2), std::narrative::Meta::write\n",
+        "  0049 CLOSURE r4, (r1, r2), crate::main::{closure#0}\n",
+        "  0053 ADT r0, (r1, r2), crate::Point\n",
+        "  0055 ISVAR r0, r1, std::option::Option::Some\n",
     ] {
         assert!(text.contains(line), "missing {line:?} in\n{text}");
     }

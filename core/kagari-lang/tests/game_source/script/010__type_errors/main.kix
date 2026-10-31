@@ -57,6 +57,8 @@ fn conversions(wide: u32, narrow: Int<0, 5>) {
     let clamped: u8 = wide.saturate();
     let cast = wide as u8;
     let lossy: Int<0, 3> = narrow.into();
+    let exact: Decimal = wide.into();
+    let not_integer: Decimal = wide.saturate();
 }
 
 fn fields(p: Point) -> u32 {

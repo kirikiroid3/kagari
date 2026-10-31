@@ -191,6 +191,13 @@ pub(crate) struct TraitSolver<'a> {
 
 impl TraitSolver<'_> {
     pub(crate) fn implements(&mut self, ty: &Ty, trait_item: ItemId) -> bool {
+        // Every integer is a `FromInteger`, including a parameter bounded by `Integer`.
+        if Some(trait_item) == self.sigs.std.from_integer
+            && let Some(integer) = self.sigs.std.integer
+            && self.implements(ty, integer)
+        {
+            return true;
+        }
         match ty.kind() {
             TyKind::Error | TyKind::Infer(_) | TyKind::Never => return true,
             TyKind::Param { owner, index } => {

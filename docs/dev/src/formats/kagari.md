@@ -356,6 +356,7 @@ reused.
 | `0x2A` | DMUL | 1 | a, b, c | Decimal; overflow panics. |
 | `0x2B` | DDIV | 1 | a, b, c | Exact quotient truncated to 7 fractional digits; zero divisor or overflow panics. |
 | `0x2C` | DNEG | 1 | a, b | Decimal negation (checked). |
+| `0x2D` | INTDEC | 1 | a, b | Int → Decimal, exact (every `i128` fits). |
 | `0x30` | RADD | 1 | a, b, c | Rat, lowest terms; overflow panics. |
 | `0x31` | RSUB | 1 | a, b, c | As RADD. |
 | `0x32` | RMUL | 1 | a, b, c | As RADD. |
@@ -421,10 +422,10 @@ instruction when one exists, otherwise a CALLIMP of an import (`emit/codegen/cal
 | `Vec::new`, `Vec::len`, `Vec::get` | VECNEW, LEN, VECGET (with the `std::Option` type id) |
 | `Vec::set`, `Vec::push` | VECSET, VECPUSH, then `TUPLE dst, 0, 0` (unit result) |
 | `Vec::is_empty` | LEN, `INT 0`, EQ |
-| `Integer::into` | MOVE |
+| `Integer::into` | MOVE; INTDEC when the target is `Decimal` |
 | `Integer::saturate` | ICLAMP to the result type |
 | `ruby`, `mono_ruby`, `effect`, `concat`, `to_text` | RUBY, MRUBY, EFFECT, CONCAT, TOTEXT |
-| `Rat::new`, `Rat::to_decimal` | RATNEW, RATDEC |
+| `Rat::new`, `Rat::to_decimal`, `Decimal::from_int` | RATNEW, RATDEC, INTDEC |
 | `std::ui::slider::<LO, HI>` | CALLIMP with 3 arguments: `props`, `LO`, `HI` (each `INT`) |
 | every other builtin | CALLIMP of the import named by its std path |
 
