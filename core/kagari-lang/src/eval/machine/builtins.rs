@@ -529,6 +529,14 @@ impl Machine<'_> {
                 };
                 self.pending(&place, PendingChange::Layer(target, None))
             }
+            Builtin::ImageLayerSetResize => {
+                let resize = self.const_arg(&args, 1)?;
+                let (place, Some(ScreenObj::Layer(target))) = self.receiver_obj(&args)? else {
+                    return Err(ErrorKind::Abort);
+                };
+                self.screen_at(&place)?.set_resize(target, resize, std)?;
+                Ok(Value::unit())
+            }
             Builtin::LabelLayerSetStyle | Builtin::LabelLayerSetWidth => {
                 let value = self.const_arg(&args, 1)?;
                 let (place, Some(ScreenObj::Layer(LayerTarget::Label(id)))) =

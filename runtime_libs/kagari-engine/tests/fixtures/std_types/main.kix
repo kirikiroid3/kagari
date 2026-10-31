@@ -113,6 +113,11 @@ fn shot() -> Screen {
     screen.entity(HERO).opacity().change(0.5).apply_animation(std::screen::anim::tween(ms(100)));
     screen.entity(HERO).image().change(A_IMG).apply_animation(std::screen::anim::fade(ms(200)));
     screen.entity(HERO).set_z(3);
+    screen
+        .entity(HERO)
+        .image()
+        .set_resize(std::screen::Resize::Cover(std::screen::size(1280, 720)));
+    screen.hud().side_image().set_resize(std::screen::Resize::Factor(0.5));
     screen.wait(ms(50));
     screen
         .music()
@@ -176,6 +181,7 @@ fn probe() {
     keep(std::screen::Plane::Front);
     keep(std::screen::Visibility::Hidden);
     keep(std::screen::Flip::Both);
+    keep(std::screen::Resize::Natural);
     keep(std::screen::VAlign::Top);
     keep(std::screen::pose(point(0, 0), 1.0, std::screen::degrees(0.0)));
     keep(std::screen::movie(M));

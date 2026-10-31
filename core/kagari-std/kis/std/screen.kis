@@ -18,7 +18,7 @@ pub struct EntityId(pub u32);
 pub const BACKGROUND: EntityId = EntityId(0);
 /// An image layer of an entity; parts draw in ascending order.
 pub struct Part(pub u8);
-/// The main part, which gives the entity its size.
+/// The main part, whose box gives the entity its size.
 pub const MAIN: Part = Part(0);
 
 /// A point in design-resolution pixels.
@@ -155,8 +155,9 @@ pub enum VAlign {
 #[builtin]
 pub struct Screen;
 impl Screen {
-    /// A screen with only the opaque `BACKGROUND` entity, the default Hud and camera, no filter
-    /// (`None`) and silent channels.
+    /// A screen with only the opaque `BACKGROUND` entity, whose `MAIN` layer covers the design
+    /// resolution (`Resize::Cover`), the default Hud and camera, no filter (`None`) and silent
+    /// channels.
     #[builtin]
     pub const fn empty() -> Screen;
     /// The entity `id`, spawned invisible with default components if it is absent.
@@ -172,7 +173,8 @@ impl Screen {
     /// and the end of its animations.
     #[builtin]
     pub const fn despawn(&mut self, id: EntityId);
-    /// The main image of the `BACKGROUND` entity.
+    /// The main image of the `BACKGROUND` entity; `Screen::empty()` sizes it to
+    /// `Resize::Cover` of the design resolution.
     pub const fn background(&mut self) -> &mut ImageLayer {
         self.entity(BACKGROUND).image()
     }
@@ -313,6 +315,26 @@ impl<T> Change<T> {
     pub const fn apply_animation(&mut self, tween: anim::Tween);
 }
 
+/// How an image layer sizes its content, before the entity's scale. The size it gives is the
+/// layer's box; the content is centred in its box and never drawn outside it.
+pub enum Resize {
+    /// The content's own size.
+    Natural,
+    /// The content's own size times the factor; a factor of 0.0 or less draws nothing.
+    Factor(Decimal),
+    /// This width; the height keeps the content's aspect ratio.
+    Width(u32),
+    /// This height; the width keeps the content's aspect ratio.
+    Height(u32),
+    /// Exactly this size, ignoring the aspect ratio.
+    Stretch(Size),
+    /// The box `Size`; the content is the largest size with its aspect ratio that fits inside.
+    Contain(Size),
+    /// The box `Size`; the content is the smallest size with its aspect ratio that covers it,
+    /// and what overflows is clipped.
+    Cover(Size),
+}
+
 /// An image layer of an entity.
 #[builtin]
 pub struct ImageLayer;
@@ -329,6 +351,10 @@ impl ImageLayer {
     /// Swaps the image for nothing.
     #[builtin]
     pub const fn clear(&mut self) -> &mut Swap;
+    /// Sets how the layer sizes every content it shows, both sides of a swap included; layers
+    /// start `Natural`.
+    #[builtin]
+    pub const fn set_resize(&mut self, resize: Resize);
 }
 /// The text layer of an entity.
 #[builtin]

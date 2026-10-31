@@ -52,7 +52,7 @@ use std::narrative::text::speed;
    - 設定の音量は `Int<0, 100>` です。
    - 単位付き文字列はなく、どの量にも第二の尺度はありません。
 3. **隠れたデフォルトはありません。** アニメーションのコンストラクタはすべて長さを明示的に受け取ります。暗黙の値は中立的なものだけです：イージング `Linear`、遅延 0、ルールのぼかし 0、繰り返し 1、恒等変換。
-4. **変更にはアニメーションが必要です。** 目に見えるプロパティはすべて、`Prop<T>`（補間され、`Tween` を受け取る）かレイヤー（`ImageLayer`、`LabelLayer`、`MovieLayer`。`Transition` で差し替える）です。補間できないレイアウト設定（`set_plane`、`set_z`、`set_anchor`、`set_flip`、`set_fill_size`、`gate`）だけが直接のセッターです。`Change<T>`、`Swap`、`ChannelChange` は `#[must_use]` で、`apply_animation` のない変更は起こりません（警告 `W3023`）。
+4. **変更にはアニメーションが必要です。** 目に見えるプロパティはすべて、`Prop<T>`（補間され、`Tween` を受け取る）かレイヤー（`ImageLayer`、`LabelLayer`、`MovieLayer`。`Transition` で差し替える）です。補間できないレイアウト設定（`set_plane`、`set_z`、`set_anchor`、`set_flip`、`set_fill_size`、`gate`、`ImageLayer::set_resize`）だけが直接のセッターです。`Change<T>`、`Swap`、`ChannelChange` は `#[must_use]` で、`apply_animation` のない変更は起こりません（警告 `W3023`）。
 5. **アニメーションは開始状態も終了状態も変えません。** ステップの論理画面とは、レンダー後の永続的な状態です：コンポーネントを持つエンティティに加え、Hud、カメラ、画面フィルター、オーディオチャンネル。スナップショット、等価性、一貫性検査が使うのはこれです。
    - `Tween` と `Transition` は、常に古い値から `change` で設定した値へ進みます。
    - `Motion` は相対的な経路で、恒等（オフセット 0、拡大率 1、回転 0）で終わらなければなりません。そうでなければ定数評価エラーです。

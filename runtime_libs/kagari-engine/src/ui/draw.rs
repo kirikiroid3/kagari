@@ -14,8 +14,8 @@ use super::text::{Px, TextAlign, TextStyleSpec, TextSystem};
 use crate::EngineState;
 use crate::assets::AssetStore;
 use crate::frame::{Affine, Node, Rect, Reveal};
-use crate::screen::draw::{content_size, draw_screen, image_layer_node};
-use crate::screen::sample::{VisualLayer, VisualScreen};
+use crate::screen::draw::{draw_screen, image_layer_node, layer_box};
+use crate::screen::sample::VisualScreen;
 use crate::story::reveal::{ClickWait, MessageView};
 use crate::system::SystemState;
 use crate::system::modes::ModeKind;
@@ -546,18 +546,11 @@ impl Drawer<'_> {
         });
         let mut above = Vec::new();
         let side = &v.hud.side_image;
-        let side_content = match side {
-            VisualLayer::Empty => None,
-            VisualLayer::Shown(content) => Some(content),
-            VisualLayer::Transition { from, to, .. } => to.as_ref().or(from.as_ref()),
-        };
         if !self.game.hide_window
-            && let Some(content) = side_content
+            && let Some([_, ih]) = layer_box(side, [fw, fh], self.assets)
+            && let Some(node) = image_layer_node(side, [0.0, fh - ih], [fw, fh], self.assets)
         {
-            let ih = content_size(content, self.assets).map_or(0.0, |(_, ih)| ih as f32);
-            if let Some(node) = image_layer_node(side, [0.0, fh - ih], self.assets) {
-                above.push(group(v.hud.text_window.clamp(0.0, 1.0), None, vec![node]));
-            }
+            above.push(group(v.hud.text_window.clamp(0.0, 1.0), None, vec![node]));
         }
         above.extend(planes.over_window);
         if !above.is_empty() {

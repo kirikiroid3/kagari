@@ -144,8 +144,9 @@ const fn mio_enters(mut screen: Screen) -> Screen {
 
 `Change<T>`、`Swap`、`ChannelChange` は `#[must_use]` なので、
 `screen.background().change(BG::ROOF);` のように変更が保留のまま終わる文は警告になります。
-補間できないレイアウト設定だけは直接設定します：`set_plane`、`set_z`、`set_anchor`、
-`set_flip`、`set_fill_size`、`gate`。
+補間できないレイアウト設定だけは直接設定します：エンティティの `set_plane`、`set_z`、`set_anchor`、
+`set_flip`、`set_fill_size`、`gate` と、画像レイヤーの `set_resize`（レイヤーが内容をどの大きさに
+するか。[`Resize`](../../std/screen.md#resize) を参照）です。
 
 ### アニメーションは論理画面を変えない {#animations-never-change-the-logical-screen}
 
@@ -202,7 +203,8 @@ match AFFECTION_MIO {
 コンパイラが自動で判定するので、注釈は不要です。それ以外のレンダーは *差分* です。
 
 `Screen::empty()` は背景エンティティ `BACKGROUND` だけを持つ画面を返します。背景は不透明で画像は
-ありません。Hud はテキストウィンドウとクイックメニューを表示し、カメラは初期状態、画面フィルターは
+ありません。そのメイン画像レイヤーは、表示する画像の解像度にかかわらず画面を覆います（デザイン解像度の
+`Resize::Cover`）。Hud はテキストウィンドウとクイックメニューを表示し、カメラは初期状態、画面フィルターは
 `None`、オーディオチャンネルはすべて無音です。したがってキーフレームは明示的にも書けます。
 
 ```kis

@@ -15,8 +15,8 @@ use super::runtime::{EffectKey, EffectSlot, ScreenRuntime};
 use crate::anim::{color_premul_linear, decimal_f32, ease, lerp4, motion_at, transition_progress};
 use crate::frame::{Dir, MotionStage, Pose, ShaderEffect, TransitionDraw};
 use crate::values::{
-    Direction, EffectSpec, Flip, MAX_ARGS_BYTES, Plane, PoseSpec, Transition, TransitionKind,
-    Visibility,
+    Direction, EffectSpec, Flip, MAX_ARGS_BYTES, Plane, PoseSpec, Resize, Transition,
+    TransitionKind, Visibility,
 };
 
 /// A screen as drawn at one time.
@@ -35,7 +35,7 @@ pub(crate) struct VisualScreen {
 pub(crate) struct VisualHud {
     pub text_window: f32,
     pub quick_menu: f32,
-    pub side_image: VisualLayer<VisualContent>,
+    pub side_image: VisualImageLayer,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -58,7 +58,7 @@ pub(crate) struct VisualEntity {
     /// Premultiplied linear.
     pub fill: [f32; 4],
     pub fill_size: Option<[u32; 2]>,
-    pub parts: Vec<(u8, VisualLayer<VisualContent>)>,
+    pub parts: Vec<(u8, VisualImageLayer)>,
     pub label: VisualLayer<Text>,
     pub label_style: Option<Value>,
     pub label_width: Option<u32>,
@@ -69,6 +69,13 @@ pub(crate) struct VisualEntity {
     pub mask: Option<ShaderEffect>,
     /// GPU motion stages: a playing travel, then the local motion.
     pub stages: Vec<MotionStage>,
+}
+
+/// An image layer at one time: what it shows and how it sizes it.
+#[derive(Clone, Debug)]
+pub(crate) struct VisualImageLayer {
+    pub layer: VisualLayer<VisualContent>,
+    pub resize: Resize,
 }
 
 /// What an image layer shows at one time.
@@ -517,7 +524,13 @@ impl ScreenRuntime {
                 let target = LayerTarget::Part(id, part);
                 match self.image_layer(target, base_entity.layer(target), t) {
                     VisualLayer::Empty => None,
-                    layer => Some((part, layer)),
+                    layer => Some((
+                        part,
+                        VisualImageLayer {
+                            layer,
+                            resize: record.resize(part),
+                        },
+                    )),
                 }
             })
             .collect();
@@ -591,11 +604,14 @@ impl ScreenRuntime {
             hud: VisualHud {
                 text_window: fade(PropTarget::HudTextWindow),
                 quick_menu: fade(PropTarget::HudQuickMenu),
-                side_image: self.image_layer(
-                    LayerTarget::SideImage,
-                    base.read_layer(LayerTarget::SideImage),
-                    t,
-                ),
+                side_image: VisualImageLayer {
+                    layer: self.image_layer(
+                        LayerTarget::SideImage,
+                        base.read_layer(LayerTarget::SideImage),
+                        t,
+                    ),
+                    resize: logical.hud.side_image_resize,
+                },
             },
             filter: self.sample_effect(
                 PropTarget::ScreenFilter,

@@ -107,7 +107,6 @@ The TyranoScript tutorial port (`example/test_game1`, local only) found these fu
   for a button bar, and link-style choices inside the window (`Menu` has only `align`).
 - Opening a URL from the game.
 - A text-reveal preview outside the game view (a text-speed sample in a settings page).
-- A non-uniform size for an image entity (only a uniform scale exists).
 - A slide (push) transition.
 - Hiding the text window from a UI button in step with the `Action::HideWindow` binding.
 - Bindings to arbitrary `fn`s (for example a fullscreen toggle) and touch input.

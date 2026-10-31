@@ -69,8 +69,9 @@ not looked up yet.
 4. **Changes need animations.** Every visible property is a `Prop<T>` (interpolated, takes a
    `Tween`) or a layer (`ImageLayer`, `LabelLayer`, `MovieLayer`, swapped with a `Transition`).
    Only non-interpolable layout settings (`set_plane`, `set_z`, `set_anchor`, `set_flip`,
-   `set_fill_size`, `gate`) are direct setters. `Change<T>`, `Swap` and `ChannelChange` are
-   `#[must_use]`: a change with no `apply_animation` does not happen (warning `W3023`).
+   `set_fill_size`, `gate`, and `ImageLayer::set_resize`) are direct setters. `Change<T>`, `Swap`
+   and `ChannelChange` are `#[must_use]`: a change with no `apply_animation` does not happen
+   (warning `W3023`).
 5. **Animations never change the start or end state.** The logical screen of a step is the
    persistent state after its render: entities with their components, plus the Hud, camera,
    screen filter and audio channels. That is what snapshots, equality and the consistency check

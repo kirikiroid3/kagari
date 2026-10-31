@@ -31,6 +31,7 @@ const fn azusa_smiles(mut screen: Screen) -> Screen {
 | [`Screen`](#screen) | ビルトイン構造体 | 画面とステップのタイムライン |
 | [`Entity`](#entity) | ビルトイン構造体 | 画面上のもの |
 | [`Prop`](#prop)、[`Change`](#change) | ビルトイン構造体 | 補間されるプロパティ |
+| [`Resize`](#resize) | 列挙型 | 画像レイヤーが内容をどの大きさにするか |
 | [`ImageLayer`](#imagelayer)、[`LabelLayer`](#labellayer)、[`Movie`](#movie)、[`MovieLayer`](#movielayer)、[`Swap`](#swap) | 構造体 | レイヤー |
 | [`Hud`](#hud) | ビルトイン構造体 | ゲームビューのクローム |
 | [`ChoiceMenu`](#choicemenu) | ビルトイン構造体 | ステップの選択肢の見せ方 |
@@ -111,7 +112,7 @@ pub struct Part(pub u8);
 pub const MAIN: Part = Part(0);
 ```
 
-エンティティのサイズを決めるメインパーツです。[`Entity::image()`](#entity-image) は `part(MAIN)` です。
+その矩形がエンティティのサイズを決めるメインパーツです（[`Resize`](#resize) を参照してください）。[`Entity::image()`](#entity-image) は `part(MAIN)` です。
 
 ### 構造体：`Point` {#point}
 
@@ -147,7 +148,7 @@ pub struct Size {
 pub const fn size(w: u32, h: u32) -> Size
 ```
 
-ピクセル単位のサイズです。`size(w, h)` は `w × h` です。[`Entity::set_fill_size`](#entity-set_fill_size) で使います。種別：`const fn` · ビルトイン：いいえ。
+ピクセル単位のサイズです。`size(w, h)` は `w × h` です。[`Entity::set_fill_size`](#entity-set_fill_size) と [`Resize`](#resize) で使います。種別：`const fn` · ビルトイン：いいえ。
 
 ### 構造体：`Insets` {#insets}
 
@@ -176,7 +177,7 @@ pub const CENTER: Anchor = Anchor { x: 0.5, y: 0.5 };
 pub const BOTTOM_CENTER: Anchor = Anchor { x: 0.5, y: 1.0 };
 ```
 
-エンティティのうち位置に置かれる点を、エンティティ自身のサイズに対する割合 `0.0..=1.0` で表します。`TOP_LEFT` は左上の角（生成時の既定値）、`CENTER` は中心、`BOTTOM_CENTER` は下辺の中点（キャラクター立ち絵でよく使います）です。拡大縮小と回転はアンカーを中心に行われます。
+エンティティのうち位置に置かれる点を、エンティティ自身のサイズ（その矩形。[描画順序](#drawing-order) を参照）に対する割合 `0.0..=1.0` で表します。`TOP_LEFT` は左上の角（生成時の既定値）、`CENTER` は中心、`BOTTOM_CENTER` は下辺の中点（キャラクター立ち絵でよく使います）です。拡大縮小と回転はアンカーを中心に行われます。
 
 ### 構造体：`Angle` {#angle}
 
@@ -332,7 +333,7 @@ screen.filter().change(Some(blur(6.0))).apply_animation(tween(ms(1500)));
 #[builtin] pub const fn empty() -> Screen;
 ```
 
-- 戻り値：不透明な `BACKGROUND` エンティティ（プレーン `Background`、不透明度 1.0、画像なし）だけを持つ画面。
+- 戻り値：不透明な `BACKGROUND` エンティティ（プレーン `Background`、不透明度 1.0、画像なし）だけを持つ画面。その `MAIN` レイヤーのリサイズはデザイン解像度（`System::resolution`）の [`Resize::Cover`](#resize) なので、背景画像は解像度にかかわらず画面を覆います。
 - Hud はテキストウィンドウとクイックメニューが `Shown` で、サイド画像はありません。
 - カメラはオフセット 0、ズーム 1.0、回転 0 です。
 - 画面フィルターは `None` です。
@@ -371,7 +372,7 @@ const fn roof_evening(_screen: Screen) -> Screen {
 | **opacity** | **0.0** |
 | filter, mix, mask, local motion | `None` |
 | fill, fill size | `TRANSPARENT`, `None`（画面全体） |
-| layers | パーツなし、ラベルなし、ムービーなし |
+| layers | パーツなし、ラベルなし、ムービーなし。パーツは `Resize::Natural` で始まる |
 | flip, gate | `Flip::None`, `None` |
 
 生成されたエンティティは見えないので、登場のたびにアニメーションを明示します。
@@ -382,6 +383,8 @@ screen.entity(HANAKO).opacity().change(1.0).apply_animation(tween(ms(300)));
 ```
 
 削除が保留中の ID に対する `entity(id)` は削除を取り消します。エンティティは現在の値を保ちます。
+
+これらの既定値はどの ID にも適用されます。削除の後で再び生成された `BACKGROUND` エンティティの `MAIN` レイヤーは `Resize::Natural` で、[`Screen::empty()`](#screen-empty) が与える `Cover` ではありません。
 
 ### `screen.contains(id)` {#screen-contains}
 
@@ -432,10 +435,18 @@ pub const fn background(&mut self) -> &mut ImageLayer {
 }
 ```
 
-`BACKGROUND` エンティティのメイン画像です。種別：`const fn` · ビルトイン：いいえ。
+`BACKGROUND` エンティティのメイン画像です。`Screen::empty()` はこれにデザイン解像度の [`Resize::Cover`](#resize) を与えるので、背景は解像度にかかわらず画面を満たし、解像度の異なる背景どうしのトランジションも全画面のままです。種別：`const fn` · ビルトイン：いいえ。
 
 ```kis
 screen.background().change(BG::ROOF).apply_animation(fade(ms(500)));
+```
+
+**移行。** `Resize` の導入前、背景はピクセルサイズのまま描画されていました。現在は画面を覆います。デザイン解像度の背景は以前と同じに見えます。背景を合わせるために背景エンティティを拡大縮小していた（`screen.entity(BACKGROUND).scale()`）場合は、その拡大率を外すか、次のようにして以前の描画を保ってください。
+
+```kis
+use std::screen::Resize;
+
+screen.background().set_resize(Resize::Natural);
 ```
 
 ### `screen.hud()` {#screen-hud}
@@ -528,7 +539,7 @@ screen.background().change(BG::ROOF).apply_animation(fade(ms(500)));
 | -------------- | ------- | ------------ |
 | 補間されるプロパティ | `position`, `scale`, `rotation`, `opacity`, `filter`, `mix`, `mask`, `local_motion`, `fill` | `change(v).apply_animation(Tween)` |
 | レイヤー | `part(p)`, `image()`, `label()`, `movie()` | `change(x)` または `paint(p)` の後に `apply_animation(Transition)` |
-| レイアウト設定 | `set_plane`, `set_z`, `set_anchor`, `set_flip`, `set_fill_size`, `gate` | 直接設定。補間不可 |
+| レイアウト設定 | `set_plane`, `set_z`, `set_anchor`, `set_flip`, `set_fill_size`, `gate`、画像レイヤーの [`set_resize`](#imagelayer-set_resize) | 直接設定。補間不可 |
 | 相対モーション | `apply_animation(Motion)` | [`Motion`](./screen-anim.md#motion) を参照 |
 | シェーダーの経路 | `travel(to, motion)` | [`travel`](#entity-travel) を参照 |
 
@@ -663,7 +674,7 @@ pub const fn image(&mut self) -> &mut ImageLayer {
 | `set_flip(f)` | 描画を鏡像反転する |
 | `set_fill_size(s)` | 塗りのサイズを設定する。`None` は画面全体 |
 
-設定は即座に反映され、アニメーションしません。種別：`const fn` · ビルトイン：はい。
+設定は即座に反映され、アニメーションしません。種別：`const fn` · ビルトイン：はい。各画像レイヤーが内容をどの大きさにするかは、レイヤー側で [`ImageLayer::set_resize`](#imagelayer-set_resize) により設定します。
 
 ### `entity.gate(setting)` {#gate}
 
@@ -702,7 +713,7 @@ const fn clock_overlay(mut screen: Screen) -> Screen {
 
 - プレーンは `Background < Stage < Front <（ゲームビューが描くテキストウィンドウ）< OverWindow` の順に描画されます。プレーン内では `z` の昇順、次に `EntityId` の昇順です。`z` は CSS の `z-index` に相当します。
 - エンティティ内の順序は、塗り、`Part` 昇順のパーツ（画像とペイント）、ムービー、ラベルです。
-- アンカー点は `position` に置かれます。エンティティのサイズは `MAIN` パーツの画像またはペイントのサイズ、なければ塗りサイズ、なければラベルのボックスです。拡大縮小と回転はアンカーを中心に行われます。
+- アンカー点は `position` に置かれます。エンティティの矩形（サイズ）は `MAIN` レイヤーの[矩形](#resize)（差し替え中は新しい内容のもの）、なければ塗りサイズ、なければラベルのボックスです。`MAIN` レイヤーはアンカーによってエンティティの矩形の中に配置され、ほかのパーツは矩形の左上の角に置かれ、それぞれ自身のリサイズで大きさが決まります。拡大縮小と回転はアンカーを中心に、リサイズの後でエンティティ全体にかかります。
 - エンティティの効果は、内側から順に入れ子になります。エンティティの矩形にかかるマスク、ローカルモーション（とトラベル）、フィルター、不透明度付きのミックスです。塗りサイズのない塗りはフィルターとミックスの内側に描かれますが、動きもマスクもされません。
 - カメラは `Background`、`Stage`、`Front` にだけかかります。オフセットは平行移動し、ズームと回転は画面中心を軸にします。
 - 画面フィルターも同じ 3 つのプレーンに、カメラの後でかかります。
@@ -745,6 +756,52 @@ impl<T> Change<T> {
 
 レイヤーの差し替えはプロパティの変更と同じように動作し、`Tween` の代わりに [`Transition`](./screen-anim.md#transition) を使います。論理的な内容はすぐに変わり、トランジションが `cursor + delay` で古い内容から新しい内容へ進みます。`clear()` は何もない状態へ差し替えます。
 
+### 列挙型：`Resize` {#resize}
+
+```kis
+pub enum Resize {
+    Natural,
+    Factor(Decimal),
+    Width(u32),
+    Height(u32),
+    Stretch(Size),
+    Contain(Size),
+    Cover(Size),
+}
+```
+
+[画像レイヤー](#imagelayer)が内容をどの大きさにするかを、エンティティの拡大率より前に決めます。リサイズは内容自身のサイズ（画像のピクセルサイズ、またはペイントの `size`）から、レイヤーがエンティティの中で占めるサイズであるレイヤーの**矩形**と、内容を描くサイズを決めます。内容は矩形の中央に置かれます。
+
+| バリアント | 矩形 | 内容 |
+| ------- | --- | ------- |
+| `Natural` | 自身のサイズ | 矩形と同じ |
+| `Factor(f)` | 自身のサイズ × `f`。`f` ≤ 0.0 では何も描かない | 矩形と同じ |
+| `Width(w)` | `w` × （自身の高さ · `w` / 自身の幅） | 矩形と同じ |
+| `Height(h)` | （自身の幅 · `h` / 自身の高さ） × `h` | 矩形と同じ |
+| `Stretch(s)` | `s`（縦横比を無視） | 矩形と同じ |
+| `Contain(s)` | `s` | 内容の縦横比を保って `s` に収まる最大のサイズ。余白は透明 |
+| `Cover(s)` | `s` | 内容の縦横比を保って `s` を覆う最小のサイズ。はみ出した部分は切り取られる |
+
+- 内容がレイヤーの矩形の外に描かれることはありません。はみ出すのは `Cover` だけで、切り取りは画像やペイントそのものを切り抜くので、拡大縮小、回転、反転、モーションの下でも正確です。
+- `MAIN` レイヤーの矩形がエンティティの矩形で、アンカー、マスク、ほかのパーツはこれを使います。[描画順序](#drawing-order) を参照してください。
+- エンティティの `scale` はリサイズの後に、エンティティ全体にかかります。リサイズはレイアウト上のサイズ、`scale` はアニメーションさせるズームです。
+- 画像レイヤーは Hud のサイド画像も含めてすべて `Natural` で始まります。例外は [`Screen::empty()`](#screen-empty) が作る `BACKGROUND` エンティティの `MAIN` レイヤーで、デザイン解像度（`System::resolution`）の `Cover` で始まります。
+- [`ImageLayer::set_resize`](#imagelayer-set_resize) で設定します。
+
+1280×720 のゲームで、画像の解像度にかかわらず CG 全体を表示する例です。
+
+```kis
+use std::screen::{Resize, size};
+
+const fn cg(mut screen: Screen) -> Screen {
+    screen.entity(CG).set_plane(Plane::Front);
+    screen.entity(CG).image().set_resize(Resize::Contain(size(1280, 720)));
+    screen.entity(CG).image().change(CG_001).apply_animation(fade(ms(500)));
+    screen.entity(CG).opacity().change(1.0).apply_animation(tween(ms(500)));
+    screen
+}
+```
+
 ### 構造体：`ImageLayer` {#imagelayer}
 
 ```kis
@@ -754,6 +811,7 @@ impl ImageLayer {
     #[builtin] pub const fn change(&mut self, image: ImageAsset) -> &mut Swap;
     #[builtin] pub const fn paint(&mut self, paint: shader::Paint) -> &mut Swap;
     #[builtin] pub const fn clear(&mut self) -> &mut Swap;
+    #[builtin] pub const fn set_resize(&mut self, resize: Resize);
 }
 ```
 
@@ -761,14 +819,26 @@ impl ImageLayer {
 
 - `get()` は表示中の画像（あれば）です。レイヤーがペイントを表示しているときも `None` です。
 - `change(image)` は内容を `image` に差し替えます。
-- `paint(p)` は内容を、生成された [`Paint`](./screen-shader.md#paint) `p` に差し替えます。グラデーションや雨など、テクスチャーシェーダーが描く `p` のサイズの内容です。そのサイズの画像と同じように配置、反転、差し替えされ、`MAIN` パーツならエンティティのサイズを決めます。
+- `paint(p)` は内容を、生成された [`Paint`](./screen-shader.md#paint) `p` に差し替えます。グラデーションや雨など、テクスチャーシェーダーが描く `p` のサイズの内容です。そのサイズの画像と同じように配置、反転、差し替え、[リサイズ](#resize)されます。`p` のサイズで生成されてから内容のサイズへ引き伸ばされるので、シェーダーには引き続き `p` のピクセルサイズが見え、`Cover` では切り取られます。
 - `clear()` は何もない状態に差し替えます。
+- `set_resize(r)` はレイヤーが内容をどの大きさにするかを設定します。[`set_resize`](#imagelayer-set_resize) を参照してください。
 
 ```kis
 use std::screen::{degrees, rgba, size};
 
 screen.entity(RAIN).image().paint(std::shaders::texture::rain(rgba(200, 210, 255, 160), 30, 900.0, degrees(10.0), size(1920, 1080))).apply_animation(fade(ms(500)));
 ```
+
+#### `layer.set_resize(resize)` {#imagelayer-set_resize}
+
+```kis
+#[builtin] pub const fn set_resize(&mut self, resize: Resize);
+```
+
+- `resize` [`Resize`](#resize) — レイヤーが内容をどの大きさにするか。
+- レイヤーが表示するすべての内容の大きさの決め方を設定します。[レイアウト設定](#entity-setters)と同じく、即座に反映され、アニメーションせず、論理画面の一部です。
+- リサイズは内容ではなくレイヤーに属するので、`change`、`paint`、`clear` の後も保たれます。差し替えの両側に適用され、トランジション中は古い内容と新しい内容がそれぞれこのリサイズで大きさを決められます。
+- 種別：`const fn` · ビルトイン：はい。
 
 ### 構造体：`LabelLayer` {#labellayer}
 
@@ -838,6 +908,8 @@ impl Hud {
 ```
 
 物語がゲームビューのクロームに求めるものです。テキストウィンドウとクイックメニューを表示するかどうか、テキストウィンドウ横のサイド画像を表します。Hud は論理画面の一部です。ゲームビューは `Narrative::hud()` で読み取り、物語が読むことはありません。種別：`const fn` · ビルトイン：はい。
+
+サイド画像は[画像レイヤー](#imagelayer)で、自身の[リサイズ](#resize)で大きさが決まります。ゲームビューはその矩形の左下の角を画面の左下の角に合わせて描画します。
 
 ```kix
 s!(render = |mut screen| {

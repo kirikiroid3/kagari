@@ -144,7 +144,8 @@ A spawned entity starts invisible, with opacity 0.0, so every appearance states 
 `Change<T>`, `Swap` and `ChannelChange` are `#[must_use]`, so a statement that ends with a change
 still pending, such as `screen.background().change(BG::ROOF);`, is a warning. Only layout
 settings that cannot be interpolated are set directly: `set_plane`, `set_z`, `set_anchor`,
-`set_flip`, `set_fill_size` and `gate`.
+`set_flip`, `set_fill_size` and `gate` on an entity, and `set_resize` (how the layer sizes its
+content, see [`Resize`](../../std/screen.md#resize)) on an image layer.
 
 ### Animations never change the logical screen
 
@@ -204,9 +205,10 @@ complete screen. The compiler detects keyframes itself; no annotation is require
 render is a *delta*.
 
 `Screen::empty()` returns a screen with only the background entity, `BACKGROUND`, opaque and with
-no image: the Hud shows the text window and the quick menu, the camera is neutral, the screen
-filter is `None`, and every audio channel is silent. A keyframe can therefore be written
-explicitly:
+no image, whose main image layer covers the screen whatever the resolution of the image it shows
+(`Resize::Cover` of the design resolution): the Hud shows the text window and the quick menu, the
+camera is neutral, the screen filter is `None`, and every audio channel is silent. A keyframe can
+therefore be written explicitly:
 
 ```kis
 const fn roof_evening(_screen: Screen) -> Screen {

@@ -85,6 +85,8 @@ pub struct Entity {
     pub fill_size: ConstValue,
     /// Image layers by `Part`: `ImageAsset`s or `Paint`s.
     pub parts: OrdMap<u8, ConstValue>,
+    /// Image layer resizes by `Part`; a part without one is `Natural`.
+    pub resize: OrdMap<u8, LayerResize>,
     /// The label's `Text`.
     pub label: Option<ConstValue>,
     /// The label's `TextStyle`; `None` is the system's default style.
@@ -106,6 +108,18 @@ pub struct Hud {
     pub quick_menu: ConstValue,
     /// An `ImageAsset` or a `Paint`.
     pub side_image: Option<ConstValue>,
+    /// The side image's `Resize`; `None` is `Natural`.
+    pub side_image_resize: Option<ConstValue>,
+}
+
+/// How an image layer sizes its content, when it is not `Natural`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum LayerResize {
+    /// `Resize::Cover` of the design resolution, which only the engine knows: what
+    /// `Screen::empty()` gives the `BACKGROUND` entity's `MAIN` layer.
+    CoverScreen,
+    /// A `Resize` other than `Natural`.
+    Set(ConstValue),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -311,6 +325,7 @@ impl Entity {
             ]),
             fill_size: std.none(),
             parts: OrdMap::new(),
+            resize: OrdMap::new(),
             label: None,
             label_style: None,
             label_width: std.none(),
@@ -345,12 +360,14 @@ impl Channel {
 }
 
 impl Screen {
-    /// `Screen::empty()`: only the opaque `BACKGROUND` entity on the `Background` plane,
-    /// the default Hud and camera, no filter and silent channels.
+    /// `Screen::empty()`: only the opaque `BACKGROUND` entity on the `Background` plane, its
+    /// `MAIN` layer covering the design resolution, the default Hud and camera, no filter and
+    /// silent channels.
     pub fn empty(std: &StdTable) -> Screen {
         let mut background = Entity::spawned(std);
         background.plane = std.plane.unit("Background");
         background.opacity = decimal(Decimal::ONE);
+        background.resize.insert(0, LayerResize::CoverScreen);
         let mut entities = OrdMap::new();
         entities.insert(0, background);
         Screen {
@@ -360,6 +377,7 @@ impl Screen {
                     text_window: std.visibility.unit("Shown"),
                     quick_menu: std.visibility.unit("Shown"),
                     side_image: None,
+                    side_image_resize: None,
                 },
                 camera: Camera {
                     offset: std
@@ -505,6 +523,31 @@ impl Screen {
             LayerTarget::Movie(id) => self.entity(id, std).movie = content,
             LayerTarget::SideImage => self.logical.hud.side_image = content,
         }
+    }
+
+    /// `ImageLayer::set_resize`: `Natural` is stored as no resize.
+    pub fn set_resize(
+        &mut self,
+        target: LayerTarget,
+        resize: ConstValue,
+        std: &StdTable,
+    ) -> Result<(), ErrorKind> {
+        let natural = resize == std.resize.unit("Natural");
+        match target {
+            LayerTarget::Part(id, part) => {
+                let layers = &mut self.entity(id, std).resize;
+                if natural {
+                    layers.remove(&part);
+                } else {
+                    layers.insert(part, LayerResize::Set(resize));
+                }
+            }
+            LayerTarget::SideImage => {
+                self.logical.hud.side_image_resize = (!natural).then_some(resize);
+            }
+            LayerTarget::Label(_) | LayerTarget::Movie(_) => return Err(ErrorKind::Abort),
+        }
+        Ok(())
     }
 
     /// Checks the value a pending change will set: fractions for opacity and volume.

@@ -51,6 +51,7 @@ impl LogicalScreen {
                     .as_ref()
                     .map(|p| part(p, r))
                     .transpose()?,
+                side_image_resize: self.hud.side_image_resize,
             },
             camera: self.camera.clone(),
             filter: opt_effect(self.filter.as_ref(), r)?,

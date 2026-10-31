@@ -18,6 +18,27 @@ use crate::pipelines::{MotionUniform, Pipe, Uniforms, Vertex};
 use crate::shaders::ShaderCache;
 use crate::textures::TextureCache;
 
+/// The local coordinates of a whole quad, `[x0, y0, x1, y1]`.
+const WHOLE: [f32; 4] = [0.0, 0.0, 1.0, 1.0];
+
+/// The part of a shader's rect that a quad shows: local coordinates `[x0, y0, x1, y1]`, and the
+/// size in px of the whole rect (`kg_size`).
+#[derive(Clone, Copy, Debug)]
+struct Span {
+    local: [f32; 4],
+    size: [f32; 2],
+}
+
+impl Span {
+    /// All of `rect`.
+    fn whole(rect: &Rect) -> Span {
+        Span {
+            local: WHOLE,
+            size: [rect.w, rect.h],
+        }
+    }
+}
+
 /// A pixel rectangle of a target.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct PxRect {
@@ -497,31 +518,40 @@ impl<'a> Planner<'a> {
         u32::try_from(self.plan.verts.len()).unwrap_or(u32::MAX)
     }
 
-    /// A quad of corners `p` (top-left, top-right, bottom-left, bottom-right) in target px.
-    pub fn quad_points(&mut self, p: [[f32; 2]; 4], uv: [f32; 4], color: [f32; 4]) -> Range<u32> {
+    /// A quad of corners `p` (top-left, top-right, bottom-left, bottom-right) in target px, with
+    /// `uv` and the local coordinates `local` (both `[x0, y0, x1, y1]`) at its corners.
+    pub fn quad_points(
+        &mut self,
+        p: [[f32; 2]; 4],
+        uv: [f32; 4],
+        local: [f32; 4],
+        color: [f32; 4],
+    ) -> Range<u32> {
         let start = self.vertex_index();
         let [u0, v0, u1, v1] = uv;
+        let [l0, m0, l1, m1] = local;
         let corner = |i: usize, u: f32, v: f32, local: [f32; 2]| Vertex {
             pos: p.get(i).copied().unwrap_or_default(),
             uv: [u, v],
             color,
             local,
         };
-        let tl = corner(0, u0, v0, [0.0, 0.0]);
-        let tr = corner(1, u1, v0, [1.0, 0.0]);
-        let bl = corner(2, u0, v1, [0.0, 1.0]);
-        let br = corner(3, u1, v1, [1.0, 1.0]);
+        let tl = corner(0, u0, v0, [l0, m0]);
+        let tr = corner(1, u1, v0, [l1, m0]);
+        let bl = corner(2, u0, v1, [l0, m1]);
+        let br = corner(3, u1, v1, [l1, m1]);
         self.plan.verts.extend_from_slice(&[tl, tr, bl, tr, br, bl]);
         start..self.vertex_index()
     }
 
     /// `rect` transformed by `xf`.
     pub fn quad(&mut self, xf: &Affine, rect: &Rect, uv: [f32; 4], color: [f32; 4]) -> Range<u32> {
-        self.quad_flipped(xf, rect, false, false, uv, color)
+        self.quad_flipped(xf, rect, false, false, uv, WHOLE, color)
     }
 
     /// `rect` transformed by `xf`, its corners mirrored horizontally / vertically (so `uv` and
-    /// the local coordinates flip with them).
+    /// the local coordinates `local` flip with them).
+    #[allow(clippy::too_many_arguments)]
     fn quad_flipped(
         &mut self,
         xf: &Affine,
@@ -529,6 +559,7 @@ impl<'a> Planner<'a> {
         flip_x: bool,
         flip_y: bool,
         uv: [f32; 4],
+        local: [f32; 4],
         color: [f32; 4],
     ) -> Range<u32> {
         let (mut x0, mut x1) = (rect.x, rect.x + rect.w);
@@ -545,7 +576,7 @@ impl<'a> Planner<'a> {
             apply(xf, x0, y1),
             apply(xf, x1, y1),
         ];
-        self.quad_points(p, uv, color)
+        self.quad_points(p, uv, local, color)
     }
 
     /// The whole target, uv 0..1 (layer composites).
@@ -610,13 +641,15 @@ impl<'a> Planner<'a> {
     }
 
     /// Draws mask shader `effect` over `rect` (under `ctx.xf`, in `ctx.slot`) into a new cleared
-    /// layer, or `None` when the shader is unavailable.
+    /// layer, or `None` when the shader is unavailable. `span` is the part of the shader's
+    /// rect that `rect` shows.
     fn mask_layer(
         &mut self,
         ctx: &Ctx,
         effect: &ShaderEffect,
         rect: &Rect,
         flip: (bool, bool),
+        span: Span,
     ) -> Option<LayerId> {
         if !self.available(effect, ShaderRole::Mask) {
             return None;
@@ -626,7 +659,7 @@ impl<'a> Planner<'a> {
         let uniform = self.params(
             ctx.slot,
             [effect.time, 0.0, 0.0, 0.0],
-            [0.0, 0.0, rect.w, rect.h],
+            [0.0, 0.0, span.size[0], span.size[1]],
             [0.0; 4],
         );
         let verts = self.quad_flipped(
@@ -635,6 +668,7 @@ impl<'a> Planner<'a> {
             flip.0,
             flip.1,
             [0.0, 0.0, 1.0, 1.0],
+            span.local,
             [1.0; 4],
         );
         self.shader_draw(
@@ -692,11 +726,19 @@ impl<'a> Planner<'a> {
             } => self.motion(ctx, stages, pose, children),
             Node::Paint {
                 rect,
+                size,
+                uv,
                 texture,
                 mask,
                 flip_x,
                 flip_y,
-            } => self.paint(ctx, rect, texture, mask.as_ref(), (*flip_x, *flip_y)),
+            } => {
+                let span = Span {
+                    local: [uv.x, uv.y, uv.x + uv.w, uv.y + uv.h],
+                    size: *size,
+                };
+                self.paint(ctx, rect, span, texture, mask.as_ref(), (*flip_x, *flip_y));
+            }
             Node::Image {
                 rect,
                 image,
@@ -911,7 +953,7 @@ impl<'a> Planner<'a> {
             return;
         }
         let content = self.isolate(&ctx, ctx.scissor, ctx.xf, children);
-        match self.mask_layer(&ctx, effect, rect, (false, false)) {
+        match self.mask_layer(&ctx, effect, rect, (false, false), Span::whole(rect)) {
             Some(mask) => {
                 let verts = self.full_quad([ctx.alpha; 4]);
                 let base = self.base;
@@ -939,11 +981,13 @@ impl<'a> Planner<'a> {
         self.layers.release(content);
     }
 
-    /// `Node::Paint`: the texture shader over `rect`, times its mask shader when it has one.
+    /// `Node::Paint`: the texture shader over `rect`, times its mask shader when it has one;
+    /// `span` is the part of the paint that `rect` shows.
     fn paint(
         &mut self,
         ctx: Ctx,
         rect: &Rect,
+        span: Span,
         texture: &ShaderEffect,
         mask: Option<&ShaderEffect>,
         flip: (bool, bool),
@@ -954,11 +998,11 @@ impl<'a> Planner<'a> {
         {
             return;
         }
-        let mask = mask.and_then(|m| self.mask_layer(&ctx, m, rect, flip));
+        let mask = mask.and_then(|m| self.mask_layer(&ctx, m, rect, flip, span));
         let uniform = self.params(
             ctx.slot,
             [texture.time, 0.0, 0.0, 0.0],
-            [0.0, 0.0, rect.w, rect.h],
+            [0.0, 0.0, span.size[0], span.size[1]],
             [0.0; 4],
         );
         let verts = self.quad_flipped(
@@ -967,6 +1011,7 @@ impl<'a> Planner<'a> {
             flip.0,
             flip.1,
             [0.0, 0.0, 1.0, 1.0],
+            span.local,
             [ctx.alpha; 4],
         );
         let bind = match mask {
@@ -1169,7 +1214,7 @@ impl<'a> Planner<'a> {
                 mask: effect,
                 softness,
                 reverse,
-            } => match self.mask_layer(&ctx, effect, bounds, (false, false)) {
+            } => match self.mask_layer(&ctx, effect, bounds, (false, false), Span::whole(bounds)) {
                 Some(layer) => {
                     mask = TransitionMask::Layer(layer);
                     let rev = if *reverse { 1.0 } else { 0.0 };

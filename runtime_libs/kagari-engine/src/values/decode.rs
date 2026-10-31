@@ -231,6 +231,22 @@ pub(crate) struct PaintSpec {
     pub mask: Option<EffectSpec>,
 }
 
+/// How an image layer sizes its content (`std::screen::Resize`), plus the default of the
+/// `BACKGROUND` entity's `MAIN` layer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Resize {
+    Natural,
+    Factor(Decimal),
+    Width(u32),
+    Height(u32),
+    Stretch([u32; 2]),
+    Contain([u32; 2]),
+    Cover([u32; 2]),
+    /// `Cover` of the design resolution, which `Screen::empty()` gives the `BACKGROUND`
+    /// entity's `MAIN` layer; resolved when drawn.
+    CoverScreen,
+}
+
 /// `std::screen::shader::TransitionalMotion`.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TransitionalMotionSpec {
@@ -457,6 +473,20 @@ pub(crate) fn decode_easing(std: &StdTypes, v: &Value) -> Result<Easing, Trap> {
             .map(Easing::Named)
             .ok_or_else(|| host_trap(format!("malformed `Easing`: variant {variant}"))),
         _ => Err(host_trap(format!("malformed `Easing`: variant {variant}"))),
+    }
+}
+
+pub(crate) fn decode_resize(std: &StdTypes, v: &Value) -> Result<Resize, Trap> {
+    let (variant, fields) = std.variant(v, StdTy::Resize)?;
+    match (variant, fields) {
+        (0, []) => Ok(Resize::Natural),
+        (1, [factor]) => Ok(Resize::Factor(decode_decimal(factor)?)),
+        (2, [w]) => Ok(Resize::Width(int_as(w, "Resize", "Width")?)),
+        (3, [h]) => Ok(Resize::Height(int_as(h, "Resize", "Height")?)),
+        (4, [size]) => Ok(Resize::Stretch(decode_size(std, size)?)),
+        (5, [size]) => Ok(Resize::Contain(decode_size(std, size)?)),
+        (6, [size]) => Ok(Resize::Cover(decode_size(std, size)?)),
+        _ => Err(host_trap(format!("malformed `Resize`: variant {variant}"))),
     }
 }
 

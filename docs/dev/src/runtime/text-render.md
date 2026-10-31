@@ -153,7 +153,7 @@ and glyphs share one pipeline. Glyph quads are snapped to whole pixels at the gl
 | `Mix { effect, opacity, children }` | children drawn into a layer, then composited over the backdrop by a mixing shader, which returns the final pixel |
 | `Masked { effect, rect, children }` | children drawn into a layer whose alpha is multiplied by a mask shader evaluated over `rect` |
 | `Motion { stages, pose, children }` | GPU motion: the stages (a transitional, then a local motion shader) compute a pose from `pose`; the children are displaced by `P·M(result)·M(pose)⁻¹·P⁻¹` |
-| `Paint { rect, texture, mask, flip_x, flip_y }` | generated content: a texture shader over `rect`, optionally times a mask shader |
+| `Paint { rect, size, uv, texture, mask, flip_x, flip_y }` | generated content: a texture shader of `size` px (its `kg_size()`), optionally times a mask shader; `rect` shows its part `uv` (`0..1` for all of it), so a resized paint is stretched and a `Cover` paint cropped |
 | `Image { rect, image, uv, flip_x, flip_y, tint }` | an image asset |
 | `Fill { rect, color }` | a solid rectangle |
 | `NineSlice { rect, image, insets, tint }` | a nine-slice image; insets in source pixels, CSS order |
@@ -177,19 +177,26 @@ design pixels, a scale and a rotation in radians (clockwise, y down).
   design resolution into the element's rect and clipped to it. Entities are sorted by
   `(plane, z, id)`. `Background`, `Stage` and `Front` form one group under the camera transform
   `T(c)·S(zoom)·R(−rotation)·T(−c)·T(−offset)` (`c` the screen centre), wrapped in a `Filter` when
-  the screen has a filter. The `OverWindow` plane and the HUD side image (at the bottom left,
-  faded with the text window, hidden with it) are deferred and drawn after the mount's whole
-  tree, so they sit above the text window.
+  the screen has a filter. The `OverWindow` plane and the HUD side image (sized by its layer's
+  `Resize`, with its box's bottom-left corner at the screen's bottom-left corner, faded with the
+  text window, hidden with it) are deferred and drawn after the mount's whole tree, so they sit
+  above the text window.
 - **An entity**, outermost first: a `Mix` with the entity's opacity when it has a mix, else a
   `Group` with its opacity; a `Filter` when it has a filter; inside, an unsized fill covering the
   screen (never moved), then a `Motion` when a travel plays or it has a local motion, holding a
   group with `T(position)·R(rotation)·S(scale)·T(−anchor × size)`, holding a `Masked` over the
   entity's box when it has a mask, holding the sized fill, the parts in part order (images or
-  paints; part 0 placed by the anchor, the others at the origin; flips mirror them) and the
-  label. The entity size is part 0's image or paint size, else the fill size, else the label
-  size. Under a `Motion` a zero scale is drawn at 1, so that the pose stays invertible and the
-  stages decide the scale. A gated entity is drawn only while its `Setting<bool>` is true; this
-  is how settings reach the screen without reaching the story.
+  paints; part 0 placed by the anchor in the entity's box, the others at the origin; flips mirror
+  them) and the label. Each part is sized by its layer's `Resize` (`screen/draw.rs`, `resized`):
+  a box, and the content's rect centred in it, larger than the box only under `Cover`. The content
+  is cropped to the box by cutting its uv range (`content_node`), not by a scissor, so the clip
+  stays exact under the entity's transform, flips and motions; a paint is generated at its own
+  `size` and stretched to the content rect, so `kg_size()` stays that size. The entity size is
+  part 0's box (the new side's during a transition, `layer_box`), else the fill size, else the
+  label size. `S(scale)` applies on top of the resize. Under a `Motion` a zero scale is drawn at
+  1, so that the pose stays invertible and the stages decide the scale. A gated entity is drawn
+  only while its `Setting<bool>` is true; this is how settings reach the screen without reaching
+  the story.
 - **Transitions** of image and label layers become `Node::Transition` over the union of both
   sides; `Cut` just shows the new side.
 - **The text window.** The subtree that holds the `message` element (and no game screen) is the

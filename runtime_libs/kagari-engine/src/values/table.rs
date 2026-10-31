@@ -63,6 +63,9 @@ std_adts! {
     Plane = "std::screen::Plane", true, [Background(), Stage(), Front(), OverWindow()];
     Visibility = "std::screen::Visibility", true, [Shown(), Hidden()];
     Flip = "std::screen::Flip", true, [None(), Horizontal(), Vertical(), Both()];
+    Resize = "std::screen::Resize", true, [
+        Natural(), Factor(_), Width(_), Height(_), Stretch(_), Contain(_), Cover(_),
+    ];
     VAlign = "std::screen::VAlign", true, [Top(), Middle(), Bottom()];
     Pose = "std::screen::Pose", false, [Pose(position, scale, rotation)];
     Movie = "std::screen::Movie", false, [Movie(video, looping)];

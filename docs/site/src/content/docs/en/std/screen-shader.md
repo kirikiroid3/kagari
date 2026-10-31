@@ -246,8 +246,8 @@ pub struct Paint {
 
 Generated image content of `size` pixels: a texture shader with its arguments, optionally masked.
 An [`ImageLayer`](./screen.md#imagelayer) shows a paint in place of an image with
-`ImageLayer::paint`; it is placed, sized, flipped and swapped with transitions like an image of
-`size` pixels. Gradients, light spots and weather are paints.
+`ImageLayer::paint`; it is placed, sized, [resized](./screen.md#resize), flipped and swapped with
+transitions like an image of `size` pixels. Gradients, light spots and weather are paints.
 
 ### `paint(shader, args, size)` {#paint-fn}
 

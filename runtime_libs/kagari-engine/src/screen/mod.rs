@@ -20,7 +20,7 @@ use crate::values::{
     decode_asset, decode_color, decode_decimal, decode_duration_ms, decode_effect,
     decode_entity_id, decode_flip, decode_handle, decode_int, decode_local_motion, decode_mark,
     decode_motion, decode_movie, decode_offset, decode_paint, decode_part, decode_plane,
-    decode_point, decode_pose, decode_size, decode_sound, decode_transition,
+    decode_point, decode_pose, decode_resize, decode_size, decode_sound, decode_transition,
     decode_transitional_motion, decode_tween, decode_valign, decode_visibility, effect_value,
     entity_id_value, host_trap, offset_value, option_asset_value, point_value, visibility_value,
 };
@@ -81,6 +81,7 @@ import_table!(
         ImageLayerChange = "std::screen::ImageLayer::change",
         ImageLayerClear = "std::screen::ImageLayer::clear",
         ImageLayerPaint = "std::screen::ImageLayer::paint",
+        ImageLayerSetResize = "std::screen::ImageLayer::set_resize",
         LabelLayerChange = "std::screen::LabelLayer::change",
         LabelLayerClear = "std::screen::LabelLayer::clear",
         LabelLayerSetStyle = "std::screen::LabelLayer::set_style",
@@ -544,6 +545,15 @@ impl ScreenImport {
                     _ => None,
                 };
                 pending(&part.screen, PendingChange::Layer(target, content))
+            }
+            I::ImageLayerSetResize => {
+                let resize = decode_resize(std, &a(1)?)?;
+                let part = part_of(rcv, path)?;
+                let PartTarget::Layer(target) = part.target else {
+                    return Err(bad_receiver(path));
+                };
+                with_screen(vm, &part.screen, |s| s.set_resize(target, resize))?;
+                Ok(unit())
             }
             I::LabelLayerSetStyle | I::LabelLayerSetWidth => {
                 let value = a(1)?;

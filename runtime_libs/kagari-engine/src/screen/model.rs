@@ -12,7 +12,7 @@ use kagari_vm::{
 };
 
 use crate::values::{
-    AudioFade, EffectSpec, Flip, LoopSpec, Motion, MovieSpec, PaintSpec, Plane, PoseSpec,
+    AudioFade, EffectSpec, Flip, LoopSpec, Motion, MovieSpec, PaintSpec, Plane, PoseSpec, Resize,
     SoundSpec, Transition, TransitionalMotionSpec, Tween, VAlign, Visibility, check_easing,
     check_fraction, check_motion, host_trap,
 };
@@ -51,6 +51,8 @@ pub(crate) struct Entity {
     pub fill: [u8; 4],
     pub fill_size: Option<[u32; 2]>,
     pub parts: BTreeMap<u8, PartContent>,
+    /// Image layer resizes by part; a part without one is `Natural`.
+    pub resize: BTreeMap<u8, Resize>,
     pub label: Option<Text>,
     pub label_style: Option<Value>,
     pub label_width: Option<u32>,
@@ -99,6 +101,7 @@ impl PartialEq for Entity {
             && self.fill == other.fill
             && self.fill_size == other.fill_size
             && self.parts == other.parts
+            && self.resize == other.resize
             && self.label_width == other.label_width
             && self.movie == other.movie
             && self.flip == other.flip
@@ -116,6 +119,7 @@ pub(crate) struct Hud {
     pub text_window: Visibility,
     pub quick_menu: Visibility,
     pub side_image: Option<PartContent>,
+    pub side_image_resize: Resize,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -350,6 +354,7 @@ impl Entity {
             fill: [0, 0, 0, 0],
             fill_size: None,
             parts: BTreeMap::new(),
+            resize: BTreeMap::new(),
             label: None,
             label_style: None,
             label_width: None,
@@ -380,6 +385,11 @@ impl Entity {
             LayerTarget::Movie(_) => self.movie.clone().map(LayerContent::Movie),
             LayerTarget::SideImage => None,
         }
+    }
+
+    /// How image layer `part` sizes its content.
+    pub fn resize(&self, part: u8) -> Resize {
+        self.resize.get(&part).copied().unwrap_or(Resize::Natural)
     }
 }
 
@@ -433,12 +443,14 @@ impl LogicalScreen {
 }
 
 impl ScreenObj {
-    /// `Screen::empty()`: only the opaque `BACKGROUND` entity on the `Background` plane, the
-    /// default Hud and camera, no filter and silent channels.
+    /// `Screen::empty()`: only the opaque `BACKGROUND` entity on the `Background` plane, its
+    /// `MAIN` layer covering the design resolution, the default Hud and camera, no filter and
+    /// silent channels.
     pub fn empty() -> ScreenObj {
         let mut background = Entity::spawned();
         background.plane = Plane::Background;
         background.opacity = Decimal::ONE;
+        background.resize.insert(0, Resize::CoverScreen);
         let mut entities = BTreeMap::new();
         entities.insert(0, background);
         ScreenObj {
@@ -448,6 +460,7 @@ impl ScreenObj {
                     text_window: Visibility::Shown,
                     quick_menu: Visibility::Shown,
                     side_image: None,
+                    side_image_resize: Resize::Natural,
                 },
                 camera: Camera {
                     offset: [0, 0],
@@ -596,6 +609,23 @@ impl ScreenObj {
             }
             (LayerTarget::SideImage, None) => self.logical.hud.side_image = None,
             _ => return Err(mismatch()),
+        }
+        Ok(())
+    }
+
+    /// `ImageLayer::set_resize`; `Natural` is stored as no resize.
+    pub fn set_resize(&mut self, target: LayerTarget, resize: Resize) -> Result<(), Trap> {
+        match target {
+            LayerTarget::Part(id, part) => {
+                let layers = &mut self.entity_mut(id).resize;
+                if resize == Resize::Natural {
+                    layers.remove(&part);
+                } else {
+                    layers.insert(part, resize);
+                }
+            }
+            LayerTarget::SideImage => self.logical.hud.side_image_resize = resize,
+            LayerTarget::Label(_) | LayerTarget::Movie(_) => return Err(mismatch()),
         }
         Ok(())
     }

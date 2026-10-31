@@ -53,8 +53,12 @@ pub enum Node {
         children: Vec<Node>,
     },
     /// A texture shader (`TextureShader`) over `rect`, optionally multiplied by a mask shader.
+    /// The paint is `size` px (its shaders' `kg_size`); `rect` shows its part `uv` (fractions
+    /// of it, `0..1` for all of it).
     Paint {
         rect: Rect,
+        size: [f32; 2],
+        uv: Rect,
         texture: ShaderEffect,
         mask: Option<ShaderEffect>,
         flip_x: bool,

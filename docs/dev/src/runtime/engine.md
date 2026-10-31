@@ -459,9 +459,13 @@ compiler's `core/kagari-lang/src/eval/machine/screen.rs` with typed fields
 
 - `LogicalScreen`, the persistent state after a render: entities (`BTreeMap<u32, Entity>` with
   plane, z, position, anchor, scale, rotation, opacity, filter, mix, mask, local motion, fill,
-  parts (an image or a paint each), label, movie, flip and gate), the HUD (text window, quick
-  menu, side image), the camera, the screen filter, the music channel and four ambience
+  parts (an image or a paint each), the parts' `Resize`s (`Entity::resize`, by part; a part
+  without one is `Natural`), label, movie, flip and gate), the HUD (text window, quick menu, side
+  image and its `Resize`), the camera, the screen filter, the music channel and four ambience
   channels. Screen equality compares only this part; the consistency analysis relies on that.
+  `Screen::empty()` gives the `BACKGROUND` entity's `MAIN` layer `Resize::CoverScreen`: `Cover`
+  of the design resolution, resolved when drawn, because the compiler's model (its
+  `LayerResize::CoverScreen`) does not know the resolution.
 - `StepState`, which belongs to one step: the timeline cursor, the text start cursor, the
   scheduled items, the choice menu's disabled arms and alignment, and despawning entities.
 

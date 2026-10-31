@@ -57,7 +57,7 @@ The asset type chooses the role, and the role chooses the `effect` function the 
 | ---------- | -------- | ----- |
 | `ColorShader<A>` | `fn effect(uv: vec2<f32>) -> vec4<f32>` | `uv` is the position on the screen, 0..1 over the design resolution; `kg_source(uv)` reads what the filter covers |
 | `MixShader<A>` | `fn effect(uv: vec2<f32>) -> vec4<f32>` | `uv` as for colour; `kg_source(uv)` reads the entity (its opacity applied), `kg_backdrop(uv)` what is below it. Returns the **final** pixel, so the shader composites |
-| `TextureShader<A>` | `fn effect(uv: vec2<f32>) -> vec4<f32>` | `uv` is 0..1 over the paint; `kg_size()` is the paint's size in pixels |
+| `TextureShader<A>` | `fn effect(uv: vec2<f32>) -> vec4<f32>` | `uv` is 0..1 over the paint; `kg_size()` is the paint's size in pixels, its `size`, whatever the layer's [`Resize`](../screen.md#resize) |
 | `MaskShader<A>` | `fn effect(uv: vec2<f32>) -> f32` | `uv` is 0..1 over the masked box; `kg_size()` is its size in pixels. Returns 0.0 to 1.0; other values are clamped |
 | `LocalMotionShader<A>` | `fn effect(state: KgState, t: f32) -> KgState` | `state` is the pose of the entity at this frame; `t` the mapped time |
 | `TransitionalMotionShader<A>` | `fn effect(start: KgState, end: KgState, progress: f32, t: f32) -> KgState` | the start and end poses, the eased progress 0..1 and the time |

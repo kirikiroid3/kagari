@@ -151,7 +151,7 @@ Use these renderings consistently. The Japanese edition of the engine proposal
 | step ID | ステップ ID | analysis cache | 解析キャッシュ |
 | debug build / release build | デバッグビルド / リリースビルド | query engine | クエリエンジン |
 | debug adapter | デバッグアダプター | debugger | デバッガー |
-| breakpoint (step / instruction) | ブレークポイント（ステップ / 命令） | | |
+| breakpoint (step / instruction) | ブレークポイント（ステップ / 命令） | resize / box (of a layer) | リサイズ / 矩形 |
 
 A new term that recurs gets a row here and in the Reference's glossary appendix in the same change.
 

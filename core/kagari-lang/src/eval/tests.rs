@@ -14,8 +14,8 @@ use super::domain::DomainCtx;
 use super::machine::anim;
 use super::machine::builtins::{check_marks, to_text};
 use super::machine::screen::{
-    ChannelId, EntityProp, LayerTarget, PendingChange, PropTarget, Scheduled, ScheduledKind,
-    Screen, Target,
+    ChannelId, EntityProp, LayerResize, LayerTarget, PendingChange, PropTarget, Scheduled,
+    ScheduledKind, Screen, Target,
 };
 use super::machine::value::Value;
 use super::machine::{CallSite, EvalError, Machine, Place};
@@ -2072,5 +2072,65 @@ fn shader_effects_on_the_screen() {
     assert_eq!(
         eval.consts[&item(&db, program, "PAINTED_GET")],
         ConstValue::Bool(true)
+    );
+}
+
+#[test]
+fn image_layers_keep_their_resize() {
+    let source = "
+        use std::screen::{Resize, size};
+        const A: EntityId = EntityId(3);
+        const fn resized() -> Screen {
+            let mut screen = Screen::empty();
+            screen.background().set_resize(Resize::Natural);
+            screen.entity(A).image().set_resize(Resize::Cover(size(1280, 720)));
+            screen.entity(A).part(Part(1)).set_resize(Resize::Width(300));
+            screen.entity(A).part(Part(1)).set_resize(Resize::Natural);
+            screen.hud().side_image().set_resize(Resize::Height(200));
+            screen
+        }
+        const EMPTY: Screen = Screen::empty();
+        const RESIZED: Screen = resized();
+        const NATURAL_IS_SPAWNED: bool = {
+            let mut screen = Screen::empty();
+            screen.entity(A).image().set_resize(Resize::Natural);
+            let mut spawned = Screen::empty();
+            spawned.entity(A);
+            screen == spawned
+        };
+    ";
+    let screen = |name: &str| match eval_item(source, name) {
+        Ok(ConstValue::Screen(screen)) => screen,
+        other => panic!("{name}: {other:?}"),
+    };
+    // `Screen::empty()` covers the design resolution with the background.
+    let empty = screen("EMPTY");
+    assert_eq!(
+        empty.logical.entities[&0].resize.get(&0),
+        Some(&LayerResize::CoverScreen)
+    );
+    let (db, program) = setup(source);
+    let std = std_table(&db, program);
+    let resized = screen("RESIZED");
+    assert!(resized.logical.entities[&0].resize.is_empty());
+    let a = &resized.logical.entities[&3];
+    let cover = ConstValue::Adt {
+        item: std.resize.item,
+        variant: std.resize.variant("Cover").unwrap(),
+        fields: vec![
+            std.size
+                .make(vec![ConstValue::Int(1280), ConstValue::Int(720)]),
+        ]
+        .into(),
+    };
+    assert_eq!(
+        a.resize.iter().collect::<Vec<_>>(),
+        vec![(&0, &LayerResize::Set(cover))]
+    );
+    assert!(resized.logical.hud.side_image_resize.is_some());
+    // `Natural` is no resize: setting it leaves the screen equal.
+    assert_eq!(
+        eval_item(source, "NATURAL_IS_SPAWNED"),
+        Ok(ConstValue::Bool(true))
     );
 }

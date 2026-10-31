@@ -38,9 +38,9 @@ use crate::ty::{FnRef, GenericArgs};
 pub use const_exprs::{ConstExprs, ConstLocal, const_exprs};
 pub use machine::MAX_CALL_DEPTH;
 pub use machine::screen::{
-    Camera, Channel, ChannelId, Cursor, CursorAnchor, Entity, EntityProp, Hud, LayerTarget,
-    LogicalScreen, PendingChange, PropTarget, Scheduled, ScheduledKind, Screen, ScreenObj,
-    StepState, Target,
+    Camera, Channel, ChannelId, Cursor, CursorAnchor, Entity, EntityProp, Hud, LayerResize,
+    LayerTarget, LogicalScreen, PendingChange, PropTarget, Scheduled, ScheduledKind, Screen,
+    ScreenObj, StepState, Target,
 };
 pub(crate) use num::{int_bits, is_signed};
 pub use queries::{const_value, promoted_value};

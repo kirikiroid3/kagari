@@ -51,7 +51,7 @@ fn effect(uv: vec2<f32>) -> vec4<f32> {
 | ---------- | -------- | ----- |
 | `ColorShader<A>` | `fn effect(uv: vec2<f32>) -> vec4<f32>` | `uv` は画面上の位置で、デザイン解像度全体で 0..1。`kg_source(uv)` はフィルターが覆うものを読む |
 | `MixShader<A>` | `fn effect(uv: vec2<f32>) -> vec4<f32>` | `uv` は色と同じ。`kg_source(uv)` はエンティティ（不透明度適用済み）、`kg_backdrop(uv)` はその下にあるものを読む。**最終的な**画素を返すので、合成はシェーダーが行う |
-| `TextureShader<A>` | `fn effect(uv: vec2<f32>) -> vec4<f32>` | `uv` はペイント全体で 0..1。`kg_size()` はペイントのサイズ（ピクセル） |
+| `TextureShader<A>` | `fn effect(uv: vec2<f32>) -> vec4<f32>` | `uv` はペイント全体で 0..1。`kg_size()` はペイントのサイズ（ピクセル）で、レイヤーの [`Resize`](../screen.md#resize) にかかわらずその `size` |
 | `MaskShader<A>` | `fn effect(uv: vec2<f32>) -> f32` | `uv` はマスクされる矩形全体で 0..1。`kg_size()` はそのサイズ（ピクセル）。0.0 から 1.0 を返す。範囲外の値は切り詰められる |
 | `LocalMotionShader<A>` | `fn effect(state: KgState, t: f32) -> KgState` | `state` はこのフレームでのエンティティのポーズ、`t` は変換後の時刻 |
 | `TransitionalMotionShader<A>` | `fn effect(start: KgState, end: KgState, progress: f32, t: f32) -> KgState` | 開始ポーズと終了ポーズ、イージング適用後の進行度 0..1、時刻 |

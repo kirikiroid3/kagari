@@ -17,8 +17,8 @@ use crate::audio::{AudioCommand, AudioModel};
 use crate::frame::{MotionStage, ShaderEffect};
 use crate::test_support::{FakePlatform, STD_TYPES, TestHost, engine};
 use crate::values::{
-    AudioFade, Easing, EffectSpec, Flip, LocalMotionBehavior, LoopSpec, Plane, PoseSpec, SoundSpec,
-    Transition, TransitionKind, TransitionalMotionSpec, Tween, VAlign, Visibility,
+    AudioFade, Easing, EffectSpec, Flip, LocalMotionBehavior, LoopSpec, Plane, PoseSpec, Resize,
+    SoundSpec, Transition, TransitionKind, TransitionalMotionSpec, Tween, VAlign, Visibility,
 };
 
 fn tween(duration_ms: u32) -> Animation {
@@ -332,6 +332,12 @@ fn imports_build_a_screen() {
     assert_eq!(hero.opacity, Decimal::new(5, 1));
     assert_eq!(hero.z, 3);
     assert_eq!(hero.parts.len(), 1);
+    assert_eq!(hero.resize(0), Resize::Cover([1280, 720]));
+    assert_eq!(screen.logical.entities[&0].resize(0), Resize::CoverScreen);
+    assert_eq!(
+        screen.logical.hud.side_image_resize,
+        Resize::Factor(Decimal::new(5, 1))
+    );
     assert_eq!(
         screen.logical.music.track.as_ref().map(|t| &*t.path),
         Some("a.ogg")

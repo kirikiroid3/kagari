@@ -42,6 +42,7 @@ The prelude re-exports `Screen`, `Render`, `EntityId`, `Part`, `Point`, `Offset`
 | [`Screen`](#screen) | builtin struct | the screen and the step's timeline |
 | [`Entity`](#entity) | builtin struct | a thing on the screen |
 | [`Prop`](#prop), [`Change`](#change) | builtin structs | interpolated properties |
+| [`Resize`](#resize) | enum | how an image layer sizes its content |
 | [`ImageLayer`](#imagelayer), [`LabelLayer`](#labellayer), [`Movie`](#movie), [`MovieLayer`](#movielayer), [`Swap`](#swap) | structs | layers |
 | [`Hud`](#hud) | builtin struct | the game view's chrome |
 | [`ChoiceMenu`](#choicemenu) | builtin struct | presentation of the step's choice |
@@ -134,8 +135,8 @@ and an overlay.
 pub const MAIN: Part = Part(0);
 ```
 
-The main part, which gives the entity its size. [`Entity::image()`](#entity-image) is
-`part(MAIN)`.
+The main part, whose box gives the entity its size (see [`Resize`](#resize)).
+[`Entity::image()`](#entity-image) is `part(MAIN)`.
 
 ### Struct: `Point` {#point}
 
@@ -172,8 +173,8 @@ pub struct Size {
 pub const fn size(w: u32, h: u32) -> Size
 ```
 
-A size in pixels; `size(w, h)` is `w × h`. Used by [`Entity::set_fill_size`](#entity-set_fill_size).
-Kind: `const fn` · Builtin: no.
+A size in pixels; `size(w, h)` is `w × h`. Used by [`Entity::set_fill_size`](#entity-set_fill_size)
+and [`Resize`](#resize). Kind: `const fn` · Builtin: no.
 
 ### Struct: `Insets` {#insets}
 
@@ -203,10 +204,10 @@ pub const CENTER: Anchor = Anchor { x: 0.5, y: 0.5 };
 pub const BOTTOM_CENTER: Anchor = Anchor { x: 0.5, y: 1.0 };
 ```
 
-The point of an entity that sits at its position, as fractions of the entity's own size,
-`0.0..=1.0`. `TOP_LEFT` is the top-left corner (the spawn default), `CENTER` the centre,
-`BOTTOM_CENTER` the middle of the bottom edge (usual for character sprites). Scale and rotation
-pivot on the anchor.
+The point of an entity that sits at its position, as fractions of the entity's own size (its
+box; see [Drawing order](#drawing-order)), `0.0..=1.0`. `TOP_LEFT` is the top-left corner (the
+spawn default), `CENTER` the centre, `BOTTOM_CENTER` the middle of the bottom edge (usual for
+character sprites). Scale and rotation pivot on the anchor.
 
 ### Struct: `Angle` {#angle}
 
@@ -382,7 +383,8 @@ reaches its state only through the methods below. Screens compare with `==` (the
 ```
 
 - Returns: a screen with only the opaque `BACKGROUND` entity (plane `Background`, opacity 1.0, no
-  image).
+  image). Its `MAIN` layer has the resize [`Resize::Cover`](#resize) of the design resolution
+  (`System::resolution`), so a background image covers the screen whatever its resolution.
 - The Hud has the text window and quick menu `Shown` and no side image.
 - The camera has offset 0, zoom 1.0 and rotation 0.
 - The screen filter is `None`.
@@ -422,7 +424,7 @@ const fn roof_evening(_screen: Screen) -> Screen {
 | **opacity** | **0.0** |
 | filter, mix, mask, local motion | `None` |
 | fill, fill size | `TRANSPARENT`, `None` (whole screen) |
-| layers | no parts, no label, no movie |
+| layers | no parts, no label, no movie; a part starts with `Resize::Natural` |
 | flip, gate | `Flip::None`, `None` |
 
 A spawned entity is invisible, so every appearance states its animation:
@@ -434,6 +436,9 @@ screen.entity(HANAKO).opacity().change(1.0).apply_animation(tween(ms(300)));
 
 `entity(id)` on an id with a pending despawn cancels the despawn; the entity keeps its current
 values.
+
+These defaults hold for every id: a `BACKGROUND` entity spawned again after a despawn has a `MAIN`
+layer with `Resize::Natural`, not the `Cover` that [`Screen::empty()`](#screen-empty) gives it.
 
 ### `screen.contains(id)` {#screen-contains}
 
@@ -490,10 +495,24 @@ pub const fn background(&mut self) -> &mut ImageLayer {
 }
 ```
 
-The main image of the `BACKGROUND` entity. Kind: `const fn` · Builtin: no.
+The main image of the `BACKGROUND` entity. `Screen::empty()` gives it the resize
+[`Resize::Cover`](#resize) of the design resolution, so a background fills the screen whatever its
+resolution, and a transition between backgrounds of different resolutions stays full-screen.
+Kind: `const fn` · Builtin: no.
 
 ```kis
 screen.background().change(BG::ROOF).apply_animation(fade(ms(500)));
+```
+
+**Migration.** Before `Resize`, a background was drawn at its pixel size; now it covers the
+screen. A background already at the design resolution looks the same. If you scaled the
+background entity (`screen.entity(BACKGROUND).scale()`) to make it fit, drop that scale, or keep
+the old drawing with:
+
+```kis
+use std::screen::Resize;
+
+screen.background().set_resize(Resize::Natural);
 ```
 
 ### `screen.hud()` {#screen-hud}
@@ -595,7 +614,7 @@ fill and layers. The component set is fixed; studios add no components.
 | -------------- | ------- | ------------ |
 | Interpolated properties | `position`, `scale`, `rotation`, `opacity`, `filter`, `mix`, `mask`, `local_motion`, `fill` | `change(v).apply_animation(Tween)` |
 | Layers | `part(p)`, `image()`, `label()`, `movie()` | `change(x)` or `paint(p)`, then `apply_animation(Transition)` |
-| Layout settings | `set_plane`, `set_z`, `set_anchor`, `set_flip`, `set_fill_size`, `gate` | direct setters, not interpolable |
+| Layout settings | `set_plane`, `set_z`, `set_anchor`, `set_flip`, `set_fill_size`, `gate`, and the image layers' [`set_resize`](#imagelayer-set_resize) | direct setters, not interpolable |
 | Relative motion | `apply_animation(Motion)` | see [`Motion`](./screen-anim.md#motion) |
 | Shader path | `travel(to, motion)` | see [`travel`](#entity-travel) |
 
@@ -748,7 +767,9 @@ movies.
 | `set_flip(f)` | mirrors the drawing |
 | `set_fill_size(s)` | sets the fill's size; `None` covers the whole screen |
 
-Setters take effect at once; they are not animated. Kind: `const fn` · Builtin: yes.
+Setters take effect at once; they are not animated. Kind: `const fn` · Builtin: yes. How each
+image layer sizes its content is set on the layer, with
+[`ImageLayer::set_resize`](#imagelayer-set_resize).
 
 ### `entity.gate(setting)` {#gate}
 
@@ -793,8 +814,11 @@ logical state does not change. Kind: `const fn` · Builtin: yes.
   CSS `z-index`.
 - Inside an entity, the order is fill, parts by ascending `Part` (images and paints), movie,
   label.
-- The anchor point sits at `position`. The entity size is the size of the `MAIN` part's image or
-  paint, else the fill size, else the label box. Scale and rotation pivot on the anchor.
+- The anchor point sits at `position`. The entity's box (its size) is the
+  [box](#resize) of the `MAIN` layer (the new content's during a swap), else the fill size, else
+  the label box. The `MAIN` layer is placed in the entity's box by the anchor; the other parts sit
+  at the box's top-left corner, each sized by its own resize. Scale and rotation pivot on the
+  anchor and apply after the resize, to the whole entity.
 - An entity's effects nest, innermost first: the mask over the entity's box, then the local motion
   (and travel), then the filter, then the mix with the opacity. A fill without a fill size is
   drawn inside the filter and the mix but is neither moved nor masked.
@@ -849,6 +873,59 @@ A layer swap behaves like a property change, with a [`Transition`](./screen-anim
 instead of a `Tween`: the logical content changes at once, and the transition runs from the old
 content to the new one at `cursor + delay`. `clear()` swaps to nothing.
 
+### Enum: `Resize` {#resize}
+
+```kis
+pub enum Resize {
+    Natural,
+    Factor(Decimal),
+    Width(u32),
+    Height(u32),
+    Stretch(Size),
+    Contain(Size),
+    Cover(Size),
+}
+```
+
+How an [image layer](#imagelayer) sizes its content, before the entity's scale. From the content's
+own size (an image's pixel size, or a paint's `size`), a resize gives the layer's **box**, the size
+the layer takes in the entity, and the size the content is drawn at, centred in the box:
+
+| Variant | Box | Content |
+| ------- | --- | ------- |
+| `Natural` | the own size | the box |
+| `Factor(f)` | the own size × `f`; `f` ≤ 0.0 draws nothing | the box |
+| `Width(w)` | `w` × (own height · `w` / own width) | the box |
+| `Height(h)` | (own width · `h` / own height) × `h` | the box |
+| `Stretch(s)` | `s`, ignoring the aspect ratio | the box |
+| `Contain(s)` | `s` | the largest size with the content's aspect ratio inside `s`; the margins are transparent |
+| `Cover(s)` | `s` | the smallest size with the content's aspect ratio that covers `s`; the overflow is clipped |
+
+- Content is never drawn outside its layer's box. Only `Cover` overflows; the clip crops the image
+  or paint itself, so it stays exact under scale, rotation, flips and motions.
+- The `MAIN` layer's box is the entity's box, which the anchor, the mask and the other parts use;
+  see [Drawing order](#drawing-order).
+- The entity's `scale` applies after the resize, to the whole entity: the resize is the layout
+  size, `scale` the zoom you animate.
+- Every image layer starts `Natural`, the Hud's side image included, except the `MAIN` layer of
+  the `BACKGROUND` entity that [`Screen::empty()`](#screen-empty) creates: it starts as `Cover` of
+  the design resolution (`System::resolution`).
+- Set it with [`ImageLayer::set_resize`](#imagelayer-set_resize).
+
+A CG shown whole in a 1280×720 game, whatever the resolution of its image:
+
+```kis
+use std::screen::{Resize, size};
+
+const fn cg(mut screen: Screen) -> Screen {
+    screen.entity(CG).set_plane(Plane::Front);
+    screen.entity(CG).image().set_resize(Resize::Contain(size(1280, 720)));
+    screen.entity(CG).image().change(CG_001).apply_animation(fade(ms(500)));
+    screen.entity(CG).opacity().change(1.0).apply_animation(tween(ms(500)));
+    screen
+}
+```
+
 ### Struct: `ImageLayer` {#imagelayer}
 
 ```kis
@@ -858,6 +935,7 @@ impl ImageLayer {
     #[builtin] pub const fn change(&mut self, image: ImageAsset) -> &mut Swap;
     #[builtin] pub const fn paint(&mut self, paint: shader::Paint) -> &mut Swap;
     #[builtin] pub const fn clear(&mut self) -> &mut Swap;
+    #[builtin] pub const fn set_resize(&mut self, resize: Resize);
 }
 ```
 
@@ -866,15 +944,33 @@ An image layer of an entity. Kind: `const fn` · Builtin: yes.
 - `get()` is the image shown, if any; `None` also when the layer shows a paint.
 - `change(image)` swaps the content for `image`.
 - `paint(p)` swaps the content for the generated [`Paint`](./screen-shader.md#paint) `p`: content
-  of `p`'s size that a texture shader draws, such as a gradient or rain. It is placed, flipped and
-  swapped like an image of that size, and as the `MAIN` part it gives the entity its size.
+  of `p`'s size that a texture shader draws, such as a gradient or rain. It is placed, flipped,
+  swapped and [resized](#resize) like an image of that size: it is generated at `p`'s size and
+  stretched to the content size, so the shader still sees `p`'s size in pixels, and `Cover` crops
+  it.
 - `clear()` swaps the content for nothing.
+- `set_resize(r)` sets how the layer sizes its content; see
+  [`set_resize`](#imagelayer-set_resize).
 
 ```kis
 use std::screen::{degrees, rgba, size};
 
 screen.entity(RAIN).image().paint(std::shaders::texture::rain(rgba(200, 210, 255, 160), 30, 900.0, degrees(10.0), size(1920, 1080))).apply_animation(fade(ms(500)));
 ```
+
+#### `layer.set_resize(resize)` {#imagelayer-set_resize}
+
+```kis
+#[builtin] pub const fn set_resize(&mut self, resize: Resize);
+```
+
+- `resize` [`Resize`](#resize) — how the layer sizes its content.
+- Sets how the layer sizes every content it shows. Like the [layout setters](#entity-setters), it
+  takes effect at once, is not animated, and is part of the logical screen.
+- The resize belongs to the layer, not to its content: `change`, `paint` and `clear` keep it. It
+  applies to both sides of a swap: during a transition, the old and the new content are each sized
+  by it.
+- Kind: `const fn` · Builtin: yes.
 
 ### Struct: `LabelLayer` {#labellayer}
 
@@ -954,6 +1050,9 @@ impl Hud {
 What the story asks of the game view's chrome: whether the text window and the quick menu are
 shown, and the side image next to the text window. The Hud is part of the logical screen. The game
 view reads it through `Narrative::hud()`; the story never reads it. Kind: `const fn` · Builtin: yes.
+
+The side image is an [image layer](#imagelayer), sized by its own [resize](#resize): the game view
+draws it with the bottom-left corner of its box at the bottom-left corner of the screen.
 
 ```kix
 s!(render = |mut screen| {

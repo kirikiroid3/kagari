@@ -155,6 +155,9 @@ it. Terms of the standard library link to the *STD Reference*.
   [Presentation](../concepts/presentation.md)
 - **Replay.** Running the story again along a recorded trace, to load a save or rewind.
   [Saves, Replay and Determinism](../concepts/saves.md)
+- **Resize.** How an image layer sizes its content, such as `Natural`, `Contain(s)` or
+  `Cover(s)`: it gives the layer's box, and the `MAIN` layer's box is the entity's size.
+  [`std::screen`](../../std/screen.md#resize)
 - **Root page.** A base mode without a running game, such as Title, Gallery or Credits.
   [The Game System](../concepts/system.md)
 - **Runtime.** The program that plays a built game; the desktop runtime implements the runtime

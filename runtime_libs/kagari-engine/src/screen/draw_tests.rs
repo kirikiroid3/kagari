@@ -10,10 +10,11 @@ use crate::assets::AssetStore;
 use crate::frame::{Frame, MotionStage, ShaderEffect};
 use crate::saves::Timestamp;
 use crate::screen::sample::{
-    VisualCamera, VisualContent, VisualEntity, VisualHud, VisualLayer, VisualScreen,
+    VisualCamera, VisualContent, VisualEntity, VisualHud, VisualImageLayer, VisualLayer,
+    VisualPaint, VisualScreen,
 };
 use crate::test_support::{FakePlatform, STD_TYPES, engine};
-use crate::values::{Flip, Plane};
+use crate::values::{Flip, Plane, Resize};
 use crate::{EngineState, Platform};
 
 /// `FakePlatform`, except that PNG assets are a 100×200 image.
@@ -94,8 +95,23 @@ fn entity(id: u32) -> VisualEntity {
     }
 }
 
-fn image(id: AssetId) -> VisualLayer<VisualContent> {
-    VisualLayer::Shown(VisualContent::Image(id))
+fn image(id: AssetId) -> VisualImageLayer {
+    resized_layer(
+        VisualLayer::Shown(VisualContent::Image(id)),
+        Resize::Natural,
+    )
+}
+
+fn resized_layer(layer: VisualLayer<VisualContent>, resize: Resize) -> VisualImageLayer {
+    VisualImageLayer { layer, resize }
+}
+
+fn paint(size: [u32; 2]) -> VisualContent {
+    VisualContent::Paint(VisualPaint {
+        size,
+        texture: shader(1),
+        mask: None,
+    })
 }
 
 fn screen(entities: Vec<VisualEntity>) -> VisualScreen {
@@ -109,7 +125,7 @@ fn screen(entities: Vec<VisualEntity>) -> VisualScreen {
         hud: VisualHud {
             text_window: 1.0,
             quick_menu: 1.0,
-            side_image: VisualLayer::Empty,
+            side_image: resized_layer(VisualLayer::Empty, Resize::Natural),
         },
         filter: None,
     }
@@ -267,13 +283,16 @@ fn unsized_fill_covers_the_screen_outside_m() {
 #[test]
 fn image_layer_transition_spans_both_images() {
     let (state, png) = setup();
-    let layer = VisualLayer::Transition {
-        from: None,
-        to: Some(VisualContent::Image(png)),
-        kind: TransitionDraw::Crossfade,
-        progress: 0.25,
-    };
-    let node = image_layer_node(&layer, [10.0, 520.0], &state.assets).unwrap();
+    let layer = resized_layer(
+        VisualLayer::Transition {
+            from: None,
+            to: Some(VisualContent::Image(png)),
+            kind: TransitionDraw::Crossfade,
+            progress: 0.25,
+        },
+        Resize::Natural,
+    );
+    let node = image_layer_node(&layer, [10.0, 520.0], [1280.0, 720.0], &state.assets).unwrap();
     let Node::Transition {
         bounds, from, to, ..
     } = node
@@ -348,11 +367,7 @@ fn paint_part_sizes_the_entity() {
     e.anchor = [0.5, 0.5];
     e.parts.push((
         0,
-        VisualLayer::Shown(VisualContent::Paint(crate::screen::sample::VisualPaint {
-            size: [40, 30],
-            texture: shader(1),
-            mask: None,
-        })),
+        resized_layer(VisualLayer::Shown(paint([40, 30])), Resize::Natural),
     ));
     let planes = draw(&mut state, &screen(vec![e]));
     let (m, children) = local(&world_children(&planes)[0]);
@@ -361,4 +376,115 @@ fn paint_part_sizes_the_entity() {
     };
     assert_eq!((rect.w, rect.h), (40.0, 30.0));
     close(apply(m, [0.0, 0.0]), [-20.0, -15.0]);
+}
+
+/// The local nodes of a single entity whose `MAIN` layer shows `content` sized by `resize`.
+fn draw_main(content: VisualLayer<VisualContent>, resize: Resize) -> (Affine, Vec<Node>) {
+    let (mut state, _) = setup();
+    let mut e = entity(1);
+    e.parts.push((0, resized_layer(content, resize)));
+    let planes = draw(&mut state, &screen(vec![e]));
+    let (m, children) = local(&world_children(&planes)[0]);
+    (m, children.to_vec())
+}
+
+fn rect_of(r: &Rect) -> (f32, f32, f32, f32) {
+    (r.x, r.y, r.w, r.h)
+}
+
+#[test]
+fn cover_crops_the_overflow_to_the_box() {
+    let (_, png) = setup();
+    // 100×200 covering 100×100 is drawn 100×200, centred: only its middle half shows.
+    let (_, children) = draw_main(
+        VisualLayer::Shown(VisualContent::Image(png)),
+        Resize::Cover([100, 100]),
+    );
+    let Node::Image { rect, uv, .. } = &children[0] else {
+        panic!("{children:?}")
+    };
+    assert_eq!(rect_of(rect), (0.0, 0.0, 100.0, 100.0));
+    assert_eq!(rect_of(uv), (0.0, 0.25, 1.0, 0.5));
+}
+
+#[test]
+fn contain_centres_the_content_in_the_box() {
+    let (mut state, png) = setup();
+    let mut e = entity(1);
+    e.anchor = [1.0, 1.0];
+    e.parts.push((
+        0,
+        resized_layer(
+            VisualLayer::Shown(VisualContent::Image(png)),
+            Resize::Contain([300, 100]),
+        ),
+    ));
+    let planes = draw(&mut state, &screen(vec![e]));
+    let (m, children) = local(&world_children(&planes)[0]);
+    let Node::Image { rect, uv, .. } = &children[0] else {
+        panic!("{children:?}")
+    };
+    assert_eq!(rect_of(rect), (125.0, 0.0, 50.0, 100.0));
+    assert_eq!(rect_of(uv), (0.0, 0.0, 1.0, 1.0));
+    // The entity's box is the layer's box, not the image: the anchor is its bottom-right.
+    close(apply(m, [300.0, 100.0]), [0.0, 0.0]);
+}
+
+#[test]
+fn width_and_height_keep_the_aspect_ratio() {
+    let (_, png) = setup();
+    for (resize, size) in [
+        (Resize::Width(50), (50.0, 100.0)),
+        (Resize::Height(50), (25.0, 50.0)),
+        (Resize::Stretch([30, 40]), (30.0, 40.0)),
+    ] {
+        let (_, children) = draw_main(VisualLayer::Shown(VisualContent::Image(png)), resize);
+        let Node::Image { rect, .. } = &children[0] else {
+            panic!("{children:?}")
+        };
+        assert_eq!((rect.w, rect.h), size, "{resize:?}");
+    }
+}
+
+#[test]
+fn non_positive_factor_draws_nothing() {
+    let (_, png) = setup();
+    let (_, children) = draw_main(
+        VisualLayer::Shown(VisualContent::Image(png)),
+        Resize::Factor(kagari_vm::Decimal::ZERO),
+    );
+    assert!(children.is_empty(), "{children:?}");
+}
+
+#[test]
+fn swap_between_sizes_covers_the_screen_on_both_sides() {
+    let (_, png) = setup();
+    // 100×200 and 40×30 both cover 1280×720; the paint keeps its own size for its shader.
+    let (_, children) = draw_main(
+        VisualLayer::Transition {
+            from: Some(VisualContent::Image(png)),
+            to: Some(paint([40, 30])),
+            kind: TransitionDraw::Crossfade,
+            progress: 0.5,
+        },
+        Resize::CoverScreen,
+    );
+    let Node::Transition {
+        bounds, from, to, ..
+    } = &children[0]
+    else {
+        panic!("{children:?}")
+    };
+    assert_eq!(rect_of(bounds), (0.0, 0.0, 1280.0, 720.0));
+    let [Node::Image { rect, uv, .. }] = from.as_slice() else {
+        panic!("{from:?}")
+    };
+    assert_eq!(rect_of(rect), (0.0, 0.0, 1280.0, 720.0));
+    assert_eq!(rect_of(uv), (0.0, 0.359375, 1.0, 0.28125));
+    let [Node::Paint { rect, size, uv, .. }] = to.as_slice() else {
+        panic!("{to:?}")
+    };
+    assert_eq!(rect_of(rect), (0.0, 0.0, 1280.0, 720.0));
+    assert_eq!(*size, [40.0, 30.0]);
+    assert_eq!(rect_of(uv), (0.0, 0.125, 1.0, 0.75));
 }

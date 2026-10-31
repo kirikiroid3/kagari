@@ -48,8 +48,8 @@ Every std item follows these rules. They are what makes the checker's special ca
 4. **Changes need animations.** Every visible property is a `Prop<T>` (interpolated, takes a
    `Tween`) or a layer (`ImageLayer`, `LabelLayer`, `MovieLayer`, swapped with a
    `Transition`). Only non-interpolable layout settings (`set_plane`, `set_z`, `set_anchor`,
-   `set_flip`, `set_fill_size`, `gate`) are direct setters; `Entity::travel` sets the pose through
-   tweens and schedules its path. `Change<T>`, `Swap` and
+   `set_flip`, `set_fill_size`, `gate`, and `ImageLayer::set_resize`) are direct setters;
+   `Entity::travel` sets the pose through tweens and schedules its path. `Change<T>`, `Swap` and
    `ChannelChange` are `#[must_use]`: a change without `apply_animation` does not happen.
 5. **Animations never change the start or end state.** The logical screen of a step is the
    persistent state after its render: entities with their components, plus the Hud, camera,

@@ -5,12 +5,15 @@ use std::rc::Rc;
 
 use kagari_vm::{Text, Value};
 
-use super::sample::{VisualCamera, VisualContent, VisualEntity, VisualLayer, VisualScreen};
+use super::sample::{
+    VisualCamera, VisualContent, VisualEntity, VisualImageLayer, VisualLayer, VisualScreen,
+};
+use crate::anim::decimal_f32;
 use crate::assets::AssetStore;
 use crate::frame::{Affine, Node, Pose, Rect, TransitionDraw};
 use crate::system::SystemState;
 use crate::ui::text::TextSystem;
-use crate::values::{Flip, Plane};
+use crate::values::{Flip, Plane, Resize};
 
 #[cfg(test)]
 #[path = "draw_tests.rs"]
@@ -68,18 +71,130 @@ pub(crate) fn content_size(content: &VisualContent, assets: &AssetStore) -> Opti
     }
 }
 
-/// One image layer at its natural size with its top-left corner at `origin`.
+/// Content sized by its layer's `Resize`: the layer's box, and the content's rect in the box
+/// (centred; larger than the box only under `Cover`, and drawn only inside the box).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Resized {
+    pub size: [f32; 2],
+    pub content: Rect,
+}
+
+/// Content of natural size `natural` sized by `resize`, on a screen of `screen` px.
+pub(crate) fn resized(resize: Resize, natural: (u32, u32), screen: [f32; 2]) -> Resized {
+    let (nw, nh) = (natural.0 as f32, natural.1 as f32);
+    let ratio = |target: f32, own: f32| if own > 0.0 { target / own } else { 0.0 };
+    let exact = |w: f32, h: f32| Resized {
+        size: [w, h],
+        content: Rect {
+            x: 0.0,
+            y: 0.0,
+            w,
+            h,
+        },
+    };
+    let fit = |[w, h]: [f32; 2], cover: bool| {
+        let (kw, kh) = (ratio(w, nw), ratio(h, nh));
+        let k = if cover { kw.max(kh) } else { kw.min(kh) };
+        let (cw, ch) = (nw * k, nh * k);
+        Resized {
+            size: [w, h],
+            content: Rect {
+                x: (w - cw) / 2.0,
+                y: (h - ch) / 2.0,
+                w: cw,
+                h: ch,
+            },
+        }
+    };
+    match resize {
+        Resize::Natural => exact(nw, nh),
+        Resize::Factor(factor) => {
+            let k = decimal_f32(factor).max(0.0);
+            exact(nw * k, nh * k)
+        }
+        Resize::Width(w) => {
+            let w = w as f32;
+            exact(w, nh * ratio(w, nw))
+        }
+        Resize::Height(h) => {
+            let h = h as f32;
+            exact(nw * ratio(h, nh), h)
+        }
+        Resize::Stretch([w, h]) => exact(w as f32, h as f32),
+        Resize::Contain([w, h]) => fit([w as f32, h as f32], false),
+        Resize::Cover([w, h]) => fit([w as f32, h as f32], true),
+        Resize::CoverScreen => fit(screen, true),
+    }
+}
+
+/// `content` sized by `resize`; `None` when it is not loaded.
+fn resize_content(
+    content: &VisualContent,
+    resize: Resize,
+    screen: [f32; 2],
+    assets: &AssetStore,
+) -> Option<Resized> {
+    let Some(natural) = content_size(content, assets) else {
+        if let VisualContent::Image(id) = content {
+            log::debug!("image `{}` not loaded; skipped", assets.path(*id));
+        }
+        return None;
+    };
+    Some(resized(resize, natural, screen))
+}
+
+/// The box of an image layer: its new content's during a swap, else its content's.
+pub(crate) fn layer_box(
+    image: &VisualImageLayer,
+    screen: [f32; 2],
+    assets: &AssetStore,
+) -> Option<[f32; 2]> {
+    let size = |content: &Option<VisualContent>| {
+        let content = content.as_ref()?;
+        resize_content(content, image.resize, screen, assets).map(|r| r.size)
+    };
+    match &image.layer {
+        VisualLayer::Empty => None,
+        VisualLayer::Shown(content) => {
+            resize_content(content, image.resize, screen, assets).map(|r| r.size)
+        }
+        VisualLayer::Transition { from, to, .. } => size(to).or_else(|| size(from)),
+    }
+}
+
+/// One image layer with its box's top-left corner at `origin`.
 pub(crate) fn image_layer_node(
-    layer: &VisualLayer<VisualContent>,
+    image: &VisualImageLayer,
     origin: [f32; 2],
+    screen: [f32; 2],
     assets: &AssetStore,
 ) -> Option<Node> {
     layer_node(
-        layer,
-        |content| natural_rect(assets, content, origin),
+        &image.layer,
+        |content| {
+            let r = resize_content(content, image.resize, screen, assets)?;
+            Some(placed(r, origin))
+        },
         false,
         false,
     )
+}
+
+/// The box of `r` with its top-left corner at `origin`, and its content's rect.
+fn placed(r: Resized, origin: [f32; 2]) -> (Rect, Rect) {
+    let [w, h] = r.size;
+    let clip = Rect {
+        x: origin[0],
+        y: origin[1],
+        w,
+        h,
+    };
+    let content = Rect {
+        x: origin[0] + r.content.x,
+        y: origin[1] + r.content.y,
+        ..r.content
+    };
+    (clip, content)
 }
 
 /// `T(c)·S(zoom)·R(−rot)·T(−c)·T(−offset)`, with `c` the screen centre.
@@ -124,56 +239,72 @@ fn rotate(degrees: f32) -> Affine {
     Affine([cos, sin, -sin, cos, 0.0, 0.0])
 }
 
-fn natural_rect(assets: &AssetStore, content: &VisualContent, origin: [f32; 2]) -> Option<Rect> {
-    let Some((w, h)) = content_size(content, assets) else {
-        if let VisualContent::Image(id) = content {
-            log::debug!("image `{}` not loaded; skipped", assets.path(*id));
-        }
-        return None;
+/// `content` drawn over `rect`, cropped to `clip`: the part of the content inside the clip is
+/// drawn over the part of `rect` inside it. `None` when nothing is inside.
+fn content_node(
+    content: &VisualContent,
+    clip: Rect,
+    rect: Rect,
+    flip_x: bool,
+    flip_y: bool,
+) -> Option<(Rect, Node)> {
+    let shown = intersect(rect, clip)?;
+    let mut uv = Rect {
+        x: (shown.x - rect.x) / rect.w,
+        y: (shown.y - rect.y) / rect.h,
+        w: shown.w / rect.w,
+        h: shown.h / rect.h,
     };
-    Some(Rect {
-        x: origin[0],
-        y: origin[1],
-        w: w as f32,
-        h: h as f32,
-    })
-}
-
-fn content_node(content: &VisualContent, rect: Rect, flip_x: bool, flip_y: bool) -> Node {
-    match content {
+    // A flipped quad samples its uv range mirrored: mirror the range so that the shown part
+    // stays the one inside the clip.
+    if flip_x {
+        uv.x = 1.0 - uv.x - uv.w;
+    }
+    if flip_y {
+        uv.y = 1.0 - uv.y - uv.h;
+    }
+    let node = match content {
         VisualContent::Image(id) => Node::Image {
-            rect,
+            rect: shown,
             image: *id,
-            uv: Rect {
-                x: 0.0,
-                y: 0.0,
-                w: 1.0,
-                h: 1.0,
-            },
+            uv,
             flip_x,
             flip_y,
             tint: [1.0; 4],
         },
         VisualContent::Paint(paint) => Node::Paint {
-            rect,
+            rect: shown,
+            size: [paint.size[0] as f32, paint.size[1] as f32],
+            uv,
             texture: paint.texture.clone(),
             mask: paint.mask.clone(),
             flip_x,
             flip_y,
         },
-    }
+    };
+    Some((shown, node))
 }
 
-/// An image layer whose content is drawn at `rect(content)`.
+/// The overlap of `a` and `b`; `None` when it is empty.
+fn intersect(a: Rect, b: Rect) -> Option<Rect> {
+    let x = a.x.max(b.x);
+    let y = a.y.max(b.y);
+    let w = (a.x + a.w).min(b.x + b.w) - x;
+    let h = (a.y + a.h).min(b.y + b.h) - y;
+    (w > 0.0 && h > 0.0).then_some(Rect { x, y, w, h })
+}
+
+/// An image layer whose content is drawn by `place(content)`: `(clip, rect)`, the content
+/// over `rect` cropped to `clip`.
 fn layer_node(
     layer: &VisualLayer<VisualContent>,
-    rect: impl Fn(&VisualContent) -> Option<Rect>,
+    place: impl Fn(&VisualContent) -> Option<(Rect, Rect)>,
     flip_x: bool,
     flip_y: bool,
 ) -> Option<Node> {
     let node = |content: &VisualContent| -> Option<(Rect, Node)> {
-        let r = rect(content)?;
-        Some((r, content_node(content, r, flip_x, flip_y)))
+        let (clip, rect) = place(content)?;
+        content_node(content, clip, rect, flip_x, flip_y)
     };
     match layer {
         VisualLayer::Empty => None,
@@ -259,23 +390,9 @@ fn text_node(layout: Rc<kagari_text::Layout>) -> (Rect, Node) {
     (rect, node)
 }
 
-/// The size of the MAIN layer's content: `to` during a transition, else `from`.
-fn main_size(e: &VisualEntity, assets: &AssetStore) -> Option<(u32, u32)> {
-    let (_, layer) = e.parts.iter().find(|(part, _)| *part == 0)?;
-    let size = |content: &Option<VisualContent>| {
-        content
-            .as_ref()
-            .and_then(|content| content_size(content, assets))
-    };
-    match layer {
-        VisualLayer::Empty => None,
-        VisualLayer::Shown(content) => content_size(content, assets),
-        VisualLayer::Transition { from, to, .. } => size(to).or_else(|| size(from)),
-    }
-}
-
 /// An entity: `Mix | Group(opacity) > Filter? > [screen fill?, Motion? > Group(M) > Masked? >
-/// local]`, where M places the entity's box (`T(pos)·R(rot)·S(scale)·T(−anchor·box)`).
+/// local]`, where M places the entity's box (`T(pos)·R(rot)·S(scale)·T(−anchor·box)`). The box
+/// is the `MAIN` layer's box, else the fill size, else the label's size.
 fn entity_node(
     e: &VisualEntity,
     screen: [f32; 2],
@@ -296,8 +413,10 @@ fn entity_node(
         .as_ref()
         .or(label_from.as_ref())
         .map(|l| (l.size[0], l.size[1]));
-    let (bw, bh) = main_size(e, assets)
-        .map(|(w, h)| (w as f32, h as f32))
+    let main = e.parts.iter().find(|(part, _)| *part == 0);
+    let (bw, bh) = main
+        .and_then(|(_, image)| layer_box(image, screen, assets))
+        .map(|[w, h]| (w, h))
         .or_else(|| e.fill_size.map(|[w, h]| (w as f32, h as f32)))
         .or(label_size)
         .unwrap_or((0.0, 0.0));
@@ -318,13 +437,13 @@ fn entity_node(
             color: e.fill,
         });
     }
-    let mut parts: Vec<&(u8, VisualLayer<VisualContent>)> = e.parts.iter().collect();
+    let mut parts: Vec<&(u8, VisualImageLayer)> = e.parts.iter().collect();
     parts.sort_by_key(|(part, _)| *part);
-    for (part, layer) in parts {
+    for (part, image) in parts {
         let is_main = *part == 0;
-        let rect = |content: &VisualContent| -> Option<Rect> {
-            let (w, h) = content_size(content, assets)?;
-            let (w, h) = (w as f32, h as f32);
+        let place = |content: &VisualContent| -> Option<(Rect, Rect)> {
+            let r = resize_content(content, image.resize, screen, assets)?;
+            let [w, h] = r.size;
             let (mut x, mut y) = if is_main {
                 (e.anchor[0] * (bw - w), e.anchor[1] * (bh - h))
             } else {
@@ -336,9 +455,9 @@ fn entity_node(
             if flip_y {
                 y = bh - y - h;
             }
-            Some(Rect { x, y, w, h })
+            Some(placed(r, [x, y]))
         };
-        if let Some(node) = layer_node(layer, rect, flip_x, flip_y) {
+        if let Some(node) = layer_node(&image.layer, place, flip_x, flip_y) {
             local.push(node);
         }
     }

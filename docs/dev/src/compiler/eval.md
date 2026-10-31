@@ -254,7 +254,11 @@ step.
 Effects are std values: the screen filter and an entity's `filter`, `mix`, `mask` and
 `local_motion` hold `Option<Filter | Mix | Mask | LocalMotion>` (`EntityProp::{Filter, Mix, Mask,
 LocalMotion}`), and an image part or the side image holds an `ImageAsset` or a `Paint`
-(`ImageLayer::get` is `None` for a paint). `Entity::travel(to, motion)` (`Screen::travel`) reads
+(`ImageLayer::get` is `None` for a paint). `ImageLayer::set_resize` (`Screen::set_resize`) stores
+the layer's `Resize` in `Entity::resize` (by part) or `Hud::side_image_resize`; `Natural` is
+stored as no entry, so a layer set back to `Natural` equals one never set. `Screen::empty()` gives
+the `BACKGROUND` entity's `MAIN` layer `LayerResize::CoverScreen`, `Cover` of the design
+resolution, which only the engine knows. `Entity::travel(to, motion)` (`Screen::travel`) reads
 the current pose as `from`, checks the motion's easing, commits the three pose props with a
 `Tween` built from the motion's duration, easing and delay, and schedules
 `ScheduledKind::Travel { motion, from, to }` on `Target::Travel(id)`. `despawn(id)` moves the
