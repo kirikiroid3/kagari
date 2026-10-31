@@ -252,6 +252,7 @@ A shipped game is one directory with the runtime executable and the contents of
 ```text
 MyGame/
 ├── kagari-desktop-runtime      (kagari-desktop-runtime.exe on Windows; you may rename it)
+├── vcruntime140.dll            (Windows only)
 ├── game.kagari
 └── *.kiarchive
 ```
@@ -259,8 +260,12 @@ MyGame/
 Started without a directory argument, the runtime looks for `game.kagari` in the directory of its
 own executable. Settings and saves are not written there; they go to the per-user data directory
 (see [Data directory](./runtime.md#data-directory)). Players need the system libraries listed in
-[System requirements](./runtime.md#system-requirements).
+[System requirements](./runtime.md#system-requirements). On Windows the runtime needs
+`vcruntime140.dll`, the Microsoft Visual C++ runtime library, which many players' Windows lack;
+next to the runtime it is used without being installed. Download it for your version from
+`https://kagari-download.suitsu31.club/windows_x86_installer/<version>/vcruntime140.dll`.
 
 [`kagari release`](./cli.md#kagari-release) makes this directory as an ISO image for Windows or
-Linux: it builds the game, downloads that platform's runtime of the same version as `kagari`, and
-writes `<out-dir>/release/<platform>/<name>.iso`.
+Linux: it builds the game, downloads that platform's runtime of the same version as `kagari` (and
+`vcruntime140.dll` for Windows), and writes `<out-dir>/release/<platform>/<name>.iso`. In the
+Windows image the runtime is named `run.exe`.

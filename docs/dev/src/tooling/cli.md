@@ -234,25 +234,30 @@ kagari release [--manifest-path PATH] (--windows | --linux)
 ```
 
 Exactly one platform flag (a required clap `ArgGroup`); `release::Platform` names the download
-directory, the runtime's file name there and in the image.
+directory, the runtime's file name there and in the image, and the libraries shipped next to the
+runtime.
 
 1. Load the project and take the first of `build.targets`. `build::build_project` builds it in
    the release profile, the same function `kagari build` calls; problems → exit 1, before any
    download.
-2. `download::runtime`: `GET <base>/<bucket dir>/<TOOLCHAIN_VERSION>/<runtime file>` and its
-   `.sha256` with `ureq` (rustls, webpki roots), where `<base>` is `DOWNLOAD_URL`
-   (`https://kagari-download.suitsu31.club`) unless `KAGARI_DOWNLOAD_URL` is set (as for
-   `installer.sh`; the tests point it at a local server). The bucket layout and the names are
-   the release workflow's ([Releases](../process/releases.md#the-bucket)); the runtime is
-   always that of this toolchain's version. HTTP 404 says the runtime is not published; a
-   checksum mismatch, any other HTTP or network error → `Failure` (exit 2). The body limit is
-   1 GiB.
+2. `download::runtime`, then `download::file` for each of `Platform::libraries`:
+   `GET <base>/<bucket dir>/<TOOLCHAIN_VERSION>/<file>` and its `.sha256` with `ureq` (rustls,
+   webpki roots), where `<base>` is `DOWNLOAD_URL` (`https://kagari-download.suitsu31.club`)
+   unless `KAGARI_DOWNLOAD_URL` is set (as for `installer.sh`; the tests point it at a local
+   server). The bucket layout and the names are the release workflow's
+   ([Releases](../process/releases.md#the-bucket)); the files are always those of this
+   toolchain's version. HTTP 404 says the platform's runtime is not published; a checksum
+   mismatch, any other HTTP or network error → `Failure` (exit 2), and no image is written. The
+   body limit is 1 GiB. The Windows runtime imports `VCRUNTIME140.dll`, which a clean Windows
+   lacks; Windows loads DLLs from the executable's directory first, so the image carries
+   `vcruntime140.dll` (the library list is `["vcruntime140.dll"]` on Windows, empty on Linux).
 3. Create `<out-dir>/release/<platform>/`, delete the `*.iso` files in it, and write
    `<name>.iso.part`, renamed to `<name>.iso` when complete (removed on failure). `<name>` is
    `project.name` with `/ \ : * ? " < > |` and controls replaced by `_`, surrounding whitespace
    and trailing dots removed (`Kagari Game` when empty): the rule of the runtime's data
-   directory, so the name is valid on every platform. The image holds the runtime
-   (`kagari-desktop-runtime[.exe]`) and `outputs::game_files` of the target directory
+   directory, so the name is valid on every platform. The image holds the runtime (`run.exe` on
+   Windows, `kagari-desktop-runtime` on Linux; the runtime finds the game in its own directory
+   whatever its name), the libraries, and `outputs::game_files` of the target directory
    (`game.kagari`, `*.kiarchive`; not the debug artifact).
 
 The image (`release/iso.rs`) is ISO 9660 with one flat root directory, written in one pass
@@ -387,7 +392,7 @@ that.
 | `tooling/kagari-cli/tests/debugger.rs` | `kagari debug` on a story with scene calls, a guarded choice and a draw: `ls`, `nav` and the `push` that follows it, `goto`, `stack`, `pop`, `detail`, `seed`; breakpoints by step ID and by `file:line`; `swap` after a source edit rebuilds and moves the story onto the new sources |
 | `tooling/kagari-cli/tests/dap.rs` | `kagari dap` end to end over DAP: launch headless, breakpoints by line, stack trace, `kagari/push` and `kagari/nav`, `evaluate`, continue to a breakpoint; `kagari/swap` rebuilds, calls the changed scene again and sets the breakpoints again |
 | `tooling/kagari-cli/tests/fmt.rs` | Fresh project is formatted, rewriting, syntax errors |
-| `tooling/kagari-cli/tests/release.rs` | `kagari release` against a local download server (`KAGARI_DOWNLOAD_URL`): the image's Joliet and Rock Ridge trees hold the runtime (executable) and the game files byte for byte, for Linux and Windows; `clean` removes the image; an unpublished runtime and a checksum mismatch (2, no image); build errors (1, no download) |
+| `tooling/kagari-cli/tests/release.rs` | `kagari release` against a local download server (`KAGARI_DOWNLOAD_URL`): the image's Joliet and Rock Ridge trees hold the runtime (executable) and the game files byte for byte, for Linux, and `run.exe` with `vcruntime140.dll` for Windows; `clean` removes the image; an unpublished runtime or C runtime DLL and a checksum mismatch (2, no image); build errors (1, no download) |
 
 The integration tests run the real binary (`env!("CARGO_BIN_EXE_kagari")`) through
 `tests/common/mod.rs`, inside a temp dir created by `kagari init`. Run them with

@@ -272,7 +272,7 @@ dots removed. It needs a connection to the internet.
 | Option | Meaning |
 | ------ | ------- |
 | `--manifest-path <PATH>` | The project's `kagari.toml`. |
-| `--windows` | Package the Windows (x86_64) runtime, `kagari-desktop-runtime.exe`. |
+| `--windows` | Package the Windows (x86_64) runtime, as `run.exe`, with the C runtime library it needs, `vcruntime140.dll`. |
 | `--linux` | Package the Linux (x86_64) runtime, `kagari-desktop-runtime`. |
 
 Exactly one of `--windows` and `--linux` is required. The steps, in order:
@@ -282,10 +282,14 @@ Exactly one of `--windows` and `--linux` is required. The steps, in order:
    status 1 before downloading anything.
 2. Download the runtime of the same version as `kagari` from
    `https://kagari-download.suitsu31.club` and check it against its published SHA-256 checksum.
-   The runtime therefore always matches the compiler that built the bytecode. When the download
-   fails, or the runtime of this version is not published (Kagari 0.1.0 publishes none), stop
-   with status 2. The environment variable `KAGARI_DOWNLOAD_URL` replaces the server.
-3. Delete the earlier `.iso` files of that platform and write the image. It holds the runtime,
+   The runtime therefore always matches the compiler that built the bytecode. For Windows, also
+   download and check `vcruntime140.dll`, the Microsoft Visual C++ runtime library: the runtime
+   cannot start without it, and many players' Windows lack it. Next to `run.exe`, it is used
+   without being installed. When a download fails, or the runtime of this version is not
+   published (Kagari 0.1.0 publishes none), stop with status 2. The environment variable
+   `KAGARI_DOWNLOAD_URL` replaces the server.
+3. Delete the earlier `.iso` files of that platform and write the image. It holds the runtime
+   (`run.exe` on Windows, with `vcruntime140.dll`; `kagari-desktop-runtime` on Linux),
    `game.kagari` and the archives, in its root directory:
 
 ```text
@@ -295,7 +299,8 @@ wrote target/release/linux/My Game.iso (4 files)
 
 The image opens on Windows (double-click mounts it) and on Linux (the desktop mounts it, or
 `mount -o loop`), with the file names as written and the Linux runtime executable. Players start
-the runtime in it without arguments; see [Shipping a game](./projects.md#shipping-a-game).
+the runtime (`run.exe` on Windows) in it without arguments; see
+[Shipping a game](./projects.md#shipping-a-game).
 
 ```sh
 kagari release --windows

@@ -55,7 +55,7 @@ fn serve(files: HashMap<String, Vec<u8>>) -> Server {
     Server { url, requests }
 }
 
-/// The server files of the runtime `bytes` for `bucket`/`file`, with a `.sha256` of `checksum`.
+/// The server files of `file` (`bytes`) for `bucket`, with a `.sha256` of `checksum`.
 fn runtime_files(
     bucket: &str,
     file: &str,
@@ -237,7 +237,39 @@ fn linux_release_packages_the_game_and_an_executable_runtime() {
 }
 
 #[test]
-fn windows_release_ships_the_exe_and_clean_removes_it() {
+fn windows_release_ships_run_exe_with_the_c_runtime_and_clean_removes_it() {
+    let tmp = init_project();
+    let dir = game(&tmp);
+    let dll = b"MZ not really vcruntime140.dll";
+    let file = format!("kagari-desktop-runtime-{VERSION}-x86_64-windows.exe");
+    let mut files = runtime_files("windows_x86_installer", &file, RUNTIME, RUNTIME);
+    files.extend(runtime_files(
+        "windows_x86_installer",
+        "vcruntime140.dll",
+        dll,
+        dll,
+    ));
+    let server = serve(files);
+    let output = release(&dir, "--windows", &server);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert!(
+        stdout(&output).contains("wrote target/release/windows/game.iso (5 files)"),
+        "{}",
+        stdout(&output)
+    );
+
+    let iso = std::fs::read(dir.join("target/release/windows/game.iso")).unwrap();
+    let mut expected = expected_files(&dir, "run.exe");
+    expected.insert("vcruntime140.dll".to_owned(), dll.to_vec());
+    assert_eq!(joliet_files(&iso), expected);
+
+    let output = kagari(&["clean"], &dir);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert!(!dir.join("target").exists());
+}
+
+#[test]
+fn an_unpublished_c_runtime_writes_no_image() {
     let tmp = init_project();
     let dir = game(&tmp);
     let file = format!("kagari-desktop-runtime-{VERSION}-x86_64-windows.exe");
@@ -248,17 +280,15 @@ fn windows_release_ships_the_exe_and_clean_removes_it() {
         RUNTIME,
     ));
     let output = release(&dir, "--windows", &server);
-    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
-
-    let iso = std::fs::read(dir.join("target/release/windows/game.iso")).unwrap();
-    assert_eq!(
-        joliet_files(&iso),
-        expected_files(&dir, "kagari-desktop-runtime.exe")
+    assert_eq!(output.status.code(), Some(2), "{}", stderr(&output));
+    assert!(
+        stderr(&output).contains(&format!(
+            "/windows_x86_installer/{VERSION}/vcruntime140.dll`: not found"
+        )),
+        "{}",
+        stderr(&output)
     );
-
-    let output = kagari(&["clean"], &dir);
-    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
-    assert!(!dir.join("target").exists());
+    assert!(!dir.join("target/release").exists());
 }
 
 #[test]

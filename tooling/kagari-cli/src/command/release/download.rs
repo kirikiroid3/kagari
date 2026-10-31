@@ -1,5 +1,5 @@
-//! Downloads the desktop runtime of this toolchain version from the download server, checked
-//! against its `.sha256` file.
+//! Downloads the desktop runtime of this toolchain version, and the files shipped with it, from
+//! the download server, each checked against its `.sha256` file.
 
 use kagari_project::TOOLCHAIN_VERSION;
 use sha2::{Digest, Sha256};
@@ -11,33 +11,37 @@ use crate::failure::Failure;
 const DOWNLOAD_URL: &str = "https://kagari-download.suitsu31.club";
 /// The environment variable that replaces [`DOWNLOAD_URL`] (as for `installer.sh`).
 const DOWNLOAD_URL_VAR: &str = "KAGARI_DOWNLOAD_URL";
-/// The largest runtime accepted.
-const MAX_RUNTIME_SIZE: u64 = 1 << 30;
+/// The largest file accepted.
+const MAX_FILE_SIZE: u64 = 1 << 30;
 /// The largest `.sha256` file accepted.
 const MAX_CHECKSUM_SIZE: u64 = 4096;
 
 /// The bytes of the `platform` runtime of [`TOOLCHAIN_VERSION`].
 pub fn runtime(platform: Platform) -> Result<Vec<u8>, Failure> {
+    file(platform, &platform.runtime_file(TOOLCHAIN_VERSION))
+}
+
+/// The bytes of `name` in the `platform` directory of [`TOOLCHAIN_VERSION`].
+pub fn file(platform: Platform, name: &str) -> Result<Vec<u8>, Failure> {
     let base = std::env::var(DOWNLOAD_URL_VAR)
         .ok()
         .filter(|url| !url.is_empty())
         .unwrap_or_else(|| DOWNLOAD_URL.to_owned());
     let url = format!(
-        "{}/{}/{TOOLCHAIN_VERSION}/{}",
+        "{}/{}/{TOOLCHAIN_VERSION}/{name}",
         base.trim_end_matches('/'),
         platform.bucket_dir(),
-        platform.runtime_file(TOOLCHAIN_VERSION),
     );
     println!("downloading {url}");
     let agent = ureq::Agent::new_with_defaults();
-    let runtime = get(&agent, &url, MAX_RUNTIME_SIZE, platform)?;
+    let bytes = get(&agent, &url, MAX_FILE_SIZE, platform)?;
     let checksum_url = format!("{url}.sha256");
     let checksum = get(&agent, &checksum_url, MAX_CHECKSUM_SIZE, platform)?;
     let expected = std::str::from_utf8(&checksum)
         .ok()
         .and_then(|text| text.split_whitespace().next())
         .ok_or_else(|| Failure(format!("`{checksum_url}` is not a checksum file")))?;
-    let actual: String = Sha256::digest(&runtime)
+    let actual: String = Sha256::digest(&bytes)
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect();
@@ -46,7 +50,7 @@ pub fn runtime(platform: Platform) -> Result<Vec<u8>, Failure> {
             "the download of `{url}` does not match its checksum (expected {expected}, got {actual})"
         )));
     }
-    Ok(runtime)
+    Ok(bytes)
 }
 
 /// The body of `url`, at most `limit` bytes.

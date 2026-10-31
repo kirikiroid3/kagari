@@ -1,7 +1,8 @@
 # Builds the Kagari toolchain (`kagari` + `kagari-desktop-runtime`) and uploads it, and the
-# runtime on its own (what `kagari release` downloads), to the download bucket (Cloudflare R2,
-# served at https://kagari-download.suitsu31.club). Nothing goes to GitHub Releases. The layout,
-# the secrets and the release steps: docs/dev/src/process/releases.md.
+# runtime on its own with the MSVC C runtime DLL (what `kagari release` downloads), to the
+# download bucket (Cloudflare R2, served at https://kagari-download.suitsu31.club). Nothing goes
+# to GitHub Releases. The layout, the secrets and the release steps:
+# docs/dev/src/process/releases.md.
 #
 # A tag push builds the release whose version is the tag without a leading `v`; it must equal
 # the workspace version in Cargo.toml. A manual run on a tag does the same; a manual run on a
@@ -135,6 +136,26 @@ jobs:
           Copy-Item target\release\kagari.exe, target\release\kagari-desktop-runtime.exe, LICENSE stage\
           # The runtime on its own, for `kagari release --windows`.
           Copy-Item target\release\kagari-desktop-runtime.exe "dist\kagari-desktop-runtime-$env:VERSION-x86_64-windows.exe"
+      - name: Stage the MSVC C runtime
+        run: |
+          # The redistributable of the Visual Studio that linked the executables: its installer
+          # goes into the Kagari installer, its vcruntime140.dll next to the runtime on its own
+          # (`kagari release --windows` ships it in the game image).
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw "no Visual Studio with the C++ tools" }
+          $redistVersion = (Get-Content "$vs\VC\Auxiliary\Build\Microsoft.VCRedistVersion.default.txt").Trim()
+          $redist = "$vs\VC\Redist\MSVC\$redistVersion"
+          Copy-Item "$redist\vc_redist.x64.exe" stage\
+          $dll = Get-ChildItem "$redist\x64\Microsoft.VC*.CRT\vcruntime140.dll" | Select-Object -First 1
+          if (-not $dll) { throw "vcruntime140.dll not found in $redist" }
+          Copy-Item $dll.FullName dist\vcruntime140.dll
+          # The game image ships only vcruntime140.dll (`Platform::libraries` in kagari-cli):
+          # fail when the runtime imports another DLL of the redistributable.
+          $dumpbin = Get-ChildItem "$vs\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Select-Object -Last 1
+          $imports = & $dumpbin.FullName /nologo /dependents target\release\kagari-desktop-runtime.exe |
+            ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^(vcruntime|msvcp|concrt|vccorlib)\S*\.dll$' }
+          if ("$imports" -ne 'VCRUNTIME140.dll') { throw "the runtime imports the redistributable DLLs '$imports'" }
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
       - name: Build the installer
@@ -147,7 +168,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Checksum
         run: |
-          foreach ($name in "kagari-$env:VERSION-x86_64-windows-setup.exe", "kagari-desktop-runtime-$env:VERSION-x86_64-windows.exe") {
+          foreach ($name in "kagari-$env:VERSION-x86_64-windows-setup.exe", "kagari-desktop-runtime-$env:VERSION-x86_64-windows.exe", "vcruntime140.dll") {
             $hash = (Get-FileHash -Algorithm SHA256 "dist\$name").Hash.ToLowerInvariant()
             Set-Content -NoNewline -Encoding ascii "dist\$name.sha256" "$hash  $name`n"
           }
@@ -203,7 +224,7 @@ jobs:
           done
           for file in dist/windows/*; do
             case "$file" in
-              *.exe) type=application/vnd.microsoft.portable-executable ;;
+              *.exe | *.dll) type=application/vnd.microsoft.portable-executable ;;
               *) type="$text" ;;
             esac
             put "$file" "windows_x86_installer/$VERSION/$(basename "$file")" "$type" "$immutable"

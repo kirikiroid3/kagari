@@ -29,7 +29,7 @@ parallel after `version`; `upload` waits for both, so a failed build uploads not
 | --- | ------- | ---- |
 | `version` | ubuntu | Reads the workspace version. On a tag it fails unless the tag matches; on a branch the version is `<workspace>-dev.<short sha>` and `release` is false. |
 | `linux` | `ubuntu:22.04` container | Builds both binaries with GCC (`x86_64-unknown-linux-gnu`) against glibc 2.35, runs `--version`, packs `kagari-<v>-x86_64-linux.tar.gz` (a directory `kagari-<v>-x86_64-linux/` with both binaries and `LICENSE`) and its `.sha256`, and copies the runtime on its own as `kagari-desktop-runtime-<v>-x86_64-linux` with its `.sha256`. |
-| `windows` | windows-2025 | Builds both binaries (MSVC), builds the Inno Setup installer `kagari-<v>-x86_64-windows-setup.exe` from them, copies the runtime on its own as `kagari-desktop-runtime-<v>-x86_64-windows.exe`, writes both `.sha256` files. Nothing is code-signed ([Code signing](#code-signing)). |
+| `windows` | windows-2025 | Builds both binaries (MSVC, the C runtime linked dynamically: they import `VCRUNTIME140.dll`), stages `vc_redist.x64.exe` and `vcruntime140.dll` from the redistributable folder of the Visual Studio that linked them (found with `vswhere`; `Microsoft.VCRedistVersion.default.txt` names the folder) and fails when the runtime imports any other DLL of the redistributable (`dumpbin /dependents`), builds the Inno Setup installer `kagari-<v>-x86_64-windows-setup.exe` (with the redistributable inside), copies the runtime on its own as `kagari-desktop-runtime-<v>-x86_64-windows.exe`, and writes the `.sha256` files of the installer, the runtime and `vcruntime140.dll`. Nothing is code-signed ([Code signing](#code-signing)). |
 | `upload` | ubuntu | Uploads both artifacts to R2 with the AWS CLI. On a release it then writes the `latest` pointers and `installer.sh`. |
 | `nix-stable` | ubuntu | Releases only: commits `nix/stable.json` (`version`, `rev` of the tag) to `main`, unless it already names this or a newer version. |
 
@@ -53,15 +53,17 @@ The bucket is served at `https://kagari-download.suitsu31.club`.
 | `windows_x86_installer/latest` | The latest released version, one line | `no-cache` |
 | `windows_x86_installer/<v>/kagari-<v>-x86_64-windows-setup.exe` (+ `.sha256`) | The Windows installer | immutable, one year |
 | `windows_x86_installer/<v>/kagari-desktop-runtime-<v>-x86_64-windows.exe` (+ `.sha256`) | The Windows runtime alone, for `kagari release --windows` | immutable, one year |
+| `windows_x86_installer/<v>/vcruntime140.dll` (+ `.sha256`) | The MSVC C runtime the Windows runtime imports, shipped next to it by `kagari release --windows` | immutable, one year |
 
 Versioned files are uploaded before the pointers, so a pointer never names a missing file. A
 `.sha256` file is `sha256sum` output: `<hex>  <file name>`.
 
-`kagari release` hard-codes the server, the two directories and the runtime file names
-(`command/release/{mod,download}.rs`) and downloads the runtime of its own version, checked
-against the `.sha256`; see [`kagari release`](../tooling/cli.md#kagari-release). 0.1.0 was
-released without a standalone runtime; `kagari release` exists from the release after it on.
-Renaming a directory or a runtime file breaks every released `kagari release`; add, never move.
+`kagari release` hard-codes the server, the two directories, the runtime file names and the
+libraries shipped with the runtime (`vcruntime140.dll` on Windows; `command/release/{mod,download}.rs`)
+and downloads them for its own version, each checked against its `.sha256`; see
+[`kagari release`](../tooling/cli.md#kagari-release). 0.1.0 was released without a standalone
+runtime; `kagari release` exists from the release after it on. Renaming a directory, a runtime
+file or a library breaks every released `kagari release`; add, never move.
 
 ## Secrets
 
@@ -98,6 +100,18 @@ exactly that entry. Its `AppId` is fixed, so a newer installer replaces the inst
 wizard has English and Japanese. The workflow passes `AppVersion`, `NumericVersion` (the version
 without a pre-release or build suffix, for the file version resource), `SourceDir` and `OutputDir`.
 
+Both executables need the MSVC C runtime. `SourceDir` also holds `vc_redist.x64.exe`, embedded
+but not installed (`dontcopy`); the preprocessor reads its file version, and compiling fails
+without one. Before copying anything (`PrepareToInstall`), the installer reads the version that
+the Visual C++ 2015 and later Redistributable registers under
+`HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64` (`Installed`, `Major`, `Minor`,
+`Bld`, `Rbld`; both registry views). When neither is at least the bundled version, it extracts
+the bundled one and runs it with `/install /passive /norestart` through `ShellExec`, so Windows
+asks for administrator rights (UAC). Exit code 0 or 1638 (a newer version is installed)
+continues, 3010 continues and asks for a restart at the end (`NeedRestart`), anything else,
+including a declined UAC prompt, stops the installation with the `VCRedistFailed` message (link
+to Microsoft's download). The uninstaller leaves the redistributable installed: it is shared.
+
 ### Code signing {#code-signing}
 
 The executables and the installer are not code-signed. On first run Windows SmartScreen shows
@@ -106,6 +120,7 @@ Azure Artifact Signing, the CI-friendly option, issues Public Trust certificates
 individuals in the US and Canada and to registered organizations, which the project is not.
 Signing later means a signing step in the `windows` job before `Build the installer` (for the
 executables) and after it (for the installer), and dropping the note from the Tutorial.
+`vc_redist.x64.exe` and `vcruntime140.dll` are Microsoft-signed already.
 
 ## Nix
 

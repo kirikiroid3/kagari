@@ -212,21 +212,21 @@ kagari release [--manifest-path <PATH>] (--windows | --linux)
 | オプション | 意味 |
 | ---------- | ---- |
 | `--manifest-path <PATH>` | プロジェクトの `kagari.toml`。 |
-| `--windows` | Windows（x86_64）のランタイム `kagari-desktop-runtime.exe` をパッケージ化します。 |
+| `--windows` | Windows（x86_64）のランタイムを `run.exe` として、必要な C ランタイムライブラリ `vcruntime140.dll` と一緒にパッケージ化します。 |
 | `--linux` | Linux（x86_64）のランタイム `kagari-desktop-runtime` をパッケージ化します。 |
 
 `--windows` と `--linux` のどちらか一方だけが必要です。手順は次の順です。
 
 1. `build.targets` の最初のターゲットを、[`kagari build`](#kagari-build) とまったく同じようにリリースプロファイルでビルドし、同じ行を表示します。問題があれば、何もダウンロードせずにステータス 1 で止まります。
-2. `kagari` と同じバージョンのランタイムを `https://kagari-download.suitsu31.club` からダウンロードし、公開されている SHA-256 チェックサムと照合します。そのため、ランタイムはバイトコードをビルドしたコンパイラと常に一致します。ダウンロードに失敗したとき、またはこのバージョンのランタイムが公開されていないとき（Kagari 0.1.0 は公開していません）はステータス 2 で止まります。環境変数 `KAGARI_DOWNLOAD_URL` でサーバーを置き換えられます。
-3. そのプラットフォームの以前の `.iso` ファイルを削除し、イメージを書き出します。イメージのルートディレクトリには、ランタイム、`game.kagari`、アーカイブが入ります。
+2. `kagari` と同じバージョンのランタイムを `https://kagari-download.suitsu31.club` からダウンロードし、公開されている SHA-256 チェックサムと照合します。そのため、ランタイムはバイトコードをビルドしたコンパイラと常に一致します。Windows 向けでは、Microsoft Visual C++ のランタイムライブラリ `vcruntime140.dll` もダウンロードして照合します。ランタイムはこれがないと起動できず、プレイヤーの Windows には入っていないことがよくあります。`run.exe` の隣に置けば、インストールせずに使われます。ダウンロードに失敗したとき、またはこのバージョンのランタイムが公開されていないとき（Kagari 0.1.0 は公開していません）はステータス 2 で止まります。環境変数 `KAGARI_DOWNLOAD_URL` でサーバーを置き換えられます。
+3. そのプラットフォームの以前の `.iso` ファイルを削除し、イメージを書き出します。イメージのルートディレクトリには、ランタイム（Windows では `run.exe` と `vcruntime140.dll`、Linux では `kagari-desktop-runtime`）、`game.kagari`、アーカイブが入ります。
 
 ```text
 downloading https://kagari-download.suitsu31.club/linux_x86_bin/<version>/kagari-desktop-runtime-<version>-x86_64-linux
 wrote target/release/linux/My Game.iso (4 files)
 ```
 
-イメージは Windows（ダブルクリックでマウントされます）でも Linux（デスクトップがマウントするか、`mount -o loop`）でも開け、ファイル名は書き出したとおりで、Linux のランタイムは実行可能です。プレイヤーはその中のランタイムを引数なしで起動します。[ゲームの配布](./projects.md#shipping-a-game)を参照してください。
+イメージは Windows（ダブルクリックでマウントされます）でも Linux（デスクトップがマウントするか、`mount -o loop`）でも開け、ファイル名は書き出したとおりで、Linux のランタイムは実行可能です。プレイヤーはその中のランタイム（Windows では `run.exe`）を引数なしで起動します。[ゲームの配布](./projects.md#shipping-a-game)を参照してください。
 
 ```sh
 kagari release --windows

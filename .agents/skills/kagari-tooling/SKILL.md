@@ -48,9 +48,11 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
   in every target directory and `*.iso` in `release/<platform>/` (`outputs.rs`), then empty
   directories.
 - `kagari release` downloads nothing when the build fails, and its download URL layout
-  (`<bucket dir>/<version>/kagari-desktop-runtime-<version>-x86_64-<os>[.exe]`) is a contract
-  with `.github/workflows/release.yml`: change both together, never move published files. Its
-  tests use a local server through `KAGARI_DOWNLOAD_URL`; no test touches the network.
+  (`<bucket dir>/<version>/kagari-desktop-runtime-<version>-x86_64-<os>[.exe]`, plus
+  `Platform::libraries` next to it: `vcruntime140.dll` for Windows) is a contract with
+  `.github/workflows/release.yml`: change both together, never move published files. The Windows
+  image names the runtime `run.exe`. Its tests use a local server through `KAGARI_DOWNLOAD_URL`;
+  no test touches the network.
 - The CLI and the LSP build programs only through `kagari_project::Project::program`.
 - Manifest parsing stays `deny_unknown_fields`, kebab-case, paths relative to the project root.
 - LSP: only the main thread writes the db; each write → `diagnostics::refresh`; background work

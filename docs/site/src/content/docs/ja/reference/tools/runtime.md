@@ -118,7 +118,7 @@ vm panic: index out of range at crate::story::FirstDate (story.kis@1234), after 
 
 ## システム要件 {#system-requirements}
 
-実行時には、Vulkan、Metal、DirectX 12、OpenGL のいずれかの GPU ドライバが必要です。使えるハードウェアアダプタがない場合はソフトウェアのフォールバックアダプタを試し、それもなければステータス 4 で終了します。Linux ではさらに Wayland または X11、ALSA、libudev が必要です。ビルド済みの Linux 版は、glibc 2.35 以降の x86_64 で動作します（[Kagari のインストール](../../tutorial/install.md#linux)を参照）。
+実行時には、Vulkan、Metal、DirectX 12、OpenGL のいずれかの GPU ドライバが必要です。使えるハードウェアアダプタがない場合はソフトウェアのフォールバックアダプタを試し、それもなければステータス 4 で終了します。Linux ではさらに Wayland または X11、ALSA、libudev が必要です。ビルド済みの Linux 版は、glibc 2.35 以降の x86_64 で動作します（[Kagari のインストール](../../tutorial/install.md#linux)を参照）。Windows では Microsoft Visual C++ のランタイム `vcruntime140.dll` が必要です。Visual C++ 再頒布可能パッケージでインストールする（Kagari のインストーラーは、ないときにインストールします）か、ランタイムの隣に置きます（[ゲームの配布](./projects.md#shipping-a-game)を参照）。ないと Windows が「VCRUNTIME140.dll が見つからない」と報告し、ランタイムは起動しません。
 
 ソースからランタイムをビルドするには、次のシステムパッケージが必要です。
 

@@ -51,11 +51,21 @@ impl Platform {
         }
     }
 
-    /// The runtime's file name in the image.
+    /// The runtime's file name in the image: what a player starts.
     fn runtime_name(self) -> &'static str {
         match self {
-            Platform::Windows => "kagari-desktop-runtime.exe",
+            Platform::Windows => "run.exe",
             Platform::Linux => "kagari-desktop-runtime",
+        }
+    }
+
+    /// The libraries the runtime needs and a player's system may lack, downloaded from the
+    /// runtime's directory on the server and shipped next to it under the same name.
+    fn libraries(self) -> &'static [&'static str] {
+        match self {
+            // The MSVC C runtime: Windows loads it from the executable's directory first.
+            Platform::Windows => &["vcruntime140.dll"],
+            Platform::Linux => &[],
         }
     }
 }
@@ -77,6 +87,13 @@ pub fn run(manifest_path: Option<&Path>, platform: Platform) -> Result<ExitCode,
         source: Source::Bytes(runtime),
         executable: true,
     }];
+    for &library in platform.libraries() {
+        files.push(IsoFile {
+            name: library.to_owned(),
+            source: Source::Bytes(download::file(platform, library)?),
+            executable: false,
+        });
+    }
     for path in game_files(&project.out_dir(target))? {
         let name = path
             .file_name()

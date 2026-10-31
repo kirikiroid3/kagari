@@ -204,10 +204,11 @@ error: shader `shader/broken.wgsl` (color): line 4: no definition in scope for i
 ```text
 MyGame/
 ├── kagari-desktop-runtime      (kagari-desktop-runtime.exe on Windows; you may rename it)
+├── vcruntime140.dll            (Windows only)
 ├── game.kagari
 └── *.kiarchive
 ```
 
-ディレクトリ引数なしで起動すると、ランタイムは自身の実行ファイルのディレクトリで `game.kagari` を探します。設定とセーブはそこには書かれず、ユーザーごとのデータディレクトリに保存されます（[データディレクトリ](./runtime.md#data-directory)を参照）。プレイヤーには[システム要件](./runtime.md#system-requirements)に挙げたシステムライブラリが必要です。
+ディレクトリ引数なしで起動すると、ランタイムは自身の実行ファイルのディレクトリで `game.kagari` を探します。設定とセーブはそこには書かれず、ユーザーごとのデータディレクトリに保存されます（[データディレクトリ](./runtime.md#data-directory)を参照）。プレイヤーには[システム要件](./runtime.md#system-requirements)に挙げたシステムライブラリが必要です。Windows のランタイムには Microsoft Visual C++ のランタイムライブラリ `vcruntime140.dll` が必要ですが、プレイヤーの Windows には入っていないことがよくあります。ランタイムの隣に置けば、インストールせずに使われます。使っているバージョンのものを `https://kagari-download.suitsu31.club/windows_x86_installer/<version>/vcruntime140.dll` からダウンロードしてください。
 
-[`kagari release`](./cli.md#kagari-release) は、このディレクトリの中身を Windows 用または Linux 用の ISO イメージとして作ります。ゲームをビルドし、`kagari` と同じバージョンのそのプラットフォーム向けランタイムをダウンロードして、`<out-dir>/release/<platform>/<name>.iso` に書き出します。
+[`kagari release`](./cli.md#kagari-release) は、このディレクトリの中身を Windows 用または Linux 用の ISO イメージとして作ります。ゲームをビルドし、`kagari` と同じバージョンのそのプラットフォーム向けランタイム（Windows 向けでは `vcruntime140.dll` も）をダウンロードして、`<out-dir>/release/<platform>/<name>.iso` に書き出します。Windows 用のイメージでは、ランタイムの名前は `run.exe` です。

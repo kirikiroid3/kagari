@@ -54,9 +54,14 @@ Invoke-WebRequest "https://kagari-download.suitsu31.club/windows_x86_installer/$
 .\kagari-setup.exe
 ```
 
-The installer needs no administrator rights. It installs into `%LOCALAPPDATA%\Programs\Kagari`
-and adds its `bin` directory to your user `PATH`; open a new terminal (or restart your editor) to
-see it. It supports 64-bit Windows on x86_64.
+The installer installs into `%LOCALAPPDATA%\Programs\Kagari` and adds its `bin` directory to your
+user `PATH`; open a new terminal (or restart your editor) to see it. It supports 64-bit Windows on
+x86_64.
+
+The Kagari programs need the Microsoft Visual C++ Redistributable (x64). When it is missing or
+older, the installer first installs the copy it carries; only then does Windows ask for
+administrator rights, and declining stops the installation. When it is already there, the
+installer needs no administrator rights.
 
 The installer and the programs are not code-signed yet. When Windows shows "Windows protected your
 PC", choose **More info**, then **Run anyway**. To check that the file is the one Kagari
