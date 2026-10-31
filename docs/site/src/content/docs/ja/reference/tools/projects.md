@@ -145,7 +145,7 @@ target/v0/
 
 （これは `example/test_game1` の出力です。）`kagari build` は書き出す前に、以前のビルドがそのディレクトリに残した `game.kagari`、すべての `.kiarchive`、すべての `.kagari-cache` を削除します。それ以外のファイルには触れません。[デバッグビルド](./cli.md#build-profiles)（`kagari build --profile debug`）では、デバッグ用成果物 `game.kagari-cache` もそこに書き出します。
 
-出力ディレクトリの直下には、`kagari check` と `kagari build` が[解析キャッシュ](./cli.md#the-analysis-cache) `analysis.kagari-cache` を保存します。[`kagari clean`](./cli.md#kagari-clean) は解析キャッシュとすべてのターゲットのビルド出力を削除します。新しいプロジェクトの `.gitignore` は、既定の出力ディレクトリである `/target` を無視します。
+出力ディレクトリの直下には、`kagari check` と `kagari build` が[解析キャッシュ](./cli.md#the-analysis-cache) `analysis.kagari-cache` を保存し、[`kagari release`](./cli.md#kagari-release) が `release/windows` と `release/linux` にイメージを書き出します。[`kagari clean`](./cli.md#kagari-clean) は解析キャッシュ、すべてのターゲットのビルド出力、イメージを削除します。新しいプロジェクトの `.gitignore` は、既定の出力ディレクトリである `/target` を無視します。
 
 ## アセットとアーカイブ {#assets-and-archives}
 
@@ -209,3 +209,5 @@ MyGame/
 ```
 
 ディレクトリ引数なしで起動すると、ランタイムは自身の実行ファイルのディレクトリで `game.kagari` を探します。設定とセーブはそこには書かれず、ユーザーごとのデータディレクトリに保存されます（[データディレクトリ](./runtime.md#data-directory)を参照）。プレイヤーには[システム要件](./runtime.md#system-requirements)に挙げたシステムライブラリが必要です。
+
+[`kagari release`](./cli.md#kagari-release) は、このディレクトリの中身を Windows 用または Linux 用の ISO イメージとして作ります。ゲームをビルドし、`kagari` と同じバージョンのそのプラットフォーム向けランタイムをダウンロードして、`<out-dir>/release/<platform>/<name>.iso` に書き出します。

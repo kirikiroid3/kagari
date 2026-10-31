@@ -28,10 +28,20 @@ pub fn run(
 ) -> Result<ExitCode, Failure> {
     let project = workspace::load(manifest_path)?;
     let targets = chosen_targets(&project, targets)?;
+    Ok(exit(build_project(&project, &targets, profile)?))
+}
 
+/// Builds `project` for `targets` in `profile`, printing what it writes; whether it found
+/// problems (diagnostics, unsupported assets, invalid shaders), in which case nothing was
+/// written.
+pub fn build_project(
+    project: &Project,
+    targets: &[Target],
+    profile: Profile,
+) -> Result<bool, Failure> {
     let mut db = RootDatabase::new(Arc::new(OsFileSystem));
     let program = project.program(&db);
-    let cache = analysis_cache::path(&project);
+    let cache = analysis_cache::path(project);
     let offered = analysis_cache::offer(&mut db, program, &cache);
     let result = build(&db, program);
     let analysis = analysis_cache::store(&db, program, &cache, offered);
@@ -42,7 +52,7 @@ pub fn run(
         );
     }
     let (Some(module), Some(bytes)) = (result.module, result.bytes) else {
-        return Ok(exit(true));
+        return Ok(true);
     };
     if compat::check(
         &module,
@@ -50,10 +60,10 @@ pub fn run(
         &project.manifest.runtime_compatibility,
     )? > 0
     {
-        return Ok(exit(true));
+        return Ok(true);
     }
     if shaders::check(&module, &result.asset_files, &result.shader_roles)? {
-        return Ok(exit(true));
+        return Ok(true);
     }
     let artifact = match profile {
         Profile::Release => None,
@@ -64,7 +74,7 @@ pub fn run(
         )?),
     };
 
-    for target in targets {
+    for &target in targets {
         let dir = project.out_dir(target);
         std::fs::create_dir_all(&dir).map_err(|error| io(&dir, error))?;
         remove_target_outputs(&dir)?;
@@ -80,7 +90,7 @@ pub fn run(
             println!("wrote {}", shown(&path, &project.root));
         }
     }
-    Ok(ExitCode::SUCCESS)
+    Ok(false)
 }
 
 /// The bytes of the debug artifact for the bytecode `bytes`.

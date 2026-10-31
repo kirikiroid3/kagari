@@ -1,6 +1,7 @@
-# Builds the Kagari toolchain (`kagari` + `kagari-desktop-runtime`) and uploads it to the download
-# bucket (Cloudflare R2, served at https://kagari-download.suitsu31.club). Nothing goes to GitHub
-# Releases. The layout, the secrets and the release steps: docs/dev/src/process/releases.md.
+# Builds the Kagari toolchain (`kagari` + `kagari-desktop-runtime`) and uploads it, and the
+# runtime on its own (what `kagari release` downloads), to the download bucket (Cloudflare R2,
+# served at https://kagari-download.suitsu31.club). Nothing goes to GitHub Releases. The layout,
+# the secrets and the release steps: docs/dev/src/process/releases.md.
 #
 # A tag push builds the release whose version is the tag without a leading `v`; it must equal
 # the workspace version in Cargo.toml. A manual run on a tag does the same; a manual run on a
@@ -95,6 +96,10 @@ jobs:
           tar -C dist --owner=0 --group=0 --numeric-owner -czf "dist/$name.tar.gz" "$name"
           (cd dist && sha256sum "$name.tar.gz" >"$name.tar.gz.sha256")
           rm -r "dist/$name"
+          # The runtime on its own, for `kagari release --linux`.
+          runtime="kagari-desktop-runtime-$VERSION-x86_64-linux"
+          cp target/release/kagari-desktop-runtime "dist/$runtime"
+          (cd dist && sha256sum "$runtime" >"$runtime.sha256")
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x86_64
@@ -128,6 +133,8 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force stage, dist | Out-Null
           Copy-Item target\release\kagari.exe, target\release\kagari-desktop-runtime.exe, LICENSE stage\
+          # The runtime on its own, for `kagari release --windows`.
+          Copy-Item target\release\kagari-desktop-runtime.exe "dist\kagari-desktop-runtime-$env:VERSION-x86_64-windows.exe"
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
       - name: Build the installer
@@ -140,9 +147,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Checksum
         run: |
-          $name = "kagari-$env:VERSION-x86_64-windows-setup.exe"
-          $hash = (Get-FileHash -Algorithm SHA256 "dist\$name").Hash.ToLowerInvariant()
-          Set-Content -NoNewline -Encoding ascii "dist\$name.sha256" "$hash  $name`n"
+          foreach ($name in "kagari-$env:VERSION-x86_64-windows-setup.exe", "kagari-desktop-runtime-$env:VERSION-x86_64-windows.exe") {
+            $hash = (Get-FileHash -Algorithm SHA256 "dist\$name").Hash.ToLowerInvariant()
+            Set-Content -NoNewline -Encoding ascii "dist\$name.sha256" "$hash  $name`n"
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x86_64
@@ -188,7 +196,8 @@ jobs:
           for file in dist/linux/*; do
             case "$file" in
               *.tar.gz) type=application/gzip ;;
-              *) type="$text" ;;
+              *.sha256) type="$text" ;;
+              *) type=application/octet-stream ;;
             esac
             put "$file" "linux_x86_bin/$VERSION/$(basename "$file")" "$type" "$immutable"
           done

@@ -18,12 +18,19 @@ pub fn kagari(args: &[&str], cwd: &Path) -> Output {
 
 /// Runs the `kagari` binary in `cwd`, with `home` as the home and XDG data directory.
 pub fn kagari_in(args: &[&str], cwd: &Path, home: &Path) -> Output {
+    kagari_env(args, cwd, home, &[])
+}
+
+/// Runs the `kagari` binary in `cwd`, with `home` as the home and XDG data directory and the
+/// environment variables `vars`.
+pub fn kagari_env(args: &[&str], cwd: &Path, home: &Path, vars: &[(&str, &str)]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_kagari"))
         .args(args)
         .current_dir(cwd)
         .env("HOME", home)
         .env("XDG_DATA_HOME", home)
         .env("XDG_DATA_DIRS", home)
+        .envs(vars.iter().copied())
         .output()
         .expect("run kagari")
 }

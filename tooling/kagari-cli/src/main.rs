@@ -5,8 +5,8 @@
     clippy::arithmetic_side_effects
 )]
 
-//! The `kagari` command: create, check, build, clean and format Kagari projects, disassemble
-//! bytecode, and run the language server.
+//! The `kagari` command: create, check, build, clean, package and format Kagari projects,
+//! disassemble bytecode, run the language server, and debug stories.
 
 mod analysis_cache;
 mod cli;
@@ -36,6 +36,18 @@ fn main() -> ExitCode {
             profile,
         } => command::build::run(manifest_path.as_deref(), &targets, profile),
         Command::Clean { manifest_path } => command::clean::run(manifest_path.as_deref()),
+        Command::Release {
+            manifest_path,
+            windows,
+            linux: _,
+        } => command::release::run(
+            manifest_path.as_deref(),
+            if windows {
+                command::release::Platform::Windows
+            } else {
+                command::release::Platform::Linux
+            },
+        ),
         Command::Fmt {
             check,
             manifest_path,

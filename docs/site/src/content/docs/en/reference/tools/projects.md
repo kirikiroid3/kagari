@@ -162,9 +162,11 @@ directory. It leaves other files alone. A [debug build](./cli.md#build-profiles)
 (`kagari build --profile debug`) also writes `game.kagari-cache` there, the debug artifact.
 
 Directly in the output directory, `kagari check` and `kagari build` keep the
-[analysis cache](./cli.md#the-analysis-cache), `analysis.kagari-cache`.
-[`kagari clean`](./cli.md#kagari-clean) deletes the analysis cache and the build outputs of every
-target. The `.gitignore` of a new project ignores `/target`, the default output directory.
+[analysis cache](./cli.md#the-analysis-cache), `analysis.kagari-cache`, and
+[`kagari release`](./cli.md#kagari-release) writes its images into `release/windows` and
+`release/linux`. [`kagari clean`](./cli.md#kagari-clean) deletes the analysis cache, the build
+outputs of every target and the images. The `.gitignore` of a new project ignores `/target`, the
+default output directory.
 
 ## Assets and archives
 
@@ -258,3 +260,7 @@ Started without a directory argument, the runtime looks for `game.kagari` in the
 own executable. Settings and saves are not written there; they go to the per-user data directory
 (see [Data directory](./runtime.md#data-directory)). Players need the system libraries listed in
 [System requirements](./runtime.md#system-requirements).
+
+[`kagari release`](./cli.md#kagari-release) makes this directory as an ISO image for Windows or
+Linux: it builds the game, downloads that platform's runtime of the same version as `kagari`, and
+writes `<out-dir>/release/<platform>/<name>.iso`.

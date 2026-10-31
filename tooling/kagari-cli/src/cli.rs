@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{ArgGroup, Parser, Subcommand, ValueEnum};
 
 /// The Kagari toolchain.
 #[derive(Parser)]
@@ -47,6 +47,19 @@ pub enum Command {
         /// The project's `kagari.toml`; by default the nearest one from the current directory.
         #[arg(long)]
         manifest_path: Option<PathBuf>,
+    },
+    /// Build the project and package it with the runtime of a platform into an ISO image.
+    #[command(group(ArgGroup::new("platform").required(true).args(["windows", "linux"])))]
+    Release {
+        /// The project's `kagari.toml`; by default the nearest one from the current directory.
+        #[arg(long)]
+        manifest_path: Option<PathBuf>,
+        /// Package the Windows (x86_64) runtime.
+        #[arg(long)]
+        windows: bool,
+        /// Package the Linux (x86_64) runtime.
+        #[arg(long)]
+        linux: bool,
     },
     /// Format the project's source files, or the given files.
     Fmt {

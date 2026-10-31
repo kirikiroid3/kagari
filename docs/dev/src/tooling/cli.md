@@ -20,10 +20,11 @@ the outcome to output and an exit code. No compiler logic lives in the CLI.
 | `tooling/kagari-cli/src/failure.rs` | `Failure` (exit 2), `io()`, `exit(failed)` (exit 0/1) |
 | `tooling/kagari-cli/src/workspace.rs` | `load(--manifest-path)`, `shown(path, base)` |
 | `tooling/kagari-cli/src/analysis_cache.rs` | `path`, `offer`, `store`: the analysis cache shared by `check` and `build` |
-| `tooling/kagari-cli/src/outputs.rs` | `BYTECODE_FILE`, removing build outputs and caches, removing empty directories |
+| `tooling/kagari-cli/src/outputs.rs` | `BYTECODE_FILE`, the game files of a target directory, the release directory, removing build outputs, images and caches, removing empty directories |
 | `tooling/kagari-cli/src/command/{check,clean,disasm,fmt,lsp}.rs` | One module per subcommand |
 | `tooling/kagari-cli/src/command/{debug,dap}.rs`, `src/debugger.rs` | `kagari debug` (the REPL) and `kagari dap` over `kagari-debugger`'s `client` and `dap` features; `debugger.rs` opens projects for them (`Projects`, the adapter's `Launcher`); see [The Debugger](../runtime/debugger.md) |
 | `tooling/kagari-cli/src/command/build/{mod,archives,compat,shaders}.rs` | `kagari build` and its profiles, archive packing, runtime-profile check, shader check |
+| `tooling/kagari-cli/src/command/release/{mod,download,iso}.rs` | `kagari release`: `Platform`, the runtime download (`DOWNLOAD_URL`, checksum), the ISO 9660 writer |
 | `tooling/kagari-cli/src/command/init/{mod,template,font}.rs` | `kagari init`, embedded template, default-font choice |
 | `tooling/kagari-cli/template/` | The new-project template (`_gitignore` becomes `.gitignore`) |
 | `tooling/kagari-cli/tests/` | Integration tests running the built binary |
@@ -122,7 +123,7 @@ the project root with `/` separators (it reuses `FilePath::display`).
 | ---: | ------- | ----------- |
 | 0 | Success (warnings allowed) | `ExitCode::SUCCESS`, `exit(false)` |
 | 1 | The command ran and found problems | `exit(true)`: error diagnostics (`check`, `build`), an asset a runtime profile cannot decode (`build`), files that would change or cannot be formatted (`fmt`), a file that fails to decode or verify (`disasm`) |
-| 2 | The command could not run | `Failure`: no or invalid manifest, toolchain mismatch, I/O error, `--target` not in `build.targets`, `init` over existing files, `fmt` on a non-`.kis`/`.kix` path, LSP protocol error, `debug` when the debug build fails or the game cannot be reached; also clap's own usage errors |
+| 2 | The command could not run | `Failure`: no or invalid manifest, toolchain mismatch, I/O error, `--target` not in `build.targets`, `init` over existing files, `fmt` on a non-`.kis`/`.kix` path, LSP protocol error, `debug` when the debug build fails or the game cannot be reached, `release` when the runtime cannot be downloaded or fails its checksum or a file name does not fit the image; also clap's own usage errors |
 
 Keep this split: 1 means "your game has a problem", 2 means "the tool could not do its job".
 Scripts and CI rely on it.
@@ -226,16 +227,67 @@ Consequences:
 The archive format itself is described in [Archives and Save Databases](../formats/archive.md),
 the bytecode in [The `.kagari` Format](../formats/kagari.md).
 
+### `kagari release`
+
+```text
+kagari release [--manifest-path PATH] (--windows | --linux)
+```
+
+Exactly one platform flag (a required clap `ArgGroup`); `release::Platform` names the download
+directory, the runtime's file name there and in the image.
+
+1. Load the project and take the first of `build.targets`. `build::build_project` builds it in
+   the release profile, the same function `kagari build` calls; problems → exit 1, before any
+   download.
+2. `download::runtime`: `GET <base>/<bucket dir>/<TOOLCHAIN_VERSION>/<runtime file>` and its
+   `.sha256` with `ureq` (rustls, webpki roots), where `<base>` is `DOWNLOAD_URL`
+   (`https://kagari-download.suitsu31.club`) unless `KAGARI_DOWNLOAD_URL` is set (as for
+   `installer.sh`; the tests point it at a local server). The bucket layout and the names are
+   the release workflow's ([Releases](../process/releases.md#the-bucket)); the runtime is
+   always that of this toolchain's version. HTTP 404 says the runtime is not published; a
+   checksum mismatch, any other HTTP or network error → `Failure` (exit 2). The body limit is
+   1 GiB.
+3. Create `<out-dir>/release/<platform>/`, delete the `*.iso` files in it, and write
+   `<name>.iso.part`, renamed to `<name>.iso` when complete (removed on failure). `<name>` is
+   `project.name` with `/ \ : * ? " < > |` and controls replaced by `_`, surrounding whitespace
+   and trailing dots removed (`Kagari Game` when empty): the rule of the runtime's data
+   directory, so the name is valid on every platform. The image holds the runtime
+   (`kagari-desktop-runtime[.exe]`) and `outputs::game_files` of the target directory
+   (`game.kagari`, `*.kiarchive`; not the debug artifact).
+
+The image (`release/iso.rs`) is ISO 9660 with one flat root directory, written in one pass
+after a sizing pass (directory sizes depend only on record lengths):
+
+| Sectors | Contents |
+| ------- | -------- |
+| 0–15 | System area, zeros |
+| 16, 17, 18 | Primary volume descriptor, Joliet supplementary descriptor (escape `%/E`, UCS-2 level 3), terminator |
+| 19–22 | Path tables (one root record each): primary L and M, Joliet L and M |
+| 23 | Rock Ridge continuation area: the `ER` entry (`RRIP_1991A`) |
+| 24… | Primary root directory, then the Joliet root directory, then each file from a sector boundary |
+
+- **Primary tree**: level 1 identifiers (`NAME.EXT;1`, d-characters, made unique with `_N`),
+  for readers without extensions. Its `.` record carries `SP`, `CE` (to the `ER`) and `PX`;
+  every file carries `PX` (mode `0555` for the runtime, `0444` otherwise, owner 0) and `NM`
+  (the real name, UTF-8, at most 165 bytes). Linux reads this tree: Rock Ridge permissions
+  override the `fmode=` that udisks passes, so the runtime stays executable on a mounted image.
+- **Joliet tree**: the real names, UTF-16 big-endian with `;1`, at most 64 code units; no
+  control characters or `* / : ; ? \`. Windows reads this tree.
+- Volume label: the project name (Joliet, 16 code units, with the characters Joliet forbids in
+  names replaced by `_`) and its d-characters (primary).
+  Timestamps are the time of writing, UTC.
+
 ### `kagari clean`
 
 ```text
 kagari clean [--manifest-path PATH]
 ```
 
-Deletes what `check` and `build` write and nothing else: the `*.kagari-cache` files directly in
-`build_dir()` (the analysis cache), and in `out_dir(target)` for **every** `Target::ALL` (listed in
-`build.targets` or not) the `game.kagari`, `*.kiarchive` and `*.kagari-cache` files. Then it
-removes each target directory and the output directory if they are empty. It prints
+Deletes what `check`, `build` and `release` write and nothing else: the `*.kagari-cache` files
+directly in `build_dir()` (the analysis cache), in `out_dir(target)` for **every** `Target::ALL`
+(listed in `build.targets` or not) the `game.kagari`, `*.kiarchive` and `*.kagari-cache` files,
+and the `*.iso` files in `release/<platform>/` for every `Platform::ALL`. Then it removes each
+target and release directory and the output directory if they are empty. It prints
 `removed N files from <out-dir>` and exits 0; an I/O error is a `Failure` (exit 2). It never
 deletes the output directory wholesale, because `build.out-dir` may name a directory that holds
 other files.
@@ -335,6 +387,7 @@ that.
 | `tooling/kagari-cli/tests/debugger.rs` | `kagari debug` on a story with scene calls, a guarded choice and a draw: `ls`, `nav` and the `push` that follows it, `goto`, `stack`, `pop`, `detail`, `seed`; breakpoints by step ID and by `file:line`; `swap` after a source edit rebuilds and moves the story onto the new sources |
 | `tooling/kagari-cli/tests/dap.rs` | `kagari dap` end to end over DAP: launch headless, breakpoints by line, stack trace, `kagari/push` and `kagari/nav`, `evaluate`, continue to a breakpoint; `kagari/swap` rebuilds, calls the changed scene again and sets the breakpoints again |
 | `tooling/kagari-cli/tests/fmt.rs` | Fresh project is formatted, rewriting, syntax errors |
+| `tooling/kagari-cli/tests/release.rs` | `kagari release` against a local download server (`KAGARI_DOWNLOAD_URL`): the image's Joliet and Rock Ridge trees hold the runtime (executable) and the game files byte for byte, for Linux and Windows; `clean` removes the image; an unpublished runtime and a checksum mismatch (2, no image); build errors (1, no download) |
 
 The integration tests run the real binary (`env!("CARGO_BIN_EXE_kagari")`) through
 `tests/common/mod.rs`, inside a temp dir created by `kagari init`. Run them with

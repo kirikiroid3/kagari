@@ -22,8 +22,10 @@ kagari-shader = { workspace = true, features = ["validate"] }
 kagari-std = { workspace = true }
 kagari-syntax = { workspace = true }
 clap = { workspace = true }
+jiff = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+ureq = { workspace = true }
 
 [dev-dependencies]
 kagari-archive = { workspace = true }

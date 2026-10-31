@@ -7,3 +7,4 @@ pub mod disasm;
 pub mod fmt;
 pub mod init;
 pub mod lsp;
+pub mod release;

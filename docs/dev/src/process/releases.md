@@ -28,8 +28,8 @@ parallel after `version`; `upload` waits for both, so a failed build uploads not
 | Job | Runs on | Does |
 | --- | ------- | ---- |
 | `version` | ubuntu | Reads the workspace version. On a tag it fails unless the tag matches; on a branch the version is `<workspace>-dev.<short sha>` and `release` is false. |
-| `linux` | `ubuntu:22.04` container | Builds both binaries with GCC (`x86_64-unknown-linux-gnu`) against glibc 2.35, runs `--version`, packs `kagari-<v>-x86_64-linux.tar.gz` (a directory `kagari-<v>-x86_64-linux/` with both binaries and `LICENSE`) and its `.sha256`. |
-| `windows` | windows-2025 | Builds both binaries (MSVC), builds the Inno Setup installer `kagari-<v>-x86_64-windows-setup.exe` from them, writes its `.sha256`. Nothing is code-signed ([Code signing](#code-signing)). |
+| `linux` | `ubuntu:22.04` container | Builds both binaries with GCC (`x86_64-unknown-linux-gnu`) against glibc 2.35, runs `--version`, packs `kagari-<v>-x86_64-linux.tar.gz` (a directory `kagari-<v>-x86_64-linux/` with both binaries and `LICENSE`) and its `.sha256`, and copies the runtime on its own as `kagari-desktop-runtime-<v>-x86_64-linux` with its `.sha256`. |
+| `windows` | windows-2025 | Builds both binaries (MSVC), builds the Inno Setup installer `kagari-<v>-x86_64-windows-setup.exe` from them, copies the runtime on its own as `kagari-desktop-runtime-<v>-x86_64-windows.exe`, writes both `.sha256` files. Nothing is code-signed ([Code signing](#code-signing)). |
 | `upload` | ubuntu | Uploads both artifacts to R2 with the AWS CLI. On a release it then writes the `latest` pointers and `installer.sh`. |
 | `nix-stable` | ubuntu | Releases only: commits `nix/stable.json` (`version`, `rev` of the tag) to `main`, unless it already names this or a newer version. |
 
@@ -49,11 +49,19 @@ The bucket is served at `https://kagari-download.suitsu31.club`.
 | `installer.sh` | The Linux installer | `no-cache` |
 | `linux_x86_bin/latest` | The latest released version, one line | `no-cache` |
 | `linux_x86_bin/<v>/kagari-<v>-x86_64-linux.tar.gz` (+ `.sha256`) | The Linux build | immutable, one year |
+| `linux_x86_bin/<v>/kagari-desktop-runtime-<v>-x86_64-linux` (+ `.sha256`) | The Linux runtime alone, for `kagari release --linux` | immutable, one year |
 | `windows_x86_installer/latest` | The latest released version, one line | `no-cache` |
 | `windows_x86_installer/<v>/kagari-<v>-x86_64-windows-setup.exe` (+ `.sha256`) | The Windows installer | immutable, one year |
+| `windows_x86_installer/<v>/kagari-desktop-runtime-<v>-x86_64-windows.exe` (+ `.sha256`) | The Windows runtime alone, for `kagari release --windows` | immutable, one year |
 
 Versioned files are uploaded before the pointers, so a pointer never names a missing file. A
 `.sha256` file is `sha256sum` output: `<hex>  <file name>`.
+
+`kagari release` hard-codes the server, the two directories and the runtime file names
+(`command/release/{mod,download}.rs`) and downloads the runtime of its own version, checked
+against the `.sha256`; see [`kagari release`](../tooling/cli.md#kagari-release). 0.1.0 was
+released without a standalone runtime; `kagari release` exists from the release after it on.
+Renaming a directory or a runtime file breaks every released `kagari release`; add, never move.
 
 ## Secrets
 
@@ -123,11 +131,14 @@ and add the libraries the runtime loads with `dlopen` (Wayland, xkbcommon, Vulka
   development builds go under `-dev.` versions.
 - `latest` and `installer.sh` change only on a release.
 - Both binaries of an installation come from the same build and sit in the same directory.
+- Every release after 0.1.0 has a standalone runtime per platform under the names
+  `kagari release` of that version expects.
 
 **When you change this**
 
 - New platform: a build job, a bucket prefix (`<os>_<arch>_…`), the detection in `installer.sh`,
-  the Tutorial's install page (en and ja) and the table above.
+  the Tutorial's install page (en and ja), the table above, and a `Platform` (with its flag) in
+  `kagari release`.
 - New binary in a release: the `cargo build` lines, both packaging steps, `COMMANDS` in
   `installer.sh`, `[Files]` in `kagari.iss` and `cargoBuildFlags` in `flake.nix`.
 - New runtime system library: also `check_runtime_libraries` in `installer.sh` and the runtime's

@@ -3,22 +3,24 @@ title: "The kagari CLI"
 ---
 
 `kagari` is the Kagari toolchain: it creates, checks, builds, cleans and formats projects,
-disassembles `.kagari` files, runs the language server, and debugs stories.
+packages games for players, disassembles `.kagari` files, runs the language server, and debugs
+stories.
 
 ```text
 kagari <COMMAND>
 
 Commands:
-  init    Create a new project in PATH
-  check   Check the project and print its diagnostics
-  build   Build the project's bytecode and asset archives
-  clean   Delete the build outputs and the analysis cache
-  fmt     Format the project's source files, or the given files
-  disasm  Disassemble a `.kagari` bytecode file
-  lsp     Run the language server over stdio
-  debug   Debug the story: the query engine's REPL on the headless game (by default), a game in a window (`--window`), or a running game (`--attach`)
-  dap     Run the debug adapter (Debug Adapter Protocol) over stdio
-  help    Print this message or the help of the given subcommand(s)
+  init     Create a new project in PATH
+  check    Check the project and print its diagnostics
+  build    Build the project's bytecode and asset archives
+  clean    Delete the build outputs and the analysis cache
+  release  Build the project and package it with the runtime of a platform into an ISO image
+  fmt      Format the project's source files, or the given files
+  disasm   Disassemble a `.kagari` bytecode file
+  lsp      Run the language server over stdio
+  debug    Debug the story: the query engine's REPL on the headless game (by default), a game in a window (`--window`), or a running game (`--attach`)
+  dap      Run the debug adapter (Debug Adapter Protocol) over stdio
+  help     Print this message or the help of the given subcommand(s)
 ```
 
 `kagari --version` prints the toolchain version, which `[toolchain] kagari` in `kagari.toml` must
@@ -42,9 +44,9 @@ without installing: `cargo run -p kagari-cli -- <COMMAND>`.
 
 ## Finding the project
 
-`check`, `build`, `clean` and `fmt` (without files) work on a project. They use the `kagari.toml`
-given by `--manifest-path <PATH>`, or else the first `kagari.toml` found in the current directory
-or one of its parents. See [Projects](./projects.md) for the manifest.
+`check`, `build`, `clean`, `release` and `fmt` (without files) work on a project. They use the
+`kagari.toml` given by `--manifest-path <PATH>`, or else the first `kagari.toml` found in the
+current directory or one of its parents. See [Projects](./projects.md) for the manifest.
 
 ## Exit statuses
 
@@ -54,7 +56,7 @@ All commands use the same exit statuses:
 | -----: | ------- |
 | 0 | Success. |
 | 1 | The command ran and found problems: an error diagnostic, an unsupported asset format, a file that is not formatted, an invalid `.kagari` file. |
-| 2 | The command could not run: a usage error, an IO error, no `kagari.toml` found, an invalid manifest, a toolchain version mismatch. The message is printed to stderr as `kagari: <message>`. |
+| 2 | The command could not run: a usage error, an IO error, no `kagari.toml` found, an invalid manifest, a toolchain version mismatch, a runtime that cannot be downloaded. The message is printed to stderr as `kagari: <message>`. |
 
 ## Compiler options
 
@@ -226,15 +228,17 @@ not need it.
 kagari clean [--manifest-path <PATH>]
 ```
 
-Deletes what `kagari check` and `kagari build` wrote into the output directory (`build.out-dir`):
+Deletes what `kagari check`, `kagari build` and `kagari release` wrote into the output directory
+(`build.out-dir`):
 
 - the [analysis cache](#the-analysis-cache): every `.kagari-cache` file directly in the output
   directory;
 - in the directory of every target (`v0`), listed in `build.targets` or not: `game.kagari`, every
-  `.kiarchive` file and every `.kagari-cache` file.
+  `.kiarchive` file and every `.kagari-cache` file;
+- every `.iso` file in `release/windows` and `release/linux`.
 
-Then it removes the target directories and the output directory if they are left empty. Other
-files stay, and so do the directories that hold them.
+Then it removes the target and release directories and the output directory if they are left
+empty. Other files stay, and so do the directories that hold them.
 
 | Option | Meaning |
 | ------ | ------- |
@@ -251,6 +255,51 @@ Exits with 0, or with 2 when it cannot run (no `kagari.toml`, an IO error).
 ```sh
 kagari clean
 kagari clean --manifest-path example/test_game1/kagari.toml
+```
+
+## `kagari release`
+
+```text
+kagari release [--manifest-path <PATH>] (--windows | --linux)
+```
+
+Packages the game for players of one platform: builds it, downloads the runtime of that
+platform, and writes both into one ISO disc image,
+`<out-dir>/release/<platform>/<name>.iso`. `<name>` is the project name (`[project] name`), with
+`/ \ : * ? " < > |` and control characters replaced by `_` and surrounding spaces and trailing
+dots removed. It needs a connection to the internet.
+
+| Option | Meaning |
+| ------ | ------- |
+| `--manifest-path <PATH>` | The project's `kagari.toml`. |
+| `--windows` | Package the Windows (x86_64) runtime, `kagari-desktop-runtime.exe`. |
+| `--linux` | Package the Linux (x86_64) runtime, `kagari-desktop-runtime`. |
+
+Exactly one of `--windows` and `--linux` is required. The steps, in order:
+
+1. Build the first target of `build.targets` in the release profile, exactly as
+   [`kagari build`](#kagari-build) does, printing the same lines. On a problem, stop with
+   status 1 before downloading anything.
+2. Download the runtime of the same version as `kagari` from
+   `https://kagari-download.suitsu31.club` and check it against its published SHA-256 checksum.
+   The runtime therefore always matches the compiler that built the bytecode. When the download
+   fails, or the runtime of this version is not published (Kagari 0.1.0 publishes none), stop
+   with status 2. The environment variable `KAGARI_DOWNLOAD_URL` replaces the server.
+3. Delete the earlier `.iso` files of that platform and write the image. It holds the runtime,
+   `game.kagari` and the archives, in its root directory:
+
+```text
+downloading https://kagari-download.suitsu31.club/linux_x86_bin/<version>/kagari-desktop-runtime-<version>-x86_64-linux
+wrote target/release/linux/My Game.iso (4 files)
+```
+
+The image opens on Windows (double-click mounts it) and on Linux (the desktop mounts it, or
+`mount -o loop`), with the file names as written and the Linux runtime executable. Players start
+the runtime in it without arguments; see [Shipping a game](./projects.md#shipping-a-game).
+
+```sh
+kagari release --windows
+kagari release --linux --manifest-path example/test_game1/kagari.toml
 ```
 
 ## `kagari fmt`

@@ -2,22 +2,23 @@
 title: "kagari CLI"
 ---
 
-`kagari` は Kagari のツールチェインです。プロジェクトの作成・検査・ビルド・掃除・整形、`.kagari` ファイルの逆アセンブル、言語サーバーの実行、物語のデバッグを行います。
+`kagari` は Kagari のツールチェインです。プロジェクトの作成・検査・ビルド・掃除・整形、プレイヤー向けのゲームのパッケージ化、`.kagari` ファイルの逆アセンブル、言語サーバーの実行、物語のデバッグを行います。
 
 ```text
 kagari <COMMAND>
 
 Commands:
-  init    Create a new project in PATH
-  check   Check the project and print its diagnostics
-  build   Build the project's bytecode and asset archives
-  clean   Delete the build outputs and the analysis cache
-  fmt     Format the project's source files, or the given files
-  disasm  Disassemble a `.kagari` bytecode file
-  lsp     Run the language server over stdio
-  debug   Debug the story: the query engine's REPL on the headless game (by default), a game in a window (`--window`), or a running game (`--attach`)
-  dap     Run the debug adapter (Debug Adapter Protocol) over stdio
-  help    Print this message or the help of the given subcommand(s)
+  init     Create a new project in PATH
+  check    Check the project and print its diagnostics
+  build    Build the project's bytecode and asset archives
+  clean    Delete the build outputs and the analysis cache
+  release  Build the project and package it with the runtime of a platform into an ISO image
+  fmt      Format the project's source files, or the given files
+  disasm   Disassemble a `.kagari` bytecode file
+  lsp      Run the language server over stdio
+  debug    Debug the story: the query engine's REPL on the headless game (by default), a game in a window (`--window`), or a running game (`--attach`)
+  dap      Run the debug adapter (Debug Adapter Protocol) over stdio
+  help     Print this message or the help of the given subcommand(s)
 ```
 
 `kagari --version` はツールチェインのバージョンを表示します。`kagari.toml` の `[toolchain] kagari` はこのバージョンに合致する必要があります。`kagari help <COMMAND>` または `kagari <COMMAND> --help` で各コマンドのヘルプを表示します。
@@ -37,7 +38,7 @@ cargo install --path runtime/kagari-desktop-runtime
 
 ## プロジェクトの探索 {#finding-the-project}
 
-`check`、`build`、`clean`、（ファイル指定なしの）`fmt` はプロジェクトに対して動作します。`--manifest-path <PATH>` で指定された `kagari.toml` を使い、指定がなければカレントディレクトリとその親ディレクトリで最初に見つかった `kagari.toml` を使います。マニフェストについては[プロジェクト](./projects.md)を参照してください。
+`check`、`build`、`clean`、`release`、（ファイル指定なしの）`fmt` はプロジェクトに対して動作します。`--manifest-path <PATH>` で指定された `kagari.toml` を使い、指定がなければカレントディレクトリとその親ディレクトリで最初に見つかった `kagari.toml` を使います。マニフェストについては[プロジェクト](./projects.md)を参照してください。
 
 ## 終了ステータス {#exit-statuses}
 
@@ -47,7 +48,7 @@ cargo install --path runtime/kagari-desktop-runtime
 | ---------: | ---- |
 | 0 | 成功。 |
 | 1 | コマンドは実行され、問題が見つかった。エラーの診断、非対応のアセット形式、整形されていないファイル、不正な `.kagari` ファイルなど。 |
-| 2 | コマンドを実行できなかった。使い方の誤り、IO エラー、`kagari.toml` が見つからない、マニフェストが不正、ツールチェインのバージョン不一致など。メッセージは `kagari: <message>` の形で stderr に出力されます。 |
+| 2 | コマンドを実行できなかった。使い方の誤り、IO エラー、`kagari.toml` が見つからない、マニフェストが不正、ツールチェインのバージョン不一致、ランタイムをダウンロードできないなど。メッセージは `kagari: <message>` の形で stderr に出力されます。 |
 
 ## コンパイラオプション {#compiler-options}
 
@@ -175,12 +176,13 @@ wrote target/v0/game.kagari-cache
 kagari clean [--manifest-path <PATH>]
 ```
 
-`kagari check` と `kagari build` が出力ディレクトリ（`build.out-dir`）に書き出したものを削除します。
+`kagari check`、`kagari build`、`kagari release` が出力ディレクトリ（`build.out-dir`）に書き出したものを削除します。
 
 - [解析キャッシュ](#the-analysis-cache)。出力ディレクトリ直下のすべての `.kagari-cache` ファイルです。
 - すべてのターゲット（`v0`）のディレクトリにある `game.kagari`、すべての `.kiarchive` ファイル、すべての `.kagari-cache` ファイル。ターゲットが `build.targets` に含まれているかどうかは問いません。
+- `release/windows` と `release/linux` にあるすべての `.iso` ファイル。
 
-その後、空になったターゲットのディレクトリと出力ディレクトリを削除します。それ以外のファイルは残り、それを収めたディレクトリも残ります。
+その後、空になったターゲットとリリースのディレクトリ、出力ディレクトリを削除します。それ以外のファイルは残り、それを収めたディレクトリも残ります。
 
 | オプション | 意味 |
 | ---------- | ---- |
@@ -197,6 +199,38 @@ removed 4 files from target
 ```sh
 kagari clean
 kagari clean --manifest-path example/test_game1/kagari.toml
+```
+
+## `kagari release` {#kagari-release}
+
+```text
+kagari release [--manifest-path <PATH>] (--windows | --linux)
+```
+
+1 つのプラットフォームのプレイヤー向けにゲームをパッケージ化します。ゲームをビルドし、そのプラットフォームのランタイムをダウンロードして、両方を 1 つの ISO ディスクイメージ `<out-dir>/release/<platform>/<name>.iso` に書き出します。`<name>` はプロジェクト名（`[project] name`）で、`/ \ : * ? " < > |` と制御文字は `_` に置き換えられ、前後の空白と末尾のドットは取り除かれます。インターネット接続が必要です。
+
+| オプション | 意味 |
+| ---------- | ---- |
+| `--manifest-path <PATH>` | プロジェクトの `kagari.toml`。 |
+| `--windows` | Windows（x86_64）のランタイム `kagari-desktop-runtime.exe` をパッケージ化します。 |
+| `--linux` | Linux（x86_64）のランタイム `kagari-desktop-runtime` をパッケージ化します。 |
+
+`--windows` と `--linux` のどちらか一方だけが必要です。手順は次の順です。
+
+1. `build.targets` の最初のターゲットを、[`kagari build`](#kagari-build) とまったく同じようにリリースプロファイルでビルドし、同じ行を表示します。問題があれば、何もダウンロードせずにステータス 1 で止まります。
+2. `kagari` と同じバージョンのランタイムを `https://kagari-download.suitsu31.club` からダウンロードし、公開されている SHA-256 チェックサムと照合します。そのため、ランタイムはバイトコードをビルドしたコンパイラと常に一致します。ダウンロードに失敗したとき、またはこのバージョンのランタイムが公開されていないとき（Kagari 0.1.0 は公開していません）はステータス 2 で止まります。環境変数 `KAGARI_DOWNLOAD_URL` でサーバーを置き換えられます。
+3. そのプラットフォームの以前の `.iso` ファイルを削除し、イメージを書き出します。イメージのルートディレクトリには、ランタイム、`game.kagari`、アーカイブが入ります。
+
+```text
+downloading https://kagari-download.suitsu31.club/linux_x86_bin/<version>/kagari-desktop-runtime-<version>-x86_64-linux
+wrote target/release/linux/My Game.iso (4 files)
+```
+
+イメージは Windows（ダブルクリックでマウントされます）でも Linux（デスクトップがマウントするか、`mount -o loop`）でも開け、ファイル名は書き出したとおりで、Linux のランタイムは実行可能です。プレイヤーはその中のランタイムを引数なしで起動します。[ゲームの配布](./projects.md#shipping-a-game)を参照してください。
+
+```sh
+kagari release --windows
+kagari release --linux --manifest-path example/test_game1/kagari.toml
 ```
 
 ## `kagari fmt` {#kagari-fmt}
