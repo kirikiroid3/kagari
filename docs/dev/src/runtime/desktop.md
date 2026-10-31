@@ -14,7 +14,8 @@ and [Headless Mode](https://kagari.suitsu31.club/en/reference/tools/headless/).
 
 | Path (`runtime/kagari-desktop-runtime/src/`) | Contents |
 | -------------------------------------------- | -------- |
-| `main.rs` | logger setup, argument parsing, dispatch to `app::run` or `headless::run` |
+| `main.rs` | the Windows GUI subsystem, logger setup, argument parsing, dispatch to `app::run` or `headless::run` |
+| `console.rs` | Windows only: attaching the parent's console for unset stdout and stderr |
 | `cli.rs` | the clap `Cli` |
 | `exit.rs` | exit statuses and `Failure` |
 | `game.rs` | the game directory, reading `game.kagari`, `boot`, thumbnail uploads |
@@ -41,11 +42,32 @@ Build-time system dependencies are declared in the repository's `flake.nix`.
 
 ## Process structure
 
-`main` initializes `env_logger` with the default filter `kagari=info,wgpu=warn` (overridden by
-`RUST_LOG`), parses the arguments, resolves the game directory (`GAME_DIR`, or the executable's
-directory) and reads `game.kagari` from it. Then it runs `headless::run` or `app::run`. A
-`Failure { code, message }` reaching `main` is printed as `kagari-desktop-runtime: <message>` and
-becomes the exit status.
+`main` attaches the console (below), initializes `env_logger` with the default filter
+`kagari=info,wgpu=warn` (overridden by `RUST_LOG`), parses the arguments, resolves the game
+directory (`GAME_DIR`, or the executable's directory) and reads `game.kagari` from it. Then it runs
+`headless::run` or `app::run`. A `Failure { code, message }` reaching `main` is printed as
+`kagari-desktop-runtime: <message>` and becomes the exit status.
+
+### The console on Windows
+
+On Windows the executable is a GUI-subsystem program
+(`#![cfg_attr(all(windows, not(test)), windows_subsystem = "windows")]`): a player starting the
+game (`run.exe` in the image of `kagari release`) gets no console window next to the game. Unit
+tests keep the console subsystem so the test harness prints.
+
+A GUI-subsystem process has no console, so started from a terminal its output would go nowhere.
+`console::attach` runs first in `main`: when stdout or stderr is unset (null or invalid handle),
+it calls `AttachConsole(ATTACH_PARENT_PROCESS)`, opens `CONOUT$` and sets it as each unset handle;
+handles the parent set (pipes and files, such as `kagari debug --window`'s stdout pipe or
+`> log.txt`) are put back as they were. Started from Explorer, there is no parent console and
+nothing happens. Stdin is never attached: the shell keeps reading it.
+
+Shells do not wait for a GUI program. In an interactive `cmd` or PowerShell the prompt returns at
+once, the runtime's output appears after it and the exit status is lost. Whatever needs the status
+waits explicitly: `start /wait` in `cmd`, a pipeline in PowerShell
+(`kagari-desktop-runtime.exe --version | Write-Output`, as the release workflow's smoke test
+does), or `Start-Process -Wait`. Programs that spawn it (`kagari debug`, CI) wait as for any other
+process.
 
 ### Exit statuses
 

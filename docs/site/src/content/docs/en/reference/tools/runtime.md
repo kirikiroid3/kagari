@@ -155,6 +155,24 @@ exits with status 2 and prints `kagari-desktop-runtime: cannot start the game: <
 
 Except for status 0, the runtime prints `kagari-desktop-runtime: <message>` to stderr.
 
+## Running from a terminal on Windows
+
+On Windows the runtime is a GUI program, so starting a game from Explorer opens only the game
+window, with no console window. Started from a terminal, it still writes its output (help,
+version, logs, errors) to that terminal, and keeps output that is redirected to a file or a pipe.
+
+`cmd` and PowerShell do not wait for a GUI program, though: the prompt comes back at once, the
+runtime's output appears after it, and the exit status is lost. To wait for the runtime and get its
+exit status:
+
+| Shell | Command |
+| ----- | ------- |
+| `cmd` | `start /wait kagari-desktop-runtime.exe target\v0` (then `%ERRORLEVEL%`) |
+| PowerShell | `kagari-desktop-runtime.exe target\v0 \| Write-Output` (then `$LASTEXITCODE`) |
+
+Programs that start the runtime themselves, such as `kagari debug --window`, scripts run under
+Git Bash, or CI, wait for it as for any other program.
+
 ## System requirements
 
 At run time the runtime needs a GPU driver for Vulkan, Metal, DirectX 12 or OpenGL. When no

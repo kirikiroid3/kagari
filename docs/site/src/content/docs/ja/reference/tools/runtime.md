@@ -116,6 +116,19 @@ vm panic: index out of range at crate::story::FirstDate (story.kis@1234), after 
 
 ステータス 0 以外では、ランタイムは `kagari-desktop-runtime: <message>` を stderr に出力します。
 
+## Windows のターミナルから実行する {#running-from-a-terminal-on-windows}
+
+Windows ではランタイムは GUI プログラムです。エクスプローラーからゲームを起動すると、ゲームのウィンドウだけが開き、コンソールウィンドウは開きません。ターミナルから起動した場合は、出力（ヘルプ、バージョン、ログ、エラー）をそのターミナルに書き出し、ファイルやパイプへのリダイレクトもそのまま保たれます。
+
+ただし `cmd` と PowerShell は GUI プログラムの終了を待ちません。プロンプトがすぐに戻り、ランタイムの出力はその後に表示され、終了ステータスは失われます。ランタイムの終了を待って終了ステータスを得るには、次のようにします。
+
+| シェル | コマンド |
+| ------ | -------- |
+| `cmd` | `start /wait kagari-desktop-runtime.exe target\v0`（その後 `%ERRORLEVEL%`） |
+| PowerShell | `kagari-desktop-runtime.exe target\v0 \| Write-Output`（その後 `$LASTEXITCODE`） |
+
+`kagari debug --window`、Git Bash で実行するスクリプト、CI など、ランタイムを自分で起動するプログラムは、ほかのプログラムと同じように終了を待ちます。
+
 ## システム要件 {#system-requirements}
 
 実行時には、Vulkan、Metal、DirectX 12、OpenGL のいずれかの GPU ドライバが必要です。使えるハードウェアアダプタがない場合はソフトウェアのフォールバックアダプタを試し、それもなければステータス 4 で終了します。Linux ではさらに Wayland または X11、ALSA、libudev が必要です。ビルド済みの Linux 版は、glibc 2.35 以降の x86_64 で動作します（[Kagari のインストール](../../tutorial/install.md#linux)を参照）。Windows では Microsoft Visual C++ のランタイム `vcruntime140.dll` が必要です。Visual C++ 再頒布可能パッケージでインストールする（Kagari のインストーラーは、ないときにインストールします）か、ランタイムの隣に置きます（[ゲームの配布](./projects.md#shipping-a-game)を参照）。ないと Windows が「VCRUNTIME140.dll が見つからない」と報告し、ランタイムは起動しません。

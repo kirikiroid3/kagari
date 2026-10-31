@@ -101,3 +101,4 @@ mdbook-markdown = "0.5"
 cc = "1"
 embed-resource = "3"
 ureq = { version = "3", default-features = false, features = ["rustls"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Console"] }

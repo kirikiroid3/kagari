@@ -128,7 +128,9 @@ jobs:
         run: |
           target\release\kagari.exe --version
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          target\release\kagari-desktop-runtime.exe --version
+          # A GUI-subsystem program: PowerShell waits for it (and sets $LASTEXITCODE) only in a
+          # pipeline.
+          target\release\kagari-desktop-runtime.exe --version | Write-Output
           if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Stage
         run: |

@@ -1,3 +1,5 @@
+// No console window when a player starts the game on Windows; see `console.rs`.
+#![cfg_attr(all(windows, not(test)), windows_subsystem = "windows")]
 #![deny(
     clippy::unwrap_used,
     clippy::panic,
@@ -12,6 +14,7 @@
 mod app;
 mod audio;
 mod cli;
+mod console;
 mod debug;
 mod exit;
 mod game;
@@ -33,6 +36,7 @@ use crate::cli::Cli;
 use crate::exit::Failure;
 
 fn main() -> ExitCode {
+    console::attach();
     env_logger::Builder::from_env(
         env_logger::Env::default().default_filter_or("kagari=info,wgpu=warn"),
     )

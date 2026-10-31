@@ -99,6 +99,9 @@ the player closes the window.
 | 4 | GPU failure: no usable adapter, out of memory, device lost. |
 | 5 | Script error: the script cannot be read or parsed, `expect-crash` found a running game, `--out` cannot be created, or a capture cannot be written. |
 
+On Windows, `cmd` and PowerShell do not wait for the runtime unless asked to; see
+[Running from a terminal on Windows](./runtime.md#running-from-a-terminal-on-windows).
+
 ## Example
 
 A smoke test for `example/test_game1`: wait for the title, capture it, click the title's Start

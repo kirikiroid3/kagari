@@ -26,6 +26,9 @@ env_logger = { workspace = true }
 png = { workspace = true }
 jiff = { workspace = true }
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true }
+
 [dev-dependencies]
 tempfile = { workspace = true }
 

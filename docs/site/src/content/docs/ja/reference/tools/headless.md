@@ -82,6 +82,8 @@ kagari-desktop-runtime [GAME_DIR] --headless --script <FILE> --out <DIR> [--seed
 | 4 | GPU の障害。使えるアダプタがない、メモリ不足、デバイスの喪失。 |
 | 5 | スクリプトのエラー。スクリプトを読めないかパースできない、`expect-crash` の時点でゲームが動作中、`--out` を作成できない、キャプチャを書き出せない。 |
 
+Windows の `cmd` と PowerShell は、指定しない限りランタイムの終了を待ちません。[Windows のターミナルから実行する](./runtime.md#running-from-a-terminal-on-windows)を参照してください。
+
 ## 例 {#example}
 
 `example/test_game1` のスモークテストです。タイトル画面を待ってキャプチャし、タイトルの Start ボタンをクリックして、最初の台詞をキャプチャします。
