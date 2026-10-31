@@ -1786,7 +1786,7 @@ dependencies = [
 
 [[package]]
 name = "kagari-archive"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "crc32fast",
  "lz4_flex",
@@ -1795,11 +1795,11 @@ dependencies = [
 
 [[package]]
 name = "kagari-bytecode"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "kagari-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "jiff",
@@ -1822,7 +1822,7 @@ dependencies = [
 
 [[package]]
 name = "kagari-compat"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jxl-oxide",
  "kagari-bytecode",
@@ -1830,14 +1830,14 @@ dependencies = [
 
 [[package]]
 name = "kagari-debug"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "kagari-archive",
 ]
 
 [[package]]
 name = "kagari-debugger"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "kagari-archive",
  "kagari-bytecode",
@@ -1855,7 +1855,7 @@ dependencies = [
 
 [[package]]
 name = "kagari-desktop-runtime"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "directories",
@@ -1877,7 +1877,7 @@ dependencies = [
 
 [[package]]
 name = "kagari-engine"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "image",
  "jxl-oxide",
@@ -1895,7 +1895,7 @@ dependencies = [
 
 [[package]]
 name = "kagari-fmt"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "insta",
  "kagari-syntax",
@@ -1905,7 +1905,7 @@ dependencies = [
 
 [[package]]
 name = "kagari-lang"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "imbl",
  "insta",
@@ -1929,7 +1929,7 @@ dependencies = [
 
 [[package]]
 name = "kagari-lsp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "crossbeam-channel",
  "kagari-fmt",
@@ -1949,11 +1949,11 @@ dependencies = [
 
 [[package]]
 name = "kagari-num"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "kagari-project"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "kagari-compat",
  "kagari-lang",
@@ -1965,7 +1965,7 @@ dependencies = [
 
 [[package]]
 name = "kagari-render"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bytemuck",
  "kagari-bytecode",
@@ -1979,7 +1979,7 @@ dependencies = [
 
 [[package]]
 name = "kagari-shader"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "kagari-std",
  "naga",
@@ -1987,11 +1987,11 @@ dependencies = [
 
 [[package]]
 name = "kagari-std"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "kagari-syntax"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "insta",
  "logos",
@@ -2001,7 +2001,7 @@ dependencies = [
 
 [[package]]
 name = "kagari-text"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "harfrust",
  "skrifa",
@@ -2012,7 +2012,7 @@ dependencies = [
 
 [[package]]
 name = "kagari-vm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "kagari-bytecode",
  "kagari-lang",
@@ -2235,7 +2235,7 @@ dependencies = [
 
 [[package]]
 name = "mdbook-kagari"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cc",
  "mdbook-markdown",

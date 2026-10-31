@@ -6,7 +6,7 @@
 - `rust-toolchain.toml`, `flake.nix`, `.envrc`: toolchain and dev shell (see [Testing](../process/testing.md)).
 - `.gitignore`, `.gitattributes`, `docs/.gitignore`: what is generated or local.
 
-The repository is one Cargo workspace (resolver 3, edition 2024, version 0.1.0, Apache-2.0) plus
+The repository is one Cargo workspace (resolver 3, edition 2024, version 0.2.0, Apache-2.0) plus
 two editor packages that are not workspace members. Crates live in four directories:
 
 | Directory | Holds |
