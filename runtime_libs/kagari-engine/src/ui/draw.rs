@@ -268,7 +268,8 @@ impl Drawer<'_> {
         let kind = node.kind.clone();
         let inner = inner_rect(rect, mods.padding);
         let mut local = Vec::new();
-        // A spliced fragment is no box of its own (§4.5): its modifiers are ignored.
+        // A spliced fragment is no box of its own (std `ui.md#flattening`): its modifiers are
+        // ignored.
         let spliced = self.arena.is_spliced(id);
         if !spliced {
             paint_nodes(mods.background, rect, 1.0, self.assets, &mut local);

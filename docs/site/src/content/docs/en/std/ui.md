@@ -146,6 +146,10 @@ Runs `run` now, and again whenever a source it read changes.
 - Returns: `Element` — one element per item, kept in sync with `items`.
 - Kind: `fn` · Builtin: yes
 
+Inside `column![…]` or `row![…]`, the item elements become children of that column or row, and
+the `each`'s own layout methods are ignored; anywhere else, the items are laid out as a column. See
+[`each` and `show` in rows and columns](#flattening).
+
 ```kix
 scroll(|| each(|| game.history(), |entry| entry_view(entry)))
 ```
@@ -160,6 +164,9 @@ scroll(|| each(|| game.history(), |entry| entry_view(entry)))
 - `then` `Fn() -> Element` — builds the content.
 - Returns: `Element` — `then()` while `when()` is `true`, else nothing.
 - Kind: `fn` · Builtin: yes
+
+Like [`each`](#each), it is flattened into a `column![…]` or `row![…]` parent and laid out as a
+column anywhere else. See [`each` and `show` in rows and columns](#flattening).
 
 ## Content {#content}
 
@@ -248,7 +255,8 @@ impl Element {
 Layout is flexbox-like:
 
 - [`column![…]`](#column) and [`row![…]`](#row) are flex containers; `gap` and `align` set the
-  spacing and alignment of their children, and `grow` is a child's flex grow factor.
+  spacing and alignment of their children, and `grow` is a child's flex grow factor. They flatten
+  [`each` and `show`](#flattening) children.
 - [`layer![…]`](#layer) stacks [`Placed`](#placed) children: `at` places a child's anchor at a
   point, and `cover` fills the layer.
 - Sizes and positions are pixels of the design resolution
@@ -257,6 +265,31 @@ Layout is flexbox-like:
 
 All methods take the element by value and return the refined element, so they chain:
 `column![…].gap(16).align(Align::Center, Align::Center)`. Each is a builtin `fn`.
+
+### `each` and `show` in rows and columns {#flattening}
+
+[`each`](#each) and [`show`](#show) lay out differently depending on their parent:
+
+- **Child of `column![…]` or `row![…]`: flattened.** The elements of the `each` (or the `then()`
+  of the `show`) become children of that column or row, in the place of the `each` among its
+  siblings. They are spaced by the column's or row's `gap` and aligned by its `align`; their own
+  `grow` applies. An `each` or `show` inside a flattened one is flattened too, so
+  `column![show(…, || each(…))]` puts the items straight into the column. A flattened `each` or
+  `show` is no box of its own: `width`, `height`, `padding`, `gap`, `align`, `grow`, `background`
+  and `opacity` called on it are ignored.
+- **Anywhere else: a column.** Placed in a `layer![…]`, as the content of `scroll(…)`,
+  `button!` or `toggle!`, inside an `each` or `show` that is not itself flattened, or as the root
+  element of a mode, an `each` or `show` lays out as a column of its elements, and its own methods
+  apply.
+
+```kix
+// 40 px between all the children, items included: the gap belongs to the column.
+column![header(), each(|| items(), |i| tile(i))].gap(40)
+// 40 px between the items, 8 px between the other children: wrap the each in a column.
+column![header(), column![each(|| items(), |i| tile(i))].gap(40), footer()].gap(8)
+// 40 px between the items: in a layer, the each is a column with its own gap.
+layer![each(|| items(), |i| tile(i)).gap(40).at(point(100, 100), TOP_LEFT)]
+```
 
 ### `Element::width(px)` {#element-width}
 
@@ -289,7 +322,8 @@ All methods take the element by value and return the refined element, so they ch
 #[builtin] pub fn gap(self, px: u32) -> Element;
 ```
 
-- `px` `u32` — the spacing between the children of a row or column.
+- `px` `u32` — the spacing between the children of a row or column. On a flattened `each` or
+  `show` it is ignored (see [`each` and `show` in rows and columns](#flattening)).
 
 ### `Element::align(main, cross)` {#element-align}
 
@@ -455,7 +489,9 @@ ui::slider(SliderProps {
 #[builtin] pub fn column<const N: usize>(children: [Fn() -> Element; N]) -> Element;
 ```
 
-What `column![…]` desugars to: the children stacked top to bottom.
+What `column![…]` desugars to: the children stacked top to bottom. An `each` or `show` child is
+flattened: its elements are stacked as children of the column (see
+[`each` and `show` in rows and columns](#flattening)).
 
 ### Function: `row(children)` {#row}
 
@@ -463,7 +499,9 @@ What `column![…]` desugars to: the children stacked top to bottom.
 #[builtin] pub fn row<const N: usize>(children: [Fn() -> Element; N]) -> Element;
 ```
 
-What `row![…]` desugars to: the children side by side, left to right.
+What `row![…]` desugars to: the children side by side, left to right. An `each` or `show` child is
+flattened: its elements are placed as children of the row (see
+[`each` and `show` in rows and columns](#flattening)).
 
 ### Function: `layer(children)` {#layer}
 

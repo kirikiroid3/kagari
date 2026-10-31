@@ -284,6 +284,14 @@ source they read changes. The implementation is `ui/reactive.rs`.
   top mount only: focus order (`focus_order` first, then document order), activation, sliders,
   selects, scrolling. Unconsumed input goes on to the bindings. `ui/draw.rs` turns each mount into
   `Frame` nodes ([Text and Rendering](./text-render.md#how-the-engine-builds-a-frame)).
+- **Fragments.** `Kind::Each` and `Kind::Show` are fragments (`Kind::is_fragment`). When the
+  parent is a `Column` or `Row`, `Layouter::flex_items` splices the fragment's children into the
+  parent's flex items, recursively through nested fragments, so they take the parent's `gap` and
+  `align`. The spliced fragment is never measured or arranged, and `Arena::is_spliced` tells
+  `draw.rs` to skip its `background` and `opacity`: none of its `Mods` apply. Under any other
+  parent (layer, scroll, button, toggle, an unspliced fragment, or as the root) a fragment is one
+  item and lays out as a column (`Shape::Flex(Axis::Y)`) with its own `Mods`. The user-facing rule
+  is [`each` and `show` in rows and columns](https://kagari.suitsu31.club/en/std/ui/#flattening).
 
 Engine events invalidate the matching sources: entering a step invalidates `NarrativeLine`,
 `NarrativeMenu` and `NarrativeHud`; a backlog push `NarrativeHistory`; a play-mode change
@@ -711,6 +719,8 @@ There are three kinds of failure:
   the compiler emits as an import has an `import_table!` entry.
 - The engine's screen model and the compiler's `eval/machine/screen.rs` agree on every operation,
   default and equality rule; the consistency analysis is only sound if they do.
+- `Layouter::flex_items` and `Arena::is_spliced` agree on which fragments are spliced (a fragment
+  whose parent is a `Column`/`Row`, directly or through spliced fragments).
 - `kagari_text::units` is the unit of both the reveal plan and the layout; a glyph's `unit` must
   index the same grapheme the reveal counts.
 - While `replaying`, nothing persistent or audible happens.

@@ -134,6 +134,8 @@ let (hidden, set_hidden) = signal(false);
 - 戻り値: `Element` — 項目ごとに 1 つの要素。`items` と同期し続けます。
 - 種別: `fn` · ビルトイン: はい
 
+`column![…]` や `row![…]` の中では、項目の要素がその列や行の子になり、`each` 自身のレイアウトメソッドは無視されます。それ以外の場所では、項目は列としてレイアウトされます。[行と列の中の `each` と `show`](#flattening) を参照してください。
+
 ```kix
 scroll(|| each(|| game.history(), |entry| entry_view(entry)))
 ```
@@ -148,6 +150,8 @@ scroll(|| each(|| game.history(), |entry| entry_view(entry)))
 - `then` `Fn() -> Element` — 内容を作ります。
 - 戻り値: `Element` — `when()` が `true` の間は `then()`、そうでなければ何もなし。
 - 種別: `fn` · ビルトイン: はい
+
+[`each`](#each) と同じく、親が `column![…]` か `row![…]` なら平坦化され、それ以外の場所では列としてレイアウトされます。[行と列の中の `each` と `show`](#flattening) を参照してください。
 
 ## コンテンツ {#content}
 
@@ -227,12 +231,28 @@ impl Element {
 
 レイアウトはフレックスボックスに似ています。
 
-- [`column![…]`](#column) と [`row![…]`](#row) はフレックスコンテナです。`gap` と `align` が子の間隔と整列を決め、`grow` は子のフレックス伸長係数です。
+- [`column![…]`](#column) と [`row![…]`](#row) はフレックスコンテナです。`gap` と `align` が子の間隔と整列を決め、`grow` は子のフレックス伸長係数です。子の [`each` と `show`](#flattening) は平坦化されます。
 - [`layer![…]`](#layer) は [`Placed`](#placed) の子を重ねます。`at` は子のアンカーを点に置き、`cover` はレイヤー全体を埋めます。
 - サイズと位置はデザイン解像度（[`System::resolution`](./system.md#system)）のピクセルです。
 - レイアウトは要素ツリーに対するエンジンの処理です。リサイズ時に再計算され、セーブされることはありません。
 
 すべてのメソッドは要素を値で受け取り、調整した要素を返すので、`column![…].gap(16).align(Align::Center, Align::Center)` のように連鎖できます。いずれもビルトインの `fn` です。
+
+### 行と列の中の `each` と `show` {#flattening}
+
+[`each`](#each) と [`show`](#show) のレイアウトは親によって変わります。
+
+- **`column![…]` か `row![…]` の子: 平坦化されます。** `each` の要素（`show` なら `then()`）は、兄弟の中で `each` があった位置に、その列や行の子として入ります。間隔は列や行の `gap`、整列はその `align` で決まり、要素自身の `grow` が効きます。平坦化された `each` や `show` の中の `each` や `show` も平坦化されるので、`column![show(…, || each(…))]` は項目を直接列に入れます。平坦化された `each` や `show` は自身の箱を持たず、それに対して呼んだ `width`、`height`、`padding`、`gap`、`align`、`grow`、`background`、`opacity` は無視されます。
+- **それ以外の場所: 列になります。** `layer![…]` に配置したとき、`scroll(…)`、`button!`、`toggle!` の内容としたとき、平坦化されていない `each` や `show` の中、モードのルート要素としたときは、`each` や `show` は要素を並べた列としてレイアウトされ、自身のメソッドが効きます。
+
+```kix
+// 40 px between all the children, items included: the gap belongs to the column.
+column![header(), each(|| items(), |i| tile(i))].gap(40)
+// 40 px between the items, 8 px between the other children: wrap the each in a column.
+column![header(), column![each(|| items(), |i| tile(i))].gap(40), footer()].gap(8)
+// 40 px between the items: in a layer, the each is a column with its own gap.
+layer![each(|| items(), |i| tile(i)).gap(40).at(point(100, 100), TOP_LEFT)]
+```
 
 ### `Element::width(px)` {#element-width}
 
@@ -264,7 +284,7 @@ impl Element {
 #[builtin] pub fn gap(self, px: u32) -> Element;
 ```
 
-- `px` `u32` — 行または列の子の間隔。
+- `px` `u32` — 行または列の子の間隔。平坦化された `each` や `show` では無視されます（[行と列の中の `each` と `show`](#flattening) を参照）。
 
 ### `Element::align(main, cross)` {#element-align}
 
@@ -417,7 +437,7 @@ ui::slider(SliderProps {
 #[builtin] pub fn column<const N: usize>(children: [Fn() -> Element; N]) -> Element;
 ```
 
-`column![…]` の脱糖先です。子を上から下へ積みます。
+`column![…]` の脱糖先です。子を上から下へ積みます。子の `each` や `show` は平坦化され、その要素が列の子として積まれます（[行と列の中の `each` と `show`](#flattening) を参照）。
 
 ### 関数: `row(children)` {#row}
 
@@ -425,7 +445,7 @@ ui::slider(SliderProps {
 #[builtin] pub fn row<const N: usize>(children: [Fn() -> Element; N]) -> Element;
 ```
 
-`row![…]` の脱糖先です。子を左から右へ並べます。
+`row![…]` の脱糖先です。子を左から右へ並べます。子の `each` や `show` は平坦化され、その要素が行の子として並びます（[行と列の中の `each` と `show`](#flattening) を参照）。
 
 ### 関数: `layer(children)` {#layer}
 

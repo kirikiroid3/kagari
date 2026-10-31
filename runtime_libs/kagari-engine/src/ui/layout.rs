@@ -416,7 +416,7 @@ impl Layouter<'_> {
         self.arrange_items(&items, axis, inner, mods, default_align, inherited);
     }
 
-    /// Places `items` as the flex items of a box with `mods` (§4.5 Flex).
+    /// Places `items` as the flex items of a box with `mods` (std `ui.md#layout`).
     fn arrange_items(
         &mut self,
         items: &[ElemId],
