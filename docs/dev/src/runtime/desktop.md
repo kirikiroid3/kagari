@@ -24,10 +24,10 @@ and [Headless Mode](https://kagari.suitsu31.club/en/reference/tools/headless/).
 | `gpu.rs` | adapter, device and `Renderer` creation; out-of-memory and device-lost tracking |
 | `platform.rs` | `DesktopPlatform`: the engine's `Platform` |
 | `store.rs` | settings and saves on disk |
-| `audio.rs`, `sounds.rs` | the kira backend and the decoded-sound cache |
+| `audio.rs`, `sounds.rs` | the kira backend and the sound cache (short sounds decoded, long ones streamed) |
 | `input.rs`, `pads.rs` | winit keyboard and mouse mapping, gilrs gamepads |
 | `headless/mod.rs`, `headless/script.rs` | headless sessions and the script parser |
-| `tests.rs` | key mapping, script parsing, store naming, audio spans, WAV sizes past the end of the file |
+| `tests.rs` | key mapping, script parsing, store naming, audio spans, WAV sizes past the end of the file, streaming of long sounds |
 
 | Path (`runtime/kagari-desktop-runtime/`) | Contents |
 | ---------------------------------------- | -------- |
@@ -87,12 +87,12 @@ process.
 | ------ | -------------- |
 | `read_store`, `write_store`, `delete_store` | `Store` ([Stores](#stores)) |
 | `read_asset` | `kagari_archive::archive::ArchiveDir::read` |
-| `audio_duration_ms` | decode with kira (`SoundCache::decode`) and take the duration; works without an audio device |
+| `audio_duration_ms` | load through `SoundCache::load` (the container's length for a streamed sound) and take the duration; works without an audio device |
 | `render_thumbnail` | `Renderer::render_to_rgba` on the platform's `Gpu`; `None` (with a warning) before the GPU exists |
 | `local_time` | `jiff::Zoned::now()`, or the fixed headless time |
 | `random_seed` | system time in nanoseconds XOR the process id, or the fixed headless seed |
 | `set_title` | resolves the data directory from the title, unless it is fixed |
-| `program_changed` | after a hot swap: opens the archives again, drops the decoded sounds and creates the `Renderer` again (its textures and pipelines are keyed by the old build's asset ids) |
+| `program_changed` | after a hot swap: opens the archives again, drops the cached sounds and creates the `Renderer` again (its textures and pipelines are keyed by the old build's asset ids) |
 
 ### Archives
 
@@ -163,7 +163,9 @@ only one Vulkan surface) and creates a new one; `Validation` is logged and the f
 falls back to a software adapter (`force_fallback_adapter`) when none is found. The surface format
 is the first sRGB format the surface offers, else its first format; headless uses
 `Rgba8UnormSrgb`. The device uses `Limits::downlevel_defaults()` raised to the adapter's texture
-resolution limits. An uncaptured out-of-memory error and the device-lost callback set an atomic
+resolution limits, and `MemoryHints::MemoryUsage`: with the default (`Performance`) the allocator
+maps 64–128 MiB host-visible blocks, which stay resident in the process (about 60 MB more on the
+example game). An uncaptured out-of-memory error and the device-lost callback set an atomic
 flag that every frame checks; the device is never recreated.
 
 ### Audio
@@ -174,14 +176,27 @@ flag that every frame checks; the device is never recreated.
 
 - Gains are linear amplitude; kira volume is `20·log10(gain)` dB, silence at 0.001 or below.
 - Tweens and fades are linear.
-- `Play` resolves the decoded sound through `DesktopPlatform::sound` and clamps its times with
+- `Play` resolves the sound through `DesktopPlatform::sound` and clamps its times with
   `clamp_span`: a start or end past the audio is clamped to its end (with a warning), an end before
   the start is ignored, a loop region (in file time) that is empty after clamping disables
   looping. So no engine command can make kira index past the data or spin on an empty loop.
 - `Restart` replays a sound with its original parameters, without fade-in or delay.
-- `SoundCache` keeps decoded sounds by asset path, evicting the least recently used beyond
-  256 MiB (counted as 8 bytes per frame). Playing sounds hold their own reference, so eviction
-  never cuts one off. A path that fails to decode is remembered and logged once.
+- `SoundCache::load` keeps a sound by asset path in one of two forms. A sound whose decoded frames
+  (8 bytes each: two `f32` channels) would exceed 2 MiB (about 6 s at 44.1 kHz) by its container's
+  frame count is `Sound::Streamed`: the encoded bytes, shared by every play, each play a kira
+  `StreamingSoundData` decoding on its own thread (decode errors while playing are logged). Other
+  sounds, and files whose container gives no length, are decoded whole (`Sound::Decoded`,
+  `StaticSoundData`). Decoding whole music would cost about 21 MB per minute.
+  The length and sample rate of a stream come from the container; kira exposes the rate only
+  through the duration, from which `stream_length` recovers it exactly. For WAV, Ogg Vorbis,
+  FLAC, MP3 (with or without a Xing header), ADTS AAC and ALAC the container's length equals the
+  decoded one; for AAC in MP4 it leaves out the encoder's trailing padding (344 frames on a 10 s
+  ffmpeg encode), so a long AAC-in-MP4 sound reports and plays a few milliseconds less than the
+  same file decoded whole. The priming at the start is kept either way. Lengths only time
+  presentation (voice and `play` waits); they are never saved.
+- The cache evicts the least recently used sounds beyond 32 MiB (decoded frames plus encoded
+  bytes). Playing sounds hold their own reference, so eviction never cuts one off. A path that
+  fails to decode is remembered and logged once.
 - Before decoding, `fit_wav_sizes` lowers a WAV's RIFF and `data` chunk sizes that run past the
   end of the file to the bytes present. Streaming encoders write `0xFFFFFFFF` there; symphonia
   then reads the `data` chunk until it runs out of bytes and fails the whole decode, while the

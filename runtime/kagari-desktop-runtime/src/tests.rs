@@ -12,7 +12,7 @@ use crate::audio::{Span, clamp_span};
 use crate::exit::Failure;
 use crate::headless::script::{Command, parse};
 use crate::input::{key_code, map_key};
-use crate::sounds::SoundCache;
+use crate::sounds::{Sound, SoundCache, stream};
 use crate::store::{Store, sanitize_title};
 
 #[test]
@@ -145,7 +145,7 @@ fn wav(riff_size: u32, data_size: u32, frames: usize) -> Vec<u8> {
 fn wav_sizes_past_the_end_mean_until_the_end() {
     let frames = |bytes: Vec<u8>| {
         let mut cache = SoundCache::default();
-        cache.decode("a.wav", &bytes).map(|data| data.frames.len())
+        cache.load("a.wav", bytes).map(|s| s.frames_and_rate().0)
     };
     let exact = wav(0, 0, 1000);
     let (riff, data) = (exact.len() as u32 - 8, 4000);
@@ -159,6 +159,29 @@ fn wav_sizes_past_the_end_mean_until_the_end() {
     let mut odd = wav(u32::MAX, u32::MAX, 1000);
     odd.push(0);
     assert_eq!(frames(odd), Some(1000));
+}
+
+/// Sounds up to 2 MiB of decoded frames are decoded whole; longer ones stream, with their length
+/// and sample rate from the container, and a stream decodes.
+#[test]
+fn long_sounds_stream() {
+    let load = |frames: usize| {
+        let mut cache = SoundCache::default();
+        cache
+            .load("a.wav", wav(u32::MAX, u32::MAX, frames))
+            .unwrap()
+    };
+    let limit = (2 << 20) / 8;
+    let short = load(limit);
+    assert!(matches!(short, Sound::Decoded(_)));
+    assert_eq!(short.frames_and_rate(), (limit, 44_100));
+    let long = load(limit + 1);
+    let Sound::Streamed { bytes, .. } = &long else {
+        panic!("a long sound streams");
+    };
+    assert_eq!(long.frames_and_rate(), (limit + 1, 44_100));
+    assert_eq!(long.duration_ms(), Some(5944));
+    assert_eq!(stream(bytes).unwrap().num_frames(), limit + 1);
 }
 
 /// The encoder output `kagari-compat` accepts (0.1 s at 16 kHz) decodes. AAC keeps the encoder's
@@ -189,12 +212,9 @@ fn supported_encodings_decode() {
     ];
     for (path, bytes, frames) in fixtures {
         let mut cache = SoundCache::default();
-        let data = cache
-            .decode(path, bytes)
+        let sound = cache
+            .load(path, bytes.to_vec())
             .unwrap_or_else(|| panic!("{path} decodes"));
-        assert_eq!(
-            (path, data.sample_rate, data.frames.len()),
-            (path, 16_000, frames)
-        );
+        assert_eq!((path, sound.frames_and_rate()), (path, (frames, 16_000)));
     }
 }

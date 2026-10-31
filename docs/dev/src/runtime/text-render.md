@@ -240,12 +240,13 @@ displacement rows `transforms` (`kagari_shader::TRANSFORMS_BYTES`, 256 slots × 
 vertex stage moves every vertex by the affine of slot `xf_slot`; slot 0 is the identity, written
 once in `Renderer::new`.
 
-**Colour.** Images are decoded by the engine to straight-alpha sRGB RGBA8 and uploaded
-premultiplied in sRGB encoding (`c·a/255`, rounded) to `Rgba8Unorm` textures; the shader
-un-premultiplies, converts to linear and premultiplies again (`decode_image`). Everything after
-that, including compositing and every user shader, happens in linear light. `Present` writes
-linear light into an sRGB surface (the hardware encodes) or encodes by hand for a non-sRGB
-surface; `Resolve` writes into an `Rgba8UnormSrgb` texture. Output alpha is always 1.
+**Colour.** Images are decoded at upload (`ImageData::decode_rgba`) to straight-alpha sRGB RGBA8
+and uploaded premultiplied in sRGB encoding (`c·a/255`, rounded, in place) to `Rgba8Unorm`
+textures; the shader un-premultiplies, converts to linear and premultiplies again
+(`decode_image`). Everything after that, including compositing and every user shader, happens in
+linear light. `Present` writes linear light into an sRGB surface (the hardware encodes) or encodes
+by hand for a non-sRGB surface; `Resolve` writes into an `Rgba8UnormSrgb` texture. Output alpha is
+always 1.
 
 **Groups.** A group with more than one child is drawn into an offscreen layer (a pooled
 `Rgba16Float` texture) at alpha 1, then composited with `Linear` at the group's alpha; otherwise its
@@ -307,8 +308,9 @@ frame even when it cannot present it ([The Desktop Runtime](./desktop.md#windowe
 `stale_thumbnails(frame)` lists the `Thumbnail` nodes whose generation the renderer lacks and
 `set_thumbnail` uploads them. A `Thumbnail` node whose generation is not uploaded draws nothing.
 
-**Caches and limits.** Image textures are evicted least recently used beyond 512 MiB (`w·h·4`
-summed). Layers are pooled per size. User pipelines live as long as the renderer. A frame larger
+**Caches and limits.** Image textures are decoded and uploaded on first draw and evicted least
+recently used beyond 512 MiB (`w·h·4` summed); an evicted image is decoded again when next drawn.
+Layers are pooled per size. User pipelines live as long as the renderer. A frame larger
 than the device's maximum texture dimension is clipped with a warning. A readback larger than the
 limit fails and returns an empty buffer.
 
@@ -334,8 +336,9 @@ output happens only at the end:
 - The renderer draws exactly what the `Frame` says; all policy (what is visible, reveal, window
   opacity, gating) is decided in the engine. A renderer for another platform must give the same
   picture from the same `Frame`.
-- Colours in a `Frame` and a `Layout` are premultiplied linear; images and thumbnails cross the
-  engine/renderer boundary as straight-alpha sRGB RGBA8.
+- Colours in a `Frame` and a `Layout` are premultiplied linear; images cross the engine/renderer
+  boundary as encoded bytes the renderer decodes to straight-alpha sRGB RGBA8, thumbnails as
+  straight-alpha sRGB RGBA8.
 - Layout units and reveal units come from `kagari_text::units`; a ruby or emphasis glyph carries
   its base's first unit.
 - `kagari-text` stays free of platform and GPU dependencies; it is shared with any future runtime.

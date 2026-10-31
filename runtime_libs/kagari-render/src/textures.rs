@@ -28,18 +28,18 @@ impl Entry {
     }
 }
 
-/// Straight-alpha sRGB RGBA8 → premultiplied in sRGB encoding: `c' = (c·a + 127)/255`.
-pub(crate) fn premultiply(rgba: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(rgba.len());
-    for &[r, g, b, a] in rgba.as_chunks::<4>().0 {
-        let a32 = u32::from(a);
-        let mul = |c: u8| {
-            let v = u32::from(c).saturating_mul(a32).saturating_add(127) / 255;
-            u8::try_from(v).unwrap_or(u8::MAX)
+/// Straight-alpha sRGB RGBA8 → premultiplied in sRGB encoding, in place: `c' = (c·a + 127)/255`.
+pub(crate) fn premultiply(rgba: &mut [u8]) {
+    for [r, g, b, a] in rgba.as_chunks_mut::<4>().0 {
+        let a32 = u32::from(*a);
+        let mul = |c: &mut u8| {
+            let v = u32::from(*c).saturating_mul(a32).saturating_add(127) / 255;
+            *c = u8::try_from(v).unwrap_or(u8::MAX);
         };
-        out.extend_from_slice(&[mul(r), mul(g), mul(b), a]);
+        mul(r);
+        mul(g);
+        mul(b);
     }
-    out
 }
 
 /// Uploads premultiplied RGBA8 as an `Rgba8Unorm` texture with its bind group.
@@ -107,8 +107,8 @@ impl TextureCache {
         self.frame = self.frame.wrapping_add(1);
     }
 
-    /// Uploads image `id` on first use and marks it used this frame; `None` (warned once per
-    /// id) when it is not loaded or exceeds `max_dim`.
+    /// Decodes and uploads image `id` on first use and marks it used this frame; `None` (warned
+    /// once per id) when it is not loaded, exceeds `max_dim` or does not decode.
     pub fn image(
         &mut self,
         gfx: &Gfx,
@@ -137,19 +137,23 @@ impl TextureCache {
             let expected = (data.width as usize)
                 .saturating_mul(data.height as usize)
                 .saturating_mul(4);
-            if data.width == 0 || data.height == 0 || data.rgba.len() != expected {
-                if self.warned.insert(id) {
-                    log::warn!("image asset #{} has no pixels; skipped", id.0);
+            let mut rgba = match data.decode_rgba() {
+                Ok(rgba) if data.width > 0 && data.height > 0 && rgba.len() == expected => rgba,
+                Ok(_) => {
+                    if self.warned.insert(id) {
+                        log::warn!("image asset #{} has no pixels; skipped", id.0);
+                    }
+                    return None;
                 }
-                return None;
-            }
-            let entry = upload(
-                gfx,
-                "kagari image",
-                data.width,
-                data.height,
-                &premultiply(&data.rgba),
-            );
+                Err(e) => {
+                    if self.warned.insert(id) {
+                        log::warn!("image asset #{} does not decode ({e}); skipped", id.0);
+                    }
+                    return None;
+                }
+            };
+            premultiply(&mut rgba);
+            let entry = upload(gfx, "kagari image", data.width, data.height, &rgba);
             self.images.insert(id, entry);
         }
         let frame = self.frame;
@@ -202,7 +206,9 @@ impl TextureCache {
             }
             return;
         }
-        let entry = upload(gfx, "kagari thumbnail", width, height, &premultiply(rgba));
+        let mut premultiplied = rgba.to_vec();
+        premultiply(&mut premultiplied);
+        let entry = upload(gfx, "kagari thumbnail", width, height, &premultiplied);
         self.thumbs.insert(slot, (generation, entry));
     }
 

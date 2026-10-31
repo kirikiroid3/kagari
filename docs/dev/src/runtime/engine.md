@@ -30,7 +30,7 @@ between std declarations and these imports is in [Builtins and the Host ABI](../
 | `debug.rs` | what a debugger needs: `GameView`, `Pilot`, `debug_probe`/`debug_jump`/`debug_step`, the hold, live step breakpoints, the instruction hook, call recording ([below](#debugger-access)) |
 | `swap.rs` | scene hot swap: `Engine::debug_swap`, `SwapPlan`, `SwapOutcome` ([below](#hot-swap)) |
 | `values/` | `STD_ADTS` (`table.rs`, the std types the engine reads or builds, in declaration order), `StdTypes`, typed decoders (`decode.rs`), shader arguments (`shader_args.rs`) |
-| `assets.rs` | `AssetStore`: lazily decoded images, fonts, shader sources, audio lengths, save thumbnails |
+| `assets.rs` | `AssetStore`: lazily loaded images (size and encoded bytes), fonts, shader sources, audio lengths, save thumbnails |
 | `frame.rs` | the `Frame` draw list |
 | `test_support.rs`, `tests/` | fixture compilation through `kagari-lang`, a fake platform, engine tests |
 
@@ -647,15 +647,19 @@ starts. Read flags, seen sets and meta are never reverted by a load or a rewind.
 
 ## Assets
 
-`AssetStore` decodes on first use and keeps everything for the process lifetime: images
-(`decode_image`: JPEG XL by signature through `jxl_oxide::integration::JxlDecoder` under
-`image::Limits::default()`, everything else through `image::load_from_memory`; both to
-straight-alpha RGBA8, without colour management), fonts (all loaded at boot, in asset order, into
-`kagari_text::Fonts`), shader sources (UTF-8 WGSL), audio lengths (through
-`Platform::audio_duration_ms`, cached) and save thumbnails (with a generation counter so the
-renderer can tell a replaced thumbnail). A step's images, shaders, transition contents and rule
-masks are loaded at step entry, so a missing image or shader traps there rather than
-mid-animation.
+`AssetStore` loads on first use and keeps everything for the process lifetime: images (the size
+from the header, `image_dimensions`, and the encoded bytes; `ImageData::decode_rgba` decodes them
+when the renderer uploads the texture, again after an eviction or with a new renderer, so no
+decoded copy stays in memory: `decode_image` decodes JPEG XL by signature through
+`jxl_oxide::integration::JxlDecoder` under `image::Limits::default()`, everything else through
+`image::load_from_memory`; both to straight-alpha RGBA8, without colour management), fonts (all
+loaded at boot, in asset order, into `kagari_text::Fonts`), shader sources (UTF-8 WGSL), audio
+lengths (through `Platform::audio_duration_ms`, cached) and save thumbnails (with a generation
+counter so the renderer can tell a replaced thumbnail). A step's images, shaders, transition
+contents and rule masks are loaded at step entry, so a missing image or shader, or a file that is
+not a supported image, traps there rather than mid-animation; pixel data that fails to decode at
+upload is logged once and the image is not drawn (`kagari build` rejects assets a listed profile
+cannot decode).
 
 ## Profile `native_v0` and `kagari-compat`
 

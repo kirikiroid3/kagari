@@ -14,11 +14,20 @@ use crate::Platform;
 use crate::frame::ThumbKey;
 use crate::values::host_trap;
 
-/// RGBA8, straight alpha, row-major.
+/// A loaded image: its size, read from the header, and its encoded bytes. The renderer decodes
+/// them when it uploads the texture (again after an eviction or with a new renderer), so no
+/// decoded copy stays in memory.
 pub struct ImageData {
     pub width: u32,
     pub height: u32,
-    pub rgba: Vec<u8>,
+    encoded: Vec<u8>,
+}
+
+impl ImageData {
+    /// The pixels: RGBA8, straight alpha, row-major.
+    pub fn decode_rgba(&self) -> image::ImageResult<Vec<u8>> {
+        Ok(decode_image(&self.encoded)?.into_rgba8().into_raw())
+    }
 }
 
 /// A save thumbnail: straight-alpha sRGB RGBA8.
@@ -163,6 +172,8 @@ impl AssetStore {
         }
     }
 
+    /// Loads an image: its size from the header (a file that is not a supported image traps),
+    /// and the encoded bytes for the renderer.
     pub(crate) fn ensure_image(
         &mut self,
         id: AssetId,
@@ -172,16 +183,14 @@ impl AssetStore {
             return Ok(size);
         }
         self.check_kind(id, |k| k == AssetKind::Image, "an image")?;
-        let bytes = self.read(id, p)?;
-        let decoded = decode_image(&bytes)
-            .map_err(|e| self.error(id, format!("decode failed: {e}")))?
-            .into_rgba8();
-        let (width, height) = decoded.dimensions();
+        let encoded = self.read(id, p)?;
+        let (width, height) = image_dimensions(&encoded)
+            .map_err(|e| self.error(id, format!("decode failed: {e}")))?;
         if let Some(slot) = self.images.get_mut(index(id)) {
             *slot = Some(ImageData {
                 width,
                 height,
-                rgba: decoded.into_raw(),
+                encoded,
             });
         }
         Ok((width, height))
@@ -246,15 +255,31 @@ impl AssetStore {
     }
 }
 
+const JXL_CODESTREAM: &[u8] = &[0xFF, 0x0A];
+const JXL_CONTAINER: &[u8] = &[
+    0x00, 0x00, 0x00, 0x0C, b'J', b'X', b'L', b' ', 0x0D, 0x0A, 0x87, 0x0A,
+];
+
+fn is_jxl(bytes: &[u8]) -> bool {
+    bytes.starts_with(JXL_CODESTREAM) || bytes.starts_with(JXL_CONTAINER)
+}
+
+/// The width and height in an image asset's header, without decoding the pixels.
+fn image_dimensions(bytes: &[u8]) -> image::ImageResult<(u32, u32)> {
+    if is_jxl(bytes) {
+        let decoder = jxl_oxide::integration::JxlDecoder::new(Cursor::new(bytes))?;
+        return Ok(image::ImageDecoder::dimensions(&decoder));
+    }
+    image::ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()?
+        .into_dimensions()
+}
+
 /// Decodes an image asset. `image` has no JPEG XL decoder, so JPEG XL goes to `jxl-oxide`
 /// directly (not through `image::hooks`, which are process-wide), under the same default
 /// allocation limit `load_from_memory` applies.
 fn decode_image(bytes: &[u8]) -> image::ImageResult<image::DynamicImage> {
-    const JXL_CODESTREAM: &[u8] = &[0xFF, 0x0A];
-    const JXL_CONTAINER: &[u8] = &[
-        0x00, 0x00, 0x00, 0x0C, b'J', b'X', b'L', b' ', 0x0D, 0x0A, 0x87, 0x0A,
-    ];
-    if bytes.starts_with(JXL_CODESTREAM) || bytes.starts_with(JXL_CONTAINER) {
+    if is_jxl(bytes) {
         let mut decoder = jxl_oxide::integration::JxlDecoder::new(Cursor::new(bytes))?;
         image::ImageDecoder::set_limits(&mut decoder, image::Limits::default())?;
         return image::DynamicImage::from_decoder(decoder);

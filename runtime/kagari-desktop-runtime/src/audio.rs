@@ -4,7 +4,9 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use kagari_engine::{AudioCommand, Bus};
-use kira::sound::static_sound::{StaticSoundData, StaticSoundHandle};
+use kira::sound::FromFileError;
+use kira::sound::static_sound::StaticSoundHandle;
+use kira::sound::streaming::StreamingSoundHandle;
 use kira::sound::{PlaybackPosition, PlaybackState};
 use kira::track::{TrackBuilder, TrackHandle};
 use kira::{
@@ -12,6 +14,7 @@ use kira::{
 };
 
 use crate::platform::DesktopPlatform;
+use crate::sounds::{Sound, stream};
 
 /// A linear amplitude gain as kira volume.
 fn db(gain: f32) -> Decibels {
@@ -126,8 +129,37 @@ struct PlayParams {
     delay_ms: u32,
 }
 
+/// A playing sound's handle.
+enum Handle {
+    Decoded(StaticSoundHandle),
+    Streamed(StreamingSoundHandle<FromFileError>),
+}
+
+impl Handle {
+    fn state(&self) -> PlaybackState {
+        match self {
+            Handle::Decoded(h) => h.state(),
+            Handle::Streamed(h) => h.state(),
+        }
+    }
+
+    fn stop(&mut self, tween: Tween) {
+        match self {
+            Handle::Decoded(h) => h.stop(tween),
+            Handle::Streamed(h) => h.stop(tween),
+        }
+    }
+
+    fn set_volume(&mut self, volume: Decibels, tween: Tween) {
+        match self {
+            Handle::Decoded(h) => h.set_volume(volume, tween),
+            Handle::Streamed(h) => h.set_volume(volume, tween),
+        }
+    }
+}
+
 struct Playing {
-    handle: StaticSoundHandle,
+    handle: Handle,
     bus: Bus,
     params: PlayParams,
 }
@@ -178,8 +210,14 @@ impl AudioOut {
         if self.manager.is_none() {
             return;
         }
-        self.playing
-            .retain(|_, p| p.handle.state() != PlaybackState::Stopped);
+        self.playing.retain(|_, p| {
+            if let Handle::Streamed(h) = &mut p.handle {
+                while let Some(e) = h.pop_error() {
+                    log::warn!("cannot stream `{}`: {e}", p.params.path);
+                }
+            }
+            p.handle.state() != PlaybackState::Stopped
+        });
         for cmd in cmds {
             match cmd {
                 AudioCommand::SetBusGain { bus, gain } => {
@@ -250,38 +288,58 @@ impl AudioOut {
         if let Some(mut old) = self.playing.remove(&id) {
             old.handle.stop(tw(0));
         }
-        let Some(data) = platform.sound(&params.path) else {
+        let Some(sound) = platform.sound(&params.path) else {
             return;
         };
+        let (len, rate) = sound.frames_and_rate();
         let span = clamp_span(
             &params.path,
-            data.frames.len(),
-            data.sample_rate,
+            len,
+            rate,
             params.start_ms,
             params.end_ms,
             params.loop_region,
         );
-        let start = PlaybackPosition::Samples(span.start);
-        let mut data: StaticSoundData = match (span.loop_region, span.end) {
-            (Some((ls, le)), _) => data
-                .start_position(start)
-                .loop_region(PlaybackPosition::Samples(ls)..PlaybackPosition::Samples(le)),
-            (None, Some(end)) => data.slice(start..PlaybackPosition::Samples(end)),
-            (None, None) => data.start_position(start),
-        };
-        data = data.volume(db(params.gain));
-        if params.fade_in_ms > 0 {
-            data = data.fade_in_tween(Some(tw(params.fade_in_ms)));
-        }
-        if params.delay_ms > 0 {
-            data = data.start_time(StartTime::Delayed(Duration::from_millis(u64::from(
-                params.delay_ms,
-            ))));
+        // The same settings on either kind of sound data, which share the builder methods.
+        macro_rules! configure {
+            ($data:expr) => {{
+                let start = PlaybackPosition::Samples(span.start);
+                let mut data = match (span.loop_region, span.end) {
+                    (Some((ls, le)), _) => $data
+                        .start_position(start)
+                        .loop_region(PlaybackPosition::Samples(ls)..PlaybackPosition::Samples(le)),
+                    (None, Some(end)) => $data.slice(start..PlaybackPosition::Samples(end)),
+                    (None, None) => $data.start_position(start),
+                };
+                data = data.volume(db(params.gain));
+                if params.fade_in_ms > 0 {
+                    data = data.fade_in_tween(Some(tw(params.fade_in_ms)));
+                }
+                if params.delay_ms > 0 {
+                    data = data.start_time(StartTime::Delayed(Duration::from_millis(u64::from(
+                        params.delay_ms,
+                    ))));
+                }
+                data
+            }};
         }
         let Some(track) = self.bus(bus) else {
             return;
         };
-        match track.play(data) {
+        let handle = match sound {
+            Sound::Decoded(data) => track
+                .play(configure!(*data))
+                .map(Handle::Decoded)
+                .map_err(|e| e.to_string()),
+            Sound::Streamed { bytes, .. } => match stream(&bytes) {
+                Ok(data) => track
+                    .play(configure!(data))
+                    .map(Handle::Streamed)
+                    .map_err(|e| e.to_string()),
+                Err(e) => Err(e.to_string()),
+            },
+        };
+        match handle {
             Ok(handle) => {
                 self.playing.insert(
                     id,

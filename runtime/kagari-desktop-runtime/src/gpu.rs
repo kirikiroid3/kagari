@@ -60,6 +60,9 @@ pub fn create(
     let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
         label: Some("kagari"),
         required_limits: wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits()),
+        // Small allocator blocks: the default (`Performance`) maps 64–128 MiB host-visible
+        // blocks, resident in the process, for the staging copies of a few textures.
+        memory_hints: wgpu::MemoryHints::MemoryUsage,
         ..Default::default()
     }))
     .map_err(|e| Failure::new(WINDOW, format!("cannot open the GPU device: {e}")))?;

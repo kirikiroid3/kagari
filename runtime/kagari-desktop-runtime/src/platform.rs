@@ -5,12 +5,11 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use kagari_engine::{AssetStore, Frame, Platform, Timestamp};
-use kira::sound::static_sound::StaticSoundData;
 
 use kagari_archive::archive::ArchiveDir;
 
 use crate::gpu::Gpu;
-use crate::sounds::SoundCache;
+use crate::sounds::{Sound, SoundCache};
 use crate::store::Store;
 
 /// The time `local_time` reports.
@@ -64,16 +63,16 @@ impl DesktopPlatform {
         }
     }
 
-    /// The decoded sound at an asset path, read from the archives on first use.
-    pub fn sound(&mut self, path: &str) -> Option<StaticSoundData> {
-        if let Some(data) = self.sounds.get(path) {
-            return Some(data);
+    /// The sound at an asset path, read from the archives on first use.
+    pub fn sound(&mut self, path: &str) -> Option<Sound> {
+        if let Some(sound) = self.sounds.get(path) {
+            return Some(sound);
         }
         if self.sounds.failed(path) {
             return None;
         }
         match self.read_asset(path) {
-            Ok(Some(bytes)) => self.sounds.decode(path, &bytes),
+            Ok(Some(bytes)) => self.sounds.load(path, bytes),
             Ok(None) => {
                 log::warn!("audio `{path}` not found");
                 None
@@ -106,8 +105,11 @@ impl Platform for DesktopPlatform {
     }
 
     fn audio_duration_ms(&mut self, path: &str, bytes: &[u8]) -> Option<u32> {
-        let data = self.sounds.decode(path, bytes)?;
-        u32::try_from(data.duration().as_millis()).ok()
+        let sound = match self.sounds.get(path) {
+            Some(sound) => sound,
+            None => self.sounds.load(path, bytes.to_vec())?,
+        };
+        sound.duration_ms()
     }
 
     fn render_thumbnail(
