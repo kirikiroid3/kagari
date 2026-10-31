@@ -10,7 +10,7 @@ use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::window::{Fullscreen, Window, WindowId};
+use winit::window::{Fullscreen, Window, WindowAttributes, WindowId};
 
 use crate::audio::AudioOut;
 use crate::cli::{BackendArg, Cli};
@@ -60,6 +60,29 @@ pub fn run(cli: &Cli, dir: &Path, bytes: &[u8]) -> Result<u8, Failure> {
         .run_app(&mut app)
         .map_err(|e| Failure::new(WINDOW, format!("cannot open a window: {e}")))?;
     Ok(app.exit.unwrap_or(0))
+}
+
+/// The Kagari logo, the executable's icon resource 1 (`kagari-desktop-runtime.rc`), as the
+/// window's title bar and taskbar icon.
+#[cfg(windows)]
+fn with_logo(attributes: WindowAttributes) -> WindowAttributes {
+    use winit::platform::windows::{IconExtWindows, WindowAttributesExtWindows};
+    use winit::window::Icon;
+    match Icon::from_resource(1, None) {
+        Ok(icon) => attributes
+            .with_window_icon(Some(icon.clone()))
+            .with_taskbar_icon(Some(icon)),
+        Err(error) => {
+            log::warn!("cannot load the window icon: {error}");
+            attributes
+        }
+    }
+}
+
+/// Elsewhere the desktop environment picks the window's icon.
+#[cfg(not(windows))]
+fn with_logo(attributes: WindowAttributes) -> WindowAttributes {
+    attributes
 }
 
 #[cfg(target_os = "linux")]
@@ -170,6 +193,7 @@ impl App {
             .with_title(&ws.title)
             .with_inner_size(LogicalSize::new(dw * scale, dh * scale))
             .with_fullscreen(ws.fullscreen.then_some(Fullscreen::Borderless(None)));
+        let attributes = with_logo(attributes);
         let window = Arc::new(
             event_loop
                 .create_window(attributes)

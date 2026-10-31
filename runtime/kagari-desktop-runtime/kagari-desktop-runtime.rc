@@ -1,0 +1,4 @@
+// The Windows resources of kagari-desktop-runtime.exe, compiled by build.rs. Resource 1 is the
+// Kagari logo: the executable's icon (Explorer shows the first icon group) and the window's
+// (src/app.rs). Paths are relative to this directory, the build script's working directory.
+1 ICON "resources/kagari.ico"

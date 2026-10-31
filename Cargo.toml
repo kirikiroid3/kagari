@@ -99,4 +99,5 @@ tree-sitter-language = "0.1"
 mdbook-preprocessor = "0.5"
 mdbook-markdown = "0.5"
 cc = "1"
+embed-resource = "3"
 ureq = { version = "3", default-features = false, features = ["rustls"] }

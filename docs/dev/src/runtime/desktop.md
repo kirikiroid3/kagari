@@ -28,6 +28,15 @@ and [Headless Mode](https://kagari.suitsu31.club/en/reference/tools/headless/).
 | `headless/mod.rs`, `headless/script.rs` | headless sessions and the script parser |
 | `tests.rs` | key mapping, script parsing, store naming, audio spans, WAV sizes past the end of the file |
 
+| Path (`runtime/kagari-desktop-runtime/`) | Contents |
+| ---------------------------------------- | -------- |
+| `build.rs`, `kagari-desktop-runtime.rc` | Windows only: compiles the resource script with `embed-resource` (`rc.exe`; `llvm-rc` when cross-compiling) into the executable; a build that cannot compile it fails |
+| `resources/kagari.ico` | The Kagari logo as icon resource 1: the `.exe`'s icon in Explorer, and the window's title bar and taskbar icon (`app.rs`, `with_logo`, which loads it with winit's `Icon::from_resource`; other platforms leave the icon to the desktop) |
+
+`kagari.ico` is rendered from the site's `docs/site/public/logo.svg` (its light colours) at 16, 20,
+24, 32, 40, 48, 64, 128 and 256 pixels with Inkscape and packed as PNG entries. Regenerate it when
+the logo changes; nothing checks that the two agree.
+
 Build-time system dependencies are declared in the repository's `flake.nix`.
 
 ## Process structure
@@ -283,4 +292,7 @@ when reading headless runs: `kagari::system` (`modes: [...]` whenever the mode s
   `core/kagari-std`, `input.rs` (`map_key` and the test inverse `key_code`, which is exhaustive so
   a missing mapping fails to compile), the STD page `system.md`.
 - New system libraries: `flake.nix` and the Reference's build requirements.
+- A new import from the MSVC redistributable (`VCRUNTIME140_1.dll`, `MSVCP140.dll`, …) on
+  Windows: `Platform::libraries` in `kagari-cli` and the `dumpbin` check in the release workflow
+  ([Releases](../process/releases.md#the-workflow)).
 - Verify with `cargo test -p kagari-desktop-runtime` and a headless run of `example/test_game1`.

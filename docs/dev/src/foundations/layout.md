@@ -80,7 +80,7 @@ The graph omits edges that other edges imply (for example `kagari-cli` also depe
 | `kagari-engine` | `kagari-bytecode`, `kagari-vm`, `kagari-text`, `kagari-archive` (dev: `kagari-lang`) | `image`, `jxl-oxide`, `png`, `sha2` |
 | `kagari-render` | `kagari-bytecode`, `kagari-engine`, `kagari-text` | `wgpu`, `bytemuck` |
 | `kagari-debugger` | `kagari-archive`, `kagari-bytecode`, `kagari-debug`, `kagari-engine`, `kagari-vm`, `kagari-std` (feature `client`) (dev: `kagari-lang`) | `serde`, `serde_json`, `log` |
-| `kagari-desktop-runtime` | `kagari-archive`, `kagari-debugger`, `kagari-engine`, `kagari-render` | `winit`, `wgpu`, `kira`, `gilrs`, `directories`, `clap`, `jiff` |
+| `kagari-desktop-runtime` | `kagari-archive`, `kagari-debugger`, `kagari-engine`, `kagari-render` | `winit`, `wgpu`, `kira`, `gilrs`, `directories`, `clap`, `jiff`, `embed-resource` (build, Windows icon) |
 
 Two rules follow from the graph and must stay true:
 
