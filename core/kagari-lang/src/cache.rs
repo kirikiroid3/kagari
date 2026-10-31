@@ -32,7 +32,7 @@ pub const TOOLCHAIN_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Changes whenever the analysis may give other results for the same sources and toolchain
 /// version, so that caches written before are not reused.
-const FINGERPRINT_SALT: &str = "kagari-analysis/1";
+const FINGERPRINT_SALT: &str = "kagari-analysis/2";
 
 /// The stage-5 diagnostics of an earlier run and the fingerprint of the sources they were
 /// computed from.

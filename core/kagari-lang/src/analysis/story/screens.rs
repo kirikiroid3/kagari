@@ -36,21 +36,25 @@ type ScreenId = u32;
 /// its `Step` terminator).
 type StepRef = (usize, ExprId);
 type InstId = usize;
-/// The step whose render last changed a screen; `None` for the screen the story starts on.
+/// The step whose render last changed a screen within an instance; `None` while the screen is
+/// still the one the instance was entered with. A shared instance is entered from several call
+/// sites, so the step before the entry is looked up at the call site the screen came from.
 type Producer = Option<StepRef>;
 
 /// A context entered with one screen.
 struct Inst {
     ctx: CtxId,
+    entry: ScreenId,
     node_in: Vec<FxHashMap<ScreenId, Producer>>,
     exit_out: Vec<FxHashMap<ScreenId, Producer>>,
     callers: Vec<(InstId, NodeId)>,
 }
 
-/// A step whose set of screens grew past the cap, and the render that grew it.
+/// A step whose set of screens grew past the cap, and the render that grew it (`None`: the
+/// screen the story starts on).
 struct Overflow {
     step: StepRef,
-    producer: Producer,
+    producer: Option<StepRef>,
 }
 
 struct Screens<'a, 'db> {
@@ -118,22 +122,46 @@ impl Screens<'_, '_> {
     }
 
     /// The instance of `ctx` entered with `screen`, created (and its entry scheduled) once.
-    fn inst(&mut self, ctx: CtxId, screen: ScreenId, producer: Producer) -> InstId {
+    fn inst(&mut self, ctx: CtxId, screen: ScreenId) -> InstId {
         if let Some(id) = self.inst_index.get(&(ctx, screen)) {
             return *id;
         }
         let id = self.insts.len();
         self.insts.push(Inst {
             ctx,
+            entry: screen,
             node_in: vec![FxHashMap::default(); self.node_count(ctx)],
             exit_out: vec![FxHashMap::default(); self.exit_count(ctx)],
             callers: Vec::new(),
         });
         self.inst_index.insert((ctx, screen), id);
         if let Some(context) = self.explored.context(ctx) {
-            self.work.push((id, context.entry, screen, producer));
+            self.work.push((id, context.entry, screen, None));
         }
         id
+    }
+
+    /// `producer` of `inst` followed through first callers to the step that last changed the
+    /// screen; `None` only for the screen the story starts on.
+    fn resolve(&self, inst: InstId, producer: Producer) -> Producer {
+        let mut visited = FxHashSet::default();
+        let mut inst = inst;
+        let mut producer = producer;
+        while producer.is_none() && visited.insert(inst) {
+            let Some(&(caller, node)) = self.insts.get(inst).and_then(|i| i.callers.first()) else {
+                break;
+            };
+            let entry = self.insts.get(inst).map(|i| i.entry);
+            producer = self
+                .insts
+                .get(caller)
+                .and_then(|c| c.node_in.get(node.idx()))
+                .zip(entry)
+                .and_then(|(set, entry)| set.get(&entry).copied())
+                .flatten();
+            inst = caller;
+        }
+        producer
     }
 
     fn propagate(&mut self) -> Result<(), Overflow> {
@@ -142,7 +170,7 @@ impl Screens<'_, '_> {
         self.step_sets.clear();
         self.work.clear();
         for root in self.explored.roots.clone() {
-            self.inst(root, self.start, None);
+            self.inst(root, self.start);
         }
         while let Some((inst, target, screen, producer)) = self.work.pop() {
             let Some(ctx) = self.insts.get(inst).map(|inst| inst.ctx) else {
@@ -178,7 +206,10 @@ impl Screens<'_, '_> {
                             let set = self.step_sets.entry(step).or_default();
                             set.insert(screen);
                             if set.len() > SCREEN_CAP {
-                                return Err(Overflow { step, producer });
+                                return Err(Overflow {
+                                    step,
+                                    producer: self.resolve(inst, producer),
+                                });
                             }
                             let shown = self.apply(step, render.as_ref(), screen);
                             let producer = if shown == screen {
@@ -197,7 +228,7 @@ impl Screens<'_, '_> {
                             }
                         }
                         NodeKind::Call { callee, succ } => {
-                            let callee_inst = self.inst(*callee, screen, producer);
+                            let callee_inst = self.inst(*callee, screen);
                             let mut pending = Vec::new();
                             if let Some(callee_data) = self.insts.get_mut(callee_inst) {
                                 callee_data.callers.push((inst, node));
@@ -208,8 +239,10 @@ impl Screens<'_, '_> {
                                     }
                                 }
                             }
-                            for (target, screen, producer) in pending {
-                                self.work.push((inst, target, screen, producer));
+                            // A screen the callee left unchanged keeps this call site's producer.
+                            for (target, shown, exit_producer) in pending {
+                                self.work
+                                    .push((inst, target, shown, exit_producer.or(producer)));
                             }
                         }
                     }
@@ -229,18 +262,20 @@ impl Screens<'_, '_> {
                     if !fresh {
                         continue;
                     }
-                    let callers = self
+                    let Some((entry, callers)) = self
                         .insts
                         .get(inst)
-                        .map(|inst| inst.callers.clone())
-                        .unwrap_or_default();
+                        .map(|inst| (inst.entry, inst.callers.clone()))
+                    else {
+                        continue;
+                    };
                     for (caller, node) in callers {
-                        let Some(caller_ctx) = self.insts.get(caller).map(|inst| inst.ctx) else {
+                        let Some(caller_data) = self.insts.get(caller) else {
                             continue;
                         };
                         let target = self
                             .explored
-                            .context(caller_ctx)
+                            .context(caller_data.ctx)
                             .and_then(|context| context.node(node))
                             .and_then(|node| match &node.kind {
                                 NodeKind::Call { succ, .. } => succ
@@ -249,6 +284,14 @@ impl Screens<'_, '_> {
                                     .map(|(_, target)| *target),
                                 NodeKind::Step { .. } | NodeKind::Rng { .. } => None,
                             });
+                        // A screen the callee left unchanged keeps the caller's producer.
+                        let producer = producer.or_else(|| {
+                            caller_data
+                                .node_in
+                                .get(node.idx())
+                                .and_then(|set| set.get(&entry).copied())
+                                .flatten()
+                        });
                         if let Some(target) = target {
                             self.work.push((caller, target, screen, producer));
                         }
@@ -398,22 +441,25 @@ impl Screens<'_, '_> {
     }
 
     /// Steps whose shown screen depends on the path, per group of instances entered from
-    /// equal call stacks (up to screens).
+    /// equal call stacks (up to screens). A group carries the producer of each screen it is
+    /// entered with on the walked call path, so producers name steps on that path.
     fn consistency(&mut self) {
         let mut seen: FxHashSet<(CtxId, Vec<ScreenId>)> = FxHashSet::default();
-        let mut stack: Vec<(CtxId, Vec<ScreenId>)> = Vec::new();
+        let mut stack: Vec<(CtxId, Vec<(ScreenId, Producer)>)> = Vec::new();
         for root in &self.explored.roots {
-            let group = (*root, vec![self.start]);
-            if seen.insert(group.clone()) {
-                stack.push(group);
+            if seen.insert((*root, vec![self.start])) {
+                stack.push((*root, vec![(self.start, None)]));
             }
         }
         let mut reported: FxHashMap<StepRef, Vec<Producer>> = FxHashMap::default();
         let mut order: Vec<StepRef> = Vec::new();
         while let Some((ctx, group)) = stack.pop() {
-            let insts: Vec<InstId> = group
+            let insts: Vec<(InstId, Producer)> = group
                 .iter()
-                .filter_map(|screen| self.inst_index.get(&(ctx, *screen)).copied())
+                .filter_map(|(screen, producer)| {
+                    let inst = self.inst_index.get(&(ctx, *screen))?;
+                    Some((*inst, *producer))
+                })
                 .collect();
             let explored = self.explored;
             let Some(context) = explored.context(ctx) else {
@@ -427,13 +473,13 @@ impl Screens<'_, '_> {
                             continue;
                         }
                         let mut reaching: Vec<(ScreenId, Producer)> = Vec::new();
-                        for inst in &insts {
+                        for (inst, entry) in &insts {
                             if let Some(set) = self
                                 .insts
                                 .get(*inst)
                                 .and_then(|i| i.node_in.get(node.idx()))
                             {
-                                reaching.extend(set.iter().map(|(s, p)| (*s, *p)));
+                                reaching.extend(set.iter().map(|(s, p)| (*s, p.or(*entry))));
                             }
                         }
                         reaching.sort_by_key(|(screen, _)| *screen);
@@ -456,19 +502,20 @@ impl Screens<'_, '_> {
                         }
                     }
                     NodeKind::Call { callee, .. } => {
-                        let mut entered: Vec<ScreenId> = Vec::new();
-                        for inst in &insts {
+                        let mut entered: Vec<(ScreenId, Producer)> = Vec::new();
+                        for (inst, entry) in &insts {
                             if let Some(set) = self
                                 .insts
                                 .get(*inst)
                                 .and_then(|i| i.node_in.get(node.idx()))
                             {
-                                entered.extend(set.keys().copied());
+                                entered.extend(set.iter().map(|(s, p)| (*s, p.or(*entry))));
                             }
                         }
-                        entered.sort_unstable();
-                        entered.dedup();
-                        if !entered.is_empty() && seen.insert((*callee, entered.clone())) {
+                        entered.sort_by_key(|(screen, _)| *screen);
+                        entered.dedup_by_key(|(screen, _)| *screen);
+                        let screens: Vec<ScreenId> = entered.iter().map(|(s, _)| *s).collect();
+                        if !entered.is_empty() && seen.insert((*callee, screens)) {
                             stack.push((*callee, entered));
                         }
                     }

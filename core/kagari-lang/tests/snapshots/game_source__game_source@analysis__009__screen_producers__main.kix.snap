@@ -1,0 +1,65 @@
+---
+source: core/kagari-lang/tests/game_source.rs
+expression: out
+input_file: core/kagari-lang/tests/game_source/analysis/009__screen_producers/main.kix
+---
+analysis/009__screen_producers/main.kix:51:5: warning[W5004]: the screen this step shows depends on the path that reached it: give this step a keyframe render (one that does not read its input screen), or choose the render by a story variable
+  note: analysis/009__screen_producers/main.kix:45:17: on one of the paths, the screen was last changed here
+  note: analysis/009__screen_producers/main.kix:48:35: on one of the paths, the screen was last changed here
+analysis/009__screen_producers/main.kix:63:5: warning[W5004]: the screen this step shows depends on the path that reached it: give this step a keyframe render (one that does not read its input screen), or choose the render by a story variable
+  note: analysis/009__screen_producers/main.kix:57:17: on one of the paths, the screen was last changed here
+  note: analysis/009__screen_producers/main.kix:60:35: on one of the paths, the screen was last changed here
+analysis/009__screen_producers/main.kix:79:5: warning[W5004]: the screen this step shows depends on the path that reached it: give this step a keyframe render (one that does not read its input screen), or choose the render by a story variable
+  note: analysis/009__screen_producers/main.kix:76:35: on one of the paths, the screen was last changed here
+  note: analysis/009__screen_producers/main.kix:68:17: on one of the paths, the screen was last changed here
+--- resolutions ---
+analysis/009__screen_producers/main.kix:10:15 screen -> local screen@10:15
+analysis/009__screen_producers/main.kix:10:27 Screen -> struct std::screen::Screen
+analysis/009__screen_producers/main.kix:10:38 Screen -> struct std::screen::Screen
+analysis/009__screen_producers/main.kix:11:5 screen -> local screen@10:15
+analysis/009__screen_producers/main.kix:11:32 asset -> fn std::asset
+analysis/009__screen_producers/main.kix:11:67 cut -> fn std::screen::anim::cut
+analysis/009__screen_producers/main.kix:12:5 screen -> local screen@10:15
+analysis/009__screen_producers/main.kix:15:20 screen -> local screen@15:20
+analysis/009__screen_producers/main.kix:15:32 Screen -> struct std::screen::Screen
+analysis/009__screen_producers/main.kix:15:43 Screen -> struct std::screen::Screen
+analysis/009__screen_producers/main.kix:16:5 screen -> local screen@15:20
+analysis/009__screen_producers/main.kix:16:32 asset -> fn std::asset
+analysis/009__screen_producers/main.kix:16:72 cut -> fn std::screen::anim::cut
+analysis/009__screen_producers/main.kix:17:5 screen -> local screen@15:20
+analysis/009__screen_producers/main.kix:20:18 _screen -> local _screen@20:18
+analysis/009__screen_producers/main.kix:20:27 Screen -> struct std::screen::Screen
+analysis/009__screen_producers/main.kix:20:38 Screen -> struct std::screen::Screen
+analysis/009__screen_producers/main.kix:21:9 screen -> local screen@21:9
+analysis/009__screen_producers/main.kix:21:22 Screen::empty -> fn std::screen::Screen::empty
+analysis/009__screen_producers/main.kix:22:5 screen -> local screen@21:9
+analysis/009__screen_producers/main.kix:22:32 asset -> fn std::asset
+analysis/009__screen_producers/main.kix:22:70 cut -> fn std::screen::anim::cut
+analysis/009__screen_producers/main.kix:23:5 screen -> local screen@21:9
+analysis/009__screen_producers/main.kix:29:5 First -> fn crate::First
+analysis/009__screen_producers/main.kix:30:5 Second -> fn crate::Second
+analysis/009__screen_producers/main.kix:31:5 Third -> fn crate::Third
+analysis/009__screen_producers/main.kix:35:22 Answer -> enum crate::Answer
+analysis/009__screen_producers/main.kix:38:22 Answer::Yes -> variant crate::Answer::Yes
+analysis/009__screen_producers/main.kix:39:21 Answer::No -> variant crate::Answer::No
+analysis/009__screen_producers/main.kix:45:17 roof -> fn crate::roof
+analysis/009__screen_producers/main.kix:46:11 ask -> fn crate::ask
+analysis/009__screen_producers/main.kix:47:9 Answer::Yes -> variant crate::Answer::Yes
+analysis/009__screen_producers/main.kix:48:9 Answer::No -> variant crate::Answer::No
+analysis/009__screen_producers/main.kix:48:35 classroom -> fn crate::classroom
+analysis/009__screen_producers/main.kix:56:17 classroom -> fn crate::classroom
+analysis/009__screen_producers/main.kix:57:17 roof -> fn crate::roof
+analysis/009__screen_producers/main.kix:58:11 ask -> fn crate::ask
+analysis/009__screen_producers/main.kix:59:9 Answer::Yes -> variant crate::Answer::Yes
+analysis/009__screen_producers/main.kix:60:9 Answer::No -> variant crate::Answer::No
+analysis/009__screen_producers/main.kix:60:35 classroom -> fn crate::classroom
+analysis/009__screen_producers/main.kix:68:17 evening -> fn crate::evening
+analysis/009__screen_producers/main.kix:69:5 Merge -> fn crate::Merge
+analysis/009__screen_producers/main.kix:74:11 ask -> fn crate::ask
+analysis/009__screen_producers/main.kix:75:9 Answer::Yes -> variant crate::Answer::Yes
+analysis/009__screen_producers/main.kix:76:9 Answer::No -> variant crate::Answer::No
+analysis/009__screen_producers/main.kix:76:35 classroom -> fn crate::classroom
+--- renders ---
+analysis/009__screen_producers/main.kix:10:10 roof -> delta
+analysis/009__screen_producers/main.kix:15:10 classroom -> delta
+analysis/009__screen_producers/main.kix:20:10 evening -> keyframe

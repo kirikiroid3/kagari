@@ -1,0 +1,80 @@
+// The notes of `W5004` name the render that last changed the screen on the reported path, even
+// when a shared scene (`ask`) was entered with the same screen from an earlier call site, and
+// when the screen was last changed before the scene of the reported step was entered.
+
+enum Answer {
+    Yes,
+    No,
+}
+
+const fn roof(mut screen: Screen) -> Screen {
+    screen.background().change(asset("roof.png")).apply_animation(cut());
+    screen
+}
+
+const fn classroom(mut screen: Screen) -> Screen {
+    screen.background().change(asset("classroom.png")).apply_animation(cut());
+    screen
+}
+
+const fn evening(_screen: Screen) -> Screen {
+    let mut screen = Screen::empty();
+    screen.background().change(asset("evening.png")).apply_animation(cut());
+    screen
+}
+
+#[scene]
+#[entry]
+pushdown fn Main() {
+    First();
+    Second();
+    Third();
+}
+
+#[scene]
+pushdown fn ask() -> Answer {
+    choice!{
+        id = "q",
+        t!["Yes"] => Answer::Yes,
+        t!["No"] => Answer::No,
+    }
+}
+
+#[scene]
+pushdown fn First() {
+    s!(render = roof, t!["Question?"]);
+    match ask() {
+        Answer::Yes => s!(t!["Yes."]),
+        Answer::No => s!(render = classroom, t!["No."]),
+    }
+    // Warning: notes at the `roof` and `classroom` above.
+    s!(t!["Merged."]);
+}
+
+#[scene]
+pushdown fn Second() {
+    s!(render = classroom, t!["Classroom again."]);
+    s!(render = roof, t!["Roof again."]);
+    match ask() {
+        Answer::Yes => s!(t!["Yes."]),
+        Answer::No => s!(render = classroom, t!["No."]),
+    }
+    // Warning: notes at the `roof` and `classroom` of this scene, not at the `roof` of `First`.
+    s!(t!["Merged again."]);
+}
+
+#[scene]
+pushdown fn Third() {
+    s!(render = evening, t!["Evening."]);
+    Merge();
+}
+
+#[scene]
+pushdown fn Merge() {
+    match ask() {
+        Answer::Yes => s!(t!["Yes."]),
+        Answer::No => s!(render = classroom, t!["No."]),
+    }
+    // Warning: notes at the `evening` of `Third` and the `classroom` above.
+    s!(t!["Merged in a callee."]);
+}

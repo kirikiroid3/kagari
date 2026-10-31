@@ -247,6 +247,10 @@ Renders never influence the story, so screens are computed afterwards over the e
   interned `LogicalScreen`s. Each instance records, per node, the screens that reach it with their
   *producer* (the step whose render last changed the screen), and per exit the screens it leaves
   with.
+- A producer is local to its instance: `None` means the screen is still the one the instance was
+  entered with. An instance is shared by every call site that enters it with the same screen, so
+  a screen an exit leaves unchanged takes the producer the call site had, and producers are never
+  carried from one call site into another.
 - Propagation is a worklist: a step node applies its render to each arriving screen and passes the
   result to every successor; a draw passes the screen unchanged; a call node enters the callee's
   instance for that screen and continues with the screens of its exits.
@@ -265,11 +269,13 @@ exact. It rejects renders that are bounded only above the cap. The cap is tentat
 step, the kept locals of every frame on the call stack, the story variables, and the call sites.
 Contexts and nodes already contain everything but the call stack, so the check walks the call
 tree from the roots, grouping the instances of a context entered from the same call node with the
-same set of screens. For each step node, the screens arriving over the group are run through the
-render; more than one distinct result is an inconsistency. Reports are deduplicated per *merge*:
-a step whose only differing producer is an already reported step is skipped, steps with the same
-set of producers are reported once, at the first in source order, with up to two producer render
-sites as related notes. This is the presentation-ambiguity lint of the proposal.
+same set of screens. A group carries the producer of each screen it is entered with on the walked
+path, which stands in for a local `None`. For each step node, the screens arriving over the group
+are run through the render; more than one distinct result is an inconsistency. Reports are
+deduplicated per *merge*: a step whose only differing producer is an already reported step is
+skipped, steps with the same set of producers are reported once, at the first in source order,
+with up to two producer render sites as related notes. This is the presentation-ambiguity lint of
+the proposal.
 
 ## Keyframe placement (`W5011`)
 
