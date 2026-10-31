@@ -137,7 +137,8 @@ pub struct StepState {
     pub disabled_arms: Vec<(i128, ConstValue)>,
     /// The choice menu's `VAlign`.
     pub menu_align: ConstValue,
-    /// Entities removed from the logical screen and still drawn until their animations end.
+    /// Entities removed from the logical screen and still drawn until their `Despawn` item and
+    /// their animations end.
     pub despawning: OrdMap<u32, Entity>,
 }
 
@@ -195,6 +196,9 @@ pub enum ScheduledKind {
         from: ConstValue,
         to: ConstValue,
     },
+    /// `despawn(id)` at the cursor, on `Target::Entity`: the despawning entity is drawn until
+    /// this time and the end of its animations, whichever is later.
+    Despawn,
 }
 
 /// What an animation applies to.
@@ -429,9 +433,16 @@ impl Screen {
             .collect()
     }
 
+    /// `despawn(id)`: removes the entity from the logical screen and schedules its `Despawn`
+    /// at the cursor; nothing when it is absent.
     pub fn despawn(&mut self, id: u32) {
         if let Some(entity) = self.logical.entities.remove(&id) {
             self.step.despawning.insert(id, entity);
+            self.step.scheduled.push(Scheduled {
+                start: self.step.cursor,
+                target: Some(Target::Entity(id)),
+                kind: ScheduledKind::Despawn,
+            });
         }
     }
 

@@ -471,7 +471,8 @@ impl ScreenRuntime {
         })
     }
 
-    /// Whether a despawning entity still has an item that is unresolved or ends after `t`.
+    /// Whether a despawning entity still has an item (its `Despawn` at the cursor, or an
+    /// animation) that is unresolved or ends after `t`.
     fn still_animating(&self, id: u32, t: u64) -> bool {
         self.by_target.iter().any(|(target, indices)| {
             let mine = match target {

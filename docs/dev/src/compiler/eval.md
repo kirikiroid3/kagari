@@ -257,7 +257,9 @@ LocalMotion}`), and an image part or the side image holds an `ImageAsset` or a `
 (`ImageLayer::get` is `None` for a paint). `Entity::travel(to, motion)` (`Screen::travel`) reads
 the current pose as `from`, checks the motion's easing, commits the three pose props with a
 `Tween` built from the motion's duration, easing and delay, and schedules
-`ScheduledKind::Travel { motion, from, to }` on `Target::Travel(id)`.
+`ScheduledKind::Travel { motion, from, to }` on `Target::Travel(id)`. `despawn(id)` moves the
+entity to `despawning` and schedules `ScheduledKind::Despawn` on `Target::Entity(id)` at the
+cursor, as the engine does.
 
 `asset("…")` evaluated in a std body names `FilePath::Std(path)` (the std shader library);
 elsewhere the path is joined to the asset root. `erase_shader`/`erase_args` return their

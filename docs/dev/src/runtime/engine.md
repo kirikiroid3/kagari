@@ -475,9 +475,10 @@ per scheduled item. Each item starts at a `Cursor`:
 
 plus the animation's delay. Item lengths are the tween or transition duration (plus the hold of
 `ThroughColor`), the motion's last key times its repeat count, the travel's duration, the fade
-lengths of an audio change, or the sound length. With the `animations` setting off, delays and
-visual lengths are 0; audio lengths are kept. The text start (where the reveal and the voice
-begin) is computed from the `begin_text` cursor, ignoring items that depend on a mark.
+lengths of an audio change, or the sound length; a `Despawn` (below) has length 0. With the
+`animations` setting off, delays and visual lengths are 0; audio lengths are kept. The text start
+(where the reveal and the voice begin) is computed from the `begin_text` cursor, ignoring items
+that depend on a mark.
 
 `tick(now)` resolves the starts it can and fires the audio of items that have started.
 `complete_all(now)` (a click, skip, an overlay) ends every resolved item now and drops one-shots
@@ -489,6 +490,15 @@ of the latest earlier item on the same target (the cut-to-end rule), or from the
 applies to tweens; transitions give a layer pair with a progress; motions add their relative
 path. Entities are sorted by `(plane, z, id)`. Drawing is described in
 [Text and Rendering](./text-render.md#how-the-engine-builds-a-frame).
+
+**Despawns.** `despawn(id)` moves the entity record from the logical screen to
+`StepState::despawning` and schedules `ScheduledKind::Despawn` on `Target::Entity(id)` at the
+cursor. Sampling draws a despawning entity while any item on its targets (the `Despawn`, its
+props, layers, motions and travels) is unresolved or ends after `t`, so it disappears at the
+later of the despawn cursor and the end of its animations; `barrier()` and `complete_all` cover
+the `Despawn` like any other item. `entity(id)` before the step ends moves the record back; the
+`Despawn` item stays (indices are `Barrier(n)` anchors) and only counts towards barriers and
+`timeline_running`.
 
 ### Shader effects
 

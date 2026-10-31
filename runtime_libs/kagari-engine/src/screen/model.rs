@@ -141,7 +141,8 @@ pub(crate) struct StepState {
     /// The choice menu's display-only arms: `(at, text)`.
     pub disabled_arms: Vec<(u32, Text)>,
     pub menu_align: VAlign,
-    /// Entities removed from the logical screen, drawn until their animations end.
+    /// Entities removed from the logical screen, drawn until their `Despawn` item and their
+    /// animations end.
     pub despawning: BTreeMap<u32, Entity>,
 }
 
@@ -210,6 +211,9 @@ pub(crate) enum ScheduledKind {
         from: PoseSpec,
         to: PoseSpec,
     },
+    /// `Screen::despawn` at the cursor, on `Target::Entity`: the despawning entity is drawn
+    /// until this time and the end of its animations, whichever is later.
+    Despawn,
 }
 
 /// What an animation applies to.
@@ -493,9 +497,16 @@ impl ScreenObj {
             .collect()
     }
 
+    /// Removes entity `id` from the logical screen and schedules its `Despawn` at the cursor;
+    /// nothing when it is absent.
     pub fn despawn(&mut self, id: u32) {
         if let Some(entity) = self.logical.entities.remove(&id) {
             self.step.despawning.insert(id, entity);
+            self.step.scheduled.push(Scheduled {
+                start: self.step.cursor,
+                target: Some(Target::Entity(id)),
+                kind: ScheduledKind::Despawn,
+            });
         }
     }
 

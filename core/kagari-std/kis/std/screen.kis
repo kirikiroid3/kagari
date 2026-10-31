@@ -168,7 +168,8 @@ impl Screen {
     /// The ids on `plane`, ascending.
     #[builtin]
     pub const fn entities(&self, plane: Plane) -> Vec<EntityId>;
-    /// Removes entity `id` from the logical screen; it is drawn until its animations end.
+    /// Removes entity `id` from the logical screen; it is drawn until the later of the cursor
+    /// and the end of its animations.
     #[builtin]
     pub const fn despawn(&mut self, id: EntityId);
     /// The main image of the `BACKGROUND` entity.

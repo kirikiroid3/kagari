@@ -186,7 +186,7 @@ fn item_length(kind: &ScheduledKind, animations: bool) -> u32 {
         }
         ScheduledKind::Sound { length_ms, .. } => *length_ms,
         ScheduledKind::StopSounds { fade_out_ms } => *fade_out_ms,
-        ScheduledKind::ReplayMusic => 0,
+        ScheduledKind::ReplayMusic | ScheduledKind::Despawn => 0,
         ScheduledKind::Travel { motion, .. } => {
             if animations {
                 motion.duration_ms

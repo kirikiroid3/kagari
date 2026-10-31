@@ -407,11 +407,21 @@ screen.entity(HANAKO).opacity().change(1.0).apply_animation(tween(ms(300)));
 #[builtin] pub const fn despawn(&mut self, id: EntityId);
 ```
 
-エンティティ `id` を論理画面から即座に取り除きます。スケジュール済みのアニメーションが終わるまでは描画され続け、その後に消えます。そのためフェードアウトの後に `despawn` を書くとフェードアウトが見え、次のステップはそのエンティティを引き継ぎません。種別：`const fn` · ビルトイン：はい。
+エンティティ `id` を論理画面から即座に取り除くため、次のステップはそのエンティティを引き継ぎません。消去そのものは[カーソル](./screen-anim.md#the-timeline)の位置にスケジュールされます。エンティティはタイムラインがカーソルに達するまでと、スケジュール済みのアニメーションが終わるまでのうち遅いほうまで描画され続け、その後に消えます。`barrier()` はこの消去の後へ進み、クリックはタイムラインの残りと一緒にこれを完了させます。種別：`const fn` · ビルトイン：はい。
+
+フェードアウトの後に `despawn` を書くとフェードアウトが見えます。
 
 ```kis
 screen.entity(CARD).opacity().change(0.0).apply_animation(tween(ms(500)));
 screen.despawn(CARD);
+```
+
+`wait` の後で消去したエンティティはカーソルまで残ります。次のプレートはフェードインし、3 秒間描画されます。
+
+```kis
+screen.entity(PLATE).opacity().change(1.0).apply_animation(tween(ms(500)));
+screen.wait(ms(3000));
+screen.despawn(PLATE);
 ```
 
 ### `screen.background()` {#screen-background}

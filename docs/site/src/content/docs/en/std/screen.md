@@ -460,13 +460,26 @@ values.
 #[builtin] pub const fn despawn(&mut self, id: EntityId);
 ```
 
-Removes entity `id` from the logical screen immediately. It is still drawn until its scheduled
-animations end, and then removed. So a fade-out followed by `despawn` fades out, and the next
-step does not inherit the entity. Kind: `const fn` · Builtin: yes.
+Removes entity `id` from the logical screen immediately, so the next step does not inherit it.
+The removal itself is scheduled at the [cursor](./screen-anim.md#the-timeline): the entity is
+still drawn until the later of that time and the end of its scheduled animations, and then
+removed. `barrier()` moves past the despawn, and a click completes it with the rest of the
+timeline. Kind: `const fn` · Builtin: yes.
+
+A fade-out followed by `despawn` fades out:
 
 ```kis
 screen.entity(CARD).opacity().change(0.0).apply_animation(tween(ms(500)));
 screen.despawn(CARD);
+```
+
+An entity despawned after `wait` stays until the cursor; this plate fades in and is drawn for three
+seconds:
+
+```kis
+screen.entity(PLATE).opacity().change(1.0).apply_animation(tween(ms(500)));
+screen.wait(ms(3000));
+screen.despawn(PLATE);
 ```
 
 ### `screen.background()` {#screen-background}

@@ -132,7 +132,7 @@ fn cut_rule() {
 }
 
 #[test]
-fn despawned_entities_draw_until_their_animations_end() {
+fn despawned_entities_draw_until_the_cursor_and_their_animations_end() {
     let mut screen = ScreenObj::empty();
     screen.entity_mut(1).opacity = Decimal::ONE;
     screen
@@ -140,14 +140,36 @@ fn despawned_entities_draw_until_their_animations_end() {
         .parts
         .insert(0, PartContent::Image(AssetId(0)));
     let base = screen.clone();
-    screen
+    // A fade-out longer than the cursor: drawn until the fade ends.
+    let mut fading = screen.clone();
+    fading
         .commit(set_opacity(1, dec(0, 0)), tween(300))
         .unwrap();
-    screen.despawn(1);
-    assert!(!screen.contains(1));
-    let rt = runtime(&base, screen, true);
+    fading.despawn(1);
+    assert!(!fading.contains(1));
+    let rt = runtime(&base, fading, true);
     assert!(close(entity_opacity(&rt.sample(150), 1).unwrap(), 0.5));
     assert_eq!(entity_opacity(&rt.sample(300), 1), None);
+    // A fade-in, then the despawn after a wait: drawn until the cursor reaches the despawn,
+    // and a barrier after it moves past it.
+    screen.entity_mut(2);
+    let base = screen.clone();
+    screen
+        .commit(set_opacity(2, dec(1, 0)), tween(500))
+        .unwrap();
+    screen.wait(3000).unwrap();
+    screen.despawn(2);
+    screen.barrier();
+    screen.begin_text().unwrap();
+    let mut rt = runtime(&base, screen, true);
+    assert!(close(entity_opacity(&rt.sample(250), 2).unwrap(), 0.5));
+    assert!(close(entity_opacity(&rt.sample(2999), 2).unwrap(), 1.0));
+    assert_eq!(entity_opacity(&rt.sample(3000), 2), None);
+    assert_eq!(rt.text_start_ms(), 3000);
+    assert!(rt.timeline_running(2999, &NoReveal(0)));
+    // A click completes the despawn with everything else.
+    rt.complete_all(1000, &NoReveal(0), &mut AudioModel::new());
+    assert_eq!(entity_opacity(&rt.sample(1000), 2), None);
 }
 
 #[test]
