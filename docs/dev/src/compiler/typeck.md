@@ -92,7 +92,9 @@ bounded integers `Int<lo, hi>`. Mixing them is never implicit.
   allowed only for an integer type and records a *fit* check: the hull must lie in the type's
   range (checked at the end, `E2013`).
 - `+ - * / %` on two literals compute a new literal hull (`range_op`) and *link* the operands and
-  result: if any member of a link later becomes a Rust integer type, all do (`resolve_links`).
+  result: if any member of a link later becomes a Rust integer type, all do; otherwise, if any
+  member becomes an `Int`, every literal member becomes the `Int` of its own hull
+  (`resolve_links`).
 - `Int` arithmetic computes the result range from the operand ranges: `Int<0, 3> + Int<1, 1>` is
   `Int<1, 4>`. Literal operands become `Int<n, n>`. A divisor whose range contains 0 is `E2016`;
   overflow of the range computation, bitwise operators on `Int`, and generic bounds are `E2015`.
@@ -108,7 +110,9 @@ bounded integers `Int<lo, hi>`. Mixing them is never implicit.
 
 At the end (`finish`): projections are normalized, links resolved, a literal bound to
 `Int<?lo, ?hi>` fixes the unknown bounds to its hull, and **every remaining literal variable
-becomes `Int<lo, hi>` of its own hull** (so `let x = 3;` is `Int<3, 3>`). Then the fit checks,
+becomes `i32`**, as in Rust (so `let x = 3;` is `i32`, and a hull outside `i32` is `E2013`). An
+`i32` is not finite, so in a `pushdown fn` a local that only a literal types, such as
+`let mut i = 0;`, is `E3008`: story code writes the `Int` type. Then the fit checks,
 pattern-literal fits, trait obligations and into checks run, and every recorded type is resolved;
 an unresolved variable is `E2029` (reported once, preferring a value's type over a function
 type), and becomes `Ty::Error` in the result.
@@ -127,8 +131,10 @@ type), and becomes `Ty::Error` in the result.
 | `NeverToAny` | `!` → any type |
 
 `if`/`match` arms without an expected type are joined (`join_arms`): `!` arms are ignored,
-bounded arms join to their hull (`if c { 0 } else { 5 }` is `Int<0, 5>`), anything else must
-agree with the first arm.
+bounded arms join to their hull (with `a: Int<0, 3>`, `if c { a } else { 5 }` is `Int<0, 5>`; a
+literal arm next to an `Int` arm becomes `Int<n, n>` first), literal arms merge their hulls
+(`if c { 0 } else { 5 }` is a literal, so `i32` when nothing else constrains it), anything else
+must agree with the first arm.
 
 ### Paths, calls and methods
 
@@ -167,7 +173,7 @@ agree with the first arm.
 | String literal | Type `Text` (std `narrative::text::Text`) |
 | Decimal literal | Type `Decimal` |
 | `?` | On `Option` in a function returning `Option`, on `Result` in a function returning `Result` with the same error type (no conversion); otherwise `E2034` |
-| `for` | Over arrays, `Vec<T>` and ranges of integers (`E2031` otherwise). Over a range literal of `Int` or integer literals, the loop variable gets the range's own bounds: `for i in 0..3` binds `i: Int<0, 2>` |
+| `for` | Over arrays, `Vec<T>` and ranges of integers (`E2031` otherwise). Over a range literal of `Int`, the loop variable gets the range's own bounds: with `a, b: Int<0, 9>`, `for i in a..b` binds `i: Int<0, 8>`. Over a range literal of integer literals, the loop variable is a new literal of the range's values linked to the bounds: `for i in 0..3` binds `i` to the hull `[0, 2]`, which a use can make `Int<0, 2>` (or any wider `Int`, the bounds then becoming `Int` too) or a Rust integer, and which is `i32` when nothing constrains it |
 
 `InferenceResult` (per body) holds the type of every expression (before coercion), pattern and
 local; `paths`, `method_calls`, `fields`, `records`, `pat_ctors`, `closures`, `coercions`; and the

@@ -4,6 +4,7 @@ static mut KEY: bool = false;
 static mut KNOCKS: Int<0, 3> = 0;
 static mut ROUTE: Route = Route::None;
 static mut AT: Int<0, 1> = 0;
+const LAPS: Int<0, 2> = 2;
 
 enum Route { None, Roof, Garden }
 enum Door { Open, Knock }
@@ -34,7 +35,7 @@ pushdown fn Main(replay: bool) -> Ending {
         Where::Garden => Garden,
     };
     next();
-    for lap in 0..2 {
+    for lap in 0..LAPS {
         s!(t!["Lap " {lap}]);
     }
     // A place indexed by a scene's result is assigned in place.
@@ -66,7 +67,8 @@ pushdown fn Main(replay: bool) -> Ending {
         s!(t!["Total: never."]);
     }
     // `continue` to an outer `for` from a loop that steps keeps the `for` going.
-    'outer: for x in [1, 2] {
+    let xs: [Int<1, 2>; 2] = [1, 2];
+    'outer: for x in xs {
         loop {
             s!(t!["x = " {x}]);
             if x == 2 {

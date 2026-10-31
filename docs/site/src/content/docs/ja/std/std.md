@@ -189,7 +189,7 @@ pub struct Range<T> {
 - `inclusive` `bool` — `start..end`（終端を含まない）なら `false`、`start..=end` なら `true`。
 - Kind: — · Builtin: no
 
-`a..b` と `a..=b` は `Range` の値です。式では両端が必要で、`a..`、`..b`、`..` はパターンにのみ書けます。`0..7` は `Range<Int<0, 7>>` です。型付けは [コンパイラ規則](./appendix/rules.md#type-rules)、反復は [`for` ループ](./appendix/rules.md#for-loops) を参照してください。
+`a..b` と `a..=b` は `Range` の値です。式では両端が必要で、`a..`、`..b`、`..` はパターンにのみ書けます。`0..7` は使い方が別の整数型を期待しない限り `Range<i32>`、`last: Int<0, 7>` なら `0..last` は `Range<Int<0, 7>>` です。型付けは [コンパイラ規則](./appendix/rules.md#type-rules)、反復は [`for` ループ](./appendix/rules.md#for-loops) を参照してください。
 
 ## Enum: `Option<T>` {#enum-optiont}
 

@@ -45,6 +45,8 @@ cannot read story variables, settings or meta. See [Function Kinds](../concepts/
   and compound assignment saturates at the bounds instead of overflowing.
 - Integer types never convert implicitly, apart from integer literals and widening one `Int` type
   to another that contains its range.
+- An integer literal that nothing constrains is an `i32`, as in Rust, but `i32` is not finite, so
+  story code writes the type of a counter: `let mut i: Int<0, 9> = 0;`, not `let mut i = 0;`.
 - Overflow and division by zero are compile errors in constant code and panics at run time; there
   is no wrapping arithmetic.
 - `match` on an `Int<lo, hi>` is exhaustive when it covers `lo` to `hi`, without `_`.

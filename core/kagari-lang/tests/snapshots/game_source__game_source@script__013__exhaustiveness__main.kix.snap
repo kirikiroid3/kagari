@@ -20,7 +20,7 @@ script/013__exhaustiveness/main.kix:177:9: warning[W2039]: unreachable pattern
 script/013__exhaustiveness/main.kix:182:9: warning[W2039]: unreachable pattern
 script/013__exhaustiveness/main.kix:188:32: error[E2038]: refutable pattern in function argument: `Route::B` and `Route::C` not covered
 script/013__exhaustiveness/main.kix:189:9: error[E2038]: refutable pattern in local binding: `None` not covered
-script/013__exhaustiveness/main.kix:190:9: error[E2038]: refutable pattern in `for` loop binding: `0..=2` and `4` not covered
+script/013__exhaustiveness/main.kix:190:9: error[E2038]: refutable pattern in `for` loop binding: `i32::MIN..=2` and `4..=i32::MAX` not covered
 script/013__exhaustiveness/main.kix:191:14: error[E2038]: refutable pattern in closure argument: `None` not covered
 --- resolutions ---
 script/013__exhaustiveness/main.kix:6:19 u64 -> prim u64

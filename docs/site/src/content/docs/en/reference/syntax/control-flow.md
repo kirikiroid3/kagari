@@ -111,9 +111,11 @@ Any other type is `E2031`, including references to arrays. A range over anything
 (for example `Decimal`) is `E2031` as well.
 
 When the range is written in the `for` itself, the loop variable's type covers exactly its
-values: `day` in `for day in 0..7` is an `Int<0, 6>`, `i` in `for i in 1..=3` is an `Int<1, 3>`,
-and with `a` and `b` of type `Int<0, 9>`, `k` in `for k in a..b` is an `Int<0, 8>`. A range value
-of type `Range<Int<lo, hi>>` from elsewhere, such as a parameter, gives an `Int<lo, hi>`.
+values: with `a` and `b` of type `Int<0, 9>`, `k` in `for k in a..b` is an `Int<0, 8>`. With
+literal bounds, the loop variable is an [integer literal](./numbers.md#integer-literals) of those
+values: `day` in `for day in 0..7` becomes the type its uses expect, such as `Int<0, 6>` (or a
+wider `Int`) or `u32`, and an `i32` when nothing determines it. A range value of type
+`Range<Int<lo, hi>>` from elsewhere, such as a parameter, gives an `Int<lo, hi>`.
 
 ## Labels, `break` and `continue`
 

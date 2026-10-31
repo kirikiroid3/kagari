@@ -92,7 +92,7 @@ for score in scores { … }
 
 それ以外の型は `E2031` で、配列への参照も含みます。整数以外（たとえば `Decimal`）の範囲も `E2031` です。
 
-範囲を `for` の中に直接書いた場合、ループ変数の型はちょうどその範囲の値を表します。`for day in 0..7` の `day` は `Int<0, 6>`、`for i in 1..=3` の `i` は `Int<1, 3>` です。`a` と `b` が `Int<0, 9>` 型なら、`for k in a..b` の `k` は `Int<0, 8>` です。引数など別の場所から来た `Range<Int<lo, hi>>` 型の範囲値では、ループ変数は `Int<lo, hi>` です。
+範囲を `for` の中に直接書いた場合、ループ変数の型はちょうどその範囲の値を表します。`a` と `b` が `Int<0, 9>` 型なら、`for k in a..b` の `k` は `Int<0, 8>` です。両端がリテラルのとき、ループ変数はその範囲の値をとる[整数リテラル](./numbers.md#integer-literals)です。`for day in 0..7` の `day` は、使い方が期待する型、たとえば `Int<0, 6>`（またはより広い `Int`）や `u32` になり、何も型を決めなければ `i32` です。引数など別の場所から来た `Range<Int<lo, hi>>` 型の範囲値では、ループ変数は `Int<lo, hi>` です。
 
 ## ラベル、`break`、`continue` {#labels-break-and-continue}
 

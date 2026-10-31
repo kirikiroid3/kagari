@@ -1737,6 +1737,27 @@ fn constant_cycles_are_errors() {
     );
 }
 
+/// Issue #18: an integer literal that nothing constrains is an `i32`, as in Rust, so a
+/// counter written the Rust way counts instead of saturating at its initial value.
+#[test]
+fn unconstrained_literals_are_i32() {
+    let source = "
+        const fn count() -> u32 {
+            let mut n: u32 = 0;
+            let mut i = 0;
+            for _x in [1u8, 2, 3, 4, 5] {
+                i += 1;
+                if i < 3 {
+                    n += 1;
+                }
+            }
+            n
+        }
+        const N: u32 = count();
+    ";
+    assert_eq!(eval_item(source, "N"), Ok(ConstValue::Int(2)));
+}
+
 #[test]
 fn evaluates_a_game_end_to_end() {
     let (db, program) = setup_at("/game/main.kix", GAME);

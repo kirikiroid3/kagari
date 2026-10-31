@@ -34,16 +34,17 @@ script/011__kind_errors/main.kix:87:5: error[E3003]: only a scene can call anoth
 script/011__kind_errors/main.kix:88:5: error[E3001]: cannot call `fn` `start` from the instant procedure `visit`: the story can call only `pushdown fn` and `const fn`
   note: script/011__kind_errors/main.kix:21:4: `start` is declared here
 script/011__kind_errors/main.kix:89:5: error[E3004]: `while` is not allowed in the instant procedure `visit`: an instant procedure has only bounded loops (`for` over an array or a range with constant bounds)
-script/011__kind_errors/main.kix:93:22: error[E3005]: instant procedures cannot recurse, but these calls form a cycle: `ping` → `pong` → `ping`; mark one of them `#[scene]` and pass through a step
-script/011__kind_errors/main.kix:97:27: error[E3005]: instant procedures cannot recurse, but these calls form a cycle: `again` → `again` (passed as a value to code that may call it); mark one of them `#[scene]` and pass through a step
-script/011__kind_errors/main.kix:104:9: error[E3015]: `g` cannot hold a closure in the instant procedure `twice`: closures in the story are second-class and can only be passed as arguments and called
-script/011__kind_errors/main.kix:114:14: error[E3016]: `p` is passed as `&mut` and also as another argument of this call: in the story, a `&mut` argument cannot alias another argument
-  note: script/011__kind_errors/main.kix:114:11: the same place is also passed here
-script/011__kind_errors/main.kix:115:9: error[E3014]: `q` cannot hold a reference in the instant procedure `alias`: references in the story are second-class and can only be passed as arguments
-script/011__kind_errors/main.kix:118:37: error[E3014]: an instant procedure cannot return a reference: references in the story are second-class, and only a method whose receiver is a reference may return one
-script/011__kind_errors/main.kix:127:5: error[E3017]: cannot assign to `b.x`, as `b` is not declared as mutable
-  note: script/011__kind_errors/main.kix:125:9: consider changing this to be mutable
-script/011__kind_errors/main.kix:129:16: error[E3008]: this `const fn` call has runtime arguments, so it is tabulated, and its result must be finite, but `u32` is not
+script/011__kind_errors/main.kix:91:9: error[E3008]: `lap` has type `i32`, which is not finite: the story can hold only finite types at runtime
+script/011__kind_errors/main.kix:97:22: error[E3005]: instant procedures cannot recurse, but these calls form a cycle: `ping` → `pong` → `ping`; mark one of them `#[scene]` and pass through a step
+script/011__kind_errors/main.kix:101:27: error[E3005]: instant procedures cannot recurse, but these calls form a cycle: `again` → `again` (passed as a value to code that may call it); mark one of them `#[scene]` and pass through a step
+script/011__kind_errors/main.kix:108:9: error[E3015]: `g` cannot hold a closure in the instant procedure `twice`: closures in the story are second-class and can only be passed as arguments and called
+script/011__kind_errors/main.kix:118:14: error[E3016]: `p` is passed as `&mut` and also as another argument of this call: in the story, a `&mut` argument cannot alias another argument
+  note: script/011__kind_errors/main.kix:118:11: the same place is also passed here
+script/011__kind_errors/main.kix:119:9: error[E3014]: `q` cannot hold a reference in the instant procedure `alias`: references in the story are second-class and can only be passed as arguments
+script/011__kind_errors/main.kix:122:37: error[E3014]: an instant procedure cannot return a reference: references in the story are second-class, and only a method whose receiver is a reference may return one
+script/011__kind_errors/main.kix:131:5: error[E3017]: cannot assign to `b.x`, as `b` is not declared as mutable
+  note: script/011__kind_errors/main.kix:129:9: consider changing this to be mutable
+script/011__kind_errors/main.kix:133:16: error[E3008]: this `const fn` call has runtime arguments, so it is tabulated, and its result must be finite, but `u32` is not
 --- resolutions ---
 script/011__kind_errors/main.kix:3:19 Int -> prim Int
 script/011__kind_errors/main.kix:4:19 u32 -> prim u32
@@ -128,57 +129,62 @@ script/011__kind_errors/main.kix:89:23 ROUTE -> static crate::ROUTE
 script/011__kind_errors/main.kix:90:9 i -> local i@90:9
 script/011__kind_errors/main.kix:90:23 ROUTE -> static crate::ROUTE
 script/011__kind_errors/main.kix:90:31 i -> local i@90:9
-script/011__kind_errors/main.kix:93:22 pong -> fn crate::pong
-script/011__kind_errors/main.kix:94:22 ping -> fn crate::ping
-script/011__kind_errors/main.kix:96:17 p -> local p@96:17
-script/011__kind_errors/main.kix:96:37 p -> local p@96:17
-script/011__kind_errors/main.kix:97:23 run -> fn crate::run
-script/011__kind_errors/main.kix:97:27 again -> fn crate::again
-script/011__kind_errors/main.kix:98:22 run -> fn crate::run
-script/011__kind_errors/main.kix:98:26 leaf -> fn crate::leaf
-script/011__kind_errors/main.kix:99:22 ROUTE -> static crate::ROUTE
-script/011__kind_errors/main.kix:101:19 f -> local f@101:19
-script/011__kind_errors/main.kix:102:5 f -> local f@101:19
-script/011__kind_errors/main.kix:103:5 f -> local f@101:19
-script/011__kind_errors/main.kix:104:9 g -> local g@104:9
-script/011__kind_errors/main.kix:104:13 f -> local f@101:19
-script/011__kind_errors/main.kix:109:19 a -> local a@109:19
-script/011__kind_errors/main.kix:109:27 Point -> struct crate::Point
-script/011__kind_errors/main.kix:109:34 b -> local b@109:34
-script/011__kind_errors/main.kix:109:38 Point -> struct crate::Point
-script/011__kind_errors/main.kix:110:5 a -> local a@109:19
-script/011__kind_errors/main.kix:110:11 b -> local b@109:34
-script/011__kind_errors/main.kix:113:19 p -> local p@113:19
+script/011__kind_errors/main.kix:91:9 lap -> local lap@91:9
+script/011__kind_errors/main.kix:92:9 laps -> local laps@92:9
+script/011__kind_errors/main.kix:92:19 Int -> prim Int
+script/011__kind_errors/main.kix:93:5 lap -> local lap@91:9
+script/011__kind_errors/main.kix:94:5 laps -> local laps@92:9
+script/011__kind_errors/main.kix:97:22 pong -> fn crate::pong
+script/011__kind_errors/main.kix:98:22 ping -> fn crate::ping
+script/011__kind_errors/main.kix:100:17 p -> local p@100:17
+script/011__kind_errors/main.kix:100:37 p -> local p@100:17
+script/011__kind_errors/main.kix:101:23 run -> fn crate::run
+script/011__kind_errors/main.kix:101:27 again -> fn crate::again
+script/011__kind_errors/main.kix:102:22 run -> fn crate::run
+script/011__kind_errors/main.kix:102:26 leaf -> fn crate::leaf
+script/011__kind_errors/main.kix:103:22 ROUTE -> static crate::ROUTE
+script/011__kind_errors/main.kix:105:19 f -> local f@105:19
+script/011__kind_errors/main.kix:106:5 f -> local f@105:19
+script/011__kind_errors/main.kix:107:5 f -> local f@105:19
+script/011__kind_errors/main.kix:108:9 g -> local g@108:9
+script/011__kind_errors/main.kix:108:13 f -> local f@105:19
+script/011__kind_errors/main.kix:113:19 a -> local a@113:19
 script/011__kind_errors/main.kix:113:27 Point -> struct crate::Point
-script/011__kind_errors/main.kix:114:5 shift -> fn crate::shift
-script/011__kind_errors/main.kix:114:11 p -> local p@113:19
-script/011__kind_errors/main.kix:114:14 p -> local p@113:19
-script/011__kind_errors/main.kix:115:9 q -> local q@115:9
-script/011__kind_errors/main.kix:115:14 p -> local p@113:19
-script/011__kind_errors/main.kix:118:23 p -> local p@118:23
-script/011__kind_errors/main.kix:118:27 Point -> struct crate::Point
-script/011__kind_errors/main.kix:118:38 Int -> prim Int
-script/011__kind_errors/main.kix:119:6 p -> local p@118:23
-script/011__kind_errors/main.kix:124:9 a -> local a@124:9
-script/011__kind_errors/main.kix:124:17 Point -> struct crate::Point
-script/011__kind_errors/main.kix:125:9 b -> local b@125:9
-script/011__kind_errors/main.kix:125:13 Point -> struct crate::Point
-script/011__kind_errors/main.kix:126:5 shift -> fn crate::shift
-script/011__kind_errors/main.kix:126:16 a -> local a@124:9
-script/011__kind_errors/main.kix:126:20 b -> local b@125:9
-script/011__kind_errors/main.kix:127:5 b -> local b@125:9
-script/011__kind_errors/main.kix:128:9 tab -> local tab@128:9
-script/011__kind_errors/main.kix:128:15 mood -> fn crate::mood
-script/011__kind_errors/main.kix:128:20 ROUTE -> static crate::ROUTE
-script/011__kind_errors/main.kix:129:9 wide -> local wide@129:9
-script/011__kind_errors/main.kix:129:16 widen -> fn crate::widen
-script/011__kind_errors/main.kix:129:22 ROUTE -> static crate::ROUTE
-script/011__kind_errors/main.kix:132:15 x -> local x@132:15
-script/011__kind_errors/main.kix:132:18 Int -> prim Int
-script/011__kind_errors/main.kix:132:32 Map -> enum crate::Map
-script/011__kind_errors/main.kix:132:41 x -> local x@132:15
-script/011__kind_errors/main.kix:132:49 Map::A -> variant crate::Map::A
-script/011__kind_errors/main.kix:132:65 Map::B -> variant crate::Map::B
-script/011__kind_errors/main.kix:133:16 x -> local x@133:16
-script/011__kind_errors/main.kix:133:19 Int -> prim Int
-script/011__kind_errors/main.kix:133:33 u32 -> prim u32
+script/011__kind_errors/main.kix:113:34 b -> local b@113:34
+script/011__kind_errors/main.kix:113:38 Point -> struct crate::Point
+script/011__kind_errors/main.kix:114:5 a -> local a@113:19
+script/011__kind_errors/main.kix:114:11 b -> local b@113:34
+script/011__kind_errors/main.kix:117:19 p -> local p@117:19
+script/011__kind_errors/main.kix:117:27 Point -> struct crate::Point
+script/011__kind_errors/main.kix:118:5 shift -> fn crate::shift
+script/011__kind_errors/main.kix:118:11 p -> local p@117:19
+script/011__kind_errors/main.kix:118:14 p -> local p@117:19
+script/011__kind_errors/main.kix:119:9 q -> local q@119:9
+script/011__kind_errors/main.kix:119:14 p -> local p@117:19
+script/011__kind_errors/main.kix:122:23 p -> local p@122:23
+script/011__kind_errors/main.kix:122:27 Point -> struct crate::Point
+script/011__kind_errors/main.kix:122:38 Int -> prim Int
+script/011__kind_errors/main.kix:123:6 p -> local p@122:23
+script/011__kind_errors/main.kix:128:9 a -> local a@128:9
+script/011__kind_errors/main.kix:128:17 Point -> struct crate::Point
+script/011__kind_errors/main.kix:129:9 b -> local b@129:9
+script/011__kind_errors/main.kix:129:13 Point -> struct crate::Point
+script/011__kind_errors/main.kix:130:5 shift -> fn crate::shift
+script/011__kind_errors/main.kix:130:16 a -> local a@128:9
+script/011__kind_errors/main.kix:130:20 b -> local b@129:9
+script/011__kind_errors/main.kix:131:5 b -> local b@129:9
+script/011__kind_errors/main.kix:132:9 tab -> local tab@132:9
+script/011__kind_errors/main.kix:132:15 mood -> fn crate::mood
+script/011__kind_errors/main.kix:132:20 ROUTE -> static crate::ROUTE
+script/011__kind_errors/main.kix:133:9 wide -> local wide@133:9
+script/011__kind_errors/main.kix:133:16 widen -> fn crate::widen
+script/011__kind_errors/main.kix:133:22 ROUTE -> static crate::ROUTE
+script/011__kind_errors/main.kix:136:15 x -> local x@136:15
+script/011__kind_errors/main.kix:136:18 Int -> prim Int
+script/011__kind_errors/main.kix:136:32 Map -> enum crate::Map
+script/011__kind_errors/main.kix:136:41 x -> local x@136:15
+script/011__kind_errors/main.kix:136:49 Map::A -> variant crate::Map::A
+script/011__kind_errors/main.kix:136:65 Map::B -> variant crate::Map::B
+script/011__kind_errors/main.kix:137:16 x -> local x@137:16
+script/011__kind_errors/main.kix:137:19 Int -> prim Int
+script/011__kind_errors/main.kix:137:33 u32 -> prim u32

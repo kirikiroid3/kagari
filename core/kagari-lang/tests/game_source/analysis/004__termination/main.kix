@@ -2,6 +2,7 @@
 
 static mut DONE: bool = false;
 static mut COUNT: Int<0, 3> = 0;
+const LAPS: Int<0, 3> = 3;
 
 enum Go { On, Stop }
 
@@ -30,7 +31,7 @@ pushdown fn Waits() {
         DONE = true;
     }
     // Fine: `for` over a constant range is bounded.
-    for _lap in 0..3 {
+    for _lap in 0..LAPS {
         COUNT += 1;
     }
 }

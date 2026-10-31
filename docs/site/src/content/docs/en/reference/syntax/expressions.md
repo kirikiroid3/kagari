@@ -254,7 +254,8 @@ A struct expression cannot appear directly in the condition of `if` and `while`,
 ```
 
 `a..b` (end excluded) and `a..=b` (end included) build a `Range<T>`, a std struct with the fields
-`start`, `end` and `inclusive`. `T` is a type both bounds convert to: `0..7` is a
+`start`, `end` and `inclusive`. `T` is a type both bounds convert to: `0..7` is a `Range<i32>`
+unless its use expects another integer type, and with `last: Int<0, 7>`, `0..last` is a
 `Range<Int<0, 7>>`. A range expression needs both bounds: `a..`, `..b`, `..=b` and `..` are `E2030`.
 As patterns, `a..` and `..=b` exist, but `..b` does not, and `..` alone is the rest pattern; see
 [Range patterns](./patterns.md#range-patterns). Ranges are used by `for` loops; see

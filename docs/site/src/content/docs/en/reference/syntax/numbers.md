@@ -48,15 +48,20 @@ match AFFECTION_MIO {
 An integer literal without a suffix has the flexible type "the integer `n`". It takes the integer
 type its context expects, `Int<lo, hi>` or a Rust integer, as long as that type's range contains
 `n`; otherwise it is [`E2013`](../../diagnostics/types.md#e2013). When nothing determines the type,
-the literal is `Int<n, n>`. A suffix fixes the type: `5u8` is a `u8`. Integer literals never
-become `Decimal` or `Rat`: write `1.0`, not `1`.
+the literal is an `i32`, as in Rust. A suffix fixes the type: `5u8` is a `u8`. Integer literals
+never become `Decimal` or `Rat`: write `1.0`, not `1`.
 
 ```kis
 let a: Int<0, 5> = 3;     // Int<0, 5>
 let b: u32 = 3;           // u32
 let c = 3u8;              // u8
 let d: Int<0, 5> = 9;     // E2013: 9 does not fit
+let mut e = 0;            // i32
 ```
+
+An `i32` is not a [finite type](../concepts/kinds.md#finite-types), so in a `pushdown fn` a local
+whose only type information is a literal is [`E3008`](../../diagnostics/kinds.md#e3008): write the
+type of a story counter, as in `let mut laps: Int<0, 3> = 0;`.
 
 Operations on literals alone are computed on the literal ranges: `2 * 3` is "the integer 6". The
 compiler represents integers with 128 bits, so a `u128` value above `i128::MAX` cannot be written

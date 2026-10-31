@@ -88,6 +88,10 @@ pushdown fn visit() {
     start();                                     // error: pushdown -> `fn`
     while ROUTE < 3 { ROUTE += 1; }              // error: unbounded loop
     for i in [1, 2] { ROUTE = i; }
+    let mut lap = 0;                             // error: an unannotated literal is `i32`
+    let mut laps: Int<0, 3> = 0;
+    lap += 1;
+    laps += 1;
 }
 
 pushdown fn ping() { pong(); }                   // error: recursion

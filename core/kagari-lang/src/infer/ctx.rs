@@ -809,7 +809,9 @@ impl<'a> InferCtx<'a> {
         self.links.push(members);
     }
 
-    /// Makes every literal of a link take the Rust integer type of another member.
+    /// Makes every literal of a link take the Rust integer type of another member, or, when
+    /// another member is an `Int`, the `Int` of its own hull: a link's members are all Rust
+    /// integers or all `Int`s.
     pub(crate) fn resolve_links(&mut self) {
         loop {
             let mut changed = false;
@@ -822,12 +824,20 @@ impl<'a> InferCtx<'a> {
                             TyKind::Int(int) => Some(*int),
                             _ => None,
                         });
-                if let Some(int) = rust_int {
-                    for member in members {
-                        if self.table.literal(member).is_some() {
-                            self.table.unify(member, &Ty::int(int));
-                            changed = true;
-                        }
+                let bounded = members.iter().any(|member| {
+                    matches!(self.table.shallow(member).kind(), TyKind::Bounded { .. })
+                });
+                if rust_int.is_none() && !bounded {
+                    continue;
+                }
+                for member in members {
+                    if let Some((_, literal)) = self.table.literal(member) {
+                        let ty = match rust_int {
+                            Some(int) => Ty::int(int),
+                            None => Ty::bounded(literal.lo, literal.hi),
+                        };
+                        self.table.unify(member, &ty);
+                        changed = true;
                     }
                 }
             }

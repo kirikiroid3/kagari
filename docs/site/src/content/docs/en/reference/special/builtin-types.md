@@ -208,8 +208,9 @@ overflow are described in [Numbers](../syntax/numbers.md).
 compiler knows it in two places:
 
 - **Range expressions.** `a..b` and `a..=b` build a `Range<T>`, where `T` is a type both bounds
-  convert to: `0..7` is a `Range<Int<0, 7>>`. Only `a..b` and `a..=b` are range values; other
-  forms such as `a..`, `..b` or `..` are `E2030`. Patterns have their own range forms (`a..`,
+  convert to: `0..7` is a `Range<i32>` unless its use expects another integer type, and with
+  `last: Int<0, 7>`, `0..last` is a `Range<Int<0, 7>>`. Only `a..b` and `a..=b` are range values;
+  other forms such as `a..`, `..b` or `..` are `E2030`. Patterns have their own range forms (`a..`,
   `..=b`, `a..b`, `a..=b`); see [Range patterns](../syntax/patterns.md#range-patterns).
 - **`for` loops.** `for` iterates a `Range<T>` whose `T` is an integer type (`E2031` otherwise). In
   a `pushdown fn`, the bounds must be constant expressions (`E3006`).

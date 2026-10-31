@@ -211,7 +211,8 @@ pub struct Range<T> {
 - Kind: — · Builtin: no
 
 `a..b` and `a..=b` are `Range` values. Both bounds are required in expressions; `a..`, `..b` and
-`..` exist only in patterns. `0..7` is a `Range<Int<0, 7>>`. See
+`..` exist only in patterns. `0..7` is a `Range<i32>` unless its use expects another integer type,
+and with `last: Int<0, 7>`, `0..last` is a `Range<Int<0, 7>>`. See
 [Compiler Rules](./appendix/rules.md#type-rules) for the typing and
 [`for` loops](./appendix/rules.md#for-loops) for iteration.
 

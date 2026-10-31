@@ -96,8 +96,10 @@ pushdown fn Week() {
 ```
 
 In a `pushdown fn`, `for` loops only over a range whose bounds are constant expressions, or over
-an array (`E3006`), and the loop variable has the matching `Int` type: `day` in
-`for day in 0..7` is an `Int<0, 6>`.
+an array (`E3006`), and the loop variable must have a finite type: `day` in `for day in 0..7`
+takes the `Int` type the parameter of `Day` expects. A loop variable that nothing constrains is an
+`i32`, which is not finite (`E3008`); type a bound instead, as in `for lap in 0..LAPS` with
+`const LAPS: Int<0, 3> = 3;`.
 
 There is no `goto` and no labelled position to jump to. A hub is a `loop`, a scene that ends
 early `return`s, and a branch is an `if` or a `match`. Two consequences:

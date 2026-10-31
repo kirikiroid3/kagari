@@ -54,8 +54,9 @@ result must be finite.
   build runtime text with `to_text`
   ([`E3009`](../../diagnostics/kinds.md#e3009)).
 - `a..b` and `a..=b` have type `Range<T>`, where `T` is a type both `a` and `b` convert to: `0..7`
-  is a `Range<Int<0, 7>>`. A range expression needs both bounds: `a..`, `..b` and `..` exist only
-  in patterns ([`E2030`](../../diagnostics/types.md#e2030)).
+  is a `Range<i32>` unless its use expects another integer type, and with `last: Int<0, 7>`,
+  `0..last` is a `Range<Int<0, 7>>`. A range expression needs both bounds: `a..`, `..b` and `..`
+  exist only in patterns ([`E2030`](../../diagnostics/types.md#e2030)).
 - `x.into()` with `x: S` and target `T`, both `Integer`, needs every value of `S` to fit in `T`
   ([`E2018`](../../diagnostics/types.md#e2018)). `x.saturate()` has no
   such condition.

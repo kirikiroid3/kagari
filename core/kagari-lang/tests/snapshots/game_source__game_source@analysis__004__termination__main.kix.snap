@@ -3,51 +3,53 @@ source: core/kagari-lang/tests/game_source.rs
 expression: out
 input_file: core/kagari-lang/tests/game_source/analysis/004__termination/main.kix
 ---
-analysis/004__termination/main.kix:12:5: error[E5001]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
-analysis/004__termination/main.kix:24:5: error[E5001]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
-analysis/004__termination/main.kix:41:5: error[E5001]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
-analysis/004__termination/main.kix:61:5: error[E5001]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
-analysis/004__termination/main.kix:115:9: error[E5002]: the scene `Echo` can call itself before passing a step: the call stack would grow forever without input
-analysis/004__termination/main.kix:123:5: error[E5002]: the scenes `Ping` and `Pong` can call each other before passing a step: the call stack would grow forever without input
-  note: analysis/004__termination/main.kix:129:5: a call on the cycle
+analysis/004__termination/main.kix:13:5: error[E5001]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
+analysis/004__termination/main.kix:25:5: error[E5001]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
+analysis/004__termination/main.kix:42:5: error[E5001]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
+analysis/004__termination/main.kix:62:5: error[E5001]: this loop can repeat without passing a step: every path around a loop in a scene must run `s!`, `choice!` or a scene that runs one
+analysis/004__termination/main.kix:116:9: error[E5002]: the scene `Echo` can call itself before passing a step: the call stack would grow forever without input
+analysis/004__termination/main.kix:124:5: error[E5002]: the scenes `Ping` and `Pong` can call each other before passing a step: the call stack would grow forever without input
+  note: analysis/004__termination/main.kix:130:5: a call on the cycle
 --- resolutions ---
 analysis/004__termination/main.kix:3:18 bool -> prim bool
 analysis/004__termination/main.kix:4:19 Int -> prim Int
-analysis/004__termination/main.kix:13:12 DONE -> static crate::DONE
-analysis/004__termination/main.kix:16:13 COUNT -> static crate::COUNT
-analysis/004__termination/main.kix:24:11 COUNT -> static crate::COUNT
-analysis/004__termination/main.kix:25:9 COUNT -> static crate::COUNT
-analysis/004__termination/main.kix:28:12 DONE -> static crate::DONE
-analysis/004__termination/main.kix:30:9 DONE -> static crate::DONE
-analysis/004__termination/main.kix:33:9 _lap -> local _lap@33:9
-analysis/004__termination/main.kix:34:9 COUNT -> static crate::COUNT
-analysis/004__termination/main.kix:42:9 Maybe -> fn crate::Maybe
-analysis/004__termination/main.kix:50:9 Always -> fn crate::Always
-analysis/004__termination/main.kix:51:50 Go::On -> variant crate::Go::On
-analysis/004__termination/main.kix:51:72 Go::Stop -> variant crate::Go::Stop
-analysis/004__termination/main.kix:52:13 Go::On -> variant crate::Go::On
-analysis/004__termination/main.kix:52:23 continue -> loop@49:5
-analysis/004__termination/main.kix:53:13 Go::Stop -> variant crate::Go::Stop
-analysis/004__termination/main.kix:53:25 break -> loop@49:5
-analysis/004__termination/main.kix:62:12 DONE -> static crate::DONE
-analysis/004__termination/main.kix:63:13 continue -> loop@61:5
-analysis/004__termination/main.kix:73:9 next -> local next@73:9
-analysis/004__termination/main.kix:73:24 bool -> prim bool
-analysis/004__termination/main.kix:73:32 Speak -> fn crate::Speak
-analysis/004__termination/main.kix:75:9 next -> local next@73:9
-analysis/004__termination/main.kix:80:19 loud -> local loud@80:19
-analysis/004__termination/main.kix:80:25 bool -> prim bool
-analysis/004__termination/main.kix:81:8 loud -> local loud@80:19
-analysis/004__termination/main.kix:89:19 level -> local level@89:19
-analysis/004__termination/main.kix:89:26 Int -> prim Int
-analysis/004__termination/main.kix:90:8 level -> local level@89:19
-analysis/004__termination/main.kix:97:8 DONE -> static crate::DONE
-analysis/004__termination/main.kix:104:8 DONE -> static crate::DONE
-analysis/004__termination/main.kix:114:8 DONE -> static crate::DONE
-analysis/004__termination/main.kix:115:9 Echo -> fn crate::Echo
-analysis/004__termination/main.kix:123:5 Pong -> fn crate::Pong
-analysis/004__termination/main.kix:128:5 Maybe -> fn crate::Maybe
-analysis/004__termination/main.kix:129:5 Ping -> fn crate::Ping
-analysis/004__termination/main.kix:136:8 COUNT -> static crate::COUNT
-analysis/004__termination/main.kix:137:9 COUNT -> static crate::COUNT
-analysis/004__termination/main.kix:138:9 Countdown -> fn crate::Countdown
+analysis/004__termination/main.kix:5:13 Int -> prim Int
+analysis/004__termination/main.kix:14:12 DONE -> static crate::DONE
+analysis/004__termination/main.kix:17:13 COUNT -> static crate::COUNT
+analysis/004__termination/main.kix:25:11 COUNT -> static crate::COUNT
+analysis/004__termination/main.kix:26:9 COUNT -> static crate::COUNT
+analysis/004__termination/main.kix:29:12 DONE -> static crate::DONE
+analysis/004__termination/main.kix:31:9 DONE -> static crate::DONE
+analysis/004__termination/main.kix:34:9 _lap -> local _lap@34:9
+analysis/004__termination/main.kix:34:20 LAPS -> const crate::LAPS
+analysis/004__termination/main.kix:35:9 COUNT -> static crate::COUNT
+analysis/004__termination/main.kix:43:9 Maybe -> fn crate::Maybe
+analysis/004__termination/main.kix:51:9 Always -> fn crate::Always
+analysis/004__termination/main.kix:52:50 Go::On -> variant crate::Go::On
+analysis/004__termination/main.kix:52:72 Go::Stop -> variant crate::Go::Stop
+analysis/004__termination/main.kix:53:13 Go::On -> variant crate::Go::On
+analysis/004__termination/main.kix:53:23 continue -> loop@50:5
+analysis/004__termination/main.kix:54:13 Go::Stop -> variant crate::Go::Stop
+analysis/004__termination/main.kix:54:25 break -> loop@50:5
+analysis/004__termination/main.kix:63:12 DONE -> static crate::DONE
+analysis/004__termination/main.kix:64:13 continue -> loop@62:5
+analysis/004__termination/main.kix:74:9 next -> local next@74:9
+analysis/004__termination/main.kix:74:24 bool -> prim bool
+analysis/004__termination/main.kix:74:32 Speak -> fn crate::Speak
+analysis/004__termination/main.kix:76:9 next -> local next@74:9
+analysis/004__termination/main.kix:81:19 loud -> local loud@81:19
+analysis/004__termination/main.kix:81:25 bool -> prim bool
+analysis/004__termination/main.kix:82:8 loud -> local loud@81:19
+analysis/004__termination/main.kix:90:19 level -> local level@90:19
+analysis/004__termination/main.kix:90:26 Int -> prim Int
+analysis/004__termination/main.kix:91:8 level -> local level@90:19
+analysis/004__termination/main.kix:98:8 DONE -> static crate::DONE
+analysis/004__termination/main.kix:105:8 DONE -> static crate::DONE
+analysis/004__termination/main.kix:115:8 DONE -> static crate::DONE
+analysis/004__termination/main.kix:116:9 Echo -> fn crate::Echo
+analysis/004__termination/main.kix:124:5 Pong -> fn crate::Pong
+analysis/004__termination/main.kix:129:5 Maybe -> fn crate::Maybe
+analysis/004__termination/main.kix:130:5 Ping -> fn crate::Ping
+analysis/004__termination/main.kix:137:8 COUNT -> static crate::COUNT
+analysis/004__termination/main.kix:138:9 COUNT -> static crate::COUNT
+analysis/004__termination/main.kix:139:9 Countdown -> fn crate::Countdown

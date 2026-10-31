@@ -9,16 +9,18 @@ use crate::diagnostic::DiagnosticCode;
 use crate::hir::ExprId;
 use crate::signatures::lower::item_name;
 use crate::signatures::{TraitSolver, display_ty};
-use crate::ty::{Const, CtorRef, FnRef, GenericArg, GenericArgs, InferVar, Ty, TyKind, TyNode};
+use crate::ty::{
+    Const, CtorRef, FnRef, GenericArg, GenericArgs, InferVar, IntTy, Ty, TyKind, TyNode,
+};
 
 impl InferCtx<'_> {
     pub(crate) fn finish(mut self) -> (InferenceResult, Vec<crate::diagnostic::Diag>) {
         self.process_projections();
         self.resolve_links();
         self.default_literal_bounds();
-        for (var, literal) in self.table.unresolved_literals() {
-            self.table
-                .unify(&Ty::infer(var), &Ty::bounded(literal.lo, literal.hi));
+        let i32 = Ty::int(IntTy::I32);
+        for (var, _) in self.table.unresolved_literals() {
+            self.table.unify(&Ty::infer(var), &i32);
         }
         self.process_projections();
         self.check_fits();

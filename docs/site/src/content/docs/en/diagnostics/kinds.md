@@ -101,13 +101,13 @@ Fix: access the story variable only from a `pushdown fn`.
 
 ## E3008 `not-finite` {#e3008}
 
-**Error.** A story variable, an entry scene parameter, or the result of a tabulated `const fn` call has a type with too many values. Such types must be finite, such as bounded integers, `bool` and enums.
+**Error.** A story variable, a local of a `pushdown fn`, an entry scene parameter, or the result of a tabulated `const fn` call has a type with too many values. Such types must be finite, such as bounded integers, `bool` and enums. An integer literal that nothing constrains is an `i32`, so `let mut i = 0;` in a `pushdown fn` is this error as well.
 
 ```kis
 static mut COUNT: u32 = 0;
 ```
 
-Fix: use a bounded type, such as `static mut COUNT: Int<0, 10> = 0;`.
+Fix: use a bounded type, such as `static mut COUNT: Int<0, 10> = 0;` or `let mut i: Int<0, 10> = 0;`.
 
 ## E3009 `text-in-entry` {#e3009}
 
