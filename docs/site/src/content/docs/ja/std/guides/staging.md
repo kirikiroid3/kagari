@@ -131,7 +131,7 @@ const fn flashback_end(mut screen: Screen) -> Screen {
 }
 ```
 
-現在唯一のランタイムプロファイルである `native_v0` はビルド時に `.wgsl` シェーダーアセットを拒否するため、`MEMORY` フィルターはまだビルドできません（[ランタイムプロファイル](../appendix/profiles.md#using-an-unsupported-item) を参照）。`MEMORY` と `filter()` の行を削除してください。色調だけでも機能します。
+`MEMORY` は、シェーダーの書き方の [最初のシェーダー](./shaders.md#a-first-shader) にある色シェーダーです。そのソースを `assets/memory.wgsl` に置いてください。
 
 ## スチル（CG） {#still-cg}
 

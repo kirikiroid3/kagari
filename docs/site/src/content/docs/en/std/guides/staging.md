@@ -145,10 +145,8 @@ const fn flashback_end(mut screen: Screen) -> Screen {
 }
 ```
 
-`native_v0`, today the only runtime profile, rejects `.wgsl` shader assets at build, so the
-`MEMORY` filter does not build yet (see
-[Runtime Profiles](../appendix/profiles.md#using-an-unsupported-item)). Drop `MEMORY` and the
-`filter()` lines; the tint alone works.
+`MEMORY` is the colour shader of [A first shader](./shaders.md#a-first-shader) in Writing
+Shaders; put its source in `assets/memory.wgsl`.
 
 ## Still (CG) {#still-cg}
 
