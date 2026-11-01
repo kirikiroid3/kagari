@@ -79,8 +79,9 @@ linked dynamically, so releases ship its shared libraries next to the runtime.
   (so `libva.so.2` and `libva-drm.so.2` become run-time requirements) and RUNPATH `$ORIGIN`;
   Windows builds with MSVC against the dynamic C runtime (dav1d `-Db_vscrt=md`, FFmpeg
   `--extra-cflags=-MD`: cl's default `/MT` cannot link the `/MD` dav1d, and the release workflow
-  requires each DLL to import `VCRUNTIME140.dll`) and adds the D3D11VA hwaccels and import
-  libraries `lib/*.lib` for `FFMPEG_DIR`; macOS (arm64 only; the script refuses other
+  requires each DLL to import `VCRUNTIME140.dll`) and adds the D3D11VA hwaccels (the
+  `*_d3d11va2` ones the runtime uses, and the `*_d3d11va` ones whose objects hold them) and
+  import libraries `lib/*.lib` for `FFMPEG_DIR`; macOS (arm64 only; the script refuses other
   architectures) exports `MACOSX_DEPLOYMENT_TARGET=11.0` and adds `--enable-pic
   --enable-videotoolbox
   --enable-hwaccel=h264_videotoolbox,vp9_videotoolbox,av1_videotoolbox

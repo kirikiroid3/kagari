@@ -140,8 +140,11 @@ case "$target" in
     windows)
         # cl defaults to the static C runtime (/MT), which cannot link the /MD dav1d and would
         # give each DLL its own heap; `-MD` imports VCRUNTIME140.dll like the Rust runtime.
+        # FFmpeg compiles the `*_d3d11va2` hwaccels (hw_device_ctx, which the runtime uses) into
+        # the objects of the `*_d3d11va` ones, so both are enabled.
         flags+=(
             --toolchain=msvc --enable-d3d11va --extra-cflags=-MD
+            --enable-hwaccel=h264_d3d11va,vp9_d3d11va,av1_d3d11va
             --enable-hwaccel=h264_d3d11va2,vp9_d3d11va2,av1_d3d11va2
         )
         ;;
