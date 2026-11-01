@@ -27,7 +27,9 @@ INSTALL_HOME="${KAGARI_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/kagari}"
 BIN_DIR="${KAGARI_BIN_DIR:-$HOME/.local/bin}"
 TUTORIAL_URL="https://kagari.suitsu31.club/en/tutorial/install/"
 COMMANDS=(kagari kagari-desktop-runtime)
-# FFmpeg, shipped next to the commands (the runtime's RUNPATH is `$ORIGIN`).
+# FFmpeg 9 (packaging/ffmpeg/build.sh), shipped next to the commands since FFMPEG_SINCE (the
+# runtime's RUNPATH is `$ORIGIN`); earlier versions ship no libraries and need no libva.
+FFMPEG_SINCE="0.3.0"
 FFMPEG_LIBS=(libavcodec.so.63 libavformat.so.63 libavutil.so.61 libswscale.so.10 libswresample.so.7)
 # The Linux binaries are built on Ubuntu 22.04.
 MIN_GLIBC="2.35"
@@ -108,7 +110,25 @@ sha256() {
     fi
 }
 
+# version_at_least VERSION MIN: whether the x.y.z of VERSION is MIN or newer. A pre-release or
+# build suffix (`-dev.<commit>`) counts as its base version.
+version_at_least() {
+    local have want i
+    IFS=. read -r -a have <<<"${1%%[-+]*}"
+    IFS=. read -r -a want <<<"$2"
+    for i in 0 1 2; do
+        local a="${have[i]:-0}" b="${want[i]:-0}"
+        case "$a" in
+            "" | *[!0-9]*) die "invalid version: '$1'" ;;
+        esac
+        if ((10#$a > 10#$b)); then return 0; fi
+        if ((10#$a < 10#$b)); then return 1; fi
+    done
+    return 0
+}
+
 # Warns about the shared libraries the runtime links that are not installed. The CLI needs none.
+# $1 is 1 when the installed version ships FFmpeg, which links libva.
 check_runtime_libraries() {
     local ldconfig
     if command -v ldconfig >/dev/null 2>&1; then
@@ -118,9 +138,12 @@ check_runtime_libraries() {
     else
         return 0
     fi
-    local cache missing=() lib
+    local cache missing=() lib needed=(libasound.so.2 libudev.so.1)
+    if [ "$1" = 1 ]; then
+        needed+=(libva.so.2 libva-drm.so.2)
+    fi
     cache="$("$ldconfig" -p 2>/dev/null || true)"
-    for lib in libasound.so.2 libudev.so.1 libva.so.2 libva-drm.so.2; do
+    for lib in "${needed[@]}"; do
         case "$cache" in
             *"$lib "*) ;;
             *) missing+=("$lib") ;;
@@ -159,12 +182,13 @@ install_kagari() {
 
     tar -xzf "$TMP_DIR/$name.tar.gz" -C "$TMP_DIR"
     local unpacked="$TMP_DIR/$name"
-    local cmd lib
-    for cmd in "${COMMANDS[@]}"; do
+    local cmd lib ffmpeg=0 libs=()
+    if version_at_least "$version" "$FFMPEG_SINCE"; then
+        ffmpeg=1
+        libs=("${FFMPEG_LIBS[@]}" ffmpeg-LICENSE.txt)
+    fi
+    for cmd in "${COMMANDS[@]}" "${libs[@]}"; do
         [ -f "$unpacked/$cmd" ] || die "the archive has no $cmd"
-    done
-    for lib in "${FFMPEG_LIBS[@]}"; do
-        [ -f "$unpacked/$lib" ] || die "the archive has no $lib"
     done
 
     mkdir -p "$INSTALL_HOME/bin" "$BIN_DIR"
@@ -175,11 +199,20 @@ install_kagari() {
         fi
     done
     # Copy next to the target, then rename: a running `kagari lsp` keeps its old file.
-    for lib in "${FFMPEG_LIBS[@]}"; do
-        cp "$unpacked/$lib" "$INSTALL_HOME/bin/.$lib.new"
-        chmod 644 "$INSTALL_HOME/bin/.$lib.new"
-        mv -f "$INSTALL_HOME/bin/.$lib.new" "$INSTALL_HOME/bin/$lib"
-    done
+    if [ "$ffmpeg" = 1 ]; then
+        for lib in "${FFMPEG_LIBS[@]}"; do
+            cp "$unpacked/$lib" "$INSTALL_HOME/bin/.$lib.new"
+            chmod 644 "$INSTALL_HOME/bin/.$lib.new"
+            mv -f "$INSTALL_HOME/bin/.$lib.new" "$INSTALL_HOME/bin/$lib"
+        done
+        cp "$unpacked/ffmpeg-LICENSE.txt" "$INSTALL_HOME/ffmpeg-LICENSE.txt"
+    else
+        # An older version over a newer one: drop the libraries it does not use.
+        for lib in "${FFMPEG_LIBS[@]}"; do
+            rm -f "$INSTALL_HOME/bin/$lib"
+        done
+        rm -f "$INSTALL_HOME/ffmpeg-LICENSE.txt"
+    fi
     for cmd in "${COMMANDS[@]}"; do
         cp "$unpacked/$cmd" "$INSTALL_HOME/bin/.$cmd.new"
         chmod 755 "$INSTALL_HOME/bin/.$cmd.new"
@@ -189,9 +222,6 @@ install_kagari() {
     if [ -f "$unpacked/LICENSE" ]; then
         cp "$unpacked/LICENSE" "$INSTALL_HOME/LICENSE"
     fi
-    if [ -f "$unpacked/ffmpeg-LICENSE.txt" ]; then
-        cp "$unpacked/ffmpeg-LICENSE.txt" "$INSTALL_HOME/ffmpeg-LICENSE.txt"
-    fi
 
     local installed
     installed="$("$INSTALL_HOME/bin/kagari" --version 2>/dev/null)" ||
@@ -199,7 +229,7 @@ install_kagari() {
     say "installed $installed into $INSTALL_HOME"
     say "linked ${COMMANDS[*]} into $BIN_DIR"
 
-    check_runtime_libraries
+    check_runtime_libraries "$ffmpeg"
     case ":$PATH:" in
         *":$BIN_DIR:"*) ;;
         *)
