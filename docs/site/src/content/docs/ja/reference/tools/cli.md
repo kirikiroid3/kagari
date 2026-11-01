@@ -12,7 +12,7 @@ Commands:
   check    Check the project and print its diagnostics
   build    Build the project's bytecode and asset archives
   clean    Delete the build outputs and the analysis cache
-  release  Build the project and package it with the runtime of a platform into an ISO image
+  release  Build the project and package it with the runtime of a platform: an ISO image for Windows and Linux, an app in a ZIP archive for macOS
   fmt      Format the project's source files, or the given files
   disasm   Disassemble a `.kagari` bytecode file
   lsp      Run the language server over stdio
@@ -25,7 +25,7 @@ Commands:
 
 ## インストール {#installing}
 
-[Kagari のインストール](../../tutorial/install.md) のインストーラーは、Linux と Windows で `kagari` と `kagari-desktop-runtime` を `PATH` に置きます。NixOS ではそこで説明している flake を使います。
+[Kagari のインストール](../../tutorial/install.md) のインストーラーは、Linux、macOS、Windows で `kagari` と `kagari-desktop-runtime` を `PATH` に置きます。NixOS ではそこで説明している flake を使います。
 
 代わりに Kagari リポジトリから両方をビルドするには、次のようにします（Rust と Cargo が必要です）。
 
@@ -180,7 +180,7 @@ kagari clean [--manifest-path <PATH>]
 
 - [解析キャッシュ](#the-analysis-cache)。出力ディレクトリ直下のすべての `.kagari-cache` ファイルです。
 - すべてのターゲット（`v0`）のディレクトリにある `game.kagari`、すべての `.kiarchive` ファイル、すべての `.kagari-cache` ファイル。ターゲットが `build.targets` に含まれているかどうかは問いません。
-- `release/windows` と `release/linux` にあるすべての `.iso` ファイル。
+- `release/windows`、`release/linux`、`release/macos` にあるすべての `.iso` と `.zip` のパッケージ。
 
 その後、空になったターゲットとリリースのディレクトリ、出力ディレクトリを削除します。それ以外のファイルは残り、それを収めたディレクトリも残ります。
 
@@ -204,22 +204,29 @@ kagari clean --manifest-path example/test_game1/kagari.toml
 ## `kagari release` {#kagari-release}
 
 ```text
-kagari release [--manifest-path <PATH>] (--windows | --linux)
+kagari release [--manifest-path <PATH>] (--windows | --linux | --macos)
 ```
 
-1 つのプラットフォームのプレイヤー向けにゲームをパッケージ化します。ゲームをビルドし、そのプラットフォームのランタイムをダウンロードして、両方を 1 つの ISO ディスクイメージ `<out-dir>/release/<platform>/<name>.iso` に書き出します。`<name>` はプロジェクト名（`[project] name`）で、`/ \ : * ? " < > |` と制御文字は `_` に置き換えられ、前後の空白と末尾のドットは取り除かれます。インターネット接続が必要です。
+1 つのプラットフォームのプレイヤー向けにゲームをパッケージ化します。ゲームをビルドし、そのプラットフォームのランタイムをダウンロードして、両方を `<out-dir>/release/<platform>/` の 1 つのパッケージに書き出します。Windows と Linux では ISO ディスクイメージ `<name>.iso`、macOS ではアプリ `<name>.app` を収めた ZIP アーカイブ `<name>.zip` です。`<name>` はプロジェクト名（`[project] name`）で、`/ \ : * ? " < > |` と制御文字は `_` に置き換えられ、前後の空白と末尾のドットは取り除かれます。インターネット接続が必要です。
 
 | オプション | 意味 |
 | ---------- | ---- |
 | `--manifest-path <PATH>` | プロジェクトの `kagari.toml`。 |
 | `--windows` | Windows（x86_64）のランタイムを `run.exe` として、必要な C ランタイムライブラリ `vcruntime140.dll` と FFmpeg のライブラリと一緒にパッケージ化します。 |
 | `--linux` | Linux（x86_64）のランタイム `kagari-desktop-runtime` を、FFmpeg のライブラリと一緒にパッケージ化します。 |
+| `--macos` | macOS（Apple シリコン）のランタイムを、FFmpeg のライブラリと一緒にアドホック署名したアプリとしてパッケージ化します。[`project.identifier`](./projects.md#project) が必要です。 |
 
-`--windows` と `--linux` のどちらか一方だけが必要です。手順は次の順です。
+`--windows`、`--linux`、`--macos` のどれか 1 つだけが必要です。macOS 向けのリリースには `kagari.toml` の `project.identifier` が必要で、これがアプリのバンドル識別子になります。ない場合は、ビルドもダウンロードもせずにステータス 2 で止まります。
+
+```text
+kagari: a macOS release needs `project.identifier` in kagari.toml (a reverse-DNS name such as `com.example.game`)
+```
+
+手順は次の順です。
 
 1. `build.targets` の最初のターゲットを、[`kagari build`](#kagari-build) とまったく同じようにリリースプロファイルでビルドし、同じ行を表示します。問題があれば、何もダウンロードせずにステータス 1 で止まります。
-2. `kagari` と同じバージョンのランタイムを `https://kagari-download.suitsu31.club` からダウンロードし、公開されている SHA-256 チェックサムと照合します。そのため、ランタイムはバイトコードをビルドしたコンパイラと常に一致します。ランタイムがムービーのデコードに使う FFmpeg のライブラリと、そのライセンス `ffmpeg-LICENSE.txt` もダウンロードして照合します。Windows 向けでは、Microsoft Visual C++ のランタイムライブラリ `vcruntime140.dll` もダウンロードして照合します。ランタイムはこれがないと起動できず、プレイヤーの Windows には入っていないことがよくあります。`run.exe` の隣に置けば、インストールせずに使われます。ダウンロードに失敗したとき、またはこのバージョンのランタイムが公開されていないとき（Kagari 0.1.0 は公開していません）はステータス 2 で止まります。環境変数 `KAGARI_DOWNLOAD_URL` でサーバーを置き換えられます。
-3. そのプラットフォームの以前の `.iso` ファイルを削除し、イメージを書き出します。イメージのルートディレクトリには、ランタイム（Windows では `run.exe` と `vcruntime140.dll`、Linux では `kagari-desktop-runtime`）、FFmpeg のライブラリと `ffmpeg-LICENSE.txt`（[ゲームの配布](./projects.md#shipping-a-game)を参照）、`game.kagari`、アーカイブが入ります。
+2. `kagari` と同じバージョンのランタイムを `https://kagari-download.suitsu31.club` のそのプラットフォームのディレクトリ（`windows_x86_installer`、`linux_x86_bin`、`macos_arm64_bin`）からダウンロードし、公開されている SHA-256 チェックサムと照合します。そのため、ランタイムはバイトコードをビルドしたコンパイラと常に一致します。ランタイムがムービーのデコードに使う FFmpeg のライブラリと、そのライセンス `ffmpeg-LICENSE.txt` もダウンロードして照合します。Windows 向けでは、Microsoft Visual C++ のランタイムライブラリ `vcruntime140.dll` もダウンロードして照合します。ランタイムはこれがないと起動できず、プレイヤーの Windows には入っていないことがよくあります。`run.exe` の隣に置けば、インストールせずに使われます。macOS 向けでは、アプリのアイコン `kagari.icns`（Kagari のロゴ）もダウンロードして照合します。ダウンロードに失敗したとき、またはこのバージョンのランタイムが公開されていないとき（Kagari 0.1.0 は公開しておらず、0.3.0 より前のバージョンは macOS のランタイムを公開していません）はステータス 2 で止まります。環境変数 `KAGARI_DOWNLOAD_URL` でサーバーを置き換えられます。
+3. そのプラットフォームの以前のパッケージ（`.iso` と `.zip` のファイル）を削除し、新しいパッケージを書き出します。まず `<name>.iso.part` または `<name>.zip.part` として書き、完成したら名前を変えます。失敗したときは書きかけのファイルを削除します。Windows と Linux のイメージのルートディレクトリには、ランタイム（Windows では `run.exe` と `vcruntime140.dll`、Linux では `kagari-desktop-runtime`）、FFmpeg のライブラリと `ffmpeg-LICENSE.txt`（[ゲームの配布](./projects.md#shipping-a-game)を参照）、`game.kagari`、アーカイブが入ります。macOS のアーカイブには [macOS のアプリ](#the-macos-app)で説明するアプリが入ります。
 
 ```text
 downloading https://kagari-download.suitsu31.club/linux_x86_bin/<version>/kagari-desktop-runtime-<version>-x86_64-linux
@@ -237,7 +244,39 @@ wrote target/release/linux/My Game.iso (10 files)
 ```sh
 kagari release --windows
 kagari release --linux --manifest-path example/test_game1/kagari.toml
+kagari release --macos
 ```
+
+### macOS のアプリ {#the-macos-app}
+
+同じプロジェクトで `kagari release --macos` を実行すると、次のように表示します。
+
+```text
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/kagari-desktop-runtime-<version>-aarch64-macos
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/libavcodec.63.dylib
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/libavformat.63.dylib
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/libavutil.61.dylib
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/libswscale.10.dylib
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/libswresample.7.dylib
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/ffmpeg-LICENSE.txt
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/kagari.icns
+wrote target/release/macos/My Game.zip (13 files)
+```
+
+アーカイブには 1 つのアプリバンドルが入ります。
+
+```text
+<name>.app/Contents/
+  Info.plist                   the app's name, bundle identifier, version and icon
+  MacOS/<name>                 the runtime
+  Frameworks/*.dylib           the FFmpeg libraries
+  Resources/                   game.kagari, *.kiarchive, kagari.icns, ffmpeg-LICENSE.txt
+  _CodeSignature/CodeResources the hashes of the files the signature covers
+```
+
+アプリの名前はプロジェクト名（`[project] name`）、バンドル識別子は `project.identifier`、バージョンは `project.version` の `major.minor.patch` で、macOS 11 以降が必要です。ランタイムはゲームを `Contents/Resources` から、FFmpeg のライブラリを `Contents/Frameworks` から見つけます。アーカイブはファイルのパーミッションを記録しているので、Finder（ダブルクリック）や `ditto -x -k` で展開すればアプリはそのまま動きます。プレイヤーは展開した `<name>.app` を開きます。
+
+ランタイムと FFmpeg のライブラリはアドホック署名されており、署名はアプリのすべてのファイルを対象にします。ファイルを変えると署名は壊れます。署名には Apple の Developer ID が含まれないため、ダウンロードしたアプリを初めて起動すると、macOS は Apple が検証できなかったと表示して開きません。プレイヤーは一度だけ **システム設定 → プライバシーとセキュリティ → このまま開く** から開きます（macOS 14 以前では、アプリを Control キーを押しながらクリックして **開く** を選びます）。その後の起動では何も必要ありません。署名に Mac は不要で、`kagari release --macos` は Linux と Windows でも動きます。ダウンロードしたランタイムが arm64 の macOS 実行ファイルでないときは、アーカイブを書き出さずにステータス 2 で止まります。
 
 ## `kagari fmt` {#kagari-fmt}
 

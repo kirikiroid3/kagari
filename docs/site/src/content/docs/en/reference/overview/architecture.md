@@ -58,10 +58,10 @@ that does not validate.
 **The runtime.** The [desktop runtime](../tools/runtime.md), `kagari-desktop-runtime`, plays a
 built game on Windows, macOS and Linux. It loads `game.kagari` from the game directory (by
 default, the directory of the executable, so a shipped game puts the executable next to
-`game.kagari` and the archives), verifies the program before running any of it, runs `fn main`
-once to get the description of the game system, and shows the start page. Settings, meta and save
-slots go to a data directory outside the game directory. The runtime implements the runtime
-profile `native_v0`: the whole standard library. A
+`game.kagari` and the archives; a macOS app keeps them in `Contents/Resources`), verifies the
+program before running any of it, runs `fn main` once to get the description of the game system,
+and shows the start page. Settings, meta and save slots go to a data directory outside the game
+directory. The runtime implements the runtime profile `native_v0`: the whole standard library. A
 [headless mode](../tools/headless.md) runs the same game without a window, driven by a script, for
 automated tests.
 

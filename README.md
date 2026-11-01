@@ -38,15 +38,15 @@ Develop Guide is an mdBook: `mdbook build docs/dev` writes it to `docs/_site/`.
 
 ## Installing
 
-Linux (x86_64, glibc 2.35 or newer):
+Linux (x86_64, glibc 2.35 or newer) and macOS (Apple silicon, macOS 11 or newer):
 
 ```sh
 curl -fsSL https://kagari-download.suitsu31.club/installer.sh | bash
 ```
 
 Windows has an installer and NixOS a flake (add `github:kirikiroid3/kagari` as an input);
-see [Installing Kagari](https://kagari.suitsu31.club/en/tutorial/install/). macOS builds are not
-available yet.
+see [Installing Kagari](https://kagari.suitsu31.club/en/tutorial/install/). Intel Macs are not
+supported.
 
 ## Quick start from the repository
 

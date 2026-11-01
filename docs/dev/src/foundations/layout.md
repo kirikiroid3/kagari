@@ -234,7 +234,7 @@ mode driven by an input script. See [The Desktop Runtime](../runtime/desktop.md)
 | `docs/site` | The documentation site (Astro + Lotus): Tutorial, Language Reference, STD Reference and Diagnostics in ja and en; see [Documentation](../process/docs.md) |
 | `docs/dev` | This guide, an mdBook |
 | `example/` | Local example projects, ignored by git (see below) |
-| `.github/workflows/release.yml`, `installer.sh`, `packaging/windows/` | Release builds, the Linux installer script and the Windows installer; see [Releases](../process/releases.md) |
+| `.github/workflows/release.yml`, `installer.sh`, `packaging/` | Release builds, the Linux and macOS installer script, the Windows installer (`packaging/windows/`) and the FFmpeg build (`packaging/ffmpeg/`); see [Releases](../process/releases.md) |
 | `flake.nix`, `nix/` | The dev shell and the `stable`/`unstable` packages; `nix/stable.json` is written by the release workflow |
 | `*/tests/` | Integration tests and fixtures; see [Testing](../process/testing.md) |
 

@@ -10,7 +10,7 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
 | Path | What |
 | ---- | ---- |
 | `tooling/kagari-project` | `kagari.toml` parsing/validation, project discovery, `Project::program`, targets, system font dirs |
-| `tooling/kagari-cli` | The `kagari` binary: `init`, `check`, `build` (`--profile debug`/`release`), `clean`, `release` (`--windows`/`--linux`: build, download the runtime, write `<out-dir>/release/<platform>/<name>.iso`), `fmt`, `disasm`, `lsp`, `debug`, `dap`; `analysis_cache.rs`, `outputs.rs` (what is written/removed in `out-dir`); `command/release/` (`download.rs`: the hard-coded download server, `KAGARI_DOWNLOAD_URL`; `iso.rs`: the ISO 9660 + Joliet + Rock Ridge writer); `debugger.rs` (projects for the story debugger: `open`, the DAP `Launcher`; the REPL and adapter live in `kagari-debugger`'s `client`/`dap` features); new-project `template/` |
+| `tooling/kagari-cli` | The `kagari` binary: `init`, `check`, `build` (`--profile debug`/`release`), `clean`, `release` (`--windows`/`--linux`/`--macos`: build, download the runtime, write `<out-dir>/release/<platform>/<name>.iso`, or `<name>.zip` holding a signed `<name>.app` for macOS, which needs `project.identifier`), `fmt`, `disasm`, `lsp`, `debug`, `dap`; `analysis_cache.rs`, `outputs.rs` (what is written/removed in `out-dir`); `command/release/` (`download.rs`: the hard-coded download server, `KAGARI_DOWNLOAD_URL`; `iso.rs`: the ISO 9660 + Joliet + Rock Ridge writer; `zip.rs`: the ZIP writer with Unix modes and ZIP64; `macos/mod.rs`: the app bundle, `Info.plist`, `CodeResources`; `macos/sign.rs`: the ad hoc Mach-O signer); `debugger.rs` (projects for the story debugger: `open`, the DAP `Launcher`; the REPL and adapter live in `kagari-debugger`'s `client`/`dap` features); new-project `template/` |
 | `tooling/kagari-fmt` | Width-based formatter (`MAX_WIDTH` 100, `INDENT` 4, not configurable) |
 | `tooling/kagari-lsp` | Language server (lsp-server, crossbeam, salsa snapshots) |
 | `core/kagari-lang/src/ide` | Go to definition, hover, file symbols over salsa queries |
@@ -45,12 +45,14 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
   `store` after compiling; written only when stage 5 ran). A cache that cannot be read is
   ignored, one that cannot be written is a stderr warning, never a failure. `kagari clean`
   removes only `*.kagari-cache` in `out-dir`, `game.kagari`/`*.kiarchive`/`*.kagari-cache`
-  in every target directory and `*.iso` in `release/<platform>/` (`outputs.rs`), then empty
-  directories.
-- `kagari release` downloads nothing when the build fails, and its download URL layout
-  (`<bucket dir>/<version>/kagari-desktop-runtime-<version>-x86_64-<os>[.exe]`, plus
-  `Platform::libraries` next to it: `vcruntime140.dll` and the five FFmpeg DLLs for Windows, the
-  five FFmpeg `.so` files for Linux, `ffmpeg-LICENSE.txt` for both) is a contract with
+  in every target directory and `*.iso`/`*.zip` in `release/<platform>/` (`outputs.rs`), then
+  empty directories.
+- `kagari release` downloads nothing when the build fails (or, for `--macos`, when
+  `project.identifier` is missing), and its download URL layout
+  (`<bucket dir>/<version>/kagari-desktop-runtime-<version>-<arch>-<os>[.exe]`: `x86_64-windows.exe`,
+  `x86_64-linux`, `aarch64-macos`; plus `Platform::libraries` next to it: `vcruntime140.dll` and
+  the five FFmpeg DLLs for Windows, the five FFmpeg `.so` files for Linux, the five FFmpeg
+  `.dylib` files and `kagari.icns` for macOS, `ffmpeg-LICENSE.txt` for all) is a contract with
   `.github/workflows/release.yml`: change both together, never move published files. The Windows
   image names the runtime `run.exe`. Its tests use a local server through `KAGARI_DOWNLOAD_URL`;
   no test touches the network.

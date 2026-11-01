@@ -39,13 +39,16 @@ fn main() -> ExitCode {
         Command::Release {
             manifest_path,
             windows,
-            linux: _,
+            linux,
+            macos: _,
         } => command::release::run(
             manifest_path.as_deref(),
             if windows {
                 command::release::Platform::Windows
-            } else {
+            } else if linux {
                 command::release::Platform::Linux
+            } else {
+                command::release::Platform::MacOs
             },
         ),
         Command::Fmt {

@@ -11,6 +11,9 @@ use crate::target::Target;
 pub struct Manifest {
     pub name: String,
     pub version: semver::Version,
+    /// `project.identifier`: the reverse-DNS name platforms identify the game by (the bundle
+    /// identifier of a macOS release).
+    pub identifier: Option<String>,
     /// The root source file, relative to the project root.
     pub entry: PathBuf,
     pub toolchain: semver::VersionReq,
@@ -42,6 +45,7 @@ struct RawProject {
     name: String,
     version: String,
     entry: Option<String>,
+    identifier: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -78,7 +82,9 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
         .map_err(|error| format!("`project.version`: {error}"))?;
     let toolchain = semver::VersionReq::parse(&raw.toolchain.kagari)
         .map_err(|error| format!("`toolchain.kagari`: {error}"))?;
-
+    if let Some(identifier) = &raw.project.identifier {
+        check_identifier(identifier)?;
+    }
     let entry = relative(
         raw.project.entry.as_deref().unwrap_or("src/main.kis"),
         "project.entry",
@@ -145,6 +151,7 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
     Ok(Manifest {
         name: raw.project.name,
         version,
+        identifier: raw.project.identifier,
         entry,
         toolchain,
         asset_dir,
@@ -166,6 +173,23 @@ fn relative(path: &str, key: &str) -> Result<PathBuf, String> {
         return Err(format!("`{key}` must be a relative path"));
     }
     Ok(path.to_path_buf())
+}
+
+/// A reverse-DNS identifier: dot-separated parts of ASCII letters, digits and `-`, at least two,
+/// none empty (the characters Apple allows in a bundle identifier).
+fn check_identifier(identifier: &str) -> Result<(), String> {
+    let parts: Vec<&str> = identifier.split('.').collect();
+    let valid = parts.len() >= 2
+        && parts.iter().all(|part| {
+            !part.is_empty() && part.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+        });
+    if valid {
+        Ok(())
+    } else {
+        Err(format!(
+            "`project.identifier` `{identifier}` must be a reverse-DNS name such as `com.example.game`: dot-separated parts of ASCII letters, digits and `-`"
+        ))
+    }
 }
 
 fn supported_targets() -> String {

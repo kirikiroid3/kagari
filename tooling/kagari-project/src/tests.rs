@@ -27,6 +27,7 @@ fn minimal_manifest_gets_defaults() {
     assert_eq!(manifest.out_dir, PathBuf::from("target"));
     assert_eq!(manifest.options, CompileOptions::default());
     assert_eq!(manifest.runtime_compatibility, [RuntimeProfile::NativeV0]);
+    assert_eq!(manifest.identifier, None);
 }
 
 #[test]
@@ -89,6 +90,30 @@ fn absolute_entries_are_rejected() {
         parse_manifest(&text).unwrap_err(),
         "`project.entry` must be a relative path"
     );
+}
+
+#[test]
+fn identifiers_are_reverse_dns_names() {
+    let with = |identifier: &str| {
+        MINIMAL.replace(
+            "version = \"0.1.0\"",
+            &format!("version = \"0.1.0\"\nidentifier = \"{identifier}\""),
+        )
+    };
+    let manifest = parse_manifest(&with("com.example.my-game2")).unwrap();
+    assert_eq!(manifest.identifier.as_deref(), Some("com.example.my-game2"));
+    for bad in [
+        "game",
+        "com..game",
+        ".com.game",
+        "com.game.",
+        "com.ゲーム",
+        "com.my_game",
+        "",
+    ] {
+        let error = parse_manifest(&with(bad)).unwrap_err();
+        assert!(error.starts_with("`project.identifier`"), "{bad}: {error}");
+    }
 }
 
 #[test]

@@ -131,5 +131,5 @@ echo "exit: $?"   # 0 ok, 2 boot/usage, 3 trap, 4 GPU, 5 script
   `concepts/saves.md`, `tools/projects.md` (profiles), `tools/cli.md` and `tutorial/install.md`
   (files shipped next to the runtime).
 - STD Reference (en **and** ja): the module page of every changed std item; `appendix/profiles.md`.
-- Shipped libraries (FFmpeg): `process/releases.md` and the `kagari release` library list in
-  `tooling/cli.md`.
+- Shipped libraries (FFmpeg, per platform: Linux, Windows, macOS): `process/releases.md`, the
+  `kagari release` library lists in `tooling/cli.md`, and the installer lists in `installer.sh`.

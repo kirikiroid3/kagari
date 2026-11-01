@@ -12,14 +12,17 @@ use crate::platform::DesktopPlatform;
 /// The bytecode file `kagari build` writes.
 const PROGRAM: &str = "game.kagari";
 
-/// `GAME_DIR`, or the executable's directory; it must hold `game.kagari`.
+/// `GAME_DIR`, or the executable's directory; it must hold `game.kagari`. On macOS, an executable
+/// in an app bundle (`<name>.app/Contents/MacOS`) whose directory lacks `game.kagari` reads the
+/// bundle's `Contents/Resources`, where `kagari release --macos` puts the game.
 pub fn game_dir(arg: Option<PathBuf>) -> Result<PathBuf, Failure> {
     let dir = match arg {
         Some(dir) => dir,
         None => {
             let exe = std::env::current_exe()
                 .map_err(|e| Failure::new(USAGE, format!("the executable's path: {e}")))?;
-            exe.parent().map(Path::to_path_buf).unwrap_or_default()
+            let dir = exe.parent().map(Path::to_path_buf).unwrap_or_default();
+            bundle_resources(&dir).unwrap_or(dir)
         }
     };
     if !dir.join(PROGRAM).is_file() {
@@ -32,6 +35,20 @@ pub fn game_dir(arg: Option<PathBuf>) -> Result<PathBuf, Failure> {
         ));
     }
     Ok(dir)
+}
+
+/// The `Contents/Resources` of the app bundle whose `Contents/MacOS` is `exe_dir`, when `exe_dir`
+/// has no `game.kagari` and that directory has one.
+fn bundle_resources(exe_dir: &Path) -> Option<PathBuf> {
+    if !cfg!(target_os = "macos") || exe_dir.join(PROGRAM).is_file() {
+        return None;
+    }
+    let contents = exe_dir.parent()?;
+    if exe_dir.file_name()? != "MacOS" || contents.file_name()? != "Contents" {
+        return None;
+    }
+    let resources = contents.join("Resources");
+    resources.join(PROGRAM).is_file().then_some(resources)
 }
 
 /// The whole `game.kagari`.

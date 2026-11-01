@@ -5,7 +5,7 @@
 # libswresample, with only what the runtime plays (WebM with AV1 or VP9 and Opus or Vorbis, MP4
 # with H.264 and AAC) and dav1d linked in statically.
 #
-#   KAGARI_FFMPEG_TARGET=linux|windows packaging/ffmpeg/build.sh <prefix>
+#   KAGARI_FFMPEG_TARGET=linux|windows|macos packaging/ffmpeg/build.sh <prefix>
 #
 # linux: run on the oldest glibc the runtime supports (the release workflow's ubuntu:22.04).
 #   Needs a C compiler, make, meson, ninja, nasm, pkg-config, libva (VAAPI), curl, tar, xz.
@@ -14,6 +14,10 @@
 #   ilammy/msvc-dev-cmd), with MSYS2's link.exe moved out of the way. Needs make, nasm, pkgconf,
 #   diffutils, and meson and ninja on PATH. Writes the import libraries `lib/avcodec.lib` etc.,
 #   which `FFMPEG_DIR=<prefix>` builds of the runtime link against.
+# macos: run on Apple Silicon (arm64 only) with the Xcode command line tools. Needs make, meson,
+#   ninja, pkg-config, curl, tar, xz. Builds for macOS 11 (MACOSX_DEPLOYMENT_TARGET) with the
+#   VideoToolbox hwaccels. The install names are `@rpath/<file>`, so the runtime finds the
+#   libraries through its own rpaths (next to it, or in an app bundle's Frameworks).
 #
 # <prefix> gets include/, lib/ (and bin/ on Windows) and ffmpeg-LICENSE.txt, FFmpeg's licence
 # followed by dav1d's. The files the runtime ships, by target:
@@ -21,6 +25,8 @@
 #            lib/libswresample.so.7
 #   windows: bin/avcodec-63.dll bin/avformat-63.dll bin/avutil-61.dll bin/swscale-10.dll
 #            bin/swresample-7.dll
+#   macos:   lib/libavcodec.63.dylib lib/libavformat.63.dylib lib/libavutil.61.dylib
+#            lib/libswscale.10.dylib lib/libswresample.7.dylib
 # Changing this file changes the release workflow's cache key, which rebuilds FFmpeg.
 
 set -euo pipefail
@@ -35,6 +41,10 @@ DAV1D_SHA256=cbe212b02faf8c6eed5b6d55ef8a6e363aaab83f15112e960701a9c3df813686
 LIBRARIES=(avcodec avformat avutil swscale swresample)
 LINUX_FILES=(libavcodec.so.63 libavformat.so.63 libavutil.so.61 libswscale.so.10 libswresample.so.7)
 WINDOWS_FILES=(avcodec-63.dll avformat-63.dll avutil-61.dll swscale-10.dll swresample-7.dll)
+MACOS_FILES=(libavcodec.63.dylib libavformat.63.dylib libavutil.61.dylib libswscale.10.dylib
+    libswresample.7.dylib)
+# The oldest macOS the runtime supports: the first with Apple Silicon.
+MACOS_DEPLOYMENT_TARGET=11.0
 
 say() { printf 'ffmpeg-build: %s\n' "$*" >&2; }
 die() {
@@ -42,11 +52,15 @@ die() {
     exit 1
 }
 
-[ "$#" -eq 1 ] || die "usage: KAGARI_FFMPEG_TARGET=linux|windows $0 <prefix>"
+[ "$#" -eq 1 ] || die "usage: KAGARI_FFMPEG_TARGET=linux|windows|macos $0 <prefix>"
 target="${KAGARI_FFMPEG_TARGET:-}"
 case "$target" in
     linux | windows) ;;
-    *) die "set KAGARI_FFMPEG_TARGET to linux or windows (got '$target')" ;;
+    macos)
+        [ "$(uname -m)" = arm64 ] || die "the macOS build is arm64 only (this is $(uname -m))"
+        export MACOSX_DEPLOYMENT_TARGET="$MACOS_DEPLOYMENT_TARGET"
+        ;;
+    *) die "set KAGARI_FFMPEG_TARGET to linux, windows or macos (got '$target')" ;;
 esac
 mkdir -p "$1"
 prefix="$(cd "$1" && pwd)"
@@ -56,16 +70,25 @@ if [ "$target" = windows ]; then
     native_prefix="$(cygpath -m "$prefix")"
 fi
 
-jobs="$(nproc 2>/dev/null || echo 4)"
+jobs="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
+
+# sha256 FILE: the SHA-256 of FILE in hex (macOS has shasum, not always sha256sum).
+sha256() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | cut -d ' ' -f 1
+    else
+        shasum -a 256 "$1" | cut -d ' ' -f 1
+    fi
+}
 
 # fetch URL FILE SHA256: downloads URL into $work/FILE and checks it.
 fetch() {
     say "downloading $1"
     curl -fsSL --retry 3 --retry-all-errors -o "$work/$2" "$1"
     local actual
-    actual="$(sha256sum "$work/$2" | cut -d ' ' -f 1)"
+    actual="$(sha256 "$work/$2")"
     [ "$actual" = "$3" ] || die "$2: SHA-256 $actual, expected $3"
 }
 
@@ -113,6 +136,15 @@ case "$target" in
             --enable-hwaccel=h264_d3d11va2,vp9_d3d11va2,av1_d3d11va2
         )
         ;;
+    macos)
+        # `@rpath` reaches the linker through `--install-name-dir`; the runtime's rpaths
+        # (build.rs) name the directories to search.
+        flags+=(
+            --enable-pic --enable-videotoolbox
+            --enable-hwaccel=h264_videotoolbox,vp9_videotoolbox,av1_videotoolbox
+            "--install-name-dir=@rpath"
+        )
+        ;;
 esac
 (
     cd "$work/ffmpeg-$FFMPEG_VERSION"
@@ -143,6 +175,10 @@ if [ "$target" = windows ]; then
     done
     for file in "${WINDOWS_FILES[@]}"; do
         [ -f "$prefix/bin/$file" ] || die "FFmpeg did not install bin/$file"
+    done
+elif [ "$target" = macos ]; then
+    for file in "${MACOS_FILES[@]}"; do
+        [ -f "$prefix/lib/$file" ] || die "FFmpeg did not install lib/$file"
     done
 else
     for file in "${LINUX_FILES[@]}"; do

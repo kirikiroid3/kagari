@@ -14,7 +14,7 @@ Commands:
   check    Check the project and print its diagnostics
   build    Build the project's bytecode and asset archives
   clean    Delete the build outputs and the analysis cache
-  release  Build the project and package it with the runtime of a platform into an ISO image
+  release  Build the project and package it with the runtime of a platform: an ISO image for Windows and Linux, an app in a ZIP archive for macOS
   fmt      Format the project's source files, or the given files
   disasm   Disassemble a `.kagari` bytecode file
   lsp      Run the language server over stdio
@@ -29,8 +29,8 @@ match. `kagari help <COMMAND>` or `kagari <COMMAND> --help` prints the help of o
 ## Installing
 
 The installers in [Installing Kagari](../../tutorial/install.md) put `kagari` and
-`kagari-desktop-runtime` on your `PATH` on Linux and Windows; on NixOS, use the flake described
-there.
+`kagari-desktop-runtime` on your `PATH` on Linux, macOS and Windows; on NixOS, use the flake
+described there.
 
 To build both from the Kagari repository instead (needs Rust and Cargo):
 
@@ -235,7 +235,7 @@ Deletes what `kagari check`, `kagari build` and `kagari release` wrote into the 
   directory;
 - in the directory of every target (`v0`), listed in `build.targets` or not: `game.kagari`, every
   `.kiarchive` file and every `.kagari-cache` file;
-- every `.iso` file in `release/windows` and `release/linux`.
+- every `.iso` and `.zip` package in `release/windows`, `release/linux` and `release/macos`.
 
 Then it removes the target and release directories and the output directory if they are left
 empty. Other files stay, and so do the directories that hold them.
@@ -260,39 +260,55 @@ kagari clean --manifest-path example/test_game1/kagari.toml
 ## `kagari release`
 
 ```text
-kagari release [--manifest-path <PATH>] (--windows | --linux)
+kagari release [--manifest-path <PATH>] (--windows | --linux | --macos)
 ```
 
 Packages the game for players of one platform: builds it, downloads the runtime of that
-platform, and writes both into one ISO disc image,
-`<out-dir>/release/<platform>/<name>.iso`. `<name>` is the project name (`[project] name`), with
-`/ \ : * ? " < > |` and control characters replaced by `_` and surrounding spaces and trailing
-dots removed. It needs a connection to the internet.
+platform, and writes both into one package in `<out-dir>/release/<platform>/`: an ISO disc image,
+`<name>.iso`, for Windows and Linux; a ZIP archive, `<name>.zip`, holding the app `<name>.app`,
+for macOS. `<name>` is the project name (`[project] name`), with `/ \ : * ? " < > |` and control
+characters replaced by `_` and surrounding spaces and trailing dots removed. It needs a
+connection to the internet.
 
 | Option | Meaning |
 | ------ | ------- |
 | `--manifest-path <PATH>` | The project's `kagari.toml`. |
 | `--windows` | Package the Windows (x86_64) runtime, as `run.exe`, with the C runtime library it needs, `vcruntime140.dll`, and the FFmpeg libraries. |
 | `--linux` | Package the Linux (x86_64) runtime, `kagari-desktop-runtime`, with the FFmpeg libraries. |
+| `--macos` | Package the macOS (Apple silicon) runtime as an app signed ad hoc, with the FFmpeg libraries. Needs [`project.identifier`](./projects.md#project). |
 
-Exactly one of `--windows` and `--linux` is required. The steps, in order:
+Exactly one of `--windows`, `--linux` and `--macos` is required. A macOS release needs
+`project.identifier` in `kagari.toml`, which becomes the app's bundle identifier; without it the
+command stops with status 2 before building or downloading anything:
+
+```text
+kagari: a macOS release needs `project.identifier` in kagari.toml (a reverse-DNS name such as `com.example.game`)
+```
+
+The steps, in order:
 
 1. Build the first target of `build.targets` in the release profile, exactly as
    [`kagari build`](#kagari-build) does, printing the same lines. On a problem, stop with
    status 1 before downloading anything.
-2. Download the runtime of the same version as `kagari` from
-   `https://kagari-download.suitsu31.club` and check it against its published SHA-256 checksum.
-   The runtime therefore always matches the compiler that built the bytecode. Also download and
-   check the FFmpeg libraries the runtime decodes movies with, and their licence,
-   `ffmpeg-LICENSE.txt`. For Windows, also download and check `vcruntime140.dll`, the Microsoft
-   Visual C++ runtime library: the runtime cannot start without it, and many players' Windows
-   lack it. Next to `run.exe`, it is used without being installed. When a download fails, or the
-   runtime of this version is not published (Kagari 0.1.0 publishes none), stop with status 2.
-   The environment variable `KAGARI_DOWNLOAD_URL` replaces the server.
-3. Delete the earlier `.iso` files of that platform and write the image. It holds the runtime
-   (`run.exe` on Windows, with `vcruntime140.dll`; `kagari-desktop-runtime` on Linux), the FFmpeg
-   libraries and `ffmpeg-LICENSE.txt` (see [Shipping a game](./projects.md#shipping-a-game)),
-   `game.kagari` and the archives, in its root directory:
+2. Download the runtime of the same version as `kagari` from the platform's directory on
+   `https://kagari-download.suitsu31.club` (`windows_x86_installer`, `linux_x86_bin` or
+   `macos_arm64_bin`) and check it against its published SHA-256 checksum. The runtime therefore
+   always matches the compiler that built the bytecode. Also download and check the FFmpeg
+   libraries the runtime decodes movies with, and their licence, `ffmpeg-LICENSE.txt`. For
+   Windows, also download and check `vcruntime140.dll`, the Microsoft Visual C++ runtime
+   library: the runtime cannot start without it, and many players' Windows lack it. Next to
+   `run.exe`, it is used without being installed. For macOS, also download and check the app's
+   icon, `kagari.icns` (the Kagari logo). When a download fails, or the runtime of this version
+   is not published (Kagari 0.1.0 publishes none, and versions before 0.3.0 publish no macOS
+   runtime), stop with status 2. The environment variable `KAGARI_DOWNLOAD_URL` replaces the
+   server.
+3. Delete the earlier packages (`.iso` and `.zip` files) of that platform and write the new one,
+   first as `<name>.iso.part` or `<name>.zip.part`, renamed when it is complete; on a failure the
+   partial file is removed. The Windows and Linux image holds the runtime (`run.exe` on Windows,
+   with `vcruntime140.dll`; `kagari-desktop-runtime` on Linux), the FFmpeg libraries and
+   `ffmpeg-LICENSE.txt` (see [Shipping a game](./projects.md#shipping-a-game)), `game.kagari`
+   and the archives, in its root directory. The macOS archive holds the app described in
+   [The macOS app](#the-macos-app).
 
 ```text
 downloading https://kagari-download.suitsu31.club/linux_x86_bin/<version>/kagari-desktop-runtime-<version>-x86_64-linux
@@ -313,7 +329,49 @@ the runtime (`run.exe` on Windows) in it without arguments; see
 ```sh
 kagari release --windows
 kagari release --linux --manifest-path example/test_game1/kagari.toml
+kagari release --macos
 ```
+
+### The macOS app
+
+For the same project, `kagari release --macos` prints:
+
+```text
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/kagari-desktop-runtime-<version>-aarch64-macos
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/libavcodec.63.dylib
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/libavformat.63.dylib
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/libavutil.61.dylib
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/libswscale.10.dylib
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/libswresample.7.dylib
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/ffmpeg-LICENSE.txt
+downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/kagari.icns
+wrote target/release/macos/My Game.zip (13 files)
+```
+
+The archive holds one app bundle:
+
+```text
+<name>.app/Contents/
+  Info.plist                   the app's name, bundle identifier, version and icon
+  MacOS/<name>                 the runtime
+  Frameworks/*.dylib           the FFmpeg libraries
+  Resources/                   game.kagari, *.kiarchive, kagari.icns, ffmpeg-LICENSE.txt
+  _CodeSignature/CodeResources the hashes of the files the signature covers
+```
+
+The app is named after the project (`[project] name`); its bundle identifier is
+`project.identifier`, its version the `major.minor.patch` of `project.version`, and it requires
+macOS 11 or newer. The runtime finds the game in `Contents/Resources` and the FFmpeg libraries in
+`Contents/Frameworks`. The archive records the files' permissions, so the app runs after Finder
+(double-click) or `ditto -x -k` unpacks it. Players then open `<name>.app`.
+
+The runtime and the FFmpeg libraries are signed ad hoc, and the signature covers every file of
+the app; a changed file breaks it. The signature names no Apple Developer ID, so on the first
+launch of a downloaded app macOS says that Apple could not verify it and does not open it.
+Players open it once through **System Settings → Privacy & Security → Open Anyway** (on macOS 14
+and older, Control-click the app and choose **Open**); later launches need nothing. Signing does
+not need a Mac: `kagari release --macos` works on Linux and Windows too. When the downloaded
+runtime is not an arm64 macOS executable, the command stops with status 2 and writes no archive.
 
 ## `kagari fmt`
 

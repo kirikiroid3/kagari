@@ -3,7 +3,8 @@
 # release` downloads), to the download bucket (Cloudflare R2, served at
 # https://kagari-download.suitsu31.club). Nothing goes to GitHub Releases. The layout, the secrets
 # and the release steps: docs/dev/src/process/releases.md. FFmpeg is built by
-# packaging/ffmpeg/build.sh and cached until that script changes.
+# packaging/ffmpeg/build.sh and cached until that script changes. Every job runs on Blacksmith
+# runners (https://docs.blacksmith.sh), whose cache backs actions/cache.
 #
 # A tag push builds the release whose version is the tag without a leading `v`; it must equal
 # the workspace version in Cargo.toml. A manual run on a tag does the same; a manual run on a
@@ -33,7 +34,7 @@ defaults:
 
 jobs:
   version:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     outputs:
       version: ${{ steps.version.outputs.version }}
       numeric: ${{ steps.version.outputs.numeric }}
@@ -77,7 +78,7 @@ jobs:
 
   linux:
     needs: version
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     # glibc 2.35: the oldest glibc the binaries run on (installer.sh checks it).
     container: ubuntu:22.04
     env:
@@ -146,7 +147,7 @@ jobs:
 
   windows:
     needs: version
-    runs-on: windows-2025
+    runs-on: blacksmith-8vcpu-windows-2025
     # The executables and the installer are not code-signed (Windows SmartScreen warns on first
     # run); see docs/dev/src/process/releases.md#code-signing.
     env:
@@ -255,9 +256,86 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+  macos:
+    needs: version
+    # Apple silicon only; the binaries are signed ad hoc by the linker, not with a Developer ID
+    # (see docs/dev/src/process/releases.md#code-signing).
+    runs-on: blacksmith-6vcpu-macos-15
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      # The first macOS with Apple silicon; packaging/ffmpeg/build.sh uses the same.
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+      # No AppleDouble `._` files in the tarball.
+      COPYFILE_DISABLE: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust (rust-toolchain.toml)
+        run: rustup toolchain install --profile minimal
+      - uses: actions/cache@v4
+        id: ffmpeg-cache
+        with:
+          path: ffmpeg-prefix
+          key: ffmpeg-macos-${{ hashFiles('packaging/ffmpeg/build.sh') }}
+      - name: Install build dependencies
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: brew install meson ninja pkgconf
+      - name: Build FFmpeg
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: KAGARI_FFMPEG_TARGET=macos packaging/ffmpeg/build.sh "$PWD/ffmpeg-prefix"
+      - name: Build
+        run: |
+          FFMPEG_DIR="$PWD/ffmpeg-prefix" \
+            cargo build --release --locked -p kagari-cli -p kagari-desktop-runtime
+      - name: Check the binaries
+        run: |
+          # Thin arm64, signed (ad hoc), and linking nothing outside the system but FFmpeg
+          # through @rpath: a Homebrew path would break on players' Macs.
+          for binary in target/release/kagari target/release/kagari-desktop-runtime ffmpeg-prefix/lib/lib*.[0-9]*.dylib; do
+            [ -L "$binary" ] && continue
+            [ "$(lipo -archs "$binary")" = arm64 ] || { echo "::error::$binary is not arm64 only"; exit 1; }
+            codesign --verify "$binary"
+            if otool -L "$binary" | tail -n +2 | awk '{print $1}' | grep -vE '^(/usr/lib/|/System/Library/|@rpath/)'; then
+              echo "::error::$binary links a library outside the system"
+              exit 1
+            fi
+          done
+      - name: Smoke test
+        run: |
+          target/release/kagari --version
+          DYLD_LIBRARY_PATH="$PWD/ffmpeg-prefix/lib" target/release/kagari-desktop-runtime --version
+      - name: Package
+        run: |
+          name="kagari-$VERSION-aarch64-macos"
+          ffmpeg=(libavcodec.63.dylib libavformat.63.dylib libavutil.61.dylib libswscale.10.dylib libswresample.7.dylib)
+          mkdir -p "dist/$name"
+          cp target/release/kagari target/release/kagari-desktop-runtime LICENSE "dist/$name/"
+          for lib in "${ffmpeg[@]}"; do
+            cp -L "ffmpeg-prefix/lib/$lib" "dist/$name/"
+          done
+          cp ffmpeg-prefix/ffmpeg-LICENSE.txt "dist/$name/"
+          tar -C dist --uid 0 --gid 0 -czf "dist/$name.tar.gz" "$name"
+          (cd dist && shasum -a 256 "$name.tar.gz" >"$name.tar.gz.sha256")
+          rm -r "dist/$name"
+          # The runtime on its own, FFmpeg and the app icon, for `kagari release --macos`.
+          runtime="kagari-desktop-runtime-$VERSION-aarch64-macos"
+          cp target/release/kagari-desktop-runtime "dist/$runtime"
+          for lib in "${ffmpeg[@]}"; do
+            cp -L "ffmpeg-prefix/lib/$lib" dist/
+          done
+          cp ffmpeg-prefix/ffmpeg-LICENSE.txt dist/
+          cp runtime/kagari-desktop-runtime/resources/kagari.icns dist/
+          for file in "$runtime" "${ffmpeg[@]}" ffmpeg-LICENSE.txt kagari.icns; do
+            (cd dist && shasum -a 256 "$file" >"$file.sha256")
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-aarch64
+          path: dist/
+          if-no-files-found: error
+
   upload:
-    needs: [version, linux, windows]
-    runs-on: ubuntu-latest
+    needs: [version, linux, windows, macos]
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     environment: release
     env:
       VERSION: ${{ needs.version.outputs.version }}
@@ -280,6 +358,10 @@ jobs:
         with:
           name: windows-x86_64
           path: dist/windows
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-aarch64
+          path: dist/macos
       - name: Upload to R2
         run: |
           # put FILE KEY CONTENT-TYPE CACHE-CONTROL
@@ -306,11 +388,21 @@ jobs:
             esac
             put "$file" "windows_x86_installer/$VERSION/$(basename "$file")" "$type" "$immutable"
           done
+          for file in dist/macos/*; do
+            case "$file" in
+              *.tar.gz) type=application/gzip ;;
+              *.sha256 | *.txt) type="$text" ;;
+              *.icns) type=image/icns ;;
+              *) type=application/octet-stream ;;
+            esac
+            put "$file" "macos_arm64_bin/$VERSION/$(basename "$file")" "$type" "$immutable"
+          done
 
           if [ "$RELEASE" = true ]; then
             printf '%s\n' "$VERSION" >latest
             put latest linux_x86_bin/latest "$text" no-cache
             put latest windows_x86_installer/latest "$text" no-cache
+            put latest macos_arm64_bin/latest "$text" no-cache
             put installer.sh installer.sh "$text" no-cache
           fi
 
@@ -318,7 +410,7 @@ jobs:
   nix-stable:
     needs: [version, upload]
     if: needs.version.outputs.release == 'true'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: write
     env:

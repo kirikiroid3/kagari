@@ -509,13 +509,13 @@ tree database; a new container would duplicate it.
 
 ### Installers, not a toolchain manager {#distribution}
 
-*Status: Implemented (Linux x86_64, Windows x86_64, the Nix flake); macOS planned.*
+*Status: Implemented (Linux x86_64, Windows x86_64, macOS arm64, the Nix flake).*
 
 **Decision.** Kagari ships as two prebuilt binaries, `kagari` and `kagari-desktop-runtime`, built
-by CI from a tag and uploaded to the download bucket. Linux gets a tarball and a Bash installer
-script, Windows a per-user installer, NixOS the flake's `stable` and `unstable` packages. There is
-no version manager (no `kagari-up`) and nothing updates by itself. The details are in
-[Releases](../process/releases.md).
+by CI from a tag and uploaded to the download bucket. Linux and macOS get a tarball and the same
+Bash installer script, Windows a per-user installer, NixOS the flake's `stable` and `unstable`
+packages. There is no version manager (no `kagari-up`) and nothing updates by itself. The details
+are in [Releases](../process/releases.md).
 
 **Why.** A toolchain manager such as rustup exists to keep several toolchains side by side, pin
 one per project and add components. Kagari needs none of it: a project states the toolchain
@@ -529,6 +529,33 @@ authors must not need Rust or Cargo, so building from source is not the install 
   both binaries in one directory.
 - A project that needs another toolchain version installs that version
   (`installer.sh --version`); two versions side by side are not supported.
-- The runtime a game ships is the author's installed runtime; packaging a game for another
-  platform needs that platform's runtime of the same version, which no command provides yet.
+- The runtime a game ships is downloaded by `kagari release` for the toolchain's own version and
+  the chosen platform, so an author can package a game for every platform from one machine.
 - Rejected: a `kagari-up` installer and self-updater (the earlier plan in the Tutorial).
+
+### macOS: Apple silicon only, signed ad hoc, an app in a ZIP {#macos}
+
+*Status: Implemented.*
+
+**Decision.** macOS builds target Apple silicon (arm64, macOS 11.0 or newer) only; there is no
+Intel build. Everything is signed ad hoc, without a Developer ID or notarization.
+`kagari release --macos` writes a `.app` bundle inside a ZIP archive, not an ISO image or a DMG,
+and signs it with its own signer, so it runs on any host OS.
+
+**Why.** Apple sells only Apple silicon Macs, and one architecture means one CI job and one
+FFmpeg build. The project is not in the Apple Developer Program, so no Developer ID is available;
+arm64 code must carry a signature to run at all, and an ad hoc one is enough. A ZIP keeps Unix
+modes and opens in Archive Utility and `ditto`; writing a ZIP and an ad hoc signature needs no
+Apple tools, so any host can package a macOS game, while a DMG needs `hdiutil`. Data files must
+not sit in `Contents/MacOS`, where `codesign` treats them as code, so the game goes into
+`Contents/Resources`, sealed by `CodeResources`.
+
+**Consequences.**
+
+- Players see Gatekeeper's "Apple could not verify…" dialog on the first launch of a downloaded
+  game and open it through System Settings → Privacy & Security → Open Anyway; the Tutorial says
+  so. The toolchain installed by `curl … | bash` is not quarantined and runs without a prompt.
+- `kagari release --macos` needs `project.identifier` for the bundle and signing identifier.
+- Developer ID signing later means a certificate, the hardened runtime, `notarytool` and
+  stapling, and for games the author's identity ([Code signing](../process/releases.md#code-signing)).
+- AV1 movies decode in hardware only on M3 and newer; M1 and M2 use dav1d.

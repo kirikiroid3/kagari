@@ -14,6 +14,9 @@
 #   linux_x86_bin/latest                                       the latest version, one line
 #   linux_x86_bin/<version>/kagari-<version>-x86_64-linux.tar.gz
 #   linux_x86_bin/<version>/kagari-<version>-x86_64-linux.tar.gz.sha256
+#   macos_arm64_bin/latest                                     the latest version, one line
+#   macos_arm64_bin/<version>/kagari-<version>-aarch64-macos.tar.gz
+#   macos_arm64_bin/<version>/kagari-<version>-aarch64-macos.tar.gz.sha256
 #   windows_x86_installer/<version>/kagari-<version>-x86_64-windows-setup.exe
 
 # Everything is inside functions and `main` runs on the last line, so a download cut short by
@@ -30,9 +33,20 @@ COMMANDS=(kagari kagari-desktop-runtime)
 # FFmpeg 9 (packaging/ffmpeg/build.sh), shipped next to the commands since FFMPEG_SINCE (the
 # runtime's RUNPATH is `$ORIGIN`); earlier versions ship no libraries and need no libva.
 FFMPEG_SINCE="0.3.0"
-FFMPEG_LIBS=(libavcodec.so.63 libavformat.so.63 libavutil.so.61 libswscale.so.10 libswresample.so.7)
+LINUX_FFMPEG_LIBS=(libavcodec.so.63 libavformat.so.63 libavutil.so.61 libswscale.so.10 libswresample.so.7)
+# The first version built for macOS (Apple silicon); every macOS build ships FFmpeg, found
+# through the runtime's rpath `@executable_path`.
+MACOS_SINCE="0.3.0"
+MACOS_FFMPEG_LIBS=(libavcodec.63.dylib libavformat.63.dylib libavutil.61.dylib libswscale.10.dylib
+    libswresample.7.dylib)
 # The Linux binaries are built on Ubuntu 22.04.
 MIN_GLIBC="2.35"
+
+# Set by check_platform: the server directory, the archive's platform suffix, the FFmpeg files.
+OS=""
+BUCKET_DIR=""
+ARCHIVE_PLATFORM=""
+FFMPEG_LIBS=()
 
 say() { printf 'kagari-installer: %s\n' "$*" >&2; }
 die() {
@@ -60,12 +74,25 @@ EOF
 
 check_platform() {
     case "$(uname -s)" in
-        Linux) ;;
-        Darwin) die "macOS is not supported yet. See $TUTORIAL_URL" ;;
+        Linux) check_linux ;;
+        Darwin) check_macos ;;
         MINGW* | MSYS* | CYGWIN*) die "on Windows, use the Windows installer. See $TUTORIAL_URL" ;;
         *) die "unsupported operating system: $(uname -s)" ;;
     esac
+}
 
+check_macos() {
+    # A shell under Rosetta reports x86_64; the hardware decides.
+    if [ "$(sysctl -n hw.optional.arm64 2>/dev/null || true)" != 1 ]; then
+        die "macOS builds are for Apple silicon (M1 or newer) only; Intel Macs are not supported"
+    fi
+    OS=macos
+    BUCKET_DIR=macos_arm64_bin
+    ARCHIVE_PLATFORM=aarch64-macos
+    FFMPEG_LIBS=("${MACOS_FFMPEG_LIBS[@]}")
+}
+
+check_linux() {
     if [ -e /etc/NIXOS ] || grep -qs '^ID=nixos' /etc/os-release; then
         say "NixOS cannot run these prebuilt binaries; add the Kagari flake to your system flake instead:"
         say "  ${TUTORIAL_URL}#nixos"
@@ -86,6 +113,10 @@ check_platform() {
     if [ "$(printf '%s\n%s\n' "$MIN_GLIBC" "$glibc" | sort -V | head -n 1)" != "$MIN_GLIBC" ]; then
         die "the Linux build needs glibc $MIN_GLIBC or newer; this system has $glibc"
     fi
+    OS=linux
+    BUCKET_DIR=linux_x86_bin
+    ARCHIVE_PLATFORM=x86_64-linux
+    FFMPEG_LIBS=("${LINUX_FFMPEG_LIBS[@]}")
 }
 
 # fetch URL FILE
@@ -127,9 +158,11 @@ version_at_least() {
     return 0
 }
 
-# Warns about the shared libraries the runtime links that are not installed. The CLI needs none.
-# $1 is 1 when the installed version ships FFmpeg, which links libva.
+# Warns about the shared libraries the Linux runtime links that are not installed (macOS has
+# them all). The CLI needs none. $1 is 1 when the installed version ships FFmpeg, which links
+# libva.
 check_runtime_libraries() {
+    [ "$OS" = linux ] || return 0
     local ldconfig
     if command -v ldconfig >/dev/null 2>&1; then
         ldconfig=ldconfig
@@ -162,15 +195,18 @@ install_kagari() {
     if [ -z "$version" ]; then
         local tmp_latest
         tmp_latest="$TMP_DIR/latest"
-        fetch "$DOWNLOAD_URL/linux_x86_bin/latest" "$tmp_latest"
+        fetch "$DOWNLOAD_URL/$BUCKET_DIR/latest" "$tmp_latest"
         version="$(tr -d '[:space:]' <"$tmp_latest")"
     fi
     case "$version" in
         "" | *[!0-9A-Za-z.+-]*) die "invalid version: '$version'" ;;
     esac
+    if [ "$OS" = macos ] && ! version_at_least "$version" "$MACOS_SINCE"; then
+        die "Kagari $version has no macOS build (the first is $MACOS_SINCE)"
+    fi
 
-    local name="kagari-$version-x86_64-linux"
-    local url="$DOWNLOAD_URL/linux_x86_bin/$version/$name.tar.gz"
+    local name="kagari-$version-$ARCHIVE_PLATFORM"
+    local url="$DOWNLOAD_URL/$BUCKET_DIR/$version/$name.tar.gz"
     say "downloading Kagari $version"
     fetch "$url" "$TMP_DIR/$name.tar.gz"
     fetch "$url.sha256" "$TMP_DIR/$name.tar.gz.sha256"
@@ -233,7 +269,11 @@ install_kagari() {
     case ":$PATH:" in
         *":$BIN_DIR:"*) ;;
         *)
-            say "$BIN_DIR is not on your PATH. Add this line to ~/.profile (or your shell's rc file):"
+            local profile="$HOME/.profile"
+            if [ "$OS" = macos ]; then
+                profile="$HOME/.zprofile"
+            fi
+            say "$BIN_DIR is not on your PATH. Add this line to $profile (or your shell's rc file):"
             say "  export PATH=\"$BIN_DIR:\$PATH\""
             ;;
     esac
