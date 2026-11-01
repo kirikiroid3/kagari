@@ -54,6 +54,20 @@ jobs:
             version="$crate_version-dev.${GITHUB_SHA::7}"
             release=false
           fi
+          # Every build ships FFmpeg, which installer.sh installs only from FFMPEG_SINCE on.
+          since="$(sed -n 's/^FFMPEG_SINCE="\(.*\)"$/\1/p' installer.sh)"
+          if [ -z "$since" ]; then
+            echo "::error::installer.sh sets no FFMPEG_SINCE"
+            exit 1
+          fi
+          if [ "$(printf '%s\n%s\n' "$since" "${crate_version%%[-+]*}" | sort -V | head -n 1)" != "$since" ]; then
+            problem="version $crate_version is below FFMPEG_SINCE $since in installer.sh, which would install this build without its FFmpeg libraries"
+            if [ "$release" = true ]; then
+              echo "::error::$problem"
+              exit 1
+            fi
+            echo "::warning::$problem"
+          fi
           {
             echo "version=$version"
             echo "numeric=${crate_version%%[-+]*}"
