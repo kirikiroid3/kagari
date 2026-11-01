@@ -1,6 +1,7 @@
 //! Embeds `kagari-desktop-runtime.rc` (the Kagari logo as the executable's icon, resource 1)
 //! into the Windows executable. On Linux, the binary looks for shared libraries (the shipped
-//! FFmpeg) in its own directory first.
+//! FFmpeg) in its own directory first; on macOS (whose FFmpeg has `@rpath` install names) in its
+//! own directory, then in the `Frameworks` directory of the app bundle it is in.
 
 fn main() {
     println!("cargo::rerun-if-changed=kagari-desktop-runtime.rc");
@@ -11,7 +12,12 @@ fn main() {
     {
         println!("cargo::error={error}");
     }
-    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
-        println!("cargo::rustc-link-arg-bins=-Wl,-rpath,$ORIGIN");
+    match std::env::var("CARGO_CFG_TARGET_OS").as_deref() {
+        Ok("linux") => println!("cargo::rustc-link-arg-bins=-Wl,-rpath,$ORIGIN"),
+        Ok("macos") => {
+            println!("cargo::rustc-link-arg-bins=-Wl,-rpath,@executable_path");
+            println!("cargo::rustc-link-arg-bins=-Wl,-rpath,@executable_path/../Frameworks");
+        }
+        _ => {}
     }
 }

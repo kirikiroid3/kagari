@@ -50,6 +50,7 @@ The manifest is TOML with four tables. A complete example with every key:
 [project]
 name = "my-game"          # required
 version = "0.1.0"         # required, semver
+identifier = "com.example.my-game"  # reverse-DNS name; required by `kagari release --macos`
 entry = "src/main.kis"    # the root file; default "src/main.kis"
 
 [toolchain]
@@ -81,7 +82,12 @@ General rules:
 | --- | ---- | ------- | ------- |
 | `name` | string | required | The project name. Must not be empty. |
 | `version` | string | required | The project version, a [semver](https://semver.org) version such as `"0.1.0"`. |
+| `identifier` | string | none | The reverse-DNS name that identifies the game, such as `"com.example.my-game"`: at least two parts separated by `.`, each made of ASCII letters, digits and `-`. Required by [`kagari release --macos`](./cli.md#kagari-release), which uses it as the app's bundle identifier. |
 | `entry` | string (path) | `"src/main.kis"` | The root source file. Must end in `.kis` or `.kix`. |
+
+Choose `identifier` from a domain you own and keep it once the game is published: macOS
+identifies the app by it. `kagari init` does not set it. An invalid value is a manifest error
+(status 2).
 
 ### `[toolchain]` {#toolchain}
 
@@ -163,10 +169,11 @@ directory. It leaves other files alone. A [debug build](./cli.md#build-profiles)
 
 Directly in the output directory, `kagari check` and `kagari build` keep the
 [analysis cache](./cli.md#the-analysis-cache), `analysis.kagari-cache`, and
-[`kagari release`](./cli.md#kagari-release) writes its images into `release/windows` and
-`release/linux`. [`kagari clean`](./cli.md#kagari-clean) deletes the analysis cache, the build
-outputs of every target and the images. The `.gitignore` of a new project ignores `/target`, the
-default output directory.
+[`kagari release`](./cli.md#kagari-release) writes its packages into `release/windows`,
+`release/linux` (ISO images) and `release/macos` (the app in a ZIP archive).
+[`kagari clean`](./cli.md#kagari-clean) deletes the analysis cache, the build outputs of every
+target and the packages. The `.gitignore` of a new project ignores `/target`, the default output
+directory.
 
 ## Assets and archives
 
@@ -255,8 +262,8 @@ Reference.
 
 ## Shipping a game
 
-A shipped game is one directory with the runtime executable and the contents of
-`<out-dir>/<target>`:
+On Windows and Linux, a shipped game is one directory with the runtime executable and the
+contents of `<out-dir>/<target>`:
 
 ```text
 MyGame/
@@ -277,13 +284,23 @@ own executable. Settings and saves are not written there; they go to the per-use
 next to the runtime it is used without being installed. Download it for your version from
 `https://kagari-download.suitsu31.club/windows_x86_installer/<version>/vcruntime140.dll`.
 
-The runtime decodes movies with the FFmpeg libraries next to it, and does not start without them.
-Download them for your version from
-`https://kagari-download.suitsu31.club/windows_x86_installer/<version>/<file>` (Windows) or
-`https://kagari-download.suitsu31.club/linux_x86_bin/<version>/<file>` (Linux), together with
+On macOS, a shipped game is an app bundle, `<name>.app`. The runtime is `Contents/MacOS/<name>`;
+the game files (`game.kagari` and the archives), `ffmpeg-LICENSE.txt` and the icon are in
+`Contents/Resources`, and the FFmpeg libraries in `Contents/Frameworks`. The runtime of an app
+finds the game in `Contents/Resources` when its own directory has no `game.kagari`. The app has
+to be signed, so let [`kagari release --macos`](./cli.md#the-macos-app) make it rather than
+assembling it by hand.
+
+The runtime decodes movies with the FFmpeg libraries next to it (in `Contents/Frameworks` in a
+macOS app), and does not start without them. Download them for your version from
+`https://kagari-download.suitsu31.club/windows_x86_installer/<version>/<file>` (Windows),
+`https://kagari-download.suitsu31.club/linux_x86_bin/<version>/<file>` (Linux) or
+`https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/<file>` (macOS), together with
 `ffmpeg-LICENSE.txt`, their licences, to ship with them.
 
 [`kagari release`](./cli.md#kagari-release) makes this directory as an ISO image for Windows or
-Linux: it builds the game, downloads that platform's runtime of the same version as `kagari`, the
-FFmpeg libraries and their licence (and `vcruntime140.dll` for Windows), and writes
-`<out-dir>/release/<platform>/<name>.iso`. In the Windows image the runtime is named `run.exe`.
+Linux, and the app in a ZIP archive for macOS: it builds the game, downloads that platform's
+runtime of the same version as `kagari`, the FFmpeg libraries and their licence (and
+`vcruntime140.dll` for Windows, the app's icon for macOS), and writes
+`<out-dir>/release/<platform>/<name>.iso` or, for macOS, `<out-dir>/release/macos/<name>.zip`.
+In the Windows image the runtime is named `run.exe`.

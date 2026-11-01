@@ -46,6 +46,7 @@ Kagari リポジトリの `example/test_game1` は同じ形の完全なプロジ
 [project]
 name = "my-game"          # required
 version = "0.1.0"         # required, semver
+identifier = "com.example.my-game"  # reverse-DNS name; required by `kagari release --macos`
 entry = "src/main.kis"    # the root file; default "src/main.kis"
 
 [toolchain]
@@ -76,7 +77,10 @@ keyframe-check = false
 | ---- | -- | ------ | ---- |
 | `name` | 文字列 | 必須 | プロジェクト名。空にはできません。 |
 | `version` | 文字列 | 必須 | プロジェクトのバージョン。`"0.1.0"` のような [semver](https://semver.org) のバージョンです。 |
+| `identifier` | 文字列 | なし | ゲームを識別する逆 DNS 形式の名前。`"com.example.my-game"` のように、`.` で区切った 2 つ以上の部分からなり、各部分は ASCII の英字、数字、`-` でできています。[`kagari release --macos`](./cli.md#kagari-release) に必須で、アプリのバンドル識別子として使われます。 |
 | `entry` | 文字列（パス） | `"src/main.kis"` | ルートのソースファイル。`.kis` か `.kix` で終わる必要があります。 |
+
+`identifier` は自分が所有するドメインから選び、ゲームを公開したら変えないでください。macOS はこれでアプリを識別します。`kagari init` はこれを設定しません。不正な値はマニフェストのエラー（ステータス 2）です。
 
 ### `[toolchain]` {#toolchain}
 
@@ -145,7 +149,7 @@ target/v0/
 
 （これは `example/test_game1` の出力です。）`kagari build` は書き出す前に、以前のビルドがそのディレクトリに残した `game.kagari`、すべての `.kiarchive`、すべての `.kagari-cache` を削除します。それ以外のファイルには触れません。[デバッグビルド](./cli.md#build-profiles)（`kagari build --profile debug`）では、デバッグ用成果物 `game.kagari-cache` もそこに書き出します。
 
-出力ディレクトリの直下には、`kagari check` と `kagari build` が[解析キャッシュ](./cli.md#the-analysis-cache) `analysis.kagari-cache` を保存し、[`kagari release`](./cli.md#kagari-release) が `release/windows` と `release/linux` にイメージを書き出します。[`kagari clean`](./cli.md#kagari-clean) は解析キャッシュ、すべてのターゲットのビルド出力、イメージを削除します。新しいプロジェクトの `.gitignore` は、既定の出力ディレクトリである `/target` を無視します。
+出力ディレクトリの直下には、`kagari check` と `kagari build` が[解析キャッシュ](./cli.md#the-analysis-cache) `analysis.kagari-cache` を保存し、[`kagari release`](./cli.md#kagari-release) が `release/windows`、`release/linux`（ISO イメージ）、`release/macos`（ZIP アーカイブに収めたアプリ）にパッケージを書き出します。[`kagari clean`](./cli.md#kagari-clean) は解析キャッシュ、すべてのターゲットのビルド出力、パッケージを削除します。新しいプロジェクトの `.gitignore` は、既定の出力ディレクトリである `/target` を無視します。
 
 ## アセットとアーカイブ {#assets-and-archives}
 
@@ -207,7 +211,7 @@ error: shader `shader/broken.wgsl` (color): line 4: no definition in scope for i
 
 ## ゲームの配布 {#shipping-a-game}
 
-配布するゲームは、ランタイムの実行ファイルと `<out-dir>/<target>` の中身を収めた 1 つのディレクトリです。
+Windows と Linux では、配布するゲームは、ランタイムの実行ファイルと `<out-dir>/<target>` の中身を収めた 1 つのディレクトリです。
 
 ```text
 MyGame/
@@ -222,6 +226,8 @@ MyGame/
 
 ディレクトリ引数なしで起動すると、ランタイムは自身の実行ファイルのディレクトリで `game.kagari` を探します。設定とセーブはそこには書かれず、ユーザーごとのデータディレクトリに保存されます（[データディレクトリ](./runtime.md#data-directory)を参照）。プレイヤーには[システム要件](./runtime.md#system-requirements)に挙げたシステムライブラリが必要です。Windows のランタイムには Microsoft Visual C++ のランタイムライブラリ `vcruntime140.dll` が必要ですが、プレイヤーの Windows には入っていないことがよくあります。ランタイムの隣に置けば、インストールせずに使われます。使っているバージョンのものを `https://kagari-download.suitsu31.club/windows_x86_installer/<version>/vcruntime140.dll` からダウンロードしてください。
 
-ランタイムは隣にある FFmpeg のライブラリでムービーをデコードし、これがないと起動しません。使っているバージョンのものを `https://kagari-download.suitsu31.club/windows_x86_installer/<version>/<file>`（Windows）または `https://kagari-download.suitsu31.club/linux_x86_bin/<version>/<file>`（Linux）から、一緒に配布するライセンス `ffmpeg-LICENSE.txt` とともにダウンロードしてください。
+macOS では、配布するゲームはアプリバンドル `<name>.app` です。ランタイムは `Contents/MacOS/<name>` で、ゲームのファイル（`game.kagari` とアーカイブ）、`ffmpeg-LICENSE.txt`、アイコンは `Contents/Resources` に、FFmpeg のライブラリは `Contents/Frameworks` にあります。アプリのランタイムは、自身のディレクトリに `game.kagari` がなければ `Contents/Resources` でゲームを見つけます。アプリには署名が必要なので、手で組み立てずに [`kagari release --macos`](./cli.md#the-macos-app) に作らせてください。
 
-[`kagari release`](./cli.md#kagari-release) は、このディレクトリの中身を Windows 用または Linux 用の ISO イメージとして作ります。ゲームをビルドし、`kagari` と同じバージョンのそのプラットフォーム向けランタイムと、FFmpeg のライブラリとそのライセンス（Windows 向けでは `vcruntime140.dll` も）をダウンロードして、`<out-dir>/release/<platform>/<name>.iso` に書き出します。Windows 用のイメージでは、ランタイムの名前は `run.exe` です。
+ランタイムは隣にある（macOS のアプリでは `Contents/Frameworks` にある）FFmpeg のライブラリでムービーをデコードし、これがないと起動しません。使っているバージョンのものを `https://kagari-download.suitsu31.club/windows_x86_installer/<version>/<file>`（Windows）、`https://kagari-download.suitsu31.club/linux_x86_bin/<version>/<file>`（Linux）、`https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/<file>`（macOS）から、一緒に配布するライセンス `ffmpeg-LICENSE.txt` とともにダウンロードしてください。
+
+[`kagari release`](./cli.md#kagari-release) は、このディレクトリの中身を Windows 用または Linux 用の ISO イメージとして、macOS 用には ZIP アーカイブに収めたアプリとして作ります。ゲームをビルドし、`kagari` と同じバージョンのそのプラットフォーム向けランタイムと、FFmpeg のライブラリとそのライセンス（Windows 向けでは `vcruntime140.dll`、macOS 向けではアプリのアイコンも）をダウンロードして、`<out-dir>/release/<platform>/<name>.iso`、macOS 向けでは `<out-dir>/release/macos/<name>.zip` に書き出します。Windows 用のイメージでは、ランタイムの名前は `run.exe` です。

@@ -1884,6 +1884,8 @@ name = "kagari-cli"
 version = "0.2.1"
 dependencies = [
  "clap",
+ "crc32fast",
+ "flate2",
  "jiff",
  "kagari-archive",
  "kagari-bytecode",
@@ -1896,7 +1898,9 @@ dependencies = [
  "kagari-shader",
  "kagari-std",
  "kagari-syntax",
+ "semver",
  "serde_json",
+ "sha1",
  "sha2",
  "tempfile",
  "ureq",
@@ -3644,6 +3648,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7523beb55eece201a2356bee0bbca0d1ab466c14c07703b2e0ee6d42cb0c2c"
 dependencies = [
  "serde_core",
+]
+
+[[package]]
+name = "sha1"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest",
 ]
 
 [[package]]

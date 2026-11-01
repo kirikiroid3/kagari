@@ -11,8 +11,9 @@ use crate::failure::{Failure, io};
 pub const BYTECODE_FILE: &str = "game.kagari";
 /// The directory of the output directory that `kagari release` writes into.
 pub const RELEASE_DIR: &str = "release";
-/// The extension of the images `kagari release` writes.
-pub const IMAGE_EXTENSION: &str = "iso";
+/// The extensions of the packages `kagari release` writes: images for Windows and Linux, a ZIP
+/// archive for macOS.
+pub const PACKAGE_EXTENSIONS: &[&str] = &["iso", "zip"];
 
 /// Whether `path` names a file a game needs at run time: the bytecode or an asset archive.
 fn is_game_file(path: &Path) -> bool {
@@ -50,16 +51,18 @@ pub fn game_files(dir: &Path) -> Result<Vec<PathBuf>, Failure> {
     Ok(files)
 }
 
-/// The directory of the images `kagari release` writes for `platform` in the output
+/// The directory of the packages `kagari release` writes for `platform` in the output
 /// directory `build_dir`.
 pub fn release_dir(build_dir: &Path, platform: &str) -> PathBuf {
     build_dir.join("release").join(platform)
 }
 
-/// Deletes the images in the release directory `dir`; returns how many.
-pub fn remove_images(dir: &Path) -> Result<usize, Failure> {
+/// Deletes the packages in the release directory `dir`; returns how many.
+pub fn remove_packages(dir: &Path) -> Result<usize, Failure> {
     remove_matching(dir, |path| {
-        path.extension().is_some_and(|ext| ext == IMAGE_EXTENSION)
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| PACKAGE_EXTENSIONS.contains(&ext))
     })
 }
 

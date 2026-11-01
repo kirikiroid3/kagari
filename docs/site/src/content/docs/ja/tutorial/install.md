@@ -52,7 +52,15 @@ Kagari のプログラムには Microsoft Visual C++ 再頒布可能パッケー
 
 ## macOS {#macos}
 
-macOS 版はまだありません。
+Apple シリコン（M1 以降）を搭載し macOS 11 以降を実行している Mac では、Linux と同じスクリプトを実行します。
+
+```sh
+curl -fsSL https://kagari-download.suitsu31.club/installer.sh | bash
+```
+
+インストールの仕方も同じです。`~/.local/share/kagari` にインストールし（FFmpeg のライブラリもプログラムの隣に置きます）、2 つのプログラムを `~/.local/bin` にリンクします。管理者権限は不要です。`~/.local/bin` が `PATH` に含まれていない場合は、`~/.zprofile` に追加する行を表示します。追加したら新しいターミナルを開いてください。オプションと環境変数も [Linux](#linux) と同じです。macOS 版がある最初のバージョンは 0.3.0 で、それより古いバージョンはスクリプトが拒否します。
+
+macOS 版にはほかのライブラリは必要ありません。FFmpeg は同梱されています。Intel Mac には対応しておらず、スクリプトはそこで止まります。スクリプトでインストールしたプログラムは、セキュリティの確認なしで起動します。Mac のプレイヤー向けにゲームをパッケージ化するには [`kagari release`](../reference/tools/cli.md#kagari-release) を参照してください。
 
 ## NixOS {#nixos}
 
@@ -98,7 +106,7 @@ kagari-desktop-runtime --version
 
 | システム | 更新 | アンインストール |
 | -------- | ---- | ---------------- |
-| Linux | インストーラースクリプトをもう一度実行します。 | `--uninstall` を付けて実行します。 |
+| Linux、macOS | インストーラースクリプトをもう一度実行します。 | `--uninstall` を付けて実行します。 |
 | Windows | 新しいインストーラーを実行します。インストール済みのバージョンを置き換えます。 | **設定 → アプリ → インストールされているアプリ → Kagari → アンインストール**。 |
 | NixOS | `nix flake update kagari` を実行し、`nixos-rebuild switch` します。 | パッケージ（と入力）を削除し、`nixos-rebuild switch` します。 |
 

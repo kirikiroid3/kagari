@@ -73,7 +73,22 @@ installer on the download server (same URL plus `.sha256`).
 
 ## macOS {#macos}
 
-There is no macOS build yet.
+On a Mac with Apple silicon (M1 or newer) and macOS 11 or newer, run the same script as on
+Linux:
+
+```sh
+curl -fsSL https://kagari-download.suitsu31.club/installer.sh | bash
+```
+
+It installs the same way: into `~/.local/share/kagari` (with the FFmpeg libraries next to the
+programs) and links both programs into `~/.local/bin`, without administrator rights. When
+`~/.local/bin` is not on your `PATH`, it prints the line to add to `~/.zprofile`; open a new
+terminal afterwards. It takes the same options and environment variables as on
+[Linux](#linux). The first version with a macOS build is 0.3.0; the script refuses older ones.
+
+The macOS build needs no other libraries: FFmpeg ships with it. Intel Macs are not supported;
+the script stops on them. Programs installed by the script start without a security prompt. To
+package a game for Mac players, see [`kagari release`](../reference/tools/cli.md#kagari-release).
 
 ## NixOS {#nixos}
 
@@ -126,7 +141,7 @@ is `kagari lsp`, which the editor finds on your `PATH`.
 
 | System | Update | Uninstall |
 | ------ | ------ | --------- |
-| Linux | Run the installer script again. | Run it with `--uninstall`. |
+| Linux, macOS | Run the installer script again. | Run it with `--uninstall`. |
 | Windows | Run a newer installer; it replaces the installed version. | **Settings → Apps → Installed apps → Kagari → Uninstall**. |
 | NixOS | `nix flake update kagari`, then `nixos-rebuild switch` | Remove the package (and the input), then `nixos-rebuild switch`. |
 

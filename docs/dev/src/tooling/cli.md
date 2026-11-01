@@ -24,7 +24,8 @@ the outcome to output and an exit code. No compiler logic lives in the CLI.
 | `tooling/kagari-cli/src/command/{check,clean,disasm,fmt,lsp}.rs` | One module per subcommand |
 | `tooling/kagari-cli/src/command/{debug,dap}.rs`, `src/debugger.rs` | `kagari debug` (the REPL) and `kagari dap` over `kagari-debugger`'s `client` and `dap` features; `debugger.rs` opens projects for them (`Projects`, the adapter's `Launcher`); see [The Debugger](../runtime/debugger.md) |
 | `tooling/kagari-cli/src/command/build/{mod,archives,compat,shaders}.rs` | `kagari build` and its profiles, archive packing, runtime-profile check, shader check |
-| `tooling/kagari-cli/src/command/release/{mod,download,iso}.rs` | `kagari release`: `Platform`, the runtime download (`DOWNLOAD_URL`, checksum), the ISO 9660 writer |
+| `tooling/kagari-cli/src/command/release/{mod,download,iso,zip}.rs` | `kagari release`: `Platform`, the runtime download (`DOWNLOAD_URL`, checksum), the ISO 9660 writer, the ZIP writer |
+| `tooling/kagari-cli/src/command/release/macos/{mod,sign}.rs` | The macOS app: bundle layout, `Info.plist`, `CodeResources`, `ICON` (`kagari.icns`); the ad hoc Mach-O code signer |
 | `tooling/kagari-cli/src/command/init/{mod,template,font}.rs` | `kagari init`, embedded template, default-font choice |
 | `tooling/kagari-cli/template/` | The new-project template (`_gitignore` becomes `.gitignore`) |
 | `tooling/kagari-cli/tests/` | Integration tests running the built binary |
@@ -45,6 +46,7 @@ not name the file; `Project::load` wraps it as `ProjectError::Manifest { path, m
 | --- | ---- | ------- | ---------- | ---------------- |
 | `project.name` | string | required | non-empty | `name` |
 | `project.version` | string | required | `semver::Version` | `version` |
+| `project.identifier` | string | none | reverse-DNS name: at least two `.`-separated parts, each non-empty ASCII letters, digits and `-` | `identifier` (`Option<String>`) |
 | `project.entry` | string | `src/main.kis` | relative; extension `kis` or `kix` | `entry` |
 | `toolchain.kagari` | string | required | `semver::VersionReq` | `toolchain` |
 | `assets.dir` | string | `assets` | relative | `asset_dir` |
@@ -55,6 +57,12 @@ not name the file; `Project::load` wraps it as `ProjectError::Manifest { path, m
 | `build.state-cap` | u32 | `DEFAULT_STATE_CAP` (200 000) | — | `options.state_cap` |
 | `build.recursion-depth` | u32 | `DEFAULT_RECURSION_DEPTH` (2048) | — | `options.recursion_depth` |
 | `build.keyframe-check` | bool | `false` | — | `options.keyframe_check` |
+
+`project.identifier` (e.g. `com.example.my-game`) is the macOS bundle identifier
+(`CFBundleIdentifier`) and the executable's code-signing identifier; only `kagari release --macos`
+needs it, and the `kagari init` template does not set it. A malformed value fails with
+"`` `project.identifier` `<value>` must be a reverse-DNS name such as `com.example.game`:
+dot-separated parts of ASCII letters, digits and `-` ``".
 
 "Relative" means neither absolute nor rooted (`relative()` rejects both, so `\x` on Windows is
 rejected too). The compile options end up in `kagari_lang::CompileOptions`, which is part of the
@@ -123,7 +131,7 @@ the project root with `/` separators (it reuses `FilePath::display`).
 | ---: | ------- | ----------- |
 | 0 | Success (warnings allowed) | `ExitCode::SUCCESS`, `exit(false)` |
 | 1 | The command ran and found problems | `exit(true)`: error diagnostics (`check`, `build`), an asset a runtime profile cannot decode (`build`), files that would change or cannot be formatted (`fmt`), a file that fails to decode or verify (`disasm`) |
-| 2 | The command could not run | `Failure`: no or invalid manifest, toolchain mismatch, I/O error, `--target` not in `build.targets`, `init` over existing files, `fmt` on a non-`.kis`/`.kix` path, LSP protocol error, `debug` when the debug build fails or the game cannot be reached, `release` when the runtime cannot be downloaded or fails its checksum or a file name does not fit the image; also clap's own usage errors |
+| 2 | The command could not run | `Failure`: no or invalid manifest, toolchain mismatch, I/O error, `--target` not in `build.targets`, `init` over existing files, `fmt` on a non-`.kis`/`.kix` path, LSP protocol error, `debug` when the debug build fails or the game cannot be reached, `release` when the runtime cannot be downloaded or fails its checksum or a file name does not fit the image, `release --macos` without `project.identifier` or with a runtime that cannot be signed; also clap's own usage errors |
 
 Keep this split: 1 means "your game has a problem", 2 means "the tool could not do its job".
 Scripts and CI rely on it.
@@ -230,16 +238,20 @@ the bytecode in [The `.kagari` Format](../formats/kagari.md).
 ### `kagari release`
 
 ```text
-kagari release [--manifest-path PATH] (--windows | --linux)
+kagari release [--manifest-path PATH] (--windows | --linux | --macos)
 ```
 
-Exactly one platform flag (a required clap `ArgGroup`); `release::Platform` names the download
-directory, the runtime's file name there and in the image, and the libraries shipped next to the
-runtime.
+Exactly one platform flag (a required clap `ArgGroup`); `release::Platform` (`Windows`, `Linux`,
+`MacOs`) names the download directory (`windows_x86_installer`, `linux_x86_bin`,
+`macos_arm64_bin`), the runtime's file name there and in the package, the libraries shipped with
+the runtime, and the package's extension (`iso`, or `zip` for macOS). Windows and Linux get an
+ISO image, macOS an app in a ZIP archive.
 
-1. Load the project and take the first of `build.targets`. `build::build_project` builds it in
-   the release profile, the same function `kagari build` calls; problems → exit 1, before any
-   download.
+1. Load the project and take the first of `build.targets`. For macOS, without
+   `project.identifier` it fails first, before building or downloading, with "a macOS release
+   needs `project.identifier` in kagari.toml (a reverse-DNS name such as `com.example.game`)"
+   (exit 2). `build::build_project` builds the target in the release profile, the same function
+   `kagari build` calls; problems → exit 1, before any download.
 2. `download::runtime`, then `download::file` for each of `Platform::libraries`:
    `GET <base>/<bucket dir>/<TOOLCHAIN_VERSION>/<file>` and its `.sha256` with `ureq` (rustls,
    webpki roots), where `<base>` is `DOWNLOAD_URL` (`https://kagari-download.suitsu31.club`)
@@ -247,24 +259,75 @@ runtime.
    server). The bucket layout and the names are the release workflow's
    ([Releases](../process/releases.md#the-bucket)); the files are always those of this
    toolchain's version. HTTP 404 says the platform's runtime is not published; a checksum
-   mismatch, any other HTTP or network error → `Failure` (exit 2), and no image is written. The
+   mismatch, any other HTTP or network error → `Failure` (exit 2), and no package is written. The
    body limit is 1 GiB. The Windows runtime imports `VCRUNTIME140.dll`, which a clean Windows
-   lacks, and both runtimes load FFmpeg's shared libraries; Windows loads DLLs from the
-   executable's directory first and the Linux runtime's RUNPATH is `$ORIGIN`, so the image
-   carries them next to the runtime. The library list is `vcruntime140.dll`, `avcodec-63.dll`,
+   lacks, and every runtime loads FFmpeg's shared libraries; Windows loads DLLs from the
+   executable's directory first, the Linux runtime's RUNPATH is `$ORIGIN` and the macOS
+   runtime's rpaths are `@executable_path` and `@executable_path/../Frameworks`, so the package
+   carries them with the runtime. The library list is `vcruntime140.dll`, `avcodec-63.dll`,
    `avformat-63.dll`, `avutil-61.dll`, `swscale-10.dll`, `swresample-7.dll` and
    `ffmpeg-LICENSE.txt` on Windows; `libavcodec.so.63`, `libavformat.so.63`, `libavutil.so.61`,
-   `libswscale.so.10`, `libswresample.so.7` and `ffmpeg-LICENSE.txt` on Linux.
-3. Create `<out-dir>/release/<platform>/`, delete the `*.iso` files in it, and write
-   `<name>.iso.part`, renamed to `<name>.iso` when complete (removed on failure). `<name>` is
+   `libswscale.so.10`, `libswresample.so.7` and `ffmpeg-LICENSE.txt` on Linux;
+   `libavcodec.63.dylib`, `libavformat.63.dylib`, `libavutil.61.dylib`, `libswscale.10.dylib`,
+   `libswresample.7.dylib`, `ffmpeg-LICENSE.txt` and `kagari.icns` (`macos::ICON`) on macOS. The
+   runtime file is `kagari-desktop-runtime-<v>-x86_64-windows.exe`, `…-x86_64-linux` or
+   `…-aarch64-macos`.
+3. Create `<out-dir>/release/<platform>/`, delete the earlier packages in it (`*.iso` and `*.zip`:
+   `outputs::PACKAGE_EXTENSIONS`, `remove_packages`), and write `<name>.<ext>.part`, renamed to
+   `<name>.<ext>` when complete (removed on failure). `<name>` is
    `project.name` with `/ \ : * ? " < > |` and controls replaced by `_`, surrounding whitespace
    and trailing dots removed (`Kagari Game` when empty): the rule of the runtime's data
    directory, so the name is valid on every platform. The image holds the runtime (`run.exe` on
    Windows, `kagari-desktop-runtime` on Linux; the runtime finds the game in its own directory
    whatever its name), the libraries, and `outputs::game_files` of the target directory
-   (`game.kagari`, `*.kiarchive`; not the debug artifact).
+   (`game.kagari`, `*.kiarchive`; not the debug artifact). For macOS it prints
+   `wrote target/release/macos/<name>.zip (N files)`, where N counts the game files, the shipped
+   files and three more (`Info.plist`, `CodeResources`, the executable).
 
-The image (`release/iso.rs`) is ISO 9660 with one flat root directory, written in one pass
+The macOS archive (`release/macos/mod.rs`) holds one app; the executable has the name `<name>` too:
+
+```text
+<name>.app/Contents/
+  Info.plist                   the bundle's identity; the executable binds its hash
+  MacOS/<name>                 the runtime, signed with the bundle bound to it
+  Frameworks/*.dylib           FFmpeg, each signed (nested code)
+  Resources/                   game.kagari, *.kiarchive, kagari.icns, ffmpeg-LICENSE.txt
+  _CodeSignature/CodeResources the hashes of Resources/ and the cdhashes of Frameworks/
+```
+
+The runtime finds the game in `Contents/Resources` ([The Desktop Runtime](../runtime/desktop.md#process-structure)).
+`Info.plist` keys: `CFBundleDevelopmentRegion` `en`; `CFBundleDisplayName` and `CFBundleName`
+= `project.name`; `CFBundleExecutable` = `<name>`; `CFBundleIconFile` `kagari.icns`;
+`CFBundleIdentifier` = `project.identifier`; `CFBundleInfoDictionaryVersion` `6.0`;
+`CFBundlePackageType` `APPL`; `CFBundleShortVersionString` and `CFBundleVersion` = the
+`major.minor.patch` of `project.version`; `LSApplicationCategoryType`
+`public.app-category.games`; `LSMinimumSystemVersion` `11.0`; `NSHighResolutionCapable` true.
+
+The ZIP writer (`release/zip.rs`) stores Unix permissions in the external attributes (version
+made by Unix, 4.5), so Archive Utility and `ditto` restore them: directories, the executable and
+the dylibs `0755`, other files `0644`. Names are UTF-8 (flag bit 11). `*.kiarchive` is stored
+(already LZ4-compressed), everything else deflated (flate2). ZIP64 records are written for
+entries, offsets and archives of 4 GiB or more. Each local header is written with placeholders
+and patched after its data, so there are no data descriptors and entries are contiguous
+(`ditto` streams them). Dates are the local time of writing.
+
+The signer (`release/macos/sign.rs`) signs ad hoc on any host OS. It takes a thin arm64 Mach-O
+(`MH_EXECUTE` or `MH_DYLIB`) that already has an `LC_CODE_SIGNATURE` at the end of the file and
+of `__LINKEDIT` (Apple's linker signs every arm64 binary ad hoc) and replaces that signature: a
+superblob with a SHA-256 CodeDirectory (version `0x20400`, flag adhoc, 4096-byte pages, exec
+segment `__TEXT`, `CS_EXECSEG_MAIN_BINARY` for executables), an empty requirement set and an
+empty CMS blob; it updates the `LC_CODE_SIGNATURE` size and `__LINKEDIT`'s file and VM size.
+Special slots: a dylib binds 1 (empty) and 2 (requirements); the executable binds 1 `Info.plist`,
+2 requirements and 3 `CodeResources`. Dylibs are signed under their name without `.dylib`
+(`libavcodec.63`), the executable under `project.identifier`. `CodeResources` is written like
+`codesign`'s: `files` (SHA-1 of `Resources/*`), `files2` (SHA-256 `hash2` of `Resources/*`, and
+for `Frameworks/*.dylib` its `cdhash` with the requirement `cdhash H"<hex>"`), and `codesign`'s
+default `rules`/`rules2`. A runtime that is not a thin arm64 Mach-O fails with "cannot sign the
+runtime: not a thin arm64 Mach-O file" (exit 2, no archive). On a Mac, `codesign --verify
+--deep --strict` accepts the result; `spctl -a` rejects it, as for every app without a Developer
+ID ([Code signing](../process/releases.md#code-signing)).
+
+The ISO image (`release/iso.rs`) is ISO 9660 with one flat root directory, written in one pass
 after a sizing pass (directory sizes depend only on record lengths):
 
 | Sectors | Contents |
@@ -295,7 +358,8 @@ kagari clean [--manifest-path PATH]
 Deletes what `check`, `build` and `release` write and nothing else: the `*.kagari-cache` files
 directly in `build_dir()` (the analysis cache), in `out_dir(target)` for **every** `Target::ALL`
 (listed in `build.targets` or not) the `game.kagari`, `*.kiarchive` and `*.kagari-cache` files,
-and the `*.iso` files in `release/<platform>/` for every `Platform::ALL`. Then it removes each
+and the `*.iso` and `*.zip` files in `release/<platform>/` for every `Platform::ALL` (Windows,
+Linux, macOS). Then it removes each
 target and release directory and the output directory if they are empty. It prints
 `removed N files from <out-dir>` and exits 0; an I/O error is a `Failure` (exit 2). It never
 deletes the output directory wholesale, because `build.out-dir` may name a directory that holds
@@ -388,7 +452,7 @@ that.
 
 | Test | What it covers |
 | ---- | -------------- |
-| `tooling/kagari-project/src/tests.rs` | Defaults, unknown keys, unknown/duplicate/empty targets and profiles, absolute paths, toolchain check, parent-directory discovery |
+| `tooling/kagari-project/src/tests.rs` | Defaults, unknown keys, unknown/duplicate/empty targets and profiles, absolute paths, toolchain check, parent-directory discovery, reverse-DNS `project.identifier` (`identifiers_are_reverse_dns_names`) |
 | `tooling/kagari-cli/tests/init.rs` | Template files, refusal to overwrite, name escaping, system-font choice and the no-font fallback |
 | `tooling/kagari-cli/tests/check.rs` | Fresh project has no diagnostics (also from a subdirectory), assets outside the asset dir, `system-fonts = false`, missing manifest (2), toolchain mismatch (2) |
 | `tooling/kagari-cli/tests/build.rs` | Bytecode decodes and verifies, archive names and contents, stale archive removal, unlisted target (2), rejected image/audio/video formats (1, no bytecode written), a supported WebM (VP9 + Opus fixture) builds, invalid WGSL (1, `error: shader … line`), std shaders packed into `std.kiarchive`, `disasm` of the result |
@@ -396,7 +460,7 @@ that.
 | `tooling/kagari-cli/tests/debugger.rs` | `kagari debug` on a story with scene calls, a guarded choice and a draw: `ls`, `nav` and the `push` that follows it, `goto`, `stack`, `pop`, `detail`, `seed`; breakpoints by step ID and by `file:line`; `swap` after a source edit rebuilds and moves the story onto the new sources |
 | `tooling/kagari-cli/tests/dap.rs` | `kagari dap` end to end over DAP: launch headless, breakpoints by line, stack trace, `kagari/push` and `kagari/nav`, `evaluate`, continue to a breakpoint; `kagari/swap` rebuilds, calls the changed scene again and sets the breakpoints again |
 | `tooling/kagari-cli/tests/fmt.rs` | Fresh project is formatted, rewriting, syntax errors |
-| `tooling/kagari-cli/tests/release.rs` | `kagari release` against a local download server (`KAGARI_DOWNLOAD_URL`): the image's Joliet and Rock Ridge trees hold the runtime (executable), every library of `Platform::libraries` (the FFmpeg libraries and `ffmpeg-LICENSE.txt`; for Windows also `vcruntime140.dll`) and the game files byte for byte, for Linux, and `run.exe` for Windows; `clean` removes the image; an unpublished runtime or C runtime DLL and a checksum mismatch (2, no image); build errors (1, no download) |
+| `tooling/kagari-cli/tests/release.rs` | `kagari release` against a local download server (`KAGARI_DOWNLOAD_URL`): the image's Joliet and Rock Ridge trees hold the runtime (executable), every library of `Platform::libraries` (the FFmpeg libraries and `ffmpeg-LICENSE.txt`; for Windows also `vcruntime140.dll`) and the game files byte for byte, for Linux, and `run.exe` for Windows; `clean` removes the image; an unpublished runtime or C runtime DLL and a checksum mismatch (2, no image); build errors (1, no download). macOS, with synthetic Mach-O files from the server: entry names and modes, contiguous local entries and CRCs, `Info.plist` keys, `CodeResources` hashes, and each dylib's and the executable's code directory (identifier, page hashes, special slots, cdhash, signature at the end of the file and of `__LINKEDIT`), and `clean` removes the ZIP; no `project.identifier` downloads nothing; a runtime that is not Mach-O writes no archive |
 
 The integration tests run the real binary (`env!("CARGO_BIN_EXE_kagari")`) through
 `tests/common/mod.rs`, inside a temp dir created by `kagari init`. Run them with

@@ -18,7 +18,7 @@ and [Headless Mode](https://kagari.suitsu31.club/en/reference/tools/headless/).
 | `console.rs` | Windows only: attaching the parent's console for unset stdout and stderr |
 | `cli.rs` | the clap `Cli` |
 | `exit.rs` | exit statuses and `Failure` |
-| `game.rs` | the game directory, reading `game.kagari`, `boot`, thumbnail uploads |
+| `game.rs` | the game directory (`game_dir`, `bundle_resources` for a macOS app), reading `game.kagari`, `boot`, thumbnail uploads |
 | `app.rs` | the windowed runtime: the winit `ApplicationHandler`, the frame, surface handling |
 | `debug.rs` | `DebugPort`: the debug channel (`--debug-port`, `--debug-stdio`) |
 | `gpu.rs` | adapter, device and `Renderer` creation; out-of-memory and device-lost tracking |
@@ -32,12 +32,15 @@ and [Headless Mode](https://kagari.suitsu31.club/en/reference/tools/headless/).
 
 | Path (`runtime/kagari-desktop-runtime/`) | Contents |
 | ---------------------------------------- | -------- |
-| `build.rs`, `kagari-desktop-runtime.rc` | Windows: compiles the resource script with `embed-resource` (`rc.exe`; `llvm-rc` when cross-compiling) into the executable; a build that cannot compile it fails. Linux: links the binaries with RUNPATH `$ORIGIN`, so the FFmpeg libraries shipped next to them are found |
+| `build.rs`, `kagari-desktop-runtime.rc` | Windows: compiles the resource script with `embed-resource` (`rc.exe`; `llvm-rc` when cross-compiling) into the executable; a build that cannot compile it fails. Linux: links the binaries with RUNPATH `$ORIGIN`; macOS: with the rpaths `@executable_path` and `@executable_path/../Frameworks`; so the FFmpeg libraries shipped next to them (or in an app's `Frameworks/`) are found |
 | `resources/kagari.ico` | The Kagari logo as icon resource 1: the `.exe`'s icon in Explorer, and the window's title bar and taskbar icon (`app.rs`, `with_logo`, which loads it with winit's `Icon::from_resource`; other platforms leave the icon to the desktop) |
+| `resources/kagari.icns` | The Kagari logo for macOS app bundles. Not embedded in the binary: the release workflow uploads it next to the macOS runtime, and `kagari release --macos` puts it into the app's `Resources/` ([`kagari release`](../tooling/cli.md#kagari-release)) |
 
 `kagari.ico` is rendered from the site's `docs/site/public/logo.svg` (its light colours) at 16, 20,
-24, 32, 40, 48, 64, 128 and 256 pixels with Inkscape and packed as PNG entries. Regenerate it when
-the logo changes; nothing checks that the two agree.
+24, 32, 40, 48, 64, 128 and 256 pixels with Inkscape and packed as PNG entries. `kagari.icns` is
+rendered from the same SVG with `rsvg-convert` into an iconset (`icon_NxN.png` and
+`icon_NxN@2x.png` for 16, 32, 64, 128, 256, 512 and 1024 pixels) and packed with
+`iconutil -c icns` on a Mac. Regenerate both when the logo changes; nothing checks that they agree.
 
 Build-time system dependencies are declared in the repository's `flake.nix`.
 
@@ -45,9 +48,15 @@ Build-time system dependencies are declared in the repository's `flake.nix`.
 
 `main` attaches the console (below), initializes `env_logger` with the default filter
 `kagari=info,wgpu=warn` (overridden by `RUST_LOG`), parses the arguments, resolves the game
-directory (`GAME_DIR`, or the executable's directory) and reads `game.kagari` from it. Then it runs
+directory and reads `game.kagari` from it. Then it runs
 `headless::run` or `app::run`. A `Failure { code, message }` reaching `main` is printed as
 `kagari-desktop-runtime: <message>` and becomes the exit status.
+
+The game directory (`game::game_dir`) is `GAME_DIR` when set, else the executable's directory.
+On macOS, when that directory has no `game.kagari` and is `<x>.app/Contents/MacOS`, it is
+`Contents/Resources` if that holds `game.kagari` (`bundle_resources`): the layout
+`kagari release --macos` writes, which keeps data out of `Contents/MacOS` so the code signature
+covers it as resources.
 
 ### The console on Windows
 
@@ -265,7 +274,9 @@ matches, the device cannot be created, the decoder does not open, a decode fails
 silently decodes in software; the decoder reopens in software and seeks to the current target.
 The fallback logs `video: hardware decoding unavailable (<reason>); using software` (info,
 `kagari::video`); FFmpeg may print its own lines (such as "Hardware does not support image
-size") before it.
+size") before it. VideoToolbox decodes AV1 in hardware only on M3 and newer Apple chips; on M1
+and M2 the AV1 decoder falls back to software (dav1d) this way. H.264 and VP9 use VideoToolbox on
+every Apple silicon Mac.
 
 **`frame_at(target)`** returns the frame with the largest pts ≤ `target` (the first frame when
 `target` precedes it), converting it to RGBA only when it changed. It seeks backwards when
@@ -361,7 +372,7 @@ until the debugger goes on, so the window does not redraw meanwhile.
 | Platform | Notes |
 | -------- | ----- |
 | Linux | Wayland or X11 (`--backend`); Vulkan or OpenGL (EGL) through wgpu; audio through ALSA (cpal); gamepads through udev (gilrs). Data directory `$XDG_DATA_HOME/Kagari/<title>` |
-| macOS | Metal; data directory `~/Library/Application Support/Kagari/<title>` |
+| macOS | Apple silicon (arm64) only, macOS 11.0 or newer (`MACOSX_DEPLOYMENT_TARGET`); Metal; data directory `~/Library/Application Support/Kagari/<title>` |
 | Windows | DirectX 12 (or Vulkan); data directory `%APPDATA%\Kagari\<title>` |
 
 **System dependencies.** `flake.nix` provides the dev shell on NixOS (`direnv allow` or
@@ -382,6 +393,9 @@ need the equivalent development packages (Debian: `libasound2-dev libudev-dev pk
 FFmpeg and libclang packages above). The released Linux FFmpeg links VAAPI, so the runtime needs
 `libva.so.2` and `libva-drm.so.2` at run time (Debian/Ubuntu `libva2 libva-drm2`, Fedora `libva`)
 and does not start without them. Windows and macOS builds need FFmpeg (`FFMPEG_DIR`) and libclang.
+On macOS, build FFmpeg with `KAGARI_FFMPEG_TARGET=macos packaging/ffmpeg/build.sh <prefix>` and
+point `FFMPEG_DIR` at the prefix ([Releases](../process/releases.md#ffmpeg)); libclang comes from
+the Xcode command line tools and is found without `LIBCLANG_PATH`.
 
 **Logging.** Besides module targets, the engine logs progress under fixed targets that are useful
 when reading headless runs: `kagari::system` (`modes: [...]` whenever the mode stack changes),
@@ -414,8 +428,10 @@ when reading headless runs: `kagari::system` (`modes: [...]` whenever the mode s
 - New system libraries: `flake.nix` and the Reference's build requirements.
 - A new video codec or container: `kagari-compat` (`sniff`, `supports`), the decoders, demuxers,
   parsers and hwaccels in `packaging/ffmpeg/build.sh`, `kagari-video`'s decoder choice and the
-  format tables (en and ja). A different FFmpeg major version changes the shipped sonames and DLL
-  names: `Platform::libraries`, `installer.sh`, `kagari.iss` and the release workflow.
+  format tables (en and ja). A different FFmpeg major version changes the shipped sonames, dylib
+  and DLL names: `Platform::libraries` (every platform's list, macOS included), `installer.sh`
+  (`LINUX_FFMPEG_LIBS` and `MACOS_FFMPEG_LIBS`), `kagari.iss` and the release workflow.
+- The logo: regenerate `resources/kagari.ico` and `resources/kagari.icns` (above).
 - A new import from the MSVC redistributable (`VCRUNTIME140_1.dll`, `MSVCP140.dll`, …) on
   Windows: `Platform::libraries` in `kagari-cli` and the `dumpbin` check in the release workflow
   ([Releases](../process/releases.md#the-workflow)).

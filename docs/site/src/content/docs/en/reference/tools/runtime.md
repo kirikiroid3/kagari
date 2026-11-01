@@ -33,7 +33,7 @@ kagari-desktop-runtime [OPTIONS] [GAME_DIR]
 
 | Argument / option | Meaning |
 | ----------------- | ------- |
-| `GAME_DIR` | The directory with `game.kagari` and the `.kiarchive` files. Default: the directory of the runtime executable. |
+| `GAME_DIR` | The directory with `game.kagari` and the `.kiarchive` files. Default: the directory of the runtime executable (in a macOS app, `Contents/Resources` when that directory has no `game.kagari`). |
 | `--data-dir <DIR>` | The directory for settings and saves. Default: the platform data directory (see [Data directory](#data-directory)). |
 | `--backend <BACKEND>` | The window backend, `wayland` or `x11` (Linux only; ignored with a warning elsewhere). Default: `wayland` when `WAYLAND_DISPLAY` is set and not empty, else `x11`. |
 | `--headless` | Run without a window. Requires `--script` and `--out`. See [Headless Mode](./headless.md). |
@@ -49,7 +49,9 @@ When `GAME_DIR` has no `game.kagari`, the runtime stops with status 2 and sugges
 directory written by `kagari build`, such as `target/v0`.
 
 Because `GAME_DIR` defaults to the executable's directory, a shipped game puts the executable
-next to `game.kagari` and the archives; players then start it without arguments. See
+next to `game.kagari` and the archives; players then start it without arguments. In a macOS app
+bundle the executable is in `Contents/MacOS` and the game in `Contents/Resources`, where the
+runtime looks when its own directory has no `game.kagari`. See
 [Shipping a game](./projects.md#shipping-a-game).
 
 Without `--debug-port` or `--debug-stdio` the runtime opens no debug channel. With one, a
@@ -97,11 +99,12 @@ logs a warning and draws those effects as if they were not set. See also
 [Runtime Profiles](../../std/appendix/profiles.md) in the STD Reference.
 
 Movies are decoded with the GPU's video decoder where the system offers one (VA-API on Linux,
-Direct3D 11 on Windows, VideoToolbox on macOS), else in software. The runtime logs which one each
-movie uses under the target `kagari::video`, for example ``movie `movie/intro.webm`: vaapi
-decoding``, and `video: hardware decoding unavailable (…); using software` when it falls back. A
-frame that is not decoded in time keeps the previous one on screen; the game never waits for the
-decoder.
+Direct3D 11 on Windows, VideoToolbox on macOS), else in software. VideoToolbox decodes AV1 only on
+M3 and newer chips; on M1 and M2 Macs AV1 movies are decoded in software, while H.264 and VP9 use
+VideoToolbox on every Apple silicon Mac. The runtime logs which one each movie uses under the
+target `kagari::video`, for example ``movie `movie/intro.webm`: vaapi decoding``, and
+`video: hardware decoding unavailable (…); using software` when it falls back. A frame that is
+not decoded in time keeps the previous one on screen; the game never waits for the decoder.
 
 The runtime keeps going when a device is missing:
 
@@ -186,8 +189,11 @@ At run time the runtime needs a GPU driver for Vulkan, Metal, DirectX 12 or Open
 hardware adapter is usable it tries a software fallback adapter before giving up with status 4.
 On Linux it also needs Wayland or X11, ALSA, libudev and libva (Debian, Ubuntu: `libva2
 libva-drm2`; Fedora: `libva`); without libva it does not start. The prebuilt Linux build runs on
-x86_64 with glibc 2.35 or newer (see [Installing Kagari](../../tutorial/install.md#linux)). Movies
-are decoded by FFmpeg libraries shipped next to the runtime executable (see
+x86_64 with glibc 2.35 or newer (see [Installing Kagari](../../tutorial/install.md#linux)). The
+prebuilt macOS build runs on Apple silicon (M1 or newer) with macOS 11 or newer and needs no
+other libraries; there is no build for Intel Macs (see
+[Installing Kagari](../../tutorial/install.md#macos)). Movies are decoded by FFmpeg libraries
+shipped next to the runtime executable, or in `Contents/Frameworks` of a macOS app (see
 [Shipping a game](./projects.md#shipping-a-game)). On Windows it needs the Microsoft Visual C++
 runtime, `vcruntime140.dll`: installed by the Visual C++ Redistributable (the Kagari installer
 installs it when missing) or placed next to the runtime
@@ -200,5 +206,6 @@ Building the runtime from source needs these system packages:
 | ------ | -------- |
 | Debian, Ubuntu | `libasound2-dev libudev-dev pkg-config libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libclang-dev` |
 | Fedora | `alsa-lib-devel systemd-devel` and the FFmpeg development files with libclang |
-| macOS, Windows | the FFmpeg development files (found through `FFMPEG_DIR`, vcpkg or pkg-config) and libclang |
+| macOS | Apple silicon; the Xcode command line tools (which include libclang), and FFmpeg built by the repository's script (`KAGARI_FFMPEG_TARGET=macos packaging/ffmpeg/build.sh <prefix>`, which also needs meson, ninja, pkg-config and xz), found through `FFMPEG_DIR=<prefix>` |
+| Windows | the FFmpeg development files (found through `FFMPEG_DIR`, vcpkg or pkg-config) and libclang |
 | NixOS | `direnv allow` (or `nix develop`) in the repository enters the dev shell with everything |

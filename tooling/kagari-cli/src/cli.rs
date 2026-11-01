@@ -48,8 +48,9 @@ pub enum Command {
         #[arg(long)]
         manifest_path: Option<PathBuf>,
     },
-    /// Build the project and package it with the runtime of a platform into an ISO image.
-    #[command(group(ArgGroup::new("platform").required(true).args(["windows", "linux"])))]
+    /// Build the project and package it with the runtime of a platform: an ISO image for
+    /// Windows and Linux, an app in a ZIP archive for macOS.
+    #[command(group(ArgGroup::new("platform").required(true).args(["windows", "linux", "macos"])))]
     Release {
         /// The project's `kagari.toml`; by default the nearest one from the current directory.
         #[arg(long)]
@@ -60,6 +61,10 @@ pub enum Command {
         /// Package the Linux (x86_64) runtime.
         #[arg(long)]
         linux: bool,
+        /// Package the macOS (Apple silicon) runtime as an app signed ad hoc; needs
+        /// `project.identifier`.
+        #[arg(long)]
+        macos: bool,
     },
     /// Format the project's source files, or the given files.
     Fmt {

@@ -28,8 +28,11 @@ packages, which build the release binaries with nixpkgs' Rust, are described in
 [Releases](./releases.md#nix).) On Debian/Ubuntu
 install `libasound2-dev libudev-dev pkg-config libavcodec-dev libavformat-dev libavutil-dev
 libswscale-dev libswresample-dev libclang-dev`, on Fedora `alsa-lib-devel systemd-devel` plus the
-FFmpeg development packages and `clang-devel`; macOS and Windows need FFmpeg (`FFMPEG_DIR`) and
-libclang (`LIBCLANG_PATH`). The compiler and tooling crates need none of these.
+FFmpeg development packages and `clang-devel`; Windows needs FFmpeg (`FFMPEG_DIR`) and libclang
+(`LIBCLANG_PATH`). On macOS (Apple silicon) build FFmpeg with
+`KAGARI_FFMPEG_TARGET=macos packaging/ffmpeg/build.sh <prefix>` and set `FFMPEG_DIR=<prefix>`;
+libclang from the Xcode command line tools is found without `LIBCLANG_PATH`. The compiler and
+tooling crates need none of these.
 
 ## Running the tests
 
