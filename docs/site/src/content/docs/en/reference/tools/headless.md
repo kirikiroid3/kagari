@@ -38,6 +38,7 @@ A headless run is reproducible: the same game, script and seed give the same cap
 | Seed of a new story | From the system clock and process id | `--seed`, default `1` |
 | Settings and saves | Platform data directory | `--data-dir`, default `<out>/data` |
 | Audio | Played | Processed, not played |
+| Movies | Decoded as they play, in hardware when available | Decoded in software at each capture, the exact frame of the capture's time |
 | Gamepads | Read | None |
 
 Settings and saves persist in the data directory between runs. Delete it (or use a fresh `--out`)

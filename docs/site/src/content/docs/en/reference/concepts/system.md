@@ -295,8 +295,9 @@ backlog.
 
 **Seen sets** are meta the engine keeps the same way: `seen_image(i)`, `heard(a)` and `watched(v)`
 in `std::system` tell whether an image was ever on a step's logical screen, a track or sound ever
-played, a movie ever played. Like read flags they are never reverted by load or rewind. They back a
-CG gallery, a music room and a movie room without any studio bookkeeping:
+played, a movie ever started on screen (with or without audio; replaying steps while a save
+loads never marks a movie). Like read flags they are never reverted by load or rewind. They back
+a CG gallery, a music room and a movie room without any studio bookkeeping:
 
 ```kix
 use std::system::seen_image;

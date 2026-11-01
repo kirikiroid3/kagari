@@ -1,6 +1,6 @@
 ---
 name: kagari-runtime
-description: Load when changing the Kagari engine, text layout, renderer, runtime profiles, story debugger or desktop/headless runtime (runtime_libs/kagari-engine, kagari-text, kagari-render, kagari-compat, kagari-debugger, runtime/kagari-desktop-runtime) — not for the VM core (kagari-vm), which is kagari-bytecode.
+description: Load when changing the Kagari engine, text layout, renderer, runtime profiles, movie decoding, story debugger or desktop/headless runtime (runtime_libs/kagari-engine, kagari-text, kagari-render, kagari-compat, kagari-video, kagari-debugger, runtime/kagari-desktop-runtime) — not for the VM core (kagari-vm), which is kagari-bytecode.
 ---
 
 # Kagari runtime
@@ -13,8 +13,9 @@ description: Load when changing the Kagari engine, text layout, renderer, runtim
 | `runtime_libs/kagari-text` | fonts, shaping, line breaking, ruby, rasterization |
 | `runtime_libs/kagari-render` | the wgpu compositor for `Frame` |
 | `runtime_libs/kagari-compat` | runtime profiles (`native_v0`) and asset sniffing, used by `kagari build` |
+| `runtime_libs/kagari-video` | FFmpeg (`ffmpeg-next`) movie probing, video frames (hardware with software fallback) and movie audio; depends on no Kagari crate |
 | `runtime_libs/kagari-debugger` | query engine (`session/`), debug protocol server, instruction hook, headless platform; features `client` (front-end helpers) and `dap` (the debug adapter) |
-| `runtime/kagari-desktop-runtime` | winit/wgpu/kira/gilrs shell, `Platform`, headless mode |
+| `runtime/kagari-desktop-runtime` | winit/wgpu/kira/gilrs shell, `Platform`, movie playback (`movies.rs`), headless mode |
 
 The VM (`runtime_libs/kagari-vm`) and the bytecode format belong to the `kagari-bytecode` skill.
 
@@ -56,6 +57,10 @@ Develop Guide (`docs/dev/src/`):
   (`image`: png/jpeg/webp/bmp; `jxl-oxide` in the engine; `kira`:
   ogg/vorbis/flac/wav/pcm/mp3/aac/isomp4/alac). The desktop runtime's
   `supported_encodings_decode` test decodes the `kagari-compat` audio fixtures.
+- The FFmpeg decoders, demuxers and parsers enabled in `packaging/ffmpeg/build.sh` must cover
+  every video format `kagari-compat::supports` accepts (WebM VP9/AV1 + Opus/Vorbis, MP4 H.264 +
+  AAC); `kagari-video`'s tests decode the `kagari-compat` video fixtures. Headless decodes movies
+  in software (`Pace::Exact`) so captures stay deterministic.
 
 ## Workflows
 
@@ -78,12 +83,12 @@ round trip and a divergence case.
 headless captures before and after.
 
 **New asset format or profile**: `kagari-compat` (`format.rs`, `sniff.rs`, `profile.rs`, tests),
-decoder features, docs listed below.
+decoder features (for video: `packaging/ffmpeg/build.sh` and `kagari-video`), docs listed below.
 
 ## Verify
 
 ```sh
-cargo test -p kagari-engine -p kagari-text -p kagari-render -p kagari-compat -p kagari-desktop-runtime
+cargo test -p kagari-engine -p kagari-text -p kagari-render -p kagari-compat -p kagari-video -p kagari-desktop-runtime
 cargo test -p kagari-debugger --features dap
 cargo clippy --workspace --all-targets
 ```
@@ -123,5 +128,8 @@ echo "exit: $?"   # 0 ok, 2 boot/usage, 3 trap, 4 GPU, 5 script
 
 - Develop Guide chapters above (same change).
 - Reference (en **and** ja): `tools/runtime.md`, `tools/headless.md`, `tools/debugger.md`, `concepts/system.md`,
-  `concepts/saves.md`, `tools/projects.md` (profiles).
+  `concepts/saves.md`, `tools/projects.md` (profiles), `tools/cli.md` and `tutorial/install.md`
+  (files shipped next to the runtime).
 - STD Reference (en **and** ja): the module page of every changed std item; `appendix/profiles.md`.
+- Shipped libraries (FFmpeg): `process/releases.md` and the `kagari release` library list in
+  `tooling/cli.md`.

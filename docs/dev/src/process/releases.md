@@ -6,6 +6,7 @@
 - CI: `.github/workflows/release.yml`.
 - Linux installer: `installer.sh` (uploaded to the bucket root).
 - Windows installer: `packaging/windows/kagari.iss` (Inno Setup).
+- FFmpeg shipped with the runtime: `packaging/ffmpeg/build.sh`.
 - Nix: `flake.nix` (`packages.{stable,unstable,default}`), `nix/stable.json` (written by CI).
 
 Why there is no toolchain manager: [Installers, not a toolchain manager](../foundations/decisions.md#distribution).
@@ -28,7 +29,7 @@ parallel after `version`; `upload` waits for both, so a failed build uploads not
 | Job | Runs on | Does |
 | --- | ------- | ---- |
 | `version` | ubuntu | Reads the workspace version. On a tag it fails unless the tag matches; on a branch the version is `<workspace>-dev.<short sha>` and `release` is false. |
-| `linux` | `ubuntu:22.04` container | Builds both binaries with GCC (`x86_64-unknown-linux-gnu`) against glibc 2.35, runs `--version`, packs `kagari-<v>-x86_64-linux.tar.gz` (a directory `kagari-<v>-x86_64-linux/` with both binaries and `LICENSE`) and its `.sha256`, and copies the runtime on its own as `kagari-desktop-runtime-<v>-x86_64-linux` with its `.sha256`. |
+| `linux` | `ubuntu:22.04` container | Builds FFmpeg ([FFmpeg](#ffmpeg); cached), builds both binaries with GCC (`x86_64-unknown-linux-gnu`) against glibc 2.35 and that FFmpeg (`FFMPEG_DIR`), runs `--version` (the runtime with the FFmpeg libraries on `LD_LIBRARY_PATH`), packs `kagari-<v>-x86_64-linux.tar.gz` (a directory `kagari-<v>-x86_64-linux/` with both binaries, `LICENSE`, the five FFmpeg libraries and `ffmpeg-LICENSE.txt`) and its `.sha256`, and copies the runtime on its own as `kagari-desktop-runtime-<v>-x86_64-linux`, the FFmpeg libraries and `ffmpeg-LICENSE.txt`, each with its `.sha256`. |
 | `windows` | windows-2025 | Builds both binaries (MSVC, the C runtime linked dynamically: they import `VCRUNTIME140.dll`), runs `--version` (the runtime's through a pipeline: it is a GUI-subsystem program, which PowerShell otherwise does not wait for; see [The console on Windows](../runtime/desktop.md#the-console-on-windows)), stages `vc_redist.x64.exe` and `vcruntime140.dll` from the redistributable folder of the Visual Studio that linked them (found with `vswhere`; `Microsoft.VCRedistVersion.default.txt` names the folder) and fails when the runtime imports any other DLL of the redistributable (`dumpbin /dependents`), builds the Inno Setup installer `kagari-<v>-x86_64-windows-setup.exe` (with the redistributable inside), copies the runtime on its own as `kagari-desktop-runtime-<v>-x86_64-windows.exe`, and writes the `.sha256` files of the installer, the runtime and `vcruntime140.dll`. Nothing is code-signed ([Code signing](#code-signing)). |
 | `upload` | ubuntu | Uploads both artifacts to R2 with the AWS CLI. On a release it then writes the `latest` pointers and `installer.sh`. |
 | `nix-stable` | ubuntu | Releases only: commits `nix/stable.json` (`version`, `rev` of the tag) to `main`, unless it already names this or a newer version. |
@@ -39,6 +40,40 @@ no pointer.
 The `linux` job builds in a container rather than on the runner image so that the glibc baseline
 does not move when GitHub retires an image. Raising the container raises `MIN_GLIBC` in
 `installer.sh` and the requirement in the Tutorial and the runtime page.
+
+The `windows` job additionally sets up MSVC (`ilammy/msvc-dev-cmd`), MSYS2 (`make nasm pkgconf
+diffutils`) and meson/ninja, builds FFmpeg in an MSYS2 shell (MSYS2's `link.exe` is moved aside
+so MSVC's is found; cached), builds with `FFMPEG_DIR` and `LIBCLANG_PATH=C:\Program Files\LLVM\bin`
+(the runner's LLVM), runs the smoke test with the FFmpeg `bin\` on `PATH`, stages the five DLLs and
+`ffmpeg-LICENSE.txt` for the installer and `dist\` (with `.sha256`), and runs the `dumpbin` check
+over the DLLs too: the only redistributable import allowed is `VCRUNTIME140.dll`.
+
+## FFmpeg {#ffmpeg}
+
+The runtime decodes movies with FFmpeg ([The Desktop Runtime](../runtime/desktop.md#kagari-video)),
+linked dynamically, so releases ship its shared libraries next to the runtime.
+`packaging/ffmpeg/build.sh <prefix>` (`KAGARI_FFMPEG_TARGET=linux|windows`) builds them:
+
+- Pinned sources: FFmpeg 9.0.2 and dav1d 1.5.3, each checked against a SHA-256 in the script.
+- dav1d is built static and linked into libavcodec.
+- FFmpeg is a minimal LGPL build (no `--enable-gpl`): shared `avcodec`, `avformat`, `avutil`,
+  `swscale` and `swresample` only; decoders `h264`, `vp9`, `av1`, `libdav1d`, `aac`, `opus`,
+  `vorbis`; demuxers `mov`, `matroska`, with their parsers and bitstream filters; no programs,
+  network, devices or filters, and no autodetected libraries. Linux adds the VAAPI hwaccels
+  (so `libva.so.2` and `libva-drm.so.2` become run-time requirements) and RUNPATH `$ORIGIN`;
+  Windows builds with MSVC and adds the D3D11VA hwaccels and import libraries `lib/*.lib` for
+  `FFMPEG_DIR`.
+- `<prefix>/ffmpeg-LICENSE.txt` is FFmpeg's LGPL followed by dav1d's BSD licence; it ships with
+  every copy of the libraries.
+
+| Platform | Shipped files |
+| -------- | ------------- |
+| Linux | `libavcodec.so.63`, `libavformat.so.63`, `libavutil.so.61`, `libswscale.so.10`, `libswresample.so.7`, `ffmpeg-LICENSE.txt` |
+| Windows | `avcodec-63.dll`, `avformat-63.dll`, `avutil-61.dll`, `swscale-10.dll`, `swresample-7.dll`, `ffmpeg-LICENSE.txt` |
+
+The workflow caches each platform's prefix under a key hashed from `build.sh`, so editing the
+script rebuilds FFmpeg. The decoders and demuxers must cover every video format
+`kagari-compat::supports` accepts for `native_v0`.
 
 ## The bucket
 
@@ -54,12 +89,15 @@ The bucket is served at `https://kagari-download.suitsu31.club`.
 | `windows_x86_installer/<v>/kagari-<v>-x86_64-windows-setup.exe` (+ `.sha256`) | The Windows installer | immutable, one year |
 | `windows_x86_installer/<v>/kagari-desktop-runtime-<v>-x86_64-windows.exe` (+ `.sha256`) | The Windows runtime alone, for `kagari release --windows` | immutable, one year |
 | `windows_x86_installer/<v>/vcruntime140.dll` (+ `.sha256`) | The MSVC C runtime the Windows runtime imports, shipped next to it by `kagari release --windows` | immutable, one year |
+| `windows_x86_installer/<v>/{avcodec-63,avformat-63,avutil-61,swscale-10,swresample-7}.dll`, `ffmpeg-LICENSE.txt` (+ `.sha256` each) | FFmpeg for the Windows runtime, shipped next to it by `kagari release --windows` | immutable, one year |
+| `linux_x86_bin/<v>/{libavcodec.so.63,libavformat.so.63,libavutil.so.61,libswscale.so.10,libswresample.so.7}`, `ffmpeg-LICENSE.txt` (+ `.sha256` each) | FFmpeg for the Linux runtime, shipped next to it by `kagari release --linux` | immutable, one year |
 
 Versioned files are uploaded before the pointers, so a pointer never names a missing file. A
 `.sha256` file is `sha256sum` output: `<hex>  <file name>`.
 
 `kagari release` hard-codes the server, the two directories, the runtime file names and the
-libraries shipped with the runtime (`vcruntime140.dll` on Windows; `command/release/{mod,download}.rs`)
+libraries shipped with the runtime (`vcruntime140.dll` and FFmpeg on Windows, FFmpeg on Linux,
+each with `ffmpeg-LICENSE.txt`; `command/release/{mod,download}.rs`)
 and downloads them for its own version, each checked against its `.sha256`; see
 [`kagari release`](../tooling/cli.md#kagari-release). 0.1.0 was released without a standalone
 runtime; `kagari release` exists from the release after it on. Renaming a directory, a runtime
@@ -83,18 +121,21 @@ on `main` must let GitHub Actions push.
 `installer.sh` runs as `curl … | bash`; all its code is in functions and `main` is called on the
 last line, so a truncated download runs nothing. It refuses macOS, Windows shells, other
 architectures, musl and glibc older than `MIN_GLIBC`, and on NixOS points to the flake. It reads
-`linux_x86_bin/latest` unless given `--version`, checks the checksum, copies both binaries into
-`$KAGARI_HOME/bin` (default `~/.local/share/kagari/bin`) through a temporary file and a rename (a
-running `kagari lsp` keeps its old file), and links them into `$KAGARI_BIN_DIR` (default
-`~/.local/bin`). It refuses to replace a file there that is not its own link, warns when
-`libasound.so.2` or `libudev.so.1` is missing from the `ldconfig` cache, and prints a `PATH` line
-when needed. `--uninstall` removes its links and `$KAGARI_HOME`. `KAGARI_DOWNLOAD_URL` points it
-at another server (for testing).
+`linux_x86_bin/latest` unless given `--version`, checks the checksum, copies both binaries and
+the five FFmpeg libraries (mode 644; an archive without one is refused) into `$KAGARI_HOME/bin`
+(default `~/.local/share/kagari/bin`) through a temporary file and a rename (a running
+`kagari lsp` keeps its old file), copies `ffmpeg-LICENSE.txt` to `$KAGARI_HOME`, and links the
+binaries into `$KAGARI_BIN_DIR` (default `~/.local/bin`). It refuses to replace a file there that
+is not its own link, warns when `libasound.so.2`, `libudev.so.1`, `libva.so.2` or
+`libva-drm.so.2` is missing from the `ldconfig` cache (the runtime does not start without libva),
+and prints a `PATH` line when needed. `--uninstall` removes its links and `$KAGARI_HOME`.
+`KAGARI_DOWNLOAD_URL` points it at another server (for testing).
 
 ## The Windows installer
 
 `packaging/windows/kagari.iss` builds a per-user installer (`PrivilegesRequired=lowest`): it
-installs into `%LOCALAPPDATA%\Programs\Kagari` (`bin\` holds both executables) and appends
+installs into `%LOCALAPPDATA%\Programs\Kagari` (`bin\` holds both executables and the FFmpeg
+DLLs; `ffmpeg-LICENSE.txt` goes to the top directory) and appends
 `…\Kagari\bin` to `HKCU\Environment\Path` when it is not there yet; the uninstaller removes
 exactly that entry. Its `AppId` is fixed, so a newer installer replaces the installed version. The
 wizard has English and Japanese. The workflow passes `AppVersion`, `NumericVersion` (the version
@@ -158,3 +199,7 @@ and add the libraries the runtime loads with `dlopen` (Wayland, xkbcommon, Vulka
   `installer.sh`, `[Files]` in `kagari.iss` and `cargoBuildFlags` in `flake.nix`.
 - New runtime system library: also `check_runtime_libraries` in `installer.sh` and the runtime's
   `RUNPATH` in `flake.nix` (see [Testing](./testing.md#toolchain-and-dev-shell)).
+- Another FFmpeg version or component: `packaging/ffmpeg/build.sh` (versions, SHA-256s, flags);
+  new sonames or DLL names also change `FFMPEG_LIBS` in `installer.sh`, `[Files]` in `kagari.iss`,
+  the workflow's lists and `Platform::libraries` in `kagari release` (published names are
+  add-only, as above).

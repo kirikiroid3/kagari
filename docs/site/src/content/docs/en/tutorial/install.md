@@ -20,13 +20,16 @@ curl -fsSL https://kagari-download.suitsu31.club/installer.sh | bash
 ```
 
 The script downloads the latest version, checks its checksum, installs it into
-`~/.local/share/kagari` and links both programs into `~/.local/bin`. It needs no administrator
-rights. When `~/.local/bin` is not on your `PATH`, it prints the line to add to `~/.profile`; open
-a new terminal afterwards.
+`~/.local/share/kagari` (with the FFmpeg libraries the runtime plays movies with, next to the
+programs) and links both programs into `~/.local/bin`. It needs no administrator rights. When
+`~/.local/bin` is not on your `PATH`, it prints the line to add to `~/.profile`; open a new
+terminal afterwards.
 
 The Linux build needs glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 and later);
-musl-based distributions such as Alpine are not supported. The runtime also needs ALSA and
-libudev, Wayland or X11, and a GPU driver; the script warns when ALSA or libudev is missing. See
+musl-based distributions such as Alpine are not supported. The runtime also needs ALSA, libudev
+and libva (Debian, Ubuntu: `libasound2 libudev1 libva2 libva-drm2`; Fedora: `alsa-lib
+systemd-libs libva`), Wayland or X11, and a GPU driver; the script warns when one of these
+libraries is missing. See
 [System requirements](../reference/tools/runtime.md#system-requirements).
 
 The script takes these options (after `bash -s --` when piped):

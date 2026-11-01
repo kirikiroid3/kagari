@@ -76,9 +76,46 @@ fn runtime_files(
     ])
 }
 
+/// The libraries `kagari release --linux` ships next to the runtime.
+const LINUX_LIBRARIES: &[&str] = &[
+    "libavcodec.so.63",
+    "libavformat.so.63",
+    "libavutil.so.61",
+    "libswscale.so.10",
+    "libswresample.so.7",
+    "ffmpeg-LICENSE.txt",
+];
+/// The libraries `kagari release --windows` ships next to the runtime.
+const WINDOWS_LIBRARIES: &[&str] = &[
+    "vcruntime140.dll",
+    "avcodec-63.dll",
+    "avformat-63.dll",
+    "avutil-61.dll",
+    "swscale-10.dll",
+    "swresample-7.dll",
+    "ffmpeg-LICENSE.txt",
+];
+
+/// The served contents of the library `name`.
+fn library(name: &str) -> Vec<u8> {
+    format!("not really {name}").into_bytes()
+}
+
+/// The server files of `libraries` for `bucket`, with matching checksums.
+fn library_files(bucket: &str, libraries: &[&str]) -> HashMap<String, Vec<u8>> {
+    let mut files = HashMap::new();
+    for name in libraries {
+        let bytes = library(name);
+        files.extend(runtime_files(bucket, name, &bytes, &bytes));
+    }
+    files
+}
+
 fn linux_runtime() -> HashMap<String, Vec<u8>> {
     let file = format!("kagari-desktop-runtime-{VERSION}-x86_64-linux");
-    runtime_files("linux_x86_bin", &file, RUNTIME, RUNTIME)
+    let mut files = runtime_files("linux_x86_bin", &file, RUNTIME, RUNTIME);
+    files.extend(library_files("linux_x86_bin", LINUX_LIBRARIES));
+    files
 }
 
 fn release(dir: &Path, platform: &str, server: &Server) -> std::process::Output {
@@ -198,26 +235,35 @@ fn expected_files(dir: &Path, runtime: &str) -> BTreeMap<String, Vec<u8>> {
 }
 
 #[test]
-fn linux_release_packages_the_game_and_an_executable_runtime() {
+fn linux_release_packages_the_game_an_executable_runtime_and_ffmpeg() {
     let tmp = init_project();
     let dir = game(&tmp);
     let server = serve(linux_runtime());
     let output = release(&dir, "--linux", &server);
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     assert!(
-        stdout(&output).contains("wrote target/release/linux/game.iso (4 files)"),
+        stdout(&output).contains("wrote target/release/linux/game.iso (10 files)"),
         "{}",
         stdout(&output)
     );
 
     let iso = std::fs::read(dir.join("target/release/linux/game.iso")).unwrap();
-    let expected = expected_files(&dir, "kagari-desktop-runtime");
+    let mut expected = expected_files(&dir, "kagari-desktop-runtime");
+    for name in LINUX_LIBRARIES {
+        expected.insert((*name).to_owned(), library(name));
+    }
     assert_eq!(
         expected.keys().collect::<Vec<_>>(),
         [
             "characters.kiarchive",
+            "ffmpeg-LICENSE.txt",
             "game.kagari",
             "kagari-desktop-runtime",
+            "libavcodec.so.63",
+            "libavformat.so.63",
+            "libavutil.so.61",
+            "libswresample.so.7",
+            "libswscale.so.10",
             "system-fonts.kiarchive"
         ]
     );
@@ -237,30 +283,26 @@ fn linux_release_packages_the_game_and_an_executable_runtime() {
 }
 
 #[test]
-fn windows_release_ships_run_exe_with_the_c_runtime_and_clean_removes_it() {
+fn windows_release_ships_run_exe_with_the_c_runtime_and_ffmpeg_and_clean_removes_it() {
     let tmp = init_project();
     let dir = game(&tmp);
-    let dll = b"MZ not really vcruntime140.dll";
     let file = format!("kagari-desktop-runtime-{VERSION}-x86_64-windows.exe");
     let mut files = runtime_files("windows_x86_installer", &file, RUNTIME, RUNTIME);
-    files.extend(runtime_files(
-        "windows_x86_installer",
-        "vcruntime140.dll",
-        dll,
-        dll,
-    ));
+    files.extend(library_files("windows_x86_installer", WINDOWS_LIBRARIES));
     let server = serve(files);
     let output = release(&dir, "--windows", &server);
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     assert!(
-        stdout(&output).contains("wrote target/release/windows/game.iso (5 files)"),
+        stdout(&output).contains("wrote target/release/windows/game.iso (11 files)"),
         "{}",
         stdout(&output)
     );
 
     let iso = std::fs::read(dir.join("target/release/windows/game.iso")).unwrap();
     let mut expected = expected_files(&dir, "run.exe");
-    expected.insert("vcruntime140.dll".to_owned(), dll.to_vec());
+    for name in WINDOWS_LIBRARIES {
+        expected.insert((*name).to_owned(), library(name));
+    }
     assert_eq!(joliet_files(&iso), expected);
 
     let output = kagari(&["clean"], &dir);

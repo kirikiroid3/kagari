@@ -1,8 +1,9 @@
 # Builds the Kagari toolchain (`kagari` + `kagari-desktop-runtime`) and uploads it, and the
-# runtime on its own with the MSVC C runtime DLL (what `kagari release` downloads), to the
-# download bucket (Cloudflare R2, served at https://kagari-download.suitsu31.club). Nothing goes
-# to GitHub Releases. The layout, the secrets and the release steps:
-# docs/dev/src/process/releases.md.
+# runtime on its own with the MSVC C runtime DLL and FFmpeg's shared libraries (what `kagari
+# release` downloads), to the download bucket (Cloudflare R2, served at
+# https://kagari-download.suitsu31.club). Nothing goes to GitHub Releases. The layout, the secrets
+# and the release steps: docs/dev/src/process/releases.md. FFmpeg is built by
+# packaging/ffmpeg/build.sh and cached until that script changes.
 #
 # A tag push builds the release whose version is the tag without a leading `v`; it must equal
 # the workspace version in Cargo.toml. A manual run on a tag does the same; a manual run on a
@@ -75,7 +76,8 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends ca-certificates curl git gcc g++ make \
-            pkg-config libasound2-dev libudev-dev
+            pkg-config libasound2-dev libudev-dev meson ninja-build nasm libva-dev libclang-dev \
+            clang xz-utils
       - uses: actions/checkout@v5
       - name: Install Rust (rust-toolchain.toml)
         run: |
@@ -83,24 +85,45 @@ jobs:
             sh -s -- -y --profile minimal --default-toolchain none
           echo "$HOME/.cargo/bin" >>"$GITHUB_PATH"
           "$HOME/.cargo/bin/rustup" toolchain install --profile minimal
+      - uses: actions/cache@v4
+        id: ffmpeg-cache
+        with:
+          path: ffmpeg-prefix
+          key: ffmpeg-linux-${{ hashFiles('packaging/ffmpeg/build.sh') }}
+      - name: Build FFmpeg
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: KAGARI_FFMPEG_TARGET=linux packaging/ffmpeg/build.sh "$PWD/ffmpeg-prefix"
       - name: Build
-        run: cargo build --release --locked -p kagari-cli -p kagari-desktop-runtime
+        run: |
+          FFMPEG_DIR="$PWD/ffmpeg-prefix" \
+            cargo build --release --locked -p kagari-cli -p kagari-desktop-runtime
       - name: Smoke test
         run: |
           target/release/kagari --version
-          target/release/kagari-desktop-runtime --version
+          LD_LIBRARY_PATH="$PWD/ffmpeg-prefix/lib" target/release/kagari-desktop-runtime --version
       - name: Package
         run: |
           name="kagari-$VERSION-x86_64-linux"
+          ffmpeg=(libavcodec.so.63 libavformat.so.63 libavutil.so.61 libswscale.so.10 libswresample.so.7)
           mkdir -p "dist/$name"
           cp target/release/kagari target/release/kagari-desktop-runtime LICENSE "dist/$name/"
+          for lib in "${ffmpeg[@]}"; do
+            cp -L "ffmpeg-prefix/lib/$lib" "dist/$name/"
+          done
+          cp ffmpeg-prefix/ffmpeg-LICENSE.txt "dist/$name/"
           tar -C dist --owner=0 --group=0 --numeric-owner -czf "dist/$name.tar.gz" "$name"
           (cd dist && sha256sum "$name.tar.gz" >"$name.tar.gz.sha256")
           rm -r "dist/$name"
-          # The runtime on its own, for `kagari release --linux`.
+          # The runtime on its own, and FFmpeg next to it, for `kagari release --linux`.
           runtime="kagari-desktop-runtime-$VERSION-x86_64-linux"
           cp target/release/kagari-desktop-runtime "dist/$runtime"
-          (cd dist && sha256sum "$runtime" >"$runtime.sha256")
+          for lib in "${ffmpeg[@]}"; do
+            cp -L "ffmpeg-prefix/lib/$lib" dist/
+          done
+          cp ffmpeg-prefix/ffmpeg-LICENSE.txt dist/
+          for file in "$runtime" "${ffmpeg[@]}" ffmpeg-LICENSE.txt; do
+            (cd dist && sha256sum "$file" >"$file.sha256")
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x86_64
@@ -122,10 +145,37 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install Rust (rust-toolchain.toml)
         run: rustup toolchain install --profile minimal
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: actions/cache@v4
+        id: ffmpeg-cache
+        with:
+          path: ffmpeg-prefix
+          key: ffmpeg-windows-${{ hashFiles('packaging/ffmpeg/build.sh') }}
+      - uses: msys2/setup-msys2@v2
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        with:
+          msystem: MSYS
+          path-type: inherit
+          install: make nasm pkgconf diffutils
+      - name: Install meson and ninja
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: pip install meson ninja
+      - name: Build FFmpeg
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: |
+          # MSYS2's link.exe (coreutils) would shadow MSVC's.
+          mv /usr/bin/link.exe /usr/bin/link-msys.exe
+          KAGARI_FFMPEG_TARGET=windows bash packaging/ffmpeg/build.sh "$(cygpath -u "$GITHUB_WORKSPACE")/ffmpeg-prefix"
       - name: Build
-        run: cargo build --release --locked -p kagari-cli -p kagari-desktop-runtime
+        run: |
+          $env:FFMPEG_DIR = "$PWD\ffmpeg-prefix"
+          # The image's LLVM (Chocolatey), for bindgen in ffmpeg-sys-next.
+          $env:LIBCLANG_PATH = "C:\Program Files\LLVM\bin"
+          cargo build --release --locked -p kagari-cli -p kagari-desktop-runtime
       - name: Smoke test
         run: |
+          $env:PATH = "$PWD\ffmpeg-prefix\bin;$env:PATH"
           target\release\kagari.exe --version
           if ($LASTEXITCODE -ne 0) { exit 1 }
           # A GUI-subsystem program: PowerShell waits for it (and sets $LASTEXITCODE) only in a
@@ -138,6 +188,12 @@ jobs:
           Copy-Item target\release\kagari.exe, target\release\kagari-desktop-runtime.exe, LICENSE stage\
           # The runtime on its own, for `kagari release --windows`.
           Copy-Item target\release\kagari-desktop-runtime.exe "dist\kagari-desktop-runtime-$env:VERSION-x86_64-windows.exe"
+          # FFmpeg: in the installer next to the runtime, and on its own for `kagari release --windows`.
+          foreach ($file in "avcodec-63.dll", "avformat-63.dll", "avutil-61.dll", "swscale-10.dll", "swresample-7.dll") {
+            Copy-Item "ffmpeg-prefix\bin\$file" stage\, dist\
+          }
+          Copy-Item ffmpeg-prefix\ffmpeg-LICENSE.txt stage\
+          Copy-Item ffmpeg-prefix\ffmpeg-LICENSE.txt dist\
       - name: Stage the MSVC C runtime
         run: |
           # The redistributable of the Visual Studio that linked the executables: its installer
@@ -153,11 +209,15 @@ jobs:
           if (-not $dll) { throw "vcruntime140.dll not found in $redist" }
           Copy-Item $dll.FullName dist\vcruntime140.dll
           # The game image ships only vcruntime140.dll (`Platform::libraries` in kagari-cli):
-          # fail when the runtime imports another DLL of the redistributable.
+          # fail when the runtime or FFmpeg imports another DLL of the redistributable.
           $dumpbin = Get-ChildItem "$vs\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Select-Object -Last 1
-          $imports = & $dumpbin.FullName /nologo /dependents target\release\kagari-desktop-runtime.exe |
-            ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^(vcruntime|msvcp|concrt|vccorlib)\S*\.dll$' }
-          if ("$imports" -ne 'VCRUNTIME140.dll') { throw "the runtime imports the redistributable DLLs '$imports'" }
+          foreach ($binary in "target\release\kagari-desktop-runtime.exe", "ffmpeg-prefix\bin\avcodec-63.dll",
+            "ffmpeg-prefix\bin\avformat-63.dll", "ffmpeg-prefix\bin\avutil-61.dll",
+            "ffmpeg-prefix\bin\swscale-10.dll", "ffmpeg-prefix\bin\swresample-7.dll") {
+            $imports = & $dumpbin.FullName /nologo /dependents $binary |
+              ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^(vcruntime|msvcp|concrt|vccorlib)\S*\.dll$' }
+            if ("$imports" -ne 'VCRUNTIME140.dll') { throw "$binary imports the redistributable DLLs '$imports'" }
+          }
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
       - name: Build the installer
@@ -170,7 +230,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Checksum
         run: |
-          foreach ($name in "kagari-$env:VERSION-x86_64-windows-setup.exe", "kagari-desktop-runtime-$env:VERSION-x86_64-windows.exe", "vcruntime140.dll") {
+          foreach ($name in "kagari-$env:VERSION-x86_64-windows-setup.exe", "kagari-desktop-runtime-$env:VERSION-x86_64-windows.exe", "vcruntime140.dll",
+            "avcodec-63.dll", "avformat-63.dll", "avutil-61.dll", "swscale-10.dll", "swresample-7.dll", "ffmpeg-LICENSE.txt") {
             $hash = (Get-FileHash -Algorithm SHA256 "dist\$name").Hash.ToLowerInvariant()
             Set-Content -NoNewline -Encoding ascii "dist\$name.sha256" "$hash  $name`n"
           }
@@ -219,7 +280,7 @@ jobs:
           for file in dist/linux/*; do
             case "$file" in
               *.tar.gz) type=application/gzip ;;
-              *.sha256) type="$text" ;;
+              *.sha256 | *.txt) type="$text" ;;
               *) type=application/octet-stream ;;
             esac
             put "$file" "linux_x86_bin/$VERSION/$(basename "$file")" "$type" "$immutable"

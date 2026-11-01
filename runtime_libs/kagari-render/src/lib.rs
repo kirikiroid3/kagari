@@ -25,7 +25,7 @@ mod viewport;
 
 pub use viewport::Viewport;
 
-use kagari_engine::{AssetStore, Frame, Node, ThumbKey};
+use kagari_engine::{AssetStore, Frame, Node, ThumbKey, VideoKey};
 
 use crate::atlas::GlyphAtlas;
 use crate::encode::{DesignTarget, FrameBuffers, Resources};
@@ -247,6 +247,19 @@ impl Renderer {
     ) {
         self.textures
             .set_thumbnail(&self.gfx, slot, generation, width, height, rgba);
+    }
+
+    /// Uploads the current frame of a movie, drawn by its `Node::Video`. `rgba`: opaque sRGB
+    /// RGBA8, rows packed; a length other than `width·height·4`, or a side above the GPU's
+    /// texture limit, is logged once and keeps the previous frame.
+    pub fn set_video_frame(&mut self, key: VideoKey, width: u32, height: u32, rgba: &[u8]) {
+        self.textures
+            .set_video_frame(&self.gfx, key, width, height, rgba);
+    }
+
+    /// Drops the texture of a movie no longer shown.
+    pub fn remove_video(&mut self, key: VideoKey) {
+        self.textures.remove_video(key);
     }
 
     /// Plans and encodes the design passes (plus the still copy) of `frame`.

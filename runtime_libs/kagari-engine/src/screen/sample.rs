@@ -15,7 +15,7 @@ use super::runtime::{EffectKey, EffectSlot, ScreenRuntime};
 use crate::anim::{color_premul_linear, decimal_f32, ease, lerp4, motion_at, transition_progress};
 use crate::frame::{Dir, MotionStage, Pose, ShaderEffect, TransitionDraw};
 use crate::values::{
-    Direction, EffectSpec, Flip, MAX_ARGS_BYTES, Plane, PoseSpec, Resize, Transition,
+    Direction, EffectSpec, Flip, MAX_ARGS_BYTES, MovieSpec, Plane, PoseSpec, Resize, Transition,
     TransitionKind, Visibility,
 };
 
@@ -62,6 +62,8 @@ pub(crate) struct VisualEntity {
     pub label: VisualLayer<Text>,
     pub label_style: Option<Value>,
     pub label_width: Option<u32>,
+    /// The movie layer, contain-fitted into the entity's box.
+    pub movie: VisualLayer<VisualContent>,
     pub flip: Flip,
     pub gate: Option<StaticId>,
     pub filter: Option<ShaderEffect>,
@@ -78,11 +80,21 @@ pub(crate) struct VisualImageLayer {
     pub resize: Resize,
 }
 
-/// What an image layer shows at one time.
+/// What an image or movie layer shows at one time.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum VisualContent {
     Image(AssetId),
     Paint(VisualPaint),
+    Movie(VisualMovie),
+}
+
+/// A movie at one time: the frame at `position_ms` on its clock.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct VisualMovie {
+    pub entity: u32,
+    pub video: AssetId,
+    pub looping: bool,
+    pub position_ms: u64,
 }
 
 /// A paint with its shader effects at one time.
@@ -394,7 +406,8 @@ impl ScreenRuntime {
         }
     }
 
-    /// An image layer's content at `t`, its paint clock taken at `at`.
+    /// An image or movie layer's content at `t`, its paint or movie clock taken at `at`. A movie
+    /// plays even when animations are off.
     fn visual_content(
         &self,
         target: LayerTarget,
@@ -416,7 +429,20 @@ impl ScreenRuntime {
                         .and_then(|mask| shader_effect(mask, None, ms)),
                 }))
             }
-            LayerContent::Label(_) | LayerContent::Movie(_) => None,
+            LayerContent::Movie(movie) => {
+                let LayerTarget::Movie(entity) = target else {
+                    return None;
+                };
+                let key = EffectKey::of_movie(&movie);
+                let origin = self.effect_origin(EffectSlot::Layer(target), key, at);
+                Some(VisualContent::Movie(VisualMovie {
+                    entity,
+                    video: movie.video,
+                    looping: movie.looping,
+                    position_ms: t.saturating_sub(origin),
+                }))
+            }
+            LayerContent::Label(_) => None,
         }
     }
 
@@ -535,6 +561,7 @@ impl ScreenRuntime {
             })
             .collect();
         let label_target = LayerTarget::Label(id);
+        let movie_target = LayerTarget::Movie(id);
         let stages = self
             .travel_stage(id, t)
             .into_iter()
@@ -561,6 +588,7 @@ impl ScreenRuntime {
                 t,
                 |content, _| label(content),
             ),
+            movie: self.image_layer(movie_target, base_entity.layer(movie_target), t),
             label_style: record.label_style.clone(),
             label_width: record.label_width,
             flip: record.flip,
@@ -572,20 +600,56 @@ impl ScreenRuntime {
         }
     }
 
+    /// The entities `sample` draws at `t`: the logical ones, then the despawning ones still
+    /// animating.
+    fn shown_entities(&self, t: u64) -> impl Iterator<Item = (u32, &Entity)> + '_ {
+        let logical = &self.screen.logical;
+        logical
+            .entities
+            .iter()
+            .map(|(id, record)| (*id, record))
+            .chain(
+                self.screen
+                    .step
+                    .despawning
+                    .iter()
+                    .filter(move |(id, _)| {
+                        !logical.entities.contains_key(id) && self.still_animating(**id, t)
+                    })
+                    .map(|(id, record)| (*id, record)),
+            )
+    }
+
+    /// The movies shown at `t`, by entity: the content of each drawn entity's movie layer,
+    /// switched at the start of its swap.
+    pub(super) fn movies_at(&self, t: u64) -> Vec<(u32, MovieSpec)> {
+        self.shown_entities(t)
+            .filter_map(|(id, _)| {
+                let target = LayerTarget::Movie(id);
+                let content = match self.chain(Target::Layer(target), t) {
+                    Some((active, _)) => self.layer_content(active).and_then(|(c, _)| c),
+                    None => self
+                        .base
+                        .entities
+                        .get(&id)
+                        .and_then(|entity| entity.layer(target)),
+                };
+                match content {
+                    Some(LayerContent::Movie(movie)) => Some((id, movie)),
+                    _ => None,
+                }
+            })
+            .collect()
+    }
+
     /// The screen at story time `now_ms`.
     pub fn sample(&self, now_ms: u64) -> VisualScreen {
         let t = now_ms;
         let logical = &self.screen.logical;
-        let mut entities: Vec<VisualEntity> = logical
-            .entities
-            .iter()
-            .map(|(id, record)| self.sample_entity(*id, record, t))
+        let mut entities: Vec<VisualEntity> = self
+            .shown_entities(t)
+            .map(|(id, record)| self.sample_entity(id, record, t))
             .collect();
-        for (id, record) in &self.screen.step.despawning {
-            if !logical.entities.contains_key(id) && self.still_animating(*id, t) {
-                entities.push(self.sample_entity(*id, record, t));
-            }
-        }
         entities.sort_by_key(|e| (e.plane, e.z, e.id));
         let base = &self.base;
         let read = |target: PropTarget| self.sample_prop(target, &base.read_prop(target), t);

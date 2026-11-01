@@ -1,0 +1,10 @@
+[package]
+name = "kagari-video"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+ffmpeg-next = { workspace = true }
+log = { workspace = true }

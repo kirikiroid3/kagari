@@ -260,6 +260,13 @@ impl SystemState {
         new
     }
 
+    /// The same for the watched set.
+    pub fn mark_watched(&mut self, id: AssetId) -> bool {
+        let new = self.stores.watched.ids.insert(id);
+        self.stores.dirty_meta |= new;
+        new
+    }
+
     /// The top mode's kind.
     pub fn top(&self) -> Option<modes::ModeKind> {
         self.modes.last().map(|m| m.kind)

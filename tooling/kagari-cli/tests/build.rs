@@ -157,14 +157,35 @@ fn incompatible_audio_formats_fail_the_build() {
 }
 
 #[test]
-fn video_assets_fail_the_build() {
+fn unsupported_video_formats_fail_the_build() {
     rejected(
         "movie/intro.webm",
         &[0x1A, 0x45, 0xDF, 0xA3],
         "const INTRO: VideoAsset = asset(\"movie/intro.webm\");",
         "std::system::watched(INTRO)",
-        "error: asset `movie/intro.webm` (video): video assets are not supported by runtime profile `native_v0`",
+        "error: asset `movie/intro.webm` (video): WebM/Matroska with another codec, several video tracks or an unreadable header is not supported by runtime profile `native_v0`",
     );
+}
+
+#[test]
+fn supported_video_builds() {
+    let tmp = init_project();
+    let dir = game(&tmp);
+    let file = dir.join("assets/movie/intro.webm");
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    std::fs::write(
+        &file,
+        include_bytes!("../../../runtime_libs/kagari-compat/tests/fixtures/vp9-opus.webm"),
+    )
+    .unwrap();
+    use_asset(
+        &dir,
+        "const INTRO: VideoAsset = asset(\"movie/intro.webm\");",
+        "std::system::watched(INTRO)",
+    );
+    let output = kagari(&["build"], &dir);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert!(dir.join("target/v0/game.kagari").exists());
 }
 
 #[test]

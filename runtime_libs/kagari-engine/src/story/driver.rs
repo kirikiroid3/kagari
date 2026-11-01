@@ -300,7 +300,8 @@ fn enter_step(ctx: &mut HostCtx, vm: &mut Vm, record: Value, step: StepId) -> Re
             }
             if !replaying {
                 let t = game.clock.story_ms(now);
-                game.screen.tick(t, &game.reveal, &mut state.audio);
+                game.screen
+                    .tick(t, &game.reveal, &mut state.audio, &state.assets);
             }
         }
     }
@@ -438,7 +439,8 @@ pub(crate) fn advance(ctx: &mut HostCtx, vm: &mut Vm) -> Result<(), Trap> {
     let t = game.clock.story_ms(now);
     let reveal = game.reveal.state(t);
     if game.screen.timeline_running(t, &game.reveal) || reveal == RevealState::Revealing {
-        game.screen.complete_all(t, &game.reveal, &mut state.audio);
+        game.screen
+            .complete_all(t, &game.reveal, &mut state.audio, &state.assets);
         game.reveal.complete_segment(t);
         return Ok(());
     }
@@ -514,7 +516,8 @@ fn tick_mode(ctx: &mut HostCtx, vm: &mut Vm) -> Result<(), Trap> {
             }
             match game.skip_ready_at {
                 None => {
-                    game.screen.complete_all(t, &game.reveal, &mut state.audio);
+                    game.screen
+                        .complete_all(t, &game.reveal, &mut state.audio, &state.assets);
                     game.reveal.complete_all(t);
                     game.skip_ready_at = Some(t.saturating_add(50));
                     Ok(())

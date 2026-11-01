@@ -8,6 +8,7 @@ use std::ops::Range;
 use kagari_bytecode::AssetId;
 use kagari_engine::{
     Affine, AssetStore, Dir, MotionStage, Node, Pose, Rect, ShaderEffect, ThumbKey, TransitionDraw,
+    VideoKey,
 };
 use kagari_shader::{MOTION_SLOTS, ShaderRole};
 
@@ -113,6 +114,8 @@ pub(crate) enum TransitionMask {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum BindKey {
     Image(AssetId),
+    /// The current frame of a movie.
+    Video(VideoKey),
     Thumb(ThumbKey),
     Still,
     Atlas(u16),
@@ -771,6 +774,40 @@ impl<'a> Planner<'a> {
                     ctx.target,
                     Pipe::Image,
                     BindKey::Image(*image),
+                    verts,
+                    ctx.scissor,
+                    base,
+                );
+            }
+            Node::Video {
+                rect,
+                key,
+                uv,
+                flip_x,
+                flip_y,
+                tint,
+                ..
+            } => {
+                let color = scale(*tint, ctx.alpha);
+                if color[3] <= 0.0 && color[0] <= 0.0 && color[1] <= 0.0 && color[2] <= 0.0 {
+                    return;
+                }
+                if self.textures.video(*key).is_none() {
+                    return;
+                }
+                let (mut u0, mut v0, mut u1, mut v1) = (uv.x, uv.y, uv.x + uv.w, uv.y + uv.h);
+                if *flip_x {
+                    std::mem::swap(&mut u0, &mut u1);
+                }
+                if *flip_y {
+                    std::mem::swap(&mut v0, &mut v1);
+                }
+                let verts = self.quad(&ctx.xf, rect, [u0, v0, u1, v1], color);
+                let base = self.base_for(ctx.slot);
+                self.draw(
+                    ctx.target,
+                    Pipe::Image,
+                    BindKey::Video(*key),
                     verts,
                     ctx.scissor,
                     base,

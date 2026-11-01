@@ -10,7 +10,7 @@ use super::sample::{
 };
 use crate::anim::decimal_f32;
 use crate::assets::AssetStore;
-use crate::frame::{Affine, Node, Pose, Rect, TransitionDraw};
+use crate::frame::{Affine, Node, Pose, Rect, TransitionDraw, VideoKey};
 use crate::system::SystemState;
 use crate::ui::text::TextSystem;
 use crate::values::{Flip, Plane, Resize};
@@ -63,11 +63,13 @@ pub(crate) fn draw_screen(
     ScreenPlanes { world, over_window }
 }
 
-/// The natural size of an image layer's content: the image's, or the paint's.
+/// The natural size of an image or movie layer's content: the image's, the paint's or the
+/// video's.
 pub(crate) fn content_size(content: &VisualContent, assets: &AssetStore) -> Option<(u32, u32)> {
     match content {
         VisualContent::Image(id) => assets.image_size(*id),
         VisualContent::Paint(paint) => Some((paint.size[0], paint.size[1])),
+        VisualContent::Movie(movie) => assets.video_size(movie.video),
     }
 }
 
@@ -281,6 +283,19 @@ fn content_node(
             flip_x,
             flip_y,
         },
+        VisualContent::Movie(movie) => Node::Video {
+            rect: shown,
+            key: VideoKey {
+                entity: movie.entity,
+                video: movie.video,
+            },
+            position_ms: movie.position_ms,
+            looping: movie.looping,
+            uv,
+            flip_x,
+            flip_y,
+            tint: [1.0; 4],
+        },
     };
     Some((shown, node))
 }
@@ -392,7 +407,8 @@ fn text_node(layout: Rc<kagari_text::Layout>) -> (Rect, Node) {
 
 /// An entity: `Mix | Group(opacity) > Filter? > [screen fill?, Motion? > Group(M) > Masked? >
 /// local]`, where M places the entity's box (`T(pos)·R(rot)·S(scale)·T(−anchor·box)`). The box
-/// is the `MAIN` layer's box, else the fill size, else the label's size.
+/// is the `MAIN` layer's box, else the fill size, else the label's size, else the screen when
+/// the entity shows a movie. The movie is contain-fitted into the box, over the image layers.
 fn entity_node(
     e: &VisualEntity,
     screen: [f32; 2],
@@ -419,6 +435,7 @@ fn entity_node(
         .map(|[w, h]| (w, h))
         .or_else(|| e.fill_size.map(|[w, h]| (w as f32, h as f32)))
         .or(label_size)
+        .or_else(|| (!matches!(e.movie, VisualLayer::Empty)).then_some((screen[0], screen[1])))
         .unwrap_or((0.0, 0.0));
     let flip_x = matches!(e.flip, Flip::Horizontal | Flip::Both);
     let flip_y = matches!(e.flip, Flip::Vertical | Flip::Both);
@@ -460,6 +477,14 @@ fn entity_node(
         if let Some(node) = layer_node(&image.layer, place, flip_x, flip_y) {
             local.push(node);
         }
+    }
+    let place_movie = |content: &VisualContent| -> Option<(Rect, Rect)> {
+        let fit = [bw.max(0.0).round() as u32, bh.max(0.0).round() as u32];
+        let r = resize_content(content, Resize::Contain(fit), screen, assets)?;
+        Some(placed(r, [0.0, 0.0]))
+    };
+    if let Some(node) = layer_node(&e.movie, place_movie, flip_x, flip_y) {
+        local.push(node);
     }
     match &e.label {
         VisualLayer::Empty => {}

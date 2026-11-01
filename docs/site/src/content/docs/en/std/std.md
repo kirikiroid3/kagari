@@ -429,8 +429,6 @@ role, such as `ColorShader<A>`, and never names `ShaderAsset`.
 
 Which file formats a runtime decodes is listed in [Runtime Profiles](./appendix/profiles.md).
 
-- `VideoAsset` — Profile: not in `native_v0`.
-
 ## Function: `asset(path)`
 
 ```kis

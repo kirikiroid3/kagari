@@ -172,18 +172,26 @@ target/v0/
 | オーディオ、ボイス | Ogg Vorbis、Ogg FLAC、FLAC、WAV（PCM または IEEE 浮動小数点）、MP3、モノラルまたはステレオの AAC-LC（ADTS の `.aac`、または MP4/M4A）、モノラルまたはステレオの ALAC（MP4/M4A） |
 | フォント | TrueType、OpenType（CFF）、TrueType/OpenType コレクション |
 | シェーダー | WGSL ソース（UTF-8 テキスト） |
-| 動画 | なし |
+| 動画 | VP9 または AV1 の映像と Opus または Vorbis の音声（音声なしも可）の WebM、H.264 の映像と AAC-LC の音声（音声なしも可）の MP4 |
 
 RIFF または `data` チャンクのサイズがファイルの終端を越える WAV（ストリーミング用のエンコーダー、たとえばパイプへ書き出す ffmpeg や TTS サービスが残す `0xFFFFFFFF` のプレースホルダーなど）は、ファイルの終端まで再生されます。
 
 MP4/M4A ファイルは最初のオーディオトラックを再生します。`kagari build` はサンプル記述がファイルのどこにあっても読むので、インデックスが末尾にあるファイル（ffmpeg の既定）も受け付けます。ランタイムは AAC のエンコーダー遅延を取り除きません。AAC ファイルはエンコーダーのプライミング（通常 1024 サンプル、48 kHz で約 21 ms の無音）で始まり、パディングで終わります。ループ位置などの再生位置はプライミングの先頭から数えます。途切れずにループさせたい音楽には Ogg Vorbis、FLAC、WAV を使ってください。
 
-それ以外はすべて拒否されます。アニメーション WebP、算術・可逆・階層・12 ビット符号化の JPEG、GIF、JPEG または PNG を埋め込んだ BMP や CMYK の BMP、AVIF、アニメーションまたは CMYK の JPEG XL、Ogg Opus、その他のコーデックの Ogg、圧縮 WAV、HE-AAC など AAC-LC 以外の AAC プロファイル、3 チャンネル以上の AAC または ALAC、その他のコーデック（Opus、MP3、FLAC など）の MP4/M4A、WOFF、WOFF2 です。動画のアセットは内容にかかわらず拒否されます。問題はアセットとプロファイルの組ごとに 1 行ずつ出力されます。
+それ以外はすべて拒否されます。アニメーション WebP、算術・可逆・階層・12 ビット符号化の JPEG、GIF、JPEG または PNG を埋め込んだ BMP や CMYK の BMP、AVIF、アニメーションまたは CMYK の JPEG XL、Ogg Opus、その他のコーデックの Ogg、圧縮 WAV、HE-AAC など AAC-LC 以外の AAC プロファイル、3 チャンネル以上の AAC または ALAC、その他のコーデック（Opus、MP3、FLAC など）の MP4/M4A、WOFF、WOFF2 です。動画は、その他の映像コーデック（VP8、H.265 など）、2 つ以上の映像トラック、その他の音声コーデック、2 つ以上の音声トラック、WebM のその他のトラック、その他のコンテナのいずれかがあると拒否されます。問題はアセットとプロファイルの組ごとに 1 行ずつ出力されます。
 
 ```text
 error: asset `bgimage/title.gif` (image): GIF is not supported by runtime profile `native_v0`
-error: asset `movie/intro.webm` (video): video assets are not supported by runtime profile `native_v0`
+error: asset `movie/intro.webm` (video): WebM/Matroska with another codec, several video tracks or an unreadable header is not supported by runtime profile `native_v0`
 ```
+
+ムービーを VP9 と Opus の WebM に変換するには次のようにします。
+
+```sh
+ffmpeg -i in.mov -c:v libvpx-vp9 -c:a libopus out.webm
+```
+
+AV1 にするには `-c:v libsvtav1` を、H.264 にするには `-c:v libx264 -c:a aac` と `.mp4` の出力を使います。
 
 ### シェーダーの検査 {#shader-check}
 
@@ -205,10 +213,15 @@ error: shader `shader/broken.wgsl` (color): line 4: no definition in scope for i
 MyGame/
 ├── kagari-desktop-runtime      (kagari-desktop-runtime.exe on Windows; you may rename it)
 ├── vcruntime140.dll            (Windows only)
+├── avcodec-63.dll, avformat-63.dll, avutil-61.dll, swscale-10.dll, swresample-7.dll   (Windows)
+├── libavcodec.so.63, libavformat.so.63, libavutil.so.61, libswscale.so.10, libswresample.so.7   (Linux)
+├── ffmpeg-LICENSE.txt
 ├── game.kagari
 └── *.kiarchive
 ```
 
 ディレクトリ引数なしで起動すると、ランタイムは自身の実行ファイルのディレクトリで `game.kagari` を探します。設定とセーブはそこには書かれず、ユーザーごとのデータディレクトリに保存されます（[データディレクトリ](./runtime.md#data-directory)を参照）。プレイヤーには[システム要件](./runtime.md#system-requirements)に挙げたシステムライブラリが必要です。Windows のランタイムには Microsoft Visual C++ のランタイムライブラリ `vcruntime140.dll` が必要ですが、プレイヤーの Windows には入っていないことがよくあります。ランタイムの隣に置けば、インストールせずに使われます。使っているバージョンのものを `https://kagari-download.suitsu31.club/windows_x86_installer/<version>/vcruntime140.dll` からダウンロードしてください。
 
-[`kagari release`](./cli.md#kagari-release) は、このディレクトリの中身を Windows 用または Linux 用の ISO イメージとして作ります。ゲームをビルドし、`kagari` と同じバージョンのそのプラットフォーム向けランタイム（Windows 向けでは `vcruntime140.dll` も）をダウンロードして、`<out-dir>/release/<platform>/<name>.iso` に書き出します。Windows 用のイメージでは、ランタイムの名前は `run.exe` です。
+ランタイムは隣にある FFmpeg のライブラリでムービーをデコードし、これがないと起動しません。使っているバージョンのものを `https://kagari-download.suitsu31.club/windows_x86_installer/<version>/<file>`（Windows）または `https://kagari-download.suitsu31.club/linux_x86_bin/<version>/<file>`（Linux）から、一緒に配布するライセンス `ffmpeg-LICENSE.txt` とともにダウンロードしてください。
+
+[`kagari release`](./cli.md#kagari-release) は、このディレクトリの中身を Windows 用または Linux 用の ISO イメージとして作ります。ゲームをビルドし、`kagari` と同じバージョンのそのプラットフォーム向けランタイムと、FFmpeg のライブラリとそのライセンス（Windows 向けでは `vcruntime140.dll` も）をダウンロードして、`<out-dir>/release/<platform>/<name>.iso` に書き出します。Windows 用のイメージでは、ランタイムの名前は `run.exe` です。

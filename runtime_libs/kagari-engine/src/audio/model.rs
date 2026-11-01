@@ -6,8 +6,9 @@ use kagari_vm::AssetId;
 
 use super::{AudioCommand, Bus};
 use crate::anim::decimal_f32;
+use crate::assets::AssetStore;
 use crate::screen::model::LogicalScreen;
-use crate::values::{AudioFade, LoopSpec, SoundSpec, Volume};
+use crate::values::{AudioFade, LoopSpec, MovieSpec, SoundSpec, Volume};
 
 /// A game channel: the screen's `ChannelId`.
 pub(crate) use crate::screen::model::ChannelId as ChannelSlot;
@@ -18,6 +19,13 @@ struct ChannelPlay {
     id: Option<u64>,
 }
 
+/// A movie shown on an entity's movie layer; `id` is its audio, if it has any.
+struct MoviePlay {
+    entity: u32,
+    video: AssetId,
+    id: Option<u64>,
+}
+
 #[derive(Default)]
 struct GameAudio {
     music: ChannelPlay,
@@ -25,6 +33,9 @@ struct GameAudio {
     /// `(id, absolute end)`; `None`: unknown length.
     one_shots: Vec<(u64, Option<u64>)>,
     voice: Option<(u64, Option<u64>)>,
+    movies: Vec<MoviePlay>,
+    /// Movie audio is paused while a mode covers the game.
+    paused: bool,
 }
 
 impl GameAudio {
@@ -42,6 +53,7 @@ impl GameAudio {
             .filter_map(|play| play.id)
             .chain(self.one_shots.iter().map(|(id, _)| *id))
             .chain(self.voice.map(|(id, _)| id))
+            .chain(self.movies.iter().filter_map(|movie| movie.id))
     }
 }
 
@@ -56,6 +68,8 @@ struct Out {
     next_id: u64,
     commands: Vec<AudioCommand>,
     heard: Vec<AssetId>,
+    /// The movies that started since the last `drain_watched`.
+    watched: Vec<AssetId>,
 }
 
 impl Out {
@@ -167,6 +181,7 @@ impl AudioModel {
                 next_id: 1,
                 commands: Vec::new(),
                 heard: Vec::new(),
+                watched: Vec::new(),
             },
             bus_gain: [None; 3],
             game: None,
@@ -366,6 +381,88 @@ impl AudioModel {
         }
     }
 
+    /// Makes the movie audio follow the movies shown, by entity: a movie no longer shown
+    /// stops, and a new one with audio stops the one-shots and the voice and starts on the
+    /// Music bus (paused while the game is paused). Every new movie counts as watched. A movie
+    /// whose facts are unknown is retried at the next call.
+    pub fn sync_movies(&mut self, movies: &[(u32, MovieSpec)], assets: &AssetStore, now_ms: u64) {
+        let Some(game) = self.game.as_mut() else {
+            return;
+        };
+        let out = &mut self.out;
+        game.movies.retain(|play| {
+            let shown = movies
+                .iter()
+                .any(|(entity, spec)| *entity == play.entity && spec.video == play.video);
+            if !shown && let Some(id) = play.id {
+                out.stop(id, 0);
+            }
+            shown
+        });
+        for (entity, spec) in movies {
+            let playing = self.game.as_ref().is_some_and(|game| {
+                game.movies
+                    .iter()
+                    .any(|play| play.entity == *entity && play.video == spec.video)
+            });
+            if playing {
+                continue;
+            }
+            let Some(info) = assets.video_info(spec.video) else {
+                continue;
+            };
+            self.out.watched.push(spec.video);
+            let id = if info.has_audio {
+                self.stop_sounds(0, now_ms);
+                self.stop_voice();
+                let id = self.out.id();
+                self.out.commands.push(AudioCommand::PlayMovie {
+                    id,
+                    path: assets.path(spec.video).to_owned(),
+                    looping: spec.looping,
+                    gain: 1.0,
+                });
+                if self.game.as_ref().is_some_and(|game| game.paused) {
+                    self.out.commands.push(AudioCommand::Pause { id });
+                }
+                Some(id)
+            } else {
+                None
+            };
+            if let Some(game) = self.game.as_mut() {
+                game.movies.push(MoviePlay {
+                    entity: *entity,
+                    video: spec.video,
+                    id,
+                });
+            }
+        }
+    }
+
+    /// A mode covers the game: movie audio freezes with the story clock.
+    pub fn pause_movies(&mut self) {
+        self.set_movies_paused(true);
+    }
+
+    /// The game is back on top: movie audio continues.
+    pub fn resume_movies(&mut self) {
+        self.set_movies_paused(false);
+    }
+
+    fn set_movies_paused(&mut self, paused: bool) {
+        let Some(game) = self.game.as_mut() else {
+            return;
+        };
+        game.paused = paused;
+        for id in game.movies.iter().filter_map(|movie| movie.id) {
+            self.out.commands.push(if paused {
+                AudioCommand::Pause { id }
+            } else {
+                AudioCommand::Resume { id }
+            });
+        }
+    }
+
     /// When the current voice ends, in the story ms `play_voice` received; `None` when unknown
     /// or silent.
     pub fn voice_end_ms(&self) -> Option<u64> {
@@ -390,6 +487,11 @@ impl AudioModel {
     /// The assets that started playing since the last call.
     pub fn drain_heard(&mut self) -> Vec<AssetId> {
         std::mem::take(&mut self.out.heard)
+    }
+
+    /// The movies that started since the last call.
+    pub fn drain_watched(&mut self) -> Vec<AssetId> {
+        std::mem::take(&mut self.out.watched)
     }
 
     /// The crash path: everything stops at once.

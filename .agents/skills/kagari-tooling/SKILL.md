@@ -49,7 +49,8 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
   directories.
 - `kagari release` downloads nothing when the build fails, and its download URL layout
   (`<bucket dir>/<version>/kagari-desktop-runtime-<version>-x86_64-<os>[.exe]`, plus
-  `Platform::libraries` next to it: `vcruntime140.dll` for Windows) is a contract with
+  `Platform::libraries` next to it: `vcruntime140.dll` and the five FFmpeg DLLs for Windows, the
+  five FFmpeg `.so` files for Linux, `ffmpeg-LICENSE.txt` for both) is a contract with
   `.github/workflows/release.yml`: change both together, never move published files. The Windows
   image names the runtime `run.exe`. Its tests use a local server through `KAGARI_DOWNLOAD_URL`;
   no test touches the network.

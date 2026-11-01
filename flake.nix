@@ -31,9 +31,9 @@
         cargoBuildFlags = [ "-p" "kagari-cli" "-p" "kagari-desktop-runtime" ];
         # The tests run in the repository's own checks; they need no Nix sandbox.
         doCheck = false;
-        nativeBuildInputs = [ pkgs.pkg-config ];
-        # linked at build time: alsa-sys (cpal) and libudev-sys (gilrs)
-        buildInputs = [ pkgs.alsa-lib pkgs.udev ];
+        nativeBuildInputs = [ pkgs.pkg-config pkgs.rustPlatform.bindgenHook ];
+        # linked at build time: alsa-sys (cpal), libudev-sys (gilrs) and ffmpeg-sys-next (kagari-video)
+        buildInputs = [ pkgs.alsa-lib pkgs.udev pkgs.ffmpeg-headless ];
         # After fixup's --shrink-rpath, which would drop entries no DT_NEEDED uses.
         postFixup = ''
           patchelf --add-rpath ${lib.makeLibraryPath (runtimeLibs pkgs)} $out/bin/kagari-desktop-runtime
@@ -72,10 +72,13 @@
 
       devShells = forAll (pkgs: {
         default = pkgs.mkShell {
-          nativeBuildInputs = [ pkgs.pkg-config ];
-          # linked at build time: alsa-sys (cpal) and libudev-sys (gilrs)
-          buildInputs = [ pkgs.alsa-lib pkgs.udev ] ++ runtimeLibs pkgs;
-          LD_LIBRARY_PATH = lib.makeLibraryPath (runtimeLibs pkgs ++ [ pkgs.alsa-lib pkgs.udev ]);
+          # bindgenHook: the libc headers for bindgen (ffmpeg-sys-next)
+          nativeBuildInputs = [ pkgs.pkg-config pkgs.rustPlatform.bindgenHook ];
+          # linked at build time: alsa-sys (cpal), libudev-sys (gilrs) and ffmpeg-sys-next (kagari-video)
+          buildInputs = [ pkgs.alsa-lib pkgs.udev pkgs.ffmpeg-headless ] ++ runtimeLibs pkgs;
+          LD_LIBRARY_PATH = lib.makeLibraryPath (runtimeLibs pkgs ++ [ pkgs.alsa-lib pkgs.udev pkgs.ffmpeg-headless ]);
+          # bindgen (ffmpeg-sys-next) loads libclang
+          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
         };
       });
     };

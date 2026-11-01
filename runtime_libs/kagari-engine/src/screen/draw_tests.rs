@@ -11,11 +11,11 @@ use crate::frame::{Frame, MotionStage, ShaderEffect};
 use crate::saves::Timestamp;
 use crate::screen::sample::{
     VisualCamera, VisualContent, VisualEntity, VisualHud, VisualImageLayer, VisualLayer,
-    VisualPaint, VisualScreen,
+    VisualMovie, VisualPaint, VisualScreen,
 };
-use crate::test_support::{FakePlatform, STD_TYPES, engine};
+use crate::test_support::{FAKE_VIDEO, FakePlatform, STD_TYPES, VideoPlatform, engine};
 use crate::values::{Flip, Plane, Resize};
-use crate::{EngineState, Platform};
+use crate::{EngineState, Platform, VideoInfo};
 
 /// `FakePlatform`, except that PNG assets are a 100×200 image.
 struct PngPlatform;
@@ -43,6 +43,9 @@ impl Platform for PngPlatform {
     fn audio_duration_ms(&mut self, path: &str, bytes: &[u8]) -> Option<u32> {
         FakePlatform.audio_duration_ms(path, bytes)
     }
+    fn video_info(&mut self, _path: &str) -> Option<VideoInfo> {
+        None
+    }
     fn render_thumbnail(&mut self, f: &Frame, a: &AssetStore, w: u32, h: u32) -> Option<Vec<u8>> {
         FakePlatform.render_thumbnail(f, a, w, h)
     }
@@ -53,6 +56,58 @@ impl Platform for PngPlatform {
         7
     }
     fn set_title(&mut self, _title: &str) {}
+}
+
+/// Engine state with `m.webm` loaded as `info`; returns its id.
+fn movie_setup(info: VideoInfo) -> (EngineState, AssetId) {
+    let (_vm, mut state) = engine(STD_TYPES);
+    let program = state.program.clone();
+    let index = program
+        .module()
+        .assets
+        .iter()
+        .position(|a| program.string(a.path) == "m.webm")
+        .unwrap();
+    let id = AssetId(u32::try_from(index).unwrap());
+    state
+        .assets
+        .ensure_video(id, &mut VideoPlatform(info))
+        .unwrap();
+    (state, id)
+}
+
+/// The rect of the `Node::Video` of a movie-only entity showing `info`.
+fn movie_rect(info: VideoInfo) -> (f32, f32, f32, f32) {
+    let (mut state, video) = movie_setup(info);
+    let mut e = entity(1);
+    e.movie = VisualLayer::Shown(VisualContent::Movie(VisualMovie {
+        entity: 1,
+        video,
+        looping: false,
+        position_ms: 0,
+    }));
+    let planes = draw(&mut state, &screen(vec![e]));
+    let (_, children) = local(&world_children(&planes)[0]);
+    let Node::Video { rect, key, .. } = &children[0] else {
+        panic!("{children:?}")
+    };
+    assert_eq!((key.entity, key.video), (1, video));
+    (rect.x, rect.y, rect.w, rect.h)
+}
+
+#[test]
+fn movie_only_entity_fills_the_screen() {
+    assert_eq!(movie_rect(FAKE_VIDEO), (0.0, 0.0, 1280.0, 720.0));
+}
+
+#[test]
+fn movie_is_contain_fitted_and_centred() {
+    let info = VideoInfo {
+        width: 480,
+        height: 360,
+        ..FAKE_VIDEO
+    };
+    assert_eq!(movie_rect(info), (160.0, 0.0, 960.0, 720.0));
 }
 
 /// Engine state with `a.png` (100×200) loaded; returns its id.
@@ -92,6 +147,7 @@ fn entity(id: u32) -> VisualEntity {
         mix: None,
         mask: None,
         stages: Vec::new(),
+        movie: VisualLayer::Empty,
     }
 }
 

@@ -250,6 +250,7 @@ impl Resources<'_> {
         };
         match key {
             BindKey::Image(id) => self.textures.get_image(id).map(|e| e.bind.clone()),
+            BindKey::Video(key) => self.textures.video(key).map(|e| e.bind.clone()),
             BindKey::Thumb(slot) => self.textures.thumb(slot).map(|(_, e)| e.bind.clone()),
             BindKey::Still => self.still.map(|s| s.bind.clone()),
             BindKey::Atlas(page) => self.atlas.bind(page).cloned(),

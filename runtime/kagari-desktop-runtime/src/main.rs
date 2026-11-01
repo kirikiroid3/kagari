@@ -21,6 +21,7 @@ mod game;
 mod gpu;
 mod headless;
 mod input;
+mod movies;
 mod pads;
 mod platform;
 mod sounds;

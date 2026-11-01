@@ -70,7 +70,9 @@ kagari-desktop-runtime [OPTIONS] [GAME_DIR]
 
 ## ランタイムプロファイル `native_v0` {#runtime-profile-native_v0}
 
-デスクトップランタイムはランタイムプロファイル `native_v0` を実装しています。動画を除く std 全体です。対応するアセット形式は[ランタイムプロファイル](./projects.md#runtime-profiles)にあります。`kagari build` はデコードできないアセットと検証に通らないシェーダーを拒否するので、`runtime-compatibility = ["native_v0"]` でビルドできたゲームには実行時に非対応のアセットはありません。シェーダーにはストレージバッファを持つ GPU が必要で、モーションのシェーダーにはさらにコンピュートシェーダーが必要です。これらのない GPU では、ランタイムは警告をログに出し、その効果を設定されていないものとして描きます。STD リファレンスの[ランタイムプロファイル](../../std/appendix/profiles.md)も参照してください。
+デスクトップランタイムはランタイムプロファイル `native_v0` を実装しています。std 全体です。対応するアセット形式は[ランタイムプロファイル](./projects.md#runtime-profiles)にあります。`kagari build` はデコードできないアセットと検証に通らないシェーダーを拒否するので、`runtime-compatibility = ["native_v0"]` でビルドできたゲームには実行時に非対応のアセットはありません。シェーダーにはストレージバッファを持つ GPU が必要で、モーションのシェーダーにはさらにコンピュートシェーダーが必要です。これらのない GPU では、ランタイムは警告をログに出し、その効果を設定されていないものとして描きます。STD リファレンスの[ランタイムプロファイル](../../std/appendix/profiles.md)も参照してください。
+
+ムービーは、システムが提供していれば GPU の動画デコーダ（Linux では VA-API、Windows では Direct3D 11、macOS では VideoToolbox）で、なければソフトウェアでデコードします。ランタイムはムービーごとにどちらを使うかをターゲット `kagari::video` でログに出し（たとえば ``movie `movie/intro.webm`: vaapi decoding``）、フォールバックしたときは `video: hardware decoding unavailable (…); using software` を出します。間に合わなかったフレームは前のフレームを表示したままにし、ゲームがデコーダを待つことはありません。
 
 デバイスがなくてもランタイムは動作を続けます。
 
@@ -131,13 +133,13 @@ Windows ではランタイムは GUI プログラムです。エクスプロー�
 
 ## システム要件 {#system-requirements}
 
-実行時には、Vulkan、Metal、DirectX 12、OpenGL のいずれかの GPU ドライバが必要です。使えるハードウェアアダプタがない場合はソフトウェアのフォールバックアダプタを試し、それもなければステータス 4 で終了します。Linux ではさらに Wayland または X11、ALSA、libudev が必要です。ビルド済みの Linux 版は、glibc 2.35 以降の x86_64 で動作します（[Kagari のインストール](../../tutorial/install.md#linux)を参照）。Windows では Microsoft Visual C++ のランタイム `vcruntime140.dll` が必要です。Visual C++ 再頒布可能パッケージでインストールする（Kagari のインストーラーは、ないときにインストールします）か、ランタイムの隣に置きます（[ゲームの配布](./projects.md#shipping-a-game)を参照）。ないと Windows が「VCRUNTIME140.dll が見つからない」と報告し、ランタイムは起動しません。
+実行時には、Vulkan、Metal、DirectX 12、OpenGL のいずれかの GPU ドライバが必要です。使えるハードウェアアダプタがない場合はソフトウェアのフォールバックアダプタを試し、それもなければステータス 4 で終了します。Linux ではさらに Wayland または X11、ALSA、libudev、libva（Debian、Ubuntu では `libva2 libva-drm2`、Fedora では `libva`）が必要です。libva がないとランタイムは起動しません。ビルド済みの Linux 版は、glibc 2.35 以降の x86_64 で動作します（[Kagari のインストール](../../tutorial/install.md#linux)を参照）。ムービーは、ランタイムの実行ファイルの隣に同梱する FFmpeg のライブラリでデコードします（[ゲームの配布](./projects.md#shipping-a-game)を参照）。Windows では Microsoft Visual C++ のランタイム `vcruntime140.dll` が必要です。Visual C++ 再頒布可能パッケージでインストールする（Kagari のインストーラーは、ないときにインストールします）か、ランタイムの隣に置きます（[ゲームの配布](./projects.md#shipping-a-game)を参照）。ないと Windows が「VCRUNTIME140.dll が見つからない」と報告し、ランタイムは起動しません。
 
 ソースからランタイムをビルドするには、次のシステムパッケージが必要です。
 
 | システム | パッケージ |
 | -------- | ---------- |
-| Debian、Ubuntu | `libasound2-dev libudev-dev pkg-config` |
-| Fedora | `alsa-lib-devel systemd-devel` |
-| macOS、Windows | なし |
+| Debian、Ubuntu | `libasound2-dev libudev-dev pkg-config libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libclang-dev` |
+| Fedora | `alsa-lib-devel systemd-devel` と、FFmpeg の開発用ファイルおよび libclang |
+| macOS、Windows | FFmpeg の開発用ファイル（`FFMPEG_DIR`、vcpkg、pkg-config のいずれかで見つけます）と libclang |
 | NixOS | リポジトリで `direnv allow`（または `nix develop`）を実行すると、必要なものがそろった開発シェルに入ります |

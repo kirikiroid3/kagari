@@ -377,7 +377,8 @@ any studio bookkeeping.
 ```
 
 - `video` `VideoAsset` — the movie.
-- Returns: `bool` — whether `video` has ever played.
+- Returns: `bool` — whether `video` has ever started on screen (with or without audio). Replaying
+  steps while a save loads never marks a movie.
 - Kind: `fn` · Builtin: yes
 
 ## Function: `set_music(track, fade)` {#set_music}

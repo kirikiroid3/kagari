@@ -1,9 +1,9 @@
-//! GPU copies of images, save thumbnails and the still.
+//! GPU copies of images, save thumbnails, movie frames and the still.
 
 use std::collections::{HashMap, HashSet};
 
 use kagari_bytecode::AssetId;
-use kagari_engine::{AssetStore, ThumbKey};
+use kagari_engine::{AssetStore, ThumbKey, VideoKey};
 
 use crate::Gfx;
 use crate::layers::linear_texture;
@@ -13,6 +13,7 @@ const IMAGE_BUDGET: u64 = 512 * 1024 * 1024;
 
 /// One uploaded texture.
 pub(crate) struct Entry {
+    pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
     pub bind: wgpu::BindGroup,
     pub width: u32,
@@ -72,6 +73,7 @@ fn upload(gfx: &Gfx, label: &str, width: u32, height: u32, premultiplied: &[u8])
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
     let bind = gfx.pipes.textures(&gfx.device, &[&view]);
     Entry {
+        texture,
         view,
         bind,
         width,
@@ -80,13 +82,17 @@ fn upload(gfx: &Gfx, label: &str, width: u32, height: u32, premultiplied: &[u8])
     }
 }
 
-/// Image and thumbnail textures, plus a 1×1 white texture (the stand-in rule mask).
+/// Image, thumbnail and movie textures, plus a 1×1 white texture (the stand-in rule mask).
 pub(crate) struct TextureCache {
     images: HashMap<AssetId, Entry>,
     warned: HashSet<AssetId>,
     thumbs: HashMap<ThumbKey, (u64, Entry)>,
     /// Thumbnails refused by `set_thumbnail`, so they are warned about and offered once.
     rejected_thumbs: HashSet<(ThumbKey, u64)>,
+    /// The current frame of each movie; outside the image budget.
+    videos: HashMap<VideoKey, Entry>,
+    /// Movies with a frame refused by `set_video_frame`, warned about once.
+    rejected_videos: HashSet<VideoKey>,
     pub white: Entry,
     frame: u64,
 }
@@ -98,6 +104,8 @@ impl TextureCache {
             warned: HashSet::new(),
             thumbs: HashMap::new(),
             rejected_thumbs: HashSet::new(),
+            videos: HashMap::new(),
+            rejected_videos: HashSet::new(),
             white: upload(gfx, "kagari white", 1, 1, &[255; 4]),
             frame: 0,
         }
@@ -210,6 +218,59 @@ impl TextureCache {
         premultiply(&mut premultiplied);
         let entry = upload(gfx, "kagari thumbnail", width, height, &premultiplied);
         self.thumbs.insert(slot, (generation, entry));
+    }
+
+    /// The current frame of a movie.
+    pub fn video(&self, key: VideoKey) -> Option<&Entry> {
+        self.videos.get(&key)
+    }
+
+    /// Replaces the current frame of a movie: opaque sRGB RGBA8, rows packed. A frame of the
+    /// same size is written into the existing texture. A frame `thumbnail_problem` refuses is
+    /// ignored (warned once per movie); the previous frame stays.
+    pub fn set_video_frame(
+        &mut self,
+        gfx: &Gfx,
+        key: VideoKey,
+        width: u32,
+        height: u32,
+        rgba: &[u8],
+    ) {
+        let max_dim = gfx.device.limits().max_texture_dimension_2d;
+        if let Some(problem) = thumbnail_problem(width, height, rgba.len(), max_dim) {
+            if self.rejected_videos.insert(key) {
+                log::warn!("video {key:?} {problem}; frame ignored");
+            }
+            return;
+        }
+        if let Some(entry) = self.videos.get(&key)
+            && entry.width == width
+            && entry.height == height
+        {
+            gfx.queue.write_texture(
+                entry.texture.as_image_copy(),
+                rgba,
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(width.saturating_mul(4)),
+                    rows_per_image: Some(height),
+                },
+                wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+            );
+            return;
+        }
+        let entry = upload(gfx, "kagari video", width, height, rgba);
+        self.videos.insert(key, entry);
+    }
+
+    /// Drops a movie's texture once it is no longer shown.
+    pub fn remove_video(&mut self, key: VideoKey) {
+        self.videos.remove(&key);
+        self.rejected_videos.remove(&key);
     }
 
     /// Evicts least recently used images not used this frame while over the budget.

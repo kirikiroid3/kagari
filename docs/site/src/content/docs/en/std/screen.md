@@ -743,9 +743,8 @@ The [text layer](#labellayer), drawn above the parts and the movie. Kind: `const
 #[builtin] pub const fn movie(&mut self) -> &mut MovieLayer;
 ```
 
-The [movie layer](#movielayer), drawn above the parts. Kind: `const fn` · Builtin: yes · Profile:
-`native_v0` rejects video assets at build, so only `clear()` builds; the native renderer draws no
-movies.
+The [movie layer](#movielayer), drawn above the parts and under the label. Kind: `const fn` ·
+Builtin: yes.
 
 <a id="entity-set_flip"></a><a id="entity-set_fill_size"></a>
 
@@ -816,9 +815,10 @@ logical state does not change. Kind: `const fn` · Builtin: yes.
   label.
 - The anchor point sits at `position`. The entity's box (its size) is the
   [box](#resize) of the `MAIN` layer (the new content's during a swap), else the fill size, else
-  the label box. The `MAIN` layer is placed in the entity's box by the anchor; the other parts sit
-  at the box's top-left corner, each sized by its own resize. Scale and rotation pivot on the
-  anchor and apply after the resize, to the whole entity.
+  the label box, else the screen size when the entity shows a movie. The `MAIN` layer is placed
+  in the entity's box by the anchor; the movie is fitted inside the box (contain) and centred;
+  the other parts sit at the box's top-left corner, each sized by its own resize. Scale and
+  rotation pivot on the anchor and apply after the resize, to the whole entity.
 - An entity's effects nest, innermost first: the mask over the entity's box, then the local motion
   (and travel), then the filter, then the mix with the opacity. A fill without a fill size is
   drawn inside the filter and the mix but is neither moved nor masked.
@@ -1003,9 +1003,7 @@ impl Movie {
 ```
 
 A movie and whether it loops. `movie(v)` plays `v` once; `movie(v).looping()` loops it.
-Kind: `const fn` · Builtin: no · Profile: `native_v0` rejects video assets at build, so movies
-and `std::system::watched` cannot be used; the native renderer draws no movies and never fills
-the seen-movie set.
+Kind: `const fn` · Builtin: no.
 
 ### Struct: `MovieLayer` {#movielayer}
 
@@ -1019,6 +1017,16 @@ impl MovieLayer {
 
 The movie layer of an entity. `change(movie)` swaps the movie for `movie`; `clear()` swaps it for
 nothing. Kind: `const fn` · Builtin: yes.
+
+A movie starts with its swap. The step's timeline waits for a movie that does not loop to end,
+as it waits for [`screen.play(sound)`](#screen-play); a looping movie adds only its transition.
+The movie's clock runs even when the player turns animations off. While the same video stays on
+the same entity, it keeps playing across steps: `change(movie(V))` while `V` plays does not
+restart it. To restart it, `clear()` it and set it again in a later step.
+
+A movie's audio plays on the Music bus. Starting a movie that has audio stops the one-shot sounds
+and the voice. Game menus and overlays opened over the game pause the movie and its audio. A movie
+that cannot be read is not drawn and adds nothing to the timeline (the runtime logs a warning).
 
 ### Struct: `Swap` {#swap}
 

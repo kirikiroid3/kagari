@@ -46,6 +46,17 @@ pub enum AssetFormat {
     /// An MP4/M4A file whose first audio track holds another codec, ALAC with more than two
     /// channels, or a sample description that does not parse.
     Mp4Other,
+    /// WebM with one VP9 video track and at most one Opus or Vorbis audio track.
+    WebmVp9,
+    /// WebM with one AV1 video track and at most one Opus or Vorbis audio track.
+    WebmAv1,
+    /// MP4 with one H.264 video track and at most one AAC-LC audio track.
+    Mp4H264,
+    /// WebM or Matroska with another codec or track layout, or a header that does not parse.
+    WebmOther,
+    /// An MP4 video with another codec or track layout, or a sample description that does not
+    /// parse.
+    Mp4VideoOther,
     TrueType,
     OpenTypeCff,
     FontCollection,
@@ -96,6 +107,15 @@ pub fn describe(format: AssetFormat) -> &'static str {
         AssetFormat::Mp4Other => {
             "MP4/M4A with another codec, more than two channels or an unreadable sample description"
         }
+        AssetFormat::WebmVp9 => "WebM with VP9 video",
+        AssetFormat::WebmAv1 => "WebM with AV1 video",
+        AssetFormat::Mp4H264 => "MP4 with H.264 video",
+        AssetFormat::WebmOther => {
+            "WebM/Matroska with another codec, several video tracks or an unreadable header"
+        }
+        AssetFormat::Mp4VideoOther => {
+            "MP4 with another codec, several video tracks or an unreadable sample description"
+        }
         AssetFormat::TrueType => "TrueType font",
         AssetFormat::OpenTypeCff => "OpenType (CFF) font",
         AssetFormat::FontCollection => "TrueType/OpenType collection",
@@ -108,8 +128,8 @@ pub fn describe(format: AssetFormat) -> &'static str {
 
 /// Whether `profile` supports assets of `kind` at all.
 pub fn supports_kind(profile: RuntimeProfile, kind: AssetKind) -> bool {
-    match profile {
-        RuntimeProfile::NativeV0 => !matches!(kind, AssetKind::Video),
+    match (profile, kind) {
+        (RuntimeProfile::NativeV0, _) => true,
     }
 }
 
@@ -143,7 +163,7 @@ pub fn supports(profile: RuntimeProfile, kind: AssetKind, format: AssetFormat) -
             ),
             AssetKind::Font => matches!(format, F::TrueType | F::OpenTypeCff | F::FontCollection),
             AssetKind::Shader => matches!(format, F::Wgsl),
-            AssetKind::Video => false,
+            AssetKind::Video => matches!(format, F::WebmVp9 | F::WebmAv1 | F::Mp4H264),
         },
     }
 }

@@ -3,12 +3,14 @@
 ;
 ;   ISCC.exe /DAppVersion=0.1.0 /DNumericVersion=0.1.0 /DSourceDir=<dir> /DOutputDir=<dir> kagari.iss
 ;
-; SourceDir holds kagari.exe, kagari-desktop-runtime.exe, LICENSE and vc_redist.x64.exe (the
-; Visual C++ Redistributable of the Visual Studio that linked the executables). The installer is
-; per user: it installs into %LOCALAPPDATA%\Programs\Kagari and adds its bin directory to the
-; user's PATH. Installing another version replaces the installed one. The executables need the
-; MSVC C runtime (vcruntime140.dll): when no Redistributable at least as new as the bundled one is
-; registered, the installer runs the bundled one first, which asks for administrator rights.
+; SourceDir holds kagari.exe, kagari-desktop-runtime.exe, LICENSE, FFmpeg's DLLs (avcodec-63.dll,
+; avformat-63.dll, avutil-61.dll, swscale-10.dll, swresample-7.dll), ffmpeg-LICENSE.txt and
+; vc_redist.x64.exe (the Visual C++ Redistributable of the Visual Studio that linked the
+; executables). The installer is per user: it installs into %LOCALAPPDATA%\Programs\Kagari and
+; adds its bin directory to the user's PATH. Installing another version replaces the installed
+; one. The executables need the MSVC C runtime (vcruntime140.dll): when no Redistributable at
+; least as new as the bundled one is registered, the installer runs the bundled one first, which
+; asks for administrator rights.
 
 #ifndef AppVersion
   #error Define AppVersion, e.g. /DAppVersion=0.1.0
@@ -63,6 +65,12 @@ ja.VCRedistFailed=Kagari には Microsoft Visual C++ 再頒布可能パッケー
 Source: "{#SourceDir}\kagari.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
 Source: "{#SourceDir}\kagari-desktop-runtime.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
 Source: "{#SourceDir}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\avcodec-63.dll"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "{#SourceDir}\avformat-63.dll"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "{#SourceDir}\avutil-61.dll"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "{#SourceDir}\swscale-10.dll"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "{#SourceDir}\swresample-7.dll"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "{#SourceDir}\ffmpeg-LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\vc_redist.x64.exe"; Flags: dontcopy
 
 [Registry]

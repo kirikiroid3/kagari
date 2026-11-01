@@ -14,6 +14,68 @@ pub struct Frame {
     pub capture_still: bool,
 }
 
+impl Frame {
+    /// The movie frames this frame shows: one per key, depth first, with the larger position
+    /// when a key appears twice (both sides of a transition between the same video).
+    pub fn video_requests(&self) -> Vec<VideoRequest> {
+        let mut out: Vec<VideoRequest> = Vec::new();
+        collect_videos(&self.nodes, &mut out);
+        out
+    }
+}
+
+fn collect_videos(nodes: &[Node], out: &mut Vec<VideoRequest>) {
+    for node in nodes {
+        match node {
+            Node::Group { children, .. }
+            | Node::Filter { children, .. }
+            | Node::Mix { children, .. }
+            | Node::Masked { children, .. }
+            | Node::Motion { children, .. } => collect_videos(children, out),
+            Node::Transition { from, to, .. } => {
+                collect_videos(from, out);
+                collect_videos(to, out);
+            }
+            Node::Video {
+                key,
+                position_ms,
+                looping,
+                ..
+            } => match out.iter_mut().find(|r| r.key == *key) {
+                Some(request) => request.position_ms = request.position_ms.max(*position_ms),
+                None => out.push(VideoRequest {
+                    key: *key,
+                    position_ms: *position_ms,
+                    looping: *looping,
+                }),
+            },
+            Node::Paint { .. }
+            | Node::Image { .. }
+            | Node::Fill { .. }
+            | Node::NineSlice { .. }
+            | Node::Text { .. }
+            | Node::Still { .. }
+            | Node::Thumbnail { .. } => {}
+        }
+    }
+}
+
+/// A movie texture: the movie layer of one entity showing one video.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct VideoKey {
+    pub entity: u32,
+    pub video: AssetId,
+}
+
+/// The movie frame a renderer needs before drawing a frame: `key`'s video at `position_ms`
+/// (wrapped by the player when `looping`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VideoRequest {
+    pub key: VideoKey,
+    pub position_ms: u64,
+    pub looping: bool,
+}
+
 #[derive(Clone, Debug)]
 pub enum Node {
     /// Children drawn into an isolated layer, then composited source-over with `opacity`.
@@ -67,6 +129,18 @@ pub enum Node {
     Image {
         rect: Rect,
         image: AssetId,
+        uv: Rect,
+        flip_x: bool,
+        flip_y: bool,
+        tint: [f32; 4],
+    },
+    /// The current frame of a movie, drawn like an `Image` from the texture the platform
+    /// uploaded for `key` (see [`Frame::video_requests`]); nothing before the first upload.
+    Video {
+        rect: Rect,
+        key: VideoKey,
+        position_ms: u64,
+        looping: bool,
         uv: Rect,
         flip_x: bool,
         flip_y: bool,

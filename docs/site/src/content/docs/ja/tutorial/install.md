@@ -17,9 +17,9 @@ x86_64 の Linux で次を実行します。
 curl -fsSL https://kagari-download.suitsu31.club/installer.sh | bash
 ```
 
-スクリプトは最新版をダウンロードし、チェックサムを確かめてから `~/.local/share/kagari` にインストールし、2 つのプログラムを `~/.local/bin` にリンクします。管理者権限は不要です。`~/.local/bin` が `PATH` に含まれていない場合は、`~/.profile` に追加する行を表示します。追加したら新しいターミナルを開いてください。
+スクリプトは最新版をダウンロードし、チェックサムを確かめてから `~/.local/share/kagari` にインストールし（ランタイムがムービーの再生に使う FFmpeg のライブラリもプログラムの隣に置きます）、2 つのプログラムを `~/.local/bin` にリンクします。管理者権限は不要です。`~/.local/bin` が `PATH` に含まれていない場合は、`~/.profile` に追加する行を表示します。追加したら新しいターミナルを開いてください。
 
-Linux 版には glibc 2.35 以降（Ubuntu 22.04、Debian 12、Fedora 36 以降）が必要です。Alpine など musl ベースのディストリビューションには対応していません。ランタイムにはさらに ALSA と libudev、Wayland または X11、GPU ドライバが必要です。ALSA か libudev がなければスクリプトが警告します。[システム要件](../reference/tools/runtime.md#system-requirements)を参照してください。
+Linux 版には glibc 2.35 以降（Ubuntu 22.04、Debian 12、Fedora 36 以降）が必要です。Alpine など musl ベースのディストリビューションには対応していません。ランタイムにはさらに ALSA、libudev、libva（Debian、Ubuntu では `libasound2 libudev1 libva2 libva-drm2`、Fedora では `alsa-lib systemd-libs libva`）、Wayland または X11、GPU ドライバが必要です。これらのライブラリのどれかがなければスクリプトが警告します。[システム要件](../reference/tools/runtime.md#system-requirements)を参照してください。
 
 スクリプトは次のオプションを受け取ります（パイプで渡すときは `bash -s --` の後に書きます）。
 

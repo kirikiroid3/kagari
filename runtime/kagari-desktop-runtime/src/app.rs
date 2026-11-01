@@ -19,6 +19,7 @@ use crate::exit::{Failure, STOPPED, WINDOW};
 use crate::game;
 use crate::gpu;
 use crate::input::{self, HeldInputs};
+use crate::movies::Pace;
 use crate::pads::Pads;
 use crate::platform::{DesktopPlatform, SeedSource, TimeSource};
 use crate::store::Store;
@@ -32,7 +33,13 @@ pub fn run(cli: &Cli, dir: &Path, bytes: &[u8]) -> Result<u8, Failure> {
         Some(dir) => Store::fixed(dir.clone()),
         None => Store::by_title(),
     };
-    let mut platform = DesktopPlatform::new(dir, store, TimeSource::Local, SeedSource::System);
+    let mut platform = DesktopPlatform::new(
+        dir,
+        store,
+        TimeSource::Local,
+        SeedSource::System,
+        Pace::Live,
+    );
     let mut engine = game::boot(bytes, &mut platform)?;
     let debug = DebugPort::open(cli, dir, &mut engine)?;
 
@@ -288,6 +295,7 @@ impl App {
         if let Some(gpu) = self.platform.gpu.as_mut() {
             game::upload_thumbnails(&mut gpu.renderer, &self.engine, &frame);
         }
+        self.platform.update_movies(&frame, self.engine.assets());
         if !self.present(&frame, event_loop)
             && frame.capture_still
             && let Some(gpu) = self.platform.gpu.as_mut()

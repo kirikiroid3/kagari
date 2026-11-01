@@ -88,13 +88,20 @@ and saves are not kept.
 
 ## Runtime profile `native_v0`
 
-The desktop runtime implements the runtime profile `native_v0`: the whole std except video. Its
+The desktop runtime implements the runtime profile `native_v0`: the whole std. Its
 asset formats are listed in [Runtime profiles](./projects.md#runtime-profiles); `kagari build`
 rejects assets it cannot decode and shaders that do not validate, so a game that builds with
 `runtime-compatibility = ["native_v0"]` has no unsupported asset at run time. Shaders need a GPU
 with storage buffers, and motion shaders also compute shaders; on a GPU without them the runtime
 logs a warning and draws those effects as if they were not set. See also
 [Runtime Profiles](../../std/appendix/profiles.md) in the STD Reference.
+
+Movies are decoded with the GPU's video decoder where the system offers one (VA-API on Linux,
+Direct3D 11 on Windows, VideoToolbox on macOS), else in software. The runtime logs which one each
+movie uses under the target `kagari::video`, for example ``movie `movie/intro.webm`: vaapi
+decoding``, and `video: hardware decoding unavailable (…); using software` when it falls back. A
+frame that is not decoded in time keeps the previous one on screen; the game never waits for the
+decoder.
 
 The runtime keeps going when a device is missing:
 
@@ -177,10 +184,13 @@ Git Bash, or CI, wait for it as for any other program.
 
 At run time the runtime needs a GPU driver for Vulkan, Metal, DirectX 12 or OpenGL. When no
 hardware adapter is usable it tries a software fallback adapter before giving up with status 4.
-On Linux it also needs Wayland or X11, ALSA and libudev. The prebuilt Linux build runs on x86_64
-with glibc 2.35 or newer (see [Installing Kagari](../../tutorial/install.md#linux)). On Windows
-it needs the Microsoft Visual C++ runtime, `vcruntime140.dll`: installed by the Visual C++
-Redistributable (the Kagari installer installs it when missing) or placed next to the runtime
+On Linux it also needs Wayland or X11, ALSA, libudev and libva (Debian, Ubuntu: `libva2
+libva-drm2`; Fedora: `libva`); without libva it does not start. The prebuilt Linux build runs on
+x86_64 with glibc 2.35 or newer (see [Installing Kagari](../../tutorial/install.md#linux)). Movies
+are decoded by FFmpeg libraries shipped next to the runtime executable (see
+[Shipping a game](./projects.md#shipping-a-game)). On Windows it needs the Microsoft Visual C++
+runtime, `vcruntime140.dll`: installed by the Visual C++ Redistributable (the Kagari installer
+installs it when missing) or placed next to the runtime
 (see [Shipping a game](./projects.md#shipping-a-game)). Without it, Windows reports
 "VCRUNTIME140.dll was not found" and the runtime does not start.
 
@@ -188,7 +198,7 @@ Building the runtime from source needs these system packages:
 
 | System | Packages |
 | ------ | -------- |
-| Debian, Ubuntu | `libasound2-dev libudev-dev pkg-config` |
-| Fedora | `alsa-lib-devel systemd-devel` |
-| macOS, Windows | none |
+| Debian, Ubuntu | `libasound2-dev libudev-dev pkg-config libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libclang-dev` |
+| Fedora | `alsa-lib-devel systemd-devel` and the FFmpeg development files with libclang |
+| macOS, Windows | the FFmpeg development files (found through `FFMPEG_DIR`, vcpkg or pkg-config) and libclang |
 | NixOS | `direnv allow` (or `nix develop`) in the repository enters the dev shell with everything |
