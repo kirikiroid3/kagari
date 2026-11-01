@@ -205,7 +205,8 @@ jobs:
           Copy-Item target\release\kagari-desktop-runtime.exe "dist\kagari-desktop-runtime-$env:VERSION-x86_64-windows.exe"
           # FFmpeg: in the installer next to the runtime, and on its own for `kagari release --windows`.
           foreach ($file in "avcodec-63.dll", "avformat-63.dll", "avutil-61.dll", "swscale-10.dll", "swresample-7.dll") {
-            Copy-Item "ffmpeg-prefix\bin\$file" stage\, dist\
+            Copy-Item "ffmpeg-prefix\bin\$file" stage\
+            Copy-Item "ffmpeg-prefix\bin\$file" dist\
           }
           Copy-Item ffmpeg-prefix\ffmpeg-LICENSE.txt stage\
           Copy-Item ffmpeg-prefix\ffmpeg-LICENSE.txt dist\
