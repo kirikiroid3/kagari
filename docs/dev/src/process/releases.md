@@ -121,15 +121,23 @@ on `main` must let GitHub Actions push.
 `installer.sh` runs as `curl … | bash`; all its code is in functions and `main` is called on the
 last line, so a truncated download runs nothing. It refuses macOS, Windows shells, other
 architectures, musl and glibc older than `MIN_GLIBC`, and on NixOS points to the flake. It reads
-`linux_x86_bin/latest` unless given `--version`, checks the checksum, copies both binaries and
-the five FFmpeg libraries (mode 644; an archive without one is refused) into `$KAGARI_HOME/bin`
-(default `~/.local/share/kagari/bin`) through a temporary file and a rename (a running
-`kagari lsp` keeps its old file), copies `ffmpeg-LICENSE.txt` to `$KAGARI_HOME`, and links the
-binaries into `$KAGARI_BIN_DIR` (default `~/.local/bin`). It refuses to replace a file there that
-is not its own link, warns when `libasound.so.2`, `libudev.so.1`, `libva.so.2` or
-`libva-drm.so.2` is missing from the `ldconfig` cache (the runtime does not start without libva),
-and prints a `PATH` line when needed. `--uninstall` removes its links and `$KAGARI_HOME`.
+`linux_x86_bin/latest` unless given `--version`, checks the checksum, copies both binaries into
+`$KAGARI_HOME/bin` (default `~/.local/share/kagari/bin`) through a temporary file and a rename (a
+running `kagari lsp` keeps its old file), and links them into `$KAGARI_BIN_DIR` (default
+`~/.local/bin`). It refuses to replace a file there that is not its own link, and prints a `PATH`
+line when needed. `--uninstall` removes its links and `$KAGARI_HOME`.
 `KAGARI_DOWNLOAD_URL` points it at another server (for testing).
+
+What else it installs depends on the version, so `--version` can still install an older
+release. From `FFMPEG_SINCE` (0.3.0) on, the archive must hold the five FFmpeg libraries and
+`ffmpeg-LICENSE.txt` (an archive without one is refused before anything is replaced); the
+libraries go next to the binaries (mode 644, the same rename) and the licence to
+`$KAGARI_HOME`. An older version ships none, and installing one removes those files left by a
+newer one. The comparison uses the `x.y.z` part, so a development build `0.3.0-dev.<commit>`
+counts as 0.3.0: a branch that changes the shipped libraries bumps the workspace version before
+its development builds are installed this way. Afterwards it warns when `libasound.so.2` or
+`libudev.so.1` is missing from the `ldconfig` cache, and for versions with FFmpeg also
+`libva.so.2` and `libva-drm.so.2` (the runtime does not start without libva).
 
 ## The Windows installer
 
@@ -200,6 +208,7 @@ and add the libraries the runtime loads with `dlopen` (Wayland, xkbcommon, Vulka
 - New runtime system library: also `check_runtime_libraries` in `installer.sh` and the runtime's
   `RUNPATH` in `flake.nix` (see [Testing](./testing.md#toolchain-and-dev-shell)).
 - Another FFmpeg version or component: `packaging/ffmpeg/build.sh` (versions, SHA-256s, flags);
-  new sonames or DLL names also change `FFMPEG_LIBS` in `installer.sh`, `[Files]` in `kagari.iss`,
-  the workflow's lists and `Platform::libraries` in `kagari release` (published names are
-  add-only, as above).
+  new sonames or DLL names also change `installer.sh` (a new version threshold next to
+  `FFMPEG_SINCE` with its own list, so older versions still install theirs), `[Files]` in
+  `kagari.iss`, the workflow's lists and `Platform::libraries` in `kagari release` (published
+  names are add-only, as above).
