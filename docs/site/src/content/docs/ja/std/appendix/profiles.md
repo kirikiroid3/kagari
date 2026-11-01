@@ -25,11 +25,11 @@ runtime-compatibility = ["native_v0"]
 
 |モジュール|`native_v0` での対応|
 |---|---|
-|`std`（型、トレイト、`asset`、`system_font`）|対応。ただし `VideoAsset` のファイルは使えません（後述）|
+|`std`（型、トレイト、`asset`、`system_font`）|対応|
 |`std::time`|対応|
 |`std::narrative`|対応：`Say`、無効なアームを含む `Choice`、`rng_choose`、`Meta`、`Narrative` のすべてのメソッド。時間付き入力は予定で、どのプロファイルにもありません|
 |`std::narrative::text`|対応：ルビとモノルビ、すべてのテキスト効果（スタイル、圏点、表示速度、ポーズ、マーク）、`hanging_indent` と `vertical` を含む `TextStyle` のすべてのフィールド|
-|`std::screen`|対応。ただしムービーレイヤー（`Entity::movie`、`MovieLayer`）は、動画アセットが必要なため使えません|
+|`std::screen`|対応。ムービーレイヤー（`Entity::movie`、`MovieLayer`）も含みます|
 |`std::screen::shader`、`std::shaders`|対応。すべてのシェーダーは `kagari build` で検証されます。ストレージバッファを持たない GPU（モーションのロールではコンピュートを持たない GPU）では、ランタイムは効果をかけずに内容を描きます|
 |`std::screen::anim`|対応|
 |`std::screen::audio`|対応|
@@ -46,7 +46,7 @@ runtime-compatibility = ["native_v0"]
 |`ImageAsset`|PNG、ベースラインおよびプログレッシブ JPEG、非可逆・可逆・拡張（アルファまたはメタデータ付き）WebP、BMP（非圧縮、RLE またはビットフィールド）、静止画の JPEG XL（RGB またはグレースケール）|算術・可逆・階層・12 ビット符号化の JPEG、アニメーション WebP、GIF、JPEG または PNG を埋め込んだ BMP や CMYK の BMP、AVIF、アニメーションまたは CMYK の JPEG XL|
 |`AudioAsset`、`VoiceAsset`|Ogg Vorbis、Ogg FLAC、FLAC、WAV（PCM）、WAV（IEEE 浮動小数点）、MP3、モノラルまたはステレオの AAC-LC（ADTS または MP4/M4A）、モノラルまたはステレオの ALAC（MP4/M4A）|Ogg Opus、その他の Ogg コーデック、圧縮 WAV、HE-AAC などその他の AAC プロファイル、3 チャンネル以上の AAC または ALAC、その他のコーデックの MP4/M4A|
 |`FontAsset`|TrueType、OpenType（CFF）、TrueType/OpenType コレクション（`.ttc`）|WOFF、WOFF2|
-|`VideoAsset`|—|すべての形式：動画アセットには対応していません|
+|`VideoAsset`|VP9 または AV1 の映像と Opus または Vorbis の音声（音声なしも可）の WebM、H.264 の映像と AAC-LC の音声（音声なしも可）の MP4|VP8 などその他の映像コーデック、複数の映像トラック、その他の音声コーデック、その他のトラックを含む WebM、その他のコンテナ|
 |`ColorShader`、`MixShader`、`TextureShader`、`MaskShader`、`LocalMotionShader`、`TransitionalMotionShader`|そのロールとして検証を通る WGSL ソース（UTF-8 テキスト）|テキストでないデータ、誤りのある WGSL|
 
 ## 対応していないアイテムを使った場合 {#using-an-unsupported-item}
@@ -54,20 +54,18 @@ runtime-compatibility = ["native_v0"]
 **対応していないアセットはビルドを失敗させます。** プログラムが使うアセットのうち、列挙されたプロファイルがデコードできないものごとに、`kagari build` はエラーを 1 行出力し、何も出力ファイルを書きません。
 
 ```text
-error: asset `movie/intro.webm` (video): video assets are not supported by runtime profile `native_v0`
+error: asset `movie/intro.webm` (video): WebM/Matroska with another codec, several video tracks or an unreadable header is not supported by runtime profile `native_v0`
 error: asset `music/theme.ogg` (audio): Ogg Opus is not supported by runtime profile `native_v0`
 error: asset `bgimage/title.gif` (image): GIF is not supported by runtime profile `native_v0`
 ```
 
-したがって、`native_v0` を対象とするゲームは `VideoAsset` の定数をどこにも使えません。その他のアセットは対応する形式に変換してください。動画アセットを受け取るアイテムについては次のとおりです。
+このようなアセットは対応する形式に変換してください。ムービーなら、たとえば次のようにします。
 
-|アイテム|`kagari build` 時|`native_v0` の実行時|
-|---|---|---|
-|`MovieLayer::change(…)`（`Movie` は `VideoAsset` を保持します）|拒否（動画アセット）|—|
-|`system::watched(VIDEO)`|拒否（動画アセット）|—|
-|`Entity::movie()`、`MovieLayer::clear(…)`|受理|論理画面（セーブ、等価性、一貫性）には保持されますが、描画はされません。描くものがないためです|
+```sh
+ffmpeg -i in.mov -c:v libvpx-vp9 -c:a libopus out.webm
+```
 
-デスクトップランタイムのレンダラーは動画を再生しません。そのため `native_v0` ではムービーレイヤーがピクセルを生むことはなく、`watched` の集合が埋まることもありません。
+AV1 にするには `-c:v libsvtav1` を、H.264 にするには `-c:v libx264 -c:a aac` と `.mp4` の出力を使います。
 
 **不正なシェーダーはビルドを失敗させます。** `kagari build` はプログラムが使うすべてのシェーダーを、`std::shaders` のものも含め、その型が示すロールとしてコンパイルし、不正なシェーダーとロールの組ごとにエラーを 1 行出力します。誤りが `.wgsl` ファイル内にあればその行を示します。
 

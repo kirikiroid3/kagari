@@ -4,9 +4,10 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use kagari_engine::{AudioCommand, Bus};
+use kagari_video::{AudioDecoder, VideoError};
 use kira::sound::FromFileError;
 use kira::sound::static_sound::StaticSoundHandle;
-use kira::sound::streaming::StreamingSoundHandle;
+use kira::sound::streaming::{Decoder, StreamingSoundData, StreamingSoundHandle};
 use kira::sound::{PlaybackPosition, PlaybackState};
 use kira::track::{TrackBuilder, TrackHandle};
 use kira::{
@@ -133,6 +134,8 @@ struct PlayParams {
 enum Handle {
     Decoded(StaticSoundHandle),
     Streamed(StreamingSoundHandle<FromFileError>),
+    /// A movie's audio track.
+    Movie(StreamingSoundHandle<VideoError>),
 }
 
 impl Handle {
@@ -140,6 +143,7 @@ impl Handle {
         match self {
             Handle::Decoded(h) => h.state(),
             Handle::Streamed(h) => h.state(),
+            Handle::Movie(h) => h.state(),
         }
     }
 
@@ -147,6 +151,7 @@ impl Handle {
         match self {
             Handle::Decoded(h) => h.stop(tween),
             Handle::Streamed(h) => h.stop(tween),
+            Handle::Movie(h) => h.stop(tween),
         }
     }
 
@@ -154,7 +159,52 @@ impl Handle {
         match self {
             Handle::Decoded(h) => h.set_volume(volume, tween),
             Handle::Streamed(h) => h.set_volume(volume, tween),
+            Handle::Movie(h) => h.set_volume(volume, tween),
         }
+    }
+
+    fn pause(&mut self, tween: Tween) {
+        match self {
+            Handle::Decoded(h) => h.pause(tween),
+            Handle::Streamed(h) => h.pause(tween),
+            Handle::Movie(h) => h.pause(tween),
+        }
+    }
+
+    fn resume(&mut self, tween: Tween) {
+        match self {
+            Handle::Decoded(h) => h.resume(tween),
+            Handle::Streamed(h) => h.resume(tween),
+            Handle::Movie(h) => h.resume(tween),
+        }
+    }
+}
+
+/// A movie's audio track as a kira stream.
+struct MovieAudio(AudioDecoder);
+
+impl Decoder for MovieAudio {
+    type Error = VideoError;
+
+    fn sample_rate(&self) -> u32 {
+        self.0.sample_rate()
+    }
+
+    fn num_frames(&self) -> usize {
+        self.0.num_frames()
+    }
+
+    fn decode(&mut self) -> Result<Vec<kira::Frame>, VideoError> {
+        Ok(self
+            .0
+            .decode()?
+            .into_iter()
+            .map(|[left, right]| kira::Frame { left, right })
+            .collect())
+    }
+
+    fn seek(&mut self, index: usize) -> Result<usize, VideoError> {
+        self.0.seek(index)
     }
 }
 
@@ -211,10 +261,18 @@ impl AudioOut {
             return;
         }
         self.playing.retain(|_, p| {
-            if let Handle::Streamed(h) = &mut p.handle {
-                while let Some(e) = h.pop_error() {
-                    log::warn!("cannot stream `{}`: {e}", p.params.path);
+            match &mut p.handle {
+                Handle::Streamed(h) => {
+                    while let Some(e) = h.pop_error() {
+                        log::warn!("cannot stream `{}`: {e}", p.params.path);
+                    }
                 }
+                Handle::Movie(h) => {
+                    while let Some(e) = h.pop_error() {
+                        log::warn!("cannot stream `{}`: {e}", p.params.path);
+                    }
+                }
+                Handle::Decoded(_) => {}
             }
             p.handle.state() != PlaybackState::Stopped
         });
@@ -259,6 +317,9 @@ impl AudioOut {
                     None => log::debug!("audio: Stop for unknown sound {id}"),
                 },
                 AudioCommand::Restart { id } => match self.playing.get(&id) {
+                    Some(p) if matches!(p.handle, Handle::Movie(_)) => {
+                        log::debug!("audio: Restart for movie audio {id} ignored");
+                    }
                     Some(p) => {
                         let bus = p.bus;
                         let params = PlayParams {
@@ -269,6 +330,20 @@ impl AudioOut {
                         self.play(id, bus, params, platform);
                     }
                     None => log::debug!("audio: Restart for unknown sound {id}"),
+                },
+                AudioCommand::PlayMovie {
+                    id,
+                    path,
+                    looping,
+                    gain,
+                } => self.play_movie(id, path, looping, gain, platform),
+                AudioCommand::Pause { id } => match self.playing.get_mut(&id) {
+                    Some(p) => p.handle.pause(tw(0)),
+                    None => log::debug!("audio: Pause for unknown sound {id}"),
+                },
+                AudioCommand::Resume { id } => match self.playing.get_mut(&id) {
+                    Some(p) => p.handle.resume(tw(0)),
+                    None => log::debug!("audio: Resume for unknown sound {id}"),
                 },
             }
         }
@@ -281,6 +356,61 @@ impl AudioOut {
             Bus::Voice => 2,
         };
         self.buses.as_mut()?.get_mut(index)
+    }
+
+    /// Starts the audio track of the movie at `path` under `id` on the music bus, stopping
+    /// whatever played under it. A movie without audio plays nothing.
+    fn play_movie(
+        &mut self,
+        id: u64,
+        path: String,
+        looping: bool,
+        gain: f32,
+        platform: &mut DesktopPlatform,
+    ) {
+        if let Some(mut old) = self.playing.remove(&id) {
+            old.handle.stop(tw(0));
+        }
+        let Some(bytes) = platform.movie_bytes(&path) else {
+            return;
+        };
+        let decoder = match AudioDecoder::open(bytes) {
+            Ok(Some(decoder)) => decoder,
+            Ok(None) => return,
+            Err(e) => {
+                log::warn!("cannot play movie audio `{path}`: {e}");
+                return;
+            }
+        };
+        let mut data = StreamingSoundData::from_decoder(MovieAudio(decoder)).volume(db(gain));
+        if looping {
+            data = data.loop_region(..);
+        }
+        let Some(track) = self.bus(Bus::Music) else {
+            return;
+        };
+        match track.play(data) {
+            Ok(handle) => {
+                let params = PlayParams {
+                    path,
+                    start_ms: 0,
+                    end_ms: None,
+                    loop_region: None,
+                    gain,
+                    fade_in_ms: 0,
+                    delay_ms: 0,
+                };
+                self.playing.insert(
+                    id,
+                    Playing {
+                        handle: Handle::Movie(handle),
+                        bus: Bus::Music,
+                        params,
+                    },
+                );
+            }
+            Err(e) => log::warn!("cannot play movie audio `{path}`: {e}"),
+        }
     }
 
     /// Starts `params` under `id`, stopping whatever played under it.

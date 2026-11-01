@@ -12,8 +12,9 @@
 `rust-toolchain.toml` pins Rust **1.99**; rustup installs it on first use. Nothing else in the
 repository needs a specific Rust version.
 
-The desktop runtime links system libraries: ALSA (through `cpal`, used by `kira`) and libudev
-(through `gilrs`), and it loads Wayland, X11, xkbcommon, Vulkan and GL at run time. On NixOS the
+The desktop runtime links system libraries: ALSA (through `cpal`, used by `kira`), libudev
+(through `gilrs`) and FFmpeg (through `ffmpeg-next` in `kagari-video`, whose bindgen needs
+libclang), and it loads Wayland, X11, xkbcommon, Vulkan and GL at run time. On NixOS the
 flake's dev shell provides them:
 
 ```sh
@@ -25,8 +26,10 @@ The dev shell provides only system libraries and sets `LD_LIBRARY_PATH` for the 
 with `dlopen`; Rust itself still comes from rustup and `rust-toolchain.toml`. (The flake's
 packages, which build the release binaries with nixpkgs' Rust, are described in
 [Releases](./releases.md#nix).) On Debian/Ubuntu
-install `libasound2-dev libudev-dev pkg-config`, on Fedora `alsa-lib-devel systemd-devel`;
-macOS and Windows need nothing. The compiler and tooling crates need none of these.
+install `libasound2-dev libudev-dev pkg-config libavcodec-dev libavformat-dev libavutil-dev
+libswscale-dev libswresample-dev libclang-dev`, on Fedora `alsa-lib-devel systemd-devel` plus the
+FFmpeg development packages and `clang-devel`; macOS and Windows need FFmpeg (`FFMPEG_DIR`) and
+libclang (`LIBCLANG_PATH`). The compiler and tooling crates need none of these.
 
 ## Running the tests
 
@@ -82,11 +85,12 @@ explain is a bug. Delete the snapshot of a fixture you delete or rename; insta d
 | `kagari-bytecode`, `kagari-num`, `kagari-archive`, `kagari-compat`, `kagari-project` | Unit tests (`src/tests.rs`, `src/archive/tests.rs`, `src/save/tests.rs`): round trips, verifier rejections, corruption, arithmetic edge cases, manifest parsing | Built in the tests (`tempfile` for file systems) |
 | `kagari-vm` | `tests/vm.rs`: hand-assembled modules (`common::hand`) for instruction semantics and traps; `tests/story.rs`: story fibers on programs compiled from Kagari source (`common::compile`, a dev-dependency on `kagari-lang`) | `tests/common/mod.rs` |
 | `kagari-text` | `src/tests.rs`: ruby, kinsoku, vertical text, rasterization | `tests/fonts/kagari-test-cjk.otf` (OFL, see `OFL.txt`) |
-| `kagari-engine` | `src/tests/{story,saves,settings,reveal,reactive,focus}.rs` on a booted engine with `FakePlatform`; `src/values/tests.rs` | Sources compiled by `test_support::compile`; `tests/fixtures/std_types/main.kix` interns every std type of `values/table.rs` |
+| `kagari-engine` | `src/tests/{story,saves,settings,reveal,reactive,focus,movies}.rs` on a booted engine with `FakePlatform`; `src/values/tests.rs` | Sources compiled by `test_support::compile`; `tests/fixtures/std_types/main.kix` interns every std type of `values/table.rs` |
 | `kagari-render` | `src/tests.rs`: viewport letterboxing, blur weights, thumbnail limits; no GPU | — |
 | `kagari-cli` | `tests/{init,check,build,fmt}.rs` run the `kagari` binary in a temp dir with `HOME` and the XDG directories pointed at `tests/font_home`, whose only system font is `TestSans.ttf` | `tests/common/mod.rs`, `tests/font_home/` |
 | `kagari-lsp` | `tests/lsp.rs` drives the real server loop over an in-memory connection | Temp dirs |
 | `mdbook-kagari` | `src/tests.rs`: Kagari blocks become one-line `<pre>` blocks that stay inside list items and block quotes and show exactly the code; other blocks and text are untouched; Zed's capture precedence; snippets mixing statements and items | Inline Markdown |
+| `kagari-video` | `src/tests.rs`: probe, `frame_at` timing and seeks, and audio decoding and seeking of the accepted formats in software | `runtime_libs/kagari-compat/tests/fixtures/{vp9-opus.webm,av1.webm,h264-aac.mp4}` |
 | `kagari-desktop-runtime` | `src/tests.rs`: key mapping, headless script parsing and exit codes, store names | — |
 
 ## Adding tests

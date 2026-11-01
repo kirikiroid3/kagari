@@ -19,8 +19,8 @@
 <text x="282" y="40" class="kg-t kg-c kg-m">settle</text>
 <text x="282" y="58" class="kg-s kg-c">nav, story input</text>
 <rect x="348" y="20" width="104" height="50" rx="4" class="kg-box"/>
-<text x="400" y="40" class="kg-t kg-c kg-m">flush_heard</text>
-<text x="400" y="58" class="kg-s kg-c">heard set</text>
+<text x="400" y="40" class="kg-t kg-c kg-m">flush_played</text>
+<text x="400" y="58" class="kg-s kg-c">heard, watched</text>
 <path d="M96,45H110" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
 <path d="M216,45H228" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
 <path d="M334,45H346" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
@@ -46,7 +46,7 @@
 <text x="754" y="148" class="kg-s kg-c">fire audio</text>
 <rect x="820" y="110" width="104" height="50" rx="4" class="kg-box"/>
 <text x="872" y="130" class="kg-t kg-c">flush</text>
-<text x="872" y="148" class="kg-s kg-c">heard, stores</text>
+<text x="872" y="148" class="kg-s kg-c">played, stores</text>
 <path d="M96,135H110" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
 <path d="M216,135H228" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>
 <path d="M334,135H346" class="kg-ln" marker-end="url(#kg-arrow-engine-loop)"/>

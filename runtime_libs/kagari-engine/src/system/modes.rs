@@ -105,7 +105,9 @@ fn push(ctx: &mut HostCtx, vm: &mut Vm, kind: ModeKind, component: Value) -> Res
         if let Some(game) = state.game.as_mut() {
             game.clock.pause(now);
             let t = game.clock.story_ms(now);
-            game.screen.complete_all(t, &game.reveal, &mut state.audio);
+            game.screen
+                .complete_all(t, &game.reveal, &mut state.audio, &state.assets);
+            state.audio.pause_movies();
         }
     }
     let narrative = match kind {
@@ -186,6 +188,7 @@ fn apply(ctx: &mut HostCtx, vm: &mut Vm, op: NavOp) -> Result<(), Trap> {
                 && let Some(game) = ctx.state.game.as_mut()
             {
                 game.clock.resume(ctx.now_ms);
+                ctx.state.audio.resume_movies();
             }
             Ok(())
         }

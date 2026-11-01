@@ -1,5 +1,6 @@
-//! Decoded assets: images, fonts, shader sources, audio durations and save thumbnails. Assets
-//! load lazily from the platform on first use and stay cached for the process lifetime.
+//! Decoded assets: images, fonts, shader sources, audio durations, video facts and save
+//! thumbnails. Assets load lazily from the platform on first use and stay cached for the process
+//! lifetime.
 
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -38,6 +39,15 @@ pub struct Thumbnail {
     pub rgba: Arc<[u8]>,
 }
 
+/// The facts the engine needs about a movie: its size, its length and whether it has audio.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VideoInfo {
+    pub width: u32,
+    pub height: u32,
+    pub duration_ms: u32,
+    pub has_audio: bool,
+}
+
 pub struct AssetStore {
     program: Rc<Program>,
     /// Indexed by `AssetId.0`.
@@ -45,6 +55,8 @@ pub struct AssetStore {
     fonts: Fonts,
     font_ids: Vec<Option<FontId>>,
     audio_ms: Vec<Option<Option<u32>>>,
+    /// Movie facts; `Some(None)` once a movie failed to read or decode.
+    videos: Vec<Option<Option<VideoInfo>>>,
     /// WGSL sources, indexed like `images`.
     shaders: Vec<Option<Rc<str>>>,
     thumbs: HashMap<ThumbKey, Thumbnail>,
@@ -64,6 +76,7 @@ impl AssetStore {
             fonts: Fonts::new(),
             font_ids: vec![None; count],
             audio_ms: vec![None; count],
+            videos: vec![None; count],
             shaders: vec![None; count],
             thumbs: HashMap::new(),
             next_generation: 1,
@@ -85,6 +98,15 @@ impl AssetStore {
 
     pub fn image_size(&self, id: AssetId) -> Option<(u32, u32)> {
         self.image(id).map(|image| (image.width, image.height))
+    }
+
+    /// The facts of a movie loaded by `ensure_video`; `None` before that or when it is unreadable.
+    pub fn video_info(&self, id: AssetId) -> Option<VideoInfo> {
+        (*self.videos.get(index(id))?)?
+    }
+
+    pub fn video_size(&self, id: AssetId) -> Option<(u32, u32)> {
+        self.video_info(id).map(|info| (info.width, info.height))
     }
 
     /// The WGSL source of a loaded shader asset.
@@ -252,6 +274,26 @@ impl AssetStore {
             *slot = Some(duration);
         }
         Ok(duration)
+    }
+
+    /// Asks the platform about a movie once. A movie that cannot be read or decoded is logged and
+    /// cached as unreadable: it is not drawn, and it adds nothing to the timeline.
+    pub(crate) fn ensure_video(&mut self, id: AssetId, p: &mut dyn Platform) -> Result<(), Trap> {
+        if matches!(self.videos.get(index(id)), Some(Some(_))) {
+            return Ok(());
+        }
+        self.check_kind(id, |k| k == AssetKind::Video, "a video")?;
+        let info = p.video_info(self.path(id));
+        if info.is_none() {
+            log::warn!(
+                "video `{}`: cannot be read or decoded; not drawn",
+                self.path(id)
+            );
+        }
+        if let Some(slot) = self.videos.get_mut(index(id)) {
+            *slot = Some(info);
+        }
+        Ok(())
     }
 }
 

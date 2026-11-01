@@ -148,6 +148,11 @@ const fn mio_enters(mut screen: Screen) -> Screen {
 `set_flip`、`set_fill_size`、`gate` と、画像レイヤーの `set_resize`（レイヤーが内容をどの大きさに
 するか。[`Resize`](../../std/screen.md#resize) を参照）です。
 
+ムービーレイヤー（`entity.movie()`）は、差し替えから動画を再生します。動画はエンティティの矩形に
+収まるように置かれて中央に寄せられ、画像パーツの上、ラベルの下に描かれます。ステップは、効果音を
+待つのと同じように、ループしないムービーの終わりを待ちます。ループするムービーはステップを引き
+止めません。[`MovieLayer`](../../std/screen.md#movielayer) を参照してください。
+
 ### アニメーションは論理画面を変えない {#animations-never-change-the-logical-screen}
 
 ステップの **論理画面** は、レンダー後に残る永続的な状態です。

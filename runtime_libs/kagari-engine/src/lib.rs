@@ -59,11 +59,11 @@ use std::sync::Arc;
 use kagari_vm::{Program, Trap, Vm};
 use sha2::Digest;
 
-pub use assets::{AssetStore, ImageData, Thumbnail};
+pub use assets::{AssetStore, ImageData, Thumbnail, VideoInfo};
 pub use audio::{AudioCommand, Bus};
 pub use frame::{
     Affine, Dir, Frame, MotionStage, Node, Pose, Rect, Reveal, ShaderEffect, ThumbKey,
-    TransitionDraw,
+    TransitionDraw, VideoKey, VideoRequest,
 };
 pub use input::{InputEvent, Key, MouseButton, PadButton};
 pub use saves::Timestamp;
@@ -76,6 +76,8 @@ pub trait Platform {
     /// The bytes of the asset at a bytecode asset path.
     fn read_asset(&mut self, path: &str) -> std::io::Result<Option<Vec<u8>>>;
     fn audio_duration_ms(&mut self, path: &str, bytes: &[u8]) -> Option<u32>;
+    /// The movie at an asset path; `None` when it is missing or cannot be decoded.
+    fn video_info(&mut self, path: &str) -> Option<VideoInfo>;
     /// `frame` rendered offscreen at `width`×`height`: straight-alpha sRGB RGBA8, row-major;
     /// `None` on failure. `assets` supplies the images and, through `assets.fonts()`, the glyphs.
     fn render_thumbnail(
@@ -305,7 +307,7 @@ impl Engine {
             input::dispatch(ctx, vm, event)?;
             system::modes::settle(ctx, vm)?;
             let state = &mut *ctx.state;
-            audio::flush_heard(&mut state.audio, &mut state.system, &mut state.ui);
+            audio::flush_played(&mut state.audio, &mut state.system, &mut state.ui);
             Ok(())
         });
     }
@@ -330,9 +332,10 @@ impl Engine {
             let state = &mut *ctx.state;
             if let Some(game) = state.game.as_mut() {
                 let t = game.clock.story_ms(now_ms);
-                game.screen.tick(t, &game.reveal, &mut state.audio);
+                game.screen
+                    .tick(t, &game.reveal, &mut state.audio, &state.assets);
             }
-            audio::flush_heard(&mut state.audio, &mut state.system, &mut state.ui);
+            audio::flush_played(&mut state.audio, &mut state.system, &mut state.ui);
             flush_stores(ctx, vm);
             Ok(())
         });

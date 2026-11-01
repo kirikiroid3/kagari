@@ -27,6 +27,8 @@ INSTALL_HOME="${KAGARI_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/kagari}"
 BIN_DIR="${KAGARI_BIN_DIR:-$HOME/.local/bin}"
 TUTORIAL_URL="https://kagari.suitsu31.club/en/tutorial/install/"
 COMMANDS=(kagari kagari-desktop-runtime)
+# FFmpeg, shipped next to the commands (the runtime's RUNPATH is `$ORIGIN`).
+FFMPEG_LIBS=(libavcodec.so.63 libavformat.so.63 libavutil.so.61 libswscale.so.10 libswresample.so.7)
 # The Linux binaries are built on Ubuntu 22.04.
 MIN_GLIBC="2.35"
 
@@ -118,7 +120,7 @@ check_runtime_libraries() {
     fi
     local cache missing=() lib
     cache="$("$ldconfig" -p 2>/dev/null || true)"
-    for lib in libasound.so.2 libudev.so.1; do
+    for lib in libasound.so.2 libudev.so.1 libva.so.2 libva-drm.so.2; do
         case "$cache" in
             *"$lib "*) ;;
             *) missing+=("$lib") ;;
@@ -126,8 +128,9 @@ check_runtime_libraries() {
     done
     if [ "${#missing[@]}" -gt 0 ]; then
         say "warning: kagari-desktop-runtime needs ${missing[*]}, which this system does not have."
-        say "  Install ALSA and libudev with your package manager (Debian/Ubuntu: libasound2 libudev1;"
-        say "  Fedora: alsa-lib systemd-libs). The kagari command works without them."
+        say "  Install ALSA, libudev and libva with your package manager (Debian/Ubuntu: libasound2"
+        say "  libudev1 libva2 libva-drm2; Fedora: alsa-lib systemd-libs libva). The kagari command"
+        say "  works without them."
     fi
 }
 
@@ -156,9 +159,12 @@ install_kagari() {
 
     tar -xzf "$TMP_DIR/$name.tar.gz" -C "$TMP_DIR"
     local unpacked="$TMP_DIR/$name"
-    local cmd
+    local cmd lib
     for cmd in "${COMMANDS[@]}"; do
         [ -f "$unpacked/$cmd" ] || die "the archive has no $cmd"
+    done
+    for lib in "${FFMPEG_LIBS[@]}"; do
+        [ -f "$unpacked/$lib" ] || die "the archive has no $lib"
     done
 
     mkdir -p "$INSTALL_HOME/bin" "$BIN_DIR"
@@ -169,6 +175,11 @@ install_kagari() {
         fi
     done
     # Copy next to the target, then rename: a running `kagari lsp` keeps its old file.
+    for lib in "${FFMPEG_LIBS[@]}"; do
+        cp "$unpacked/$lib" "$INSTALL_HOME/bin/.$lib.new"
+        chmod 644 "$INSTALL_HOME/bin/.$lib.new"
+        mv -f "$INSTALL_HOME/bin/.$lib.new" "$INSTALL_HOME/bin/$lib"
+    done
     for cmd in "${COMMANDS[@]}"; do
         cp "$unpacked/$cmd" "$INSTALL_HOME/bin/.$cmd.new"
         chmod 755 "$INSTALL_HOME/bin/.$cmd.new"
@@ -177,6 +188,9 @@ install_kagari() {
     done
     if [ -f "$unpacked/LICENSE" ]; then
         cp "$unpacked/LICENSE" "$INSTALL_HOME/LICENSE"
+    fi
+    if [ -f "$unpacked/ffmpeg-LICENSE.txt" ]; then
+        cp "$unpacked/ffmpeg-LICENSE.txt" "$INSTALL_HOME/ffmpeg-LICENSE.txt"
     fi
 
     local installed

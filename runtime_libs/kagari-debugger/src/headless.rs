@@ -6,7 +6,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use kagari_archive::archive::ArchiveDir;
-use kagari_engine::{AssetStore, Engine, Frame, Platform, Timestamp};
+use kagari_engine::{AssetStore, Engine, Frame, Platform, Timestamp, VideoInfo};
 
 use crate::frames::Artifact;
 use crate::server::Server;
@@ -17,8 +17,8 @@ use crate::transport::Link;
 pub const BYTECODE_FILE: &str = "game.kagari";
 
 /// A platform for the query engine: assets from the game directory's archives, stores in
-/// memory (empty at boot, never written to disk), no audio lengths, no thumbnails, a fixed
-/// time and seed.
+/// memory (empty at boot, never written to disk), no audio lengths, no movie facts, no
+/// thumbnails, a fixed time and seed.
 pub struct HeadlessPlatform {
     dir: PathBuf,
     archives: ArchiveDir,
@@ -59,6 +59,10 @@ impl Platform for HeadlessPlatform {
     }
 
     fn audio_duration_ms(&mut self, _path: &str, _bytes: &[u8]) -> Option<u32> {
+        None
+    }
+
+    fn video_info(&mut self, _path: &str) -> Option<VideoInfo> {
         None
     }
 

@@ -16,18 +16,27 @@ use crate::frame::Frame;
 use crate::host::Bindings;
 use crate::saves::Timestamp;
 use crate::screen::ScreenImport;
-use crate::{EngineState, HostCtx, Platform};
+use crate::{EngineState, HostCtx, Platform, VideoInfo};
+
+/// Every video of [`FakePlatform`]: 640×360, two seconds, with audio.
+pub(crate) const FAKE_VIDEO: VideoInfo = VideoInfo {
+    width: 640,
+    height: 360,
+    duration_ms: 2000,
+    has_audio: true,
+};
 
 /// The fixture that interns every std type of `values/table.rs`.
 pub(crate) const STD_TYPES: &str = include_str!("../tests/fixtures/std_types/main.kix");
 
 /// The empty asset files every fixture compiles with.
-const ASSETS: [&str; 12] = [
+const ASSETS: [&str; 13] = [
     "font.ttf",
     "a.png",
     "a.ogg",
     "v.ogg",
     "m.webm",
+    "n.webm",
     "glow.wgsl",
     "sepia.wgsl",
     "blend.wgsl",
@@ -60,8 +69,8 @@ pub(crate) fn compile(source: &str) -> Vec<u8> {
 /// The font every font asset reads as.
 const TEST_FONT: &[u8] = include_bytes!("../../kagari-text/tests/fonts/kagari-test-cjk.otf");
 
-/// A platform whose fonts are the test font and whose other assets are empty files lasting one
-/// second.
+/// A platform whose fonts are the test font and whose other assets are empty files: audio lasts
+/// one second, and videos are [`FAKE_VIDEO`].
 pub(crate) struct FakePlatform;
 
 impl Platform for FakePlatform {
@@ -89,6 +98,10 @@ impl Platform for FakePlatform {
         Some(1000)
     }
 
+    fn video_info(&mut self, _path: &str) -> Option<VideoInfo> {
+        Some(FAKE_VIDEO)
+    }
+
     fn render_thumbnail(
         &mut self,
         _frame: &Frame,
@@ -114,6 +127,40 @@ impl Platform for FakePlatform {
         7
     }
 
+    fn set_title(&mut self, _title: &str) {}
+}
+
+/// `FakePlatform`, except that every video is `.0`.
+pub(crate) struct VideoPlatform(pub VideoInfo);
+
+impl Platform for VideoPlatform {
+    fn read_store(&mut self, name: &str) -> std::io::Result<Option<Vec<u8>>> {
+        FakePlatform.read_store(name)
+    }
+    fn write_store(&mut self, name: &str, bytes: &[u8]) -> std::io::Result<()> {
+        FakePlatform.write_store(name, bytes)
+    }
+    fn delete_store(&mut self, name: &str) -> std::io::Result<()> {
+        FakePlatform.delete_store(name)
+    }
+    fn read_asset(&mut self, path: &str) -> std::io::Result<Option<Vec<u8>>> {
+        FakePlatform.read_asset(path)
+    }
+    fn audio_duration_ms(&mut self, path: &str, bytes: &[u8]) -> Option<u32> {
+        FakePlatform.audio_duration_ms(path, bytes)
+    }
+    fn video_info(&mut self, _path: &str) -> Option<VideoInfo> {
+        Some(self.0)
+    }
+    fn render_thumbnail(&mut self, f: &Frame, a: &AssetStore, w: u32, h: u32) -> Option<Vec<u8>> {
+        FakePlatform.render_thumbnail(f, a, w, h)
+    }
+    fn local_time(&self) -> Timestamp {
+        FakePlatform.local_time()
+    }
+    fn random_seed(&mut self) -> u64 {
+        7
+    }
     fn set_title(&mut self, _title: &str) {}
 }
 

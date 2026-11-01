@@ -15,8 +15,9 @@ use crate::values::{self, decode_audio_fade, decode_loop_spec, host_trap, loop_v
 
 pub(crate) use model::AudioModel;
 
-/// Records what started playing as heard; a new entry invalidates `Heard`.
-pub(crate) fn flush_heard(
+/// Records what started playing as heard and the movies that started as watched; a new entry
+/// invalidates `Heard` or `Watched`.
+pub(crate) fn flush_played(
     audio: &mut AudioModel,
     system: &mut crate::system::SystemState,
     ui: &mut crate::ui::UiState,
@@ -24,6 +25,11 @@ pub(crate) fn flush_heard(
     for id in audio.drain_heard() {
         if system.mark_heard(id) {
             ui.invalidate(crate::ui::SourceKey::Heard(id));
+        }
+    }
+    for id in audio.drain_watched() {
+        if system.mark_watched(id) {
+            ui.invalidate(crate::ui::SourceKey::Watched(id));
         }
     }
 }
@@ -65,6 +71,22 @@ pub enum AudioCommand {
         fade_out_ms: u32,
     },
     Restart {
+        id: u64,
+    },
+    /// The audio of the movie at `path`, on the Music bus, from its start; `looping` loops the
+    /// whole movie.
+    PlayMovie {
+        id: u64,
+        path: String,
+        looping: bool,
+        gain: f32,
+    },
+    /// Freezes a playing sound where it is.
+    Pause {
+        id: u64,
+    },
+    /// Continues a paused sound.
+    Resume {
         id: u64,
     },
 }

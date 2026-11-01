@@ -23,15 +23,16 @@ and [Headless Mode](https://kagari.suitsu31.club/en/reference/tools/headless/).
 | `debug.rs` | `DebugPort`: the debug channel (`--debug-port`, `--debug-stdio`) |
 | `gpu.rs` | adapter, device and `Renderer` creation; out-of-memory and device-lost tracking |
 | `platform.rs` | `DesktopPlatform`: the engine's `Platform` |
+| `movies.rs` | `Movies`: movie bytes and facts, one player per `VideoKey`, frame uploads ([Movies](#movies)) |
 | `store.rs` | settings and saves on disk |
-| `audio.rs`, `sounds.rs` | the kira backend and the sound cache (short sounds decoded, long ones streamed) |
+| `audio.rs`, `sounds.rs` | the kira backend (movie audio included) and the sound cache (short sounds decoded, long ones streamed) |
 | `input.rs`, `pads.rs` | winit keyboard and mouse mapping, gilrs gamepads |
 | `headless/mod.rs`, `headless/script.rs` | headless sessions and the script parser |
 | `tests.rs` | key mapping, script parsing, store naming, audio spans, WAV sizes past the end of the file, streaming of long sounds |
 
 | Path (`runtime/kagari-desktop-runtime/`) | Contents |
 | ---------------------------------------- | -------- |
-| `build.rs`, `kagari-desktop-runtime.rc` | Windows only: compiles the resource script with `embed-resource` (`rc.exe`; `llvm-rc` when cross-compiling) into the executable; a build that cannot compile it fails |
+| `build.rs`, `kagari-desktop-runtime.rc` | Windows: compiles the resource script with `embed-resource` (`rc.exe`; `llvm-rc` when cross-compiling) into the executable; a build that cannot compile it fails. Linux: links the binaries with RUNPATH `$ORIGIN`, so the FFmpeg libraries shipped next to them are found |
 | `resources/kagari.ico` | The Kagari logo as icon resource 1: the `.exe`'s icon in Explorer, and the window's title bar and taskbar icon (`app.rs`, `with_logo`, which loads it with winit's `Icon::from_resource`; other platforms leave the icon to the desktop) |
 
 `kagari.ico` is rendered from the site's `docs/site/public/logo.svg` (its light colours) at 16, 20,
@@ -88,11 +89,12 @@ process.
 | `read_store`, `write_store`, `delete_store` | `Store` ([Stores](#stores)) |
 | `read_asset` | `kagari_archive::archive::ArchiveDir::read` |
 | `audio_duration_ms` | load through `SoundCache::load` (the container's length for a streamed sound) and take the duration; works without an audio device |
+| `video_info` | `Movies::info`: `kagari_video::probe` on the movie's bytes, cached per path; an unreadable movie is warned once |
 | `render_thumbnail` | `Renderer::render_to_rgba` on the platform's `Gpu`; `None` (with a warning) before the GPU exists |
 | `local_time` | `jiff::Zoned::now()`, or the fixed headless time |
 | `random_seed` | system time in nanoseconds XOR the process id, or the fixed headless seed |
 | `set_title` | resolves the data directory from the title, unless it is fixed |
-| `program_changed` | after a hot swap: opens the archives again, drops the cached sounds and creates the `Renderer` again (its textures and pipelines are keyed by the old build's asset ids) |
+| `program_changed` | after a hot swap: opens the archives again, drops the cached sounds and movies (`Movies::reset`) and creates the `Renderer` again (its textures and pipelines are keyed by the old build's asset ids) |
 
 ### Archives
 
@@ -148,7 +150,8 @@ time does not eat into the first animations. The engine booted at 0, before that
 4. Pass `take_audio()` to the audio backend.
 5. Apply the `WindowState`: exit on `quit`; update the title and fullscreen state when they
    changed.
-6. `Engine::frame(now)`, upload stale save thumbnails, then present: letterbox the design target
+6. `Engine::frame(now)`, upload stale save thumbnails, decode and upload the frame's movies
+   (`DesktopPlatform::update_movies`, [Movies](#movies)), then present: letterbox the design target
    into the surface texture and present it (`Fifo`, so the loop runs at the display rate).
 7. If nothing could be presented but the frame has `capture_still`, render it offscreen anyway: the
    engine draws `Node::Still` from the next frame on and needs the still to exist.
@@ -180,7 +183,14 @@ flag that every frame checks; the device is never recreated.
   `clamp_span`: a start or end past the audio is clamped to its end (with a warning), an end before
   the start is ignored, a loop region (in file time) that is empty after clamping disables
   looping. So no engine command can make kira index past the data or spin on an empty loop.
-- `Restart` replays a sound with its original parameters, without fade-in or delay.
+- `Restart` replays a sound with its original parameters, without fade-in or delay; on movie
+  audio it does nothing.
+- `PlayMovie { id, path, looping, gain }` reads the movie through `DesktopPlatform::movie_bytes`,
+  opens `kagari_video::AudioDecoder` (a movie without audio plays nothing; an error is warned as
+  ``cannot play movie audio `path`: …``), and plays it as a kira `StreamingSoundData` through
+  `MovieAudio` on the `Music` bus (`Handle::Movie`; looping loops the whole file). Decode errors
+  while playing are logged like those of streamed sounds. `Pause { id }` / `Resume { id }` pause
+  and resume any handle without a fade.
 - `SoundCache::load` keeps a sound by asset path in one of two forms. A sound whose decoded frames
   (8 bytes each: two `f32` channels) would exceed 2 MiB (about 6 s at 44.1 kHz) by its container's
   frame count is `Sound::Streamed`: the encoded bytes, shared by every play, each play a kira
@@ -209,6 +219,74 @@ flag that every frame checks; the device is never recreated.
 `Start`, `Select`, sticks, D-pad); `C`, `Z`, `Mode` and unknown buttons are ignored. A button is
 pressed while any connected pad holds it; a disconnect releases that pad's buttons. When gilrs is
 unavailable on the platform it runs without gamepads.
+
+## Movies
+
+`Movies` (`movies.rs`) turns the frame's `VideoRequest`s into textures
+([Text and Rendering](./text-render.md#how-the-engine-builds-a-frame)). It keeps the encoded
+bytes per asset path (read from the archives on first use; the least recently used bytes no live
+player holds are evicted beyond 256 MiB), the probe result per path, and one player per
+`VideoKey`. `DesktopPlatform::update_movies(frame, assets)` runs `Movies::update` with
+`frame.video_requests()`:
+
+- The target time is `position_ms`, modulo the movie length when it loops.
+- A new player opens `kagari_video::VideoDecoder` and logs `` movie `path`: <backend> decoding ``
+  (info, target `kagari::video`). An open or decode error is warned once; the player then shows
+  nothing (or keeps its last frame).
+- A frame is uploaded with `Renderer::set_video_frame` only when it differs from the last one
+  uploaded for that key (`Arc::ptr_eq`).
+- A player whose key the frame does not request is dropped with its texture (`remove_video`).
+
+| `Pace` | Used by | Decoding |
+| ------ | ------- | -------- |
+| `Live` | the windowed runtime | `Accel::Hardware`; the first frame is decoded synchronously, then the decoder moves to a `kagari-video` thread that decodes the latest target; the main thread never waits, and a late frame keeps the previous one on screen |
+| `Exact` | headless | `Accel::Software`, the exact frame decoded synchronously at each capture, so captures are deterministic |
+
+The hooks: the windowed frame (after the thumbnails), the headless `capture`, and the
+`capture_still` render inside `wait`. A headless run decodes nothing between captures. Headless
+runs drop audio commands, so movie audio is never decoded there.
+
+## `kagari-video`
+
+`runtime_libs/kagari-video` wraps FFmpeg (`ffmpeg-next` 9, linked dynamically) and depends on no
+Kagari crate, so other runtimes can reuse it. It reads movies from memory (`StreamIo` over a
+`Cursor<Arc<[u8]>>`). Its API: `init` (once per process; FFmpeg's own log level is `Error`, and
+its messages go to stderr), `probe` → `MediaInfo { width, height, duration_ms, has_audio }`,
+`VideoDecoder { open(bytes, Accel), backend, frame_at }`, `AudioDecoder { open, sample_rate,
+num_frames, decode, seek }`, `RgbaFrame { pts_ms, width, height, rgba }`, `VideoError`. Both
+decoders are `Send`.
+
+**Decoder choice.** Software: AV1 through `libdav1d` (else FFmpeg's native `av1`), H.264 and VP9
+through the native decoders, with automatic frame threading. Hardware: VAAPI on Linux, D3D11VA on
+Windows, VideoToolbox on macOS, with the native decoders; the hardware pixel format comes from
+`avcodec_get_hw_config`, and `get_format` returns it when offered, else the first format that is
+not a hwaccel one. Hardware decoding falls back to software, once per decoder, when no config
+matches, the device cannot be created, the decoder does not open, a decode fails, or FFmpeg
+silently decodes in software; the decoder reopens in software and seeks to the current target.
+The fallback logs `video: hardware decoding unavailable (<reason>); using software` (info,
+`kagari::video`); FFmpeg may print its own lines (such as "Hardware does not support image
+size") before it.
+
+**`frame_at(target)`** returns the frame with the largest pts ≤ `target` (the first frame when
+`target` precedes it), converting it to RGBA only when it changed. It seeks backwards when
+`target` is before the current frame, and forwards when `target` is more than 2000 ms past the
+next frame (or past 2000 ms on a fresh decoder); at the end of the stream it holds the last frame.
+Timestamps are relative to the stream's start time.
+
+**Colour.** swscale converts to sRGB RGBA8 with alpha 255 and packed rows, using the stream's
+matrix (BT.709, BT.601 or BT.2020; unspecified is BT.709 from 720 rows up, else BT.601) and its
+range (limited or full).
+
+**Audio.** The best audio stream, resampled to packed stereo `f32` at its own rate. `num_frames`
+comes from the stream duration, else the container's. After the end of the stream `decode`
+returns silent chunks of 1024 frames rather than none (kira loops forever on an empty chunk);
+`seek(index)` is sample exact.
+
+**Building.** `ffmpeg-sys-next` finds FFmpeg (up to 9.0) through `FFMPEG_DIR`, vcpkg or
+pkg-config and runs bindgen, which needs libclang (`LIBCLANG_PATH`). The dev shell provides
+`ffmpeg-headless` and `LIBCLANG_PATH`; Debian/Ubuntu need `libavcodec-dev libavformat-dev
+libavutil-dev libswscale-dev libswresample-dev libclang-dev`. Releases ship a minimal LGPL FFmpeg
+built by `packaging/ffmpeg/build.sh` ([Releases](../process/releases.md#ffmpeg)).
 
 ## Headless mode
 
@@ -295,16 +373,21 @@ until the debugger goes on, so the window does not redraw meanwhile.
 | `udev` | linked at build time by `libudev-sys` (gilrs) |
 | `wayland`, `libxkbcommon`, `libX11`, `libXcursor`, `libXi`, `libXrandr` | loaded at run time by winit |
 | `vulkan-loader`, `libGL` | loaded at run time by wgpu |
+| `ffmpeg-headless` | linked by `ffmpeg-sys-next` (`kagari-video`) |
+| `libclang` (`LIBCLANG_PATH`), `bindgenHook` in the package | bindgen in `ffmpeg-sys-next` |
 | `pkg-config` | finds the build-time libraries |
 
-The shell puts the run-time libraries on `LD_LIBRARY_PATH`, since they are `dlopen`ed. Other Linux
-distributions need the equivalent development packages (Debian: `libasound2-dev libudev-dev
-pkg-config`); macOS and Windows need none.
+The shell puts the run-time libraries and FFmpeg on `LD_LIBRARY_PATH`. Other Linux distributions
+need the equivalent development packages (Debian: `libasound2-dev libudev-dev pkg-config` and the
+FFmpeg and libclang packages above). The released Linux FFmpeg links VAAPI, so the runtime needs
+`libva.so.2` and `libva-drm.so.2` at run time (Debian/Ubuntu `libva2 libva-drm2`, Fedora `libva`)
+and does not start without them. Windows and macOS builds need FFmpeg (`FFMPEG_DIR`) and libclang.
 
 **Logging.** Besides module targets, the engine logs progress under fixed targets that are useful
 when reading headless runs: `kagari::system` (`modes: [...]` whenever the mode stack changes),
 `kagari::story` (`step <step id> say|choice`, e.g. `step crate::Start#0 say`; `chose <choice ID>`, `story returned`),
-`kagari::saves` (`saved`, `loaded … (n choices replayed)`, divergence warnings) and
+`kagari::saves` (`saved`, `loaded … (n choices replayed)`, divergence warnings),
+`kagari::video` (movie decoding backend, hardware fallback) and
 `kagari::desktop` (window backend, data directory).
 
 ## Invariants
@@ -329,6 +412,10 @@ when reading headless runs: `kagari::system` (`modes: [...]` whenever the mode s
   `core/kagari-std`, `input.rs` (`map_key` and the test inverse `key_code`, which is exhaustive so
   a missing mapping fails to compile), the STD page `system.md`.
 - New system libraries: `flake.nix` and the Reference's build requirements.
+- A new video codec or container: `kagari-compat` (`sniff`, `supports`), the decoders, demuxers,
+  parsers and hwaccels in `packaging/ffmpeg/build.sh`, `kagari-video`'s decoder choice and the
+  format tables (en and ja). A different FFmpeg major version changes the shipped sonames and DLL
+  names: `Platform::libraries`, `installer.sh`, `kagari.iss` and the release workflow.
 - A new import from the MSVC redistributable (`VCRUNTIME140_1.dll`, `MSVCP140.dll`, …) on
   Windows: `Platform::libraries` in `kagari-cli` and the `dumpbin` check in the release workflow
   ([Releases](../process/releases.md#the-workflow)).

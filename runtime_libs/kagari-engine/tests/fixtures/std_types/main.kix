@@ -41,6 +41,7 @@ const A_IMG: ImageAsset = asset("a.png");
 const A_SND: AudioAsset = asset("a.ogg");
 const V: VoiceAsset = asset("v.ogg");
 const M: VideoAsset = asset("m.webm");
+const N: VideoAsset = asset("n.webm");
 
 #[shader_arg]
 struct Glow {
@@ -185,6 +186,7 @@ fn probe() {
     keep(std::screen::VAlign::Top);
     keep(std::screen::pose(point(0, 0), 1.0, std::screen::degrees(0.0)));
     keep(std::screen::movie(M));
+    keep(std::screen::movie(N));
     keep(std::screen::anim::Easing::OutQuad);
     keep(std::screen::anim::Direction::Left);
     keep(std::screen::anim::TransitionKind::Crossfade);

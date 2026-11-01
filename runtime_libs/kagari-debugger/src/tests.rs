@@ -8,7 +8,7 @@ mod swap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use kagari_engine::{AssetStore, Engine, Frame, Platform, Timestamp};
+use kagari_engine::{AssetStore, Engine, Frame, Platform, Timestamp, VideoInfo};
 use kagari_lang::{FilePath, MemoryFileSystem, RootDatabase, Severity, build, render_diagnostics};
 use serde_json::{Value, json};
 
@@ -213,6 +213,9 @@ impl Platform for TestPlatform {
         }))
     }
     fn audio_duration_ms(&mut self, _path: &str, _bytes: &[u8]) -> Option<u32> {
+        None
+    }
+    fn video_info(&mut self, _path: &str) -> Option<VideoInfo> {
         None
     }
     fn render_thumbnail(

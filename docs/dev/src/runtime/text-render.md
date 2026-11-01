@@ -17,13 +17,13 @@ compositor and how the design resolution maps to a window.
 | `runtime_libs/kagari-text/src/raster.rs` | glyph coverage masks: skrifa outlines filled or stroked by zeno |
 | `runtime_libs/kagari-engine/src/ui/text.rs` | `TextStyle`/`TextEffect` decoding, flattening a `Text` into spans, the layout cache |
 | `runtime_libs/kagari-engine/src/story/reveal.rs` | reveal timing: units, speeds, pauses, marks |
-| `runtime_libs/kagari-engine/src/frame.rs` | `Frame`, `Node`, `Reveal`, `ShaderEffect`, `Pose`, `MotionStage`, `TransitionDraw` |
+| `runtime_libs/kagari-engine/src/frame.rs` | `Frame`, `Node`, `Reveal`, `ShaderEffect`, `Pose`, `MotionStage`, `TransitionDraw`, `VideoKey`, `VideoRequest` |
 | `runtime_libs/kagari-engine/src/screen/draw.rs`, `ui/draw.rs` | the screen and the mounted UI as `Frame` nodes |
 | `runtime_libs/kagari-render/src/lib.rs` | `Renderer`: `render`, `render_offscreen`, `render_to_rgba`, thumbnails |
 | `runtime_libs/kagari-render/src/plan.rs`, `text.rs`, `encode.rs` | the planning walk, text drawing, command encoding |
 | `runtime_libs/kagari-render/src/pipelines.rs`, `shaders/*.wgsl` | built-in pipelines, bind group layouts, uniforms, shaders |
 | `runtime_libs/kagari-render/src/shaders.rs` | user shader pipelines (`ShaderCache`), built from `kagari_shader::compose` |
-| `runtime_libs/kagari-render/src/atlas.rs`, `textures.rs`, `layers.rs`, `readback.rs`, `viewport.rs` | glyph atlas, image and thumbnail textures, offscreen layers, readback, letterboxing |
+| `runtime_libs/kagari-render/src/atlas.rs`, `textures.rs`, `layers.rs`, `readback.rs`, `viewport.rs` | glyph atlas, image, thumbnail and video textures, offscreen layers, readback, letterboxing |
 
 ## Overview
 
@@ -155,6 +155,7 @@ and glyphs share one pipeline. Glyph quads are snapped to whole pixels at the gl
 | `Motion { stages, pose, children }` | GPU motion: the stages (a transitional, then a local motion shader) compute a pose from `pose`; the children are displaced by `P·M(result)·M(pose)⁻¹·P⁻¹` |
 | `Paint { rect, size, uv, texture, mask, flip_x, flip_y }` | generated content: a texture shader of `size` px (its `kg_size()`), optionally times a mask shader; `rect` shows its part `uv` (`0..1` for all of it), so a resized paint is stretched and a `Cover` paint cropped |
 | `Image { rect, image, uv, flip_x, flip_y, tint }` | an image asset |
+| `Video { rect, key, position_ms, looping, uv, flip_x, flip_y, tint }` | the current frame of a movie; `key` is `VideoKey { entity, video }`, `position_ms` the movie clock |
 | `Fill { rect, color }` | a solid rectangle |
 | `NineSlice { rect, image, insets, tint }` | a nine-slice image; insets in source pixels, CSS order |
 | `Text { origin, layout, reveal, opacity }` | a laid-out paragraph |
@@ -187,24 +188,32 @@ design pixels, a scale and a rotation in radians (clockwise, y down).
   group with `T(position)·R(rotation)·S(scale)·T(−anchor × size)`, holding a `Masked` over the
   entity's box when it has a mask, holding the sized fill, the parts in part order (images or
   paints; part 0 placed by the anchor in the entity's box, the others at the origin; flips mirror
-  them) and the label. Each part is sized by its layer's `Resize` (`screen/draw.rs`, `resized`):
-  a box, and the content's rect centred in it, larger than the box only under `Cover`. The content
-  is cropped to the box by cutting its uv range (`content_node`), not by a scissor, so the clip
-  stays exact under the entity's transform, flips and motions; a paint is generated at its own
-  `size` and stretched to the content rect, so `kg_size()` stays that size. The entity size is
-  part 0's box (the new side's during a transition, `layer_box`), else the fill size, else the
-  label size. `S(scale)` applies on top of the resize. Under a `Motion` a zero scale is drawn at
-  1, so that the pose stays invertible and the stages decide the scale. A gated entity is drawn
-  only while its `Setting<bool>` is true; this is how settings reach the screen without reaching
-  the story.
-- **Transitions** of image and label layers become `Node::Transition` over the union of both
-  sides; `Cut` just shows the new side.
+  them), the movie and the label. Each part is sized by its layer's `Resize` (`screen/draw.rs`,
+  `resized`): a box, and the content's rect centred in it, larger than the box only under
+  `Cover`. The content is cropped to the box by cutting its uv range (`content_node`), not by a
+  scissor, so the clip stays exact under the entity's transform, flips and motions; a paint is
+  generated at its own `size` and stretched to the content rect, so `kg_size()` stays that size.
+  The entity size is part 0's box (the new side's during a transition, `layer_box`), else the fill
+  size, else the label size, else the screen size when the entity has a movie, else 0×0. The movie
+  (`VisualEntity::movie`) is `Contain`-fitted into that box, centred, at the size from
+  `AssetStore::video_size`. `S(scale)` applies on top of the resize. Under a `Motion` a zero scale
+  is drawn at 1, so that the pose stays invertible and the stages decide the scale. A gated
+  entity is drawn only while its `Setting<bool>` is true; this is how settings reach the screen
+  without reaching the story.
+- **Transitions** of image, label and movie layers become `Node::Transition` over the union of
+  both sides; `Cut` just shows the new side. Both sides of a transition between the same video on
+  one entity share one texture.
 - **The text window.** The subtree that holds the `message` element (and no game screen) is the
   window. Its fills and image tints are multiplied by the `window_opacity` setting (text is kept),
   and the whole window fades with the HUD's text-window alpha.
-- **Not drawn by `native_v0`**: movies. They are part of the logical screen (the consistency
-  analysis sees them) but the compositor has no pipeline for them; `kagari build` rejects video
-  assets for this profile.
+- **Movies** become `Node::Video` with the movie clock as `position_ms`
+  ([The Engine](./engine.md#shader-effects)), which runs even with animations off. The engine
+  never decodes video: `Frame::video_requests()` lists one `VideoRequest { key, position_ms,
+  looping }` per key (depth first through groups, filters, mixes, masks, motions and both sides of
+  transitions; the larger position wins), the platform decodes those frames and uploads them with
+  `Renderer::set_video_frame`, and drops the ones no longer requested with `remove_video`
+  ([The Desktop Runtime](./desktop.md#movies)). A movie the platform cannot read has no size and
+  is not drawn.
 - **Crash.** A crashed engine returns a black frame with the trap message
   ([The Engine](./engine.md#errors-traps-and-the-crashed-state)).
 
@@ -308,6 +317,14 @@ frame even when it cannot present it ([The Desktop Runtime](./desktop.md#windowe
 `stale_thumbnails(frame)` lists the `Thumbnail` nodes whose generation the renderer lacks and
 `set_thumbnail` uploads them. A `Thumbnail` node whose generation is not uploaded draws nothing.
 
+**Video textures.** `TextureCache::videos` holds one texture per `VideoKey`, outside the image
+budget and eviction. `set_video_frame(key, w, h, rgba)` takes opaque sRGB RGBA8 (not
+premultiplied, alpha is 255): a frame of the same size is written in place with
+`queue.write_texture`, another size uploads a new texture; a size that fails the thumbnail checks
+(zero, over the device's maximum dimension, wrong buffer length) is warned once per key and
+ignored, so the previous frame stays. `Node::Video` plans like `Node::Image` with
+`BindKey::Video` and the `Image` pipeline, and draws nothing until a frame is uploaded.
+
 **Caches and limits.** Image textures are decoded and uploaded on first draw and evicted least
 recently used beyond 512 MiB (`w·h·4` summed); an evicted image is decoded again when next drawn.
 Layers are pooled per size. User pipelines live as long as the renderer. A frame larger
@@ -357,8 +374,11 @@ output happens only at the end:
 - Shader bindings or `Uniforms`: the preludes in `core/kagari-shader/src/wgsl/`, the layouts in
   `pipelines.rs` and `kagari-render`'s layout tests (`uniforms_start_with_the_user_frame`,
   `motion_uniform_matches_the_prelude`) together.
-- A new drawable (movies, shaders, filters): the compositor, the profile table in
+- A new drawable (shaders, filters, another kind of content): the compositor, the profile table in
   `kagari-compat` (a new profile if `native_v0`'s promise changes), and the STD appendix
-  [Runtime Profiles](https://kagari.suitsu31.club/en/std/appendix/profiles/).
+  [Runtime Profiles](https://kagari.suitsu31.club/en/std/appendix/profiles/). Movies follow the
+  `Node::Video` / `VideoRequest` path: a change to video drawing touches the engine (`frame.rs`,
+  `screen/draw.rs`), the renderer (`textures.rs`, `plan.rs`, `encode.rs`) and the platform
+  (`movies.rs` in the desktop runtime).
 - Check visual changes with headless captures before and after
   ([The Desktop Runtime](./desktop.md#headless-mode)).

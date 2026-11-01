@@ -12,6 +12,7 @@ use kagari_engine::{Engine, InputEvent, Key, MouseButton};
 use crate::cli::Cli;
 use crate::exit::{Failure, SCRIPT, WINDOW};
 use crate::game;
+use crate::movies::Pace;
 use crate::platform::{DesktopPlatform, HEADLESS_TIME, SeedSource, TimeSource};
 use crate::store::Store;
 use script::{Command, ScriptError};
@@ -35,6 +36,7 @@ pub fn run(cli: &Cli, dir: &Path, bytes: &[u8]) -> Result<(), Failure> {
         Store::fixed(data),
         TimeSource::Fixed(HEADLESS_TIME),
         SeedSource::Fixed(cli.seed.unwrap_or(1)),
+        Pace::Exact,
     );
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
     platform.gpu = Some(crate::gpu::create(instance, None)?);
@@ -146,10 +148,11 @@ impl Session {
             self.engine.update(&mut self.platform, self.now);
             drop(self.engine.take_audio());
             let frame = self.engine.frame(self.now);
-            if frame.capture_still
-                && let Some(gpu) = self.platform.gpu.as_mut()
-            {
-                gpu.renderer.render_offscreen(&frame, self.engine.assets());
+            if frame.capture_still {
+                self.platform.update_movies(&frame, self.engine.assets());
+                if let Some(gpu) = self.platform.gpu.as_mut() {
+                    gpu.renderer.render_offscreen(&frame, self.engine.assets());
+                }
             }
             if self.engine.window().quit {
                 break;
@@ -161,6 +164,7 @@ impl Session {
     fn capture(&mut self, name: &str) -> Result<(), Failure> {
         let path = self.out.join(format!("{name}.png"));
         let frame = self.engine.frame(self.now);
+        self.platform.update_movies(&frame, self.engine.assets());
         let Some(gpu) = self.platform.gpu.as_mut() else {
             return Err(Failure::new(WINDOW, "no GPU"));
         };

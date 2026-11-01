@@ -202,7 +202,7 @@ The only profile is `native_v0`, the [desktop runtime](./runtime.md):
 | Audio, voice | Ogg Vorbis, Ogg FLAC, FLAC, WAV (PCM or IEEE float), MP3, mono or stereo AAC-LC (ADTS `.aac`, or MP4/M4A), mono or stereo ALAC (MP4/M4A) |
 | Font | TrueType, OpenType (CFF), TrueType/OpenType collections |
 | Shader | WGSL source (UTF-8 text) |
-| Video | none |
+| Video | WebM with VP9 or AV1 video and Opus or Vorbis audio, or no audio; MP4 with H.264 video and AAC-LC audio, or no audio |
 
 A WAV whose RIFF or `data` chunk size runs past the end of the file, such as the `0xFFFFFFFF`
 placeholder that streaming encoders (ffmpeg writing to a pipe, TTS services) leave, plays to the
@@ -219,13 +219,22 @@ Everything else is rejected: animated WebP, JPEG with arithmetic, lossless, hier
 12-bit coding, GIF, BMP with embedded JPEG or PNG or CMYK pixels, AVIF, animated or CMYK JPEG XL,
 Ogg Opus, Ogg with another codec, compressed WAV, AAC profiles other than AAC-LC (HE-AAC, Main,
 LTP, …), AAC or ALAC with more than two channels, MP4/M4A with another codec (Opus, MP3, FLAC, …),
-WOFF and WOFF2. Video assets are rejected whatever their content. Each problem prints one line per
-asset and profile:
+WOFF and WOFF2. A video is rejected when it has another video codec (VP8, H.265, …), more than one
+video track, another audio codec, more than one audio track, another track in WebM, or another
+container. Each problem prints one line per asset and profile:
 
 ```text
 error: asset `bgimage/title.gif` (image): GIF is not supported by runtime profile `native_v0`
-error: asset `movie/intro.webm` (video): video assets are not supported by runtime profile `native_v0`
+error: asset `movie/intro.webm` (video): WebM/Matroska with another codec, several video tracks or an unreadable header is not supported by runtime profile `native_v0`
 ```
+
+To convert a movie to WebM with VP9 and Opus:
+
+```sh
+ffmpeg -i in.mov -c:v libvpx-vp9 -c:a libopus out.webm
+```
+
+Use `-c:v libsvtav1` for AV1, or `-c:v libx264 -c:a aac` with an `.mp4` output for H.264.
 
 ### Shader check
 
@@ -253,6 +262,9 @@ A shipped game is one directory with the runtime executable and the contents of
 MyGame/
 ├── kagari-desktop-runtime      (kagari-desktop-runtime.exe on Windows; you may rename it)
 ├── vcruntime140.dll            (Windows only)
+├── avcodec-63.dll, avformat-63.dll, avutil-61.dll, swscale-10.dll, swresample-7.dll   (Windows)
+├── libavcodec.so.63, libavformat.so.63, libavutil.so.61, libswscale.so.10, libswresample.so.7   (Linux)
+├── ffmpeg-LICENSE.txt
 ├── game.kagari
 └── *.kiarchive
 ```
@@ -265,7 +277,13 @@ own executable. Settings and saves are not written there; they go to the per-use
 next to the runtime it is used without being installed. Download it for your version from
 `https://kagari-download.suitsu31.club/windows_x86_installer/<version>/vcruntime140.dll`.
 
+The runtime decodes movies with the FFmpeg libraries next to it, and does not start without them.
+Download them for your version from
+`https://kagari-download.suitsu31.club/windows_x86_installer/<version>/<file>` (Windows) or
+`https://kagari-download.suitsu31.club/linux_x86_bin/<version>/<file>` (Linux), together with
+`ffmpeg-LICENSE.txt`, their licences, to ship with them.
+
 [`kagari release`](./cli.md#kagari-release) makes this directory as an ISO image for Windows or
-Linux: it builds the game, downloads that platform's runtime of the same version as `kagari` (and
-`vcruntime140.dll` for Windows), and writes `<out-dir>/release/<platform>/<name>.iso`. In the
-Windows image the runtime is named `run.exe`.
+Linux: it builds the game, downloads that platform's runtime of the same version as `kagari`, the
+FFmpeg libraries and their licence (and `vcruntime140.dll` for Windows), and writes
+`<out-dir>/release/<platform>/<name>.iso`. In the Windows image the runtime is named `run.exe`.

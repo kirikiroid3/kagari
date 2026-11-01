@@ -207,15 +207,9 @@ fn mp4_box(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
     bytes
 }
 
-/// An M4A file whose one track has `handler` and a version 0 sample entry `entry` with `config`
-/// as its child; `mdat` holds `media` bytes and comes after `moov` if `moov_first`.
-fn m4a(
-    handler: &[u8; 4],
-    entry: &[u8; 4],
-    config: &[u8],
-    media: usize,
-    moov_first: bool,
-) -> Vec<u8> {
+/// A `trak` box whose handler is `handler` and whose one version 0 sample entry `entry` has
+/// `config` as its child.
+fn trak(handler: &[u8; 4], entry: &[u8; 4], config: &[u8]) -> Vec<u8> {
     let mut fields = vec![0u8; 28];
     fields.extend_from_slice(config);
     let mut stsd = vec![0, 0, 0, 0, 0, 0, 0, 1];
@@ -225,7 +219,19 @@ fn m4a(
     hdlr.extend_from_slice(handler);
     hdlr.extend_from_slice(&[0; 13]);
     let mdia = mp4_box(b"mdia", &[mp4_box(b"hdlr", &hdlr), minf].concat());
-    let moov = mp4_box(b"moov", &mp4_box(b"trak", &mdia));
+    mp4_box(b"trak", &mdia)
+}
+
+/// An M4A file whose one track has `handler` and a version 0 sample entry `entry` with `config`
+/// as its child; `mdat` holds `media` bytes and comes after `moov` if `moov_first`.
+fn m4a(
+    handler: &[u8; 4],
+    entry: &[u8; 4],
+    config: &[u8],
+    media: usize,
+    moov_first: bool,
+) -> Vec<u8> {
+    let moov = mp4_box(b"moov", &trak(handler, entry, config));
     let ftyp = mp4_box(b"ftyp", b"M4A \0\0\x02\0M4A isomiso2");
     let mdat = mp4_box(b"mdat", &vec![0xAA; media]);
     if moov_first {
@@ -233,6 +239,172 @@ fn m4a(
     } else {
         [ftyp, mdat, moov].concat()
     }
+}
+
+/// An MP4 file whose `moov` holds `traks`.
+fn mp4(traks: &[Vec<u8>]) -> Vec<u8> {
+    let ftyp = mp4_box(b"ftyp", b"isom\0\0\x02\0isomiso2avc1mp41");
+    [ftyp, mp4_box(b"moov", &traks.concat())].concat()
+}
+
+#[test]
+fn mp4_video_tracks() {
+    let video = |traks: &[Vec<u8>]| sniff(AssetKind::Video, &mp4(traks));
+    let h264 = trak(b"vide", b"avc1", &[]);
+    let aac = trak(b"soun", b"mp4a", &esds(0x40, &[0x12, 0x10]));
+    let text = trak(b"text", b"tx3g", &[]);
+    assert_eq!(video(std::slice::from_ref(&h264)), AssetFormat::Mp4H264);
+    assert_eq!(
+        video(&[text, trak(b"vide", b"avc3", &[]), aac.clone()]),
+        AssetFormat::Mp4H264
+    );
+    assert_eq!(
+        video(&[h264.clone(), h264.clone()]),
+        AssetFormat::Mp4VideoOther
+    );
+    assert_eq!(
+        video(&[h264.clone(), aac.clone(), aac]),
+        AssetFormat::Mp4VideoOther
+    );
+    assert_eq!(
+        video(&[h264.clone(), trak(b"soun", b"alac", &alac(2))]),
+        AssetFormat::Mp4VideoOther
+    );
+    assert_eq!(
+        video(&[trak(b"vide", b"hvc1", &[])]),
+        AssetFormat::Mp4VideoOther
+    );
+    assert_eq!(video(&[]), AssetFormat::Mp4VideoOther);
+    // Audio assets keep reading only the sound track.
+    assert_eq!(
+        sniff(
+            AssetKind::Audio,
+            &mp4(&[h264, trak(b"soun", b"alac", &alac(2))])
+        ),
+        AssetFormat::Mp4Alac
+    );
+}
+
+/// An EBML element with an 8-byte size.
+fn ebml(id: &[u8], body: &[u8]) -> Vec<u8> {
+    let mut bytes = id.to_vec();
+    bytes.push(0x01);
+    bytes.extend_from_slice(&(body.len() as u64).to_be_bytes()[1..]);
+    bytes.extend_from_slice(body);
+    bytes
+}
+
+/// A Matroska file with DocType `doc_type` whose tracks are (track type, codec ID); the segment
+/// has an unknown size and ends with a cluster.
+fn matroska(doc_type: &[u8], tracks: &[(u8, &[u8])]) -> Vec<u8> {
+    let header = ebml(&[0x1A, 0x45, 0xDF, 0xA3], &ebml(&[0x42, 0x82], doc_type));
+    let entries: Vec<u8> = tracks
+        .iter()
+        .flat_map(|(kind, codec)| {
+            ebml(
+                &[0xAE],
+                &[ebml(&[0x83], &[*kind]), ebml(&[0x86], codec)].concat(),
+            )
+        })
+        .collect();
+    let info = ebml(&[0x15, 0x49, 0xA9, 0x66], &[0; 4]);
+    let tracks = ebml(&[0x16, 0x54, 0xAE, 0x6B], &entries);
+    let cluster = ebml(&[0x1F, 0x43, 0xB6, 0x75], &[0; 8]);
+    let mut segment = vec![
+        0x18, 0x53, 0x80, 0x67, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    ];
+    segment.extend([info, tracks, cluster].concat());
+    [header, segment].concat()
+}
+
+#[test]
+fn webm_tracks() {
+    let video =
+        |doc: &[u8], tracks: &[(u8, &[u8])]| sniff(AssetKind::Video, &matroska(doc, tracks));
+    assert_eq!(
+        video(b"webm", &[(1, b"V_VP9"), (2, b"A_OPUS")]),
+        AssetFormat::WebmVp9
+    );
+    assert_eq!(
+        video(b"webm", &[(2, b"A_VORBIS"), (1, b"V_AV1")]),
+        AssetFormat::WebmAv1
+    );
+    assert_eq!(video(b"matroska", &[(1, b"V_VP9")]), AssetFormat::WebmOther);
+    assert_eq!(video(b"webm", &[(1, b"V_VP8")]), AssetFormat::WebmOther);
+    assert_eq!(
+        video(b"webm", &[(1, b"V_VP9"), (1, b"V_VP9")]),
+        AssetFormat::WebmOther
+    );
+    assert_eq!(
+        video(b"webm", &[(1, b"V_VP9"), (2, b"A_OPUS"), (2, b"A_OPUS")]),
+        AssetFormat::WebmOther
+    );
+    assert_eq!(
+        video(b"webm", &[(1, b"V_VP9"), (2, b"A_AAC")]),
+        AssetFormat::WebmOther
+    );
+    assert_eq!(
+        video(b"webm", &[(1, b"V_VP9"), (17, b"S_TEXT/WEBVTT")]),
+        AssetFormat::WebmOther
+    );
+    assert_eq!(video(b"webm", &[]), AssetFormat::WebmOther);
+    // Truncated inside the tracks.
+    let file = matroska(b"webm", &[(1, b"V_VP9")]);
+    assert_eq!(
+        sniff(AssetKind::Video, &file[..file.len() - 30]),
+        AssetFormat::WebmOther
+    );
+    assert_eq!(
+        sniff(AssetKind::Video, &[0x1A, 0x45, 0xDF, 0xA3]),
+        AssetFormat::WebmOther
+    );
+}
+
+/// Files ffmpeg wrote (64x64, 0.5 s; the MP4 with `moov` after `mdat`). The `kagari-video` tests
+/// decode the same files.
+#[test]
+fn video_encoder_output() {
+    let fixtures: [(&[u8], AssetFormat); 3] = [
+        (
+            include_bytes!("../tests/fixtures/vp9-opus.webm"),
+            AssetFormat::WebmVp9,
+        ),
+        (
+            include_bytes!("../tests/fixtures/av1.webm"),
+            AssetFormat::WebmAv1,
+        ),
+        (
+            include_bytes!("../tests/fixtures/h264-aac.mp4"),
+            AssetFormat::Mp4H264,
+        ),
+    ];
+    for (bytes, expected) in fixtures {
+        let head = if bytes.get(4..8) == Some(b"ftyp") {
+            read_iso_bmff_head(&mut Cursor::new(bytes), 1 << 20).unwrap()
+        } else {
+            bytes.to_vec()
+        };
+        assert_eq!(sniff(AssetKind::Video, &head), expected);
+        assert!(supports(
+            RuntimeProfile::NativeV0,
+            AssetKind::Video,
+            expected
+        ));
+    }
+    let vp8 = sniff(
+        AssetKind::Video,
+        include_bytes!("../tests/fixtures/vp8.webm"),
+    );
+    assert_eq!(vp8, AssetFormat::WebmOther);
+    assert!(!supports(RuntimeProfile::NativeV0, AssetKind::Video, vp8));
+    // Only video assets read EBML.
+    assert_eq!(
+        sniff(
+            AssetKind::Audio,
+            include_bytes!("../tests/fixtures/vp9-opus.webm")
+        ),
+        AssetFormat::Unknown
+    );
 }
 
 /// An MPEG-4 descriptor with its length in the four-byte form encoders write.
@@ -380,7 +552,10 @@ fn native_v0_support() {
     assert!(supports(p, AssetKind::Font, AssetFormat::FontCollection));
     assert!(!supports(p, AssetKind::Video, AssetFormat::Unknown));
     assert!(supports_kind(p, AssetKind::Shader));
-    assert!(!supports_kind(p, AssetKind::Video));
+    assert!(supports_kind(p, AssetKind::Video));
+    assert!(supports(p, AssetKind::Video, AssetFormat::WebmVp9));
+    assert!(!supports(p, AssetKind::Video, AssetFormat::WebmOther));
+    assert!(!supports(p, AssetKind::Video, AssetFormat::Mp4VideoOther));
     assert!(supports(p, AssetKind::Shader, AssetFormat::Wgsl));
     assert!(!supports(p, AssetKind::Shader, AssetFormat::Unknown));
 }

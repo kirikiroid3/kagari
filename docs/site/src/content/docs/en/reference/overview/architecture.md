@@ -61,7 +61,7 @@ default, the directory of the executable, so a shipped game puts the executable 
 `game.kagari` and the archives), verifies the program before running any of it, runs `fn main`
 once to get the description of the game system, and shows the start page. Settings, meta and save
 slots go to a data directory outside the game directory. The runtime implements the runtime
-profile `native_v0`: the whole standard library except video assets. A
+profile `native_v0`: the whole standard library. A
 [headless mode](../tools/headless.md) runs the same game without a window, driven by a script, for
 automated tests.
 

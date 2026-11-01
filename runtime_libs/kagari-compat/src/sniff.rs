@@ -41,6 +41,9 @@ pub fn sniff(kind: AssetKind, bytes: &[u8]) -> AssetFormat {
     if bytes.get(4..8) == Some(b"ftyp") {
         return iso_bmff(kind, bytes);
     }
+    if kind == AssetKind::Video && bytes.starts_with(&[0x1A, 0x45, 0xDF, 0xA3]) {
+        return webm(bytes);
+    }
     if bytes.starts_with(b"OggS") {
         return ogg(bytes);
     }
@@ -224,6 +227,7 @@ fn iso_bmff(kind: AssetKind, bytes: &[u8]) -> AssetFormat {
             }
         }
         AssetKind::Audio | AssetKind::Voice => mp4_audio(bytes).unwrap_or(AssetFormat::Mp4Other),
+        AssetKind::Video => mp4_video(bytes).unwrap_or(AssetFormat::Mp4VideoOther),
         _ => AssetFormat::Unknown,
     }
 }
@@ -253,19 +257,40 @@ fn child<'a>(bytes: &'a [u8], kind: &[u8]) -> Option<&'a [u8]> {
     boxes(bytes).find_map(|(k, body)| (k == kind).then_some(body))
 }
 
-/// The first sample description of the first audio (`soun`) track, the track the runtime plays.
-/// Its children are read like the `symphonia` MP4 reader does: AAC from `esds` (directly or in a
-/// QuickTime `wave`), ALAC from the `alac` magic cookie.
-fn mp4_audio(bytes: &[u8]) -> Option<AssetFormat> {
-    let moov = child(bytes, b"moov")?;
-    let stbl = boxes(moov)
-        .filter(|(kind, _)| *kind == b"trak")
-        .find_map(|(_, trak)| {
-            let mdia = child(trak, b"mdia")?;
-            (child(mdia, b"hdlr")?.get(8..12)? == b"soun").then_some(())?;
-            child(child(mdia, b"minf")?, b"stbl")
-        })?;
+/// A track's handler type, sample entry type and first sample entry (after its box header).
+type Track<'a> = (&'a [u8], &'a [u8], &'a [u8]);
+
+/// The [`Track`] of `trak`.
+fn track_entry(trak: &[u8]) -> Option<Track<'_>> {
+    let mdia = child(trak, b"mdia")?;
+    let handler = child(mdia, b"hdlr")?.get(8..12)?;
+    let stbl = child(child(mdia, b"minf")?, b"stbl")?;
     let (kind, entry, _) = split_box(child(stbl, b"stsd")?.get(8..)?)?;
+    Some((handler, kind, entry))
+}
+
+/// The tracks of the `moov` box in `bytes`, as [`track_entry`] reads them; `None` for a track
+/// that does not parse.
+fn tracks(bytes: &[u8]) -> Option<impl Iterator<Item = Option<Track<'_>>>> {
+    let moov = child(bytes, b"moov")?;
+    Some(
+        boxes(moov)
+            .filter(|(kind, _)| *kind == b"trak")
+            .map(|(_, trak)| track_entry(trak)),
+    )
+}
+
+/// The first sample description of the first audio (`soun`) track, the track the runtime plays.
+fn mp4_audio(bytes: &[u8]) -> Option<AssetFormat> {
+    let (_, kind, entry) = tracks(bytes)?
+        .flatten()
+        .find(|(handler, _, _)| *handler == b"soun")?;
+    audio_entry(kind, entry)
+}
+
+/// An audio sample entry of type `kind`, read like the `symphonia` MP4 reader does: AAC from
+/// `esds` (directly or in a QuickTime `wave`), ALAC from the `alac` magic cookie.
+fn audio_entry(kind: &[u8], entry: &[u8]) -> Option<AssetFormat> {
     let fields = match u16_be(entry, 8)? {
         0 => 28,
         1 => 44,
@@ -280,6 +305,136 @@ fn mp4_audio(bytes: &[u8]) -> Option<AssetFormat> {
         b"alac" => alac(config(b"alac")?),
         _ => None,
     }
+}
+
+/// An MP4 movie FFmpeg decodes: exactly one video (`vide`) track holding H.264 (`avc1` or
+/// `avc3`) and at most one audio (`soun`) track holding AAC-LC. Other tracks (text, timecode)
+/// are ignored, but every track has to parse.
+fn mp4_video(bytes: &[u8]) -> Option<AssetFormat> {
+    let mut video = 0usize;
+    let mut audio = 0usize;
+    for track in tracks(bytes)? {
+        let (handler, kind, entry) = track?;
+        match handler {
+            b"vide" => {
+                video = video.checked_add(1)?;
+                (kind == b"avc1" || kind == b"avc3").then_some(())?;
+            }
+            b"soun" => {
+                audio = audio.checked_add(1)?;
+                (audio_entry(kind, entry)? == AssetFormat::Mp4Aac).then_some(())?;
+            }
+            _ => {}
+        }
+    }
+    (video == 1 && audio <= 1).then_some(AssetFormat::Mp4H264)
+}
+
+/// An EBML variable-length integer at the start of `bytes`: its length in bytes (1 to `max`,
+/// told by the position of the first set bit) and the bytes themselves.
+fn vint(bytes: &[u8], max: u32) -> Option<(usize, &[u8])> {
+    let len = bytes.first()?.leading_zeros().checked_add(1)?;
+    if len > max {
+        return None;
+    }
+    let len = usize::try_from(len).ok()?;
+    Some((len, bytes.get(..len)?))
+}
+
+/// The EBML element at the start of `bytes`: its ID (marker bit kept), its payload and the bytes
+/// after it. An unknown size (all value bits set) extends to the end of `bytes`; with `clamp`, so
+/// does a payload longer than `bytes`, otherwise such an element does not parse.
+fn element(bytes: &[u8], clamp: bool) -> Option<(u32, &[u8], &[u8])> {
+    let (id_len, id) = vint(bytes, 4)?;
+    let id = id.iter().try_fold(0u32, |acc, &b| {
+        acc.checked_mul(256)?.checked_add(u32::from(b))
+    })?;
+    let rest = bytes.get(id_len..)?;
+    let (size_len, size) = vint(rest, 8)?;
+    // The value bits of the first byte; none for an 8-byte size.
+    let marker = u8::try_from(0xFFu16.checked_shr(u32::try_from(size_len).ok()?)?).ok()?;
+    let first = size.first()? & marker;
+    let unknown = first == marker && size.iter().skip(1).all(|&b| b == 0xFF);
+    let value = size.iter().skip(1).try_fold(u64::from(first), |acc, &b| {
+        acc.checked_mul(256)?.checked_add(u64::from(b))
+    })?;
+    let body = rest.get(size_len..)?;
+    let len = usize::try_from(value).unwrap_or(usize::MAX);
+    if unknown || (clamp && len > body.len()) {
+        return Some((id, body, &[]));
+    }
+    Some((id, body.get(..len)?, body.get(len..)?))
+}
+
+/// The EBML elements in `bytes` as (ID, payload), up to the first that does not fit.
+fn elements(mut bytes: &[u8]) -> impl Iterator<Item = (u32, &[u8])> {
+    std::iter::from_fn(move || {
+        let (id, body, rest) = element(bytes, false)?;
+        bytes = rest;
+        Some((id, body))
+    })
+}
+
+/// The payload of the first element `id` in `bytes`.
+fn ebml_child(bytes: &[u8], id: u32) -> Option<&[u8]> {
+    elements(bytes).find_map(|(i, body)| (i == id).then_some(body))
+}
+
+/// Reads a WebM file's EBML header and its `Tracks`, which muxers write before the first
+/// `Cluster`.
+fn webm(bytes: &[u8]) -> AssetFormat {
+    webm_tracks(bytes).unwrap_or(AssetFormat::WebmOther)
+}
+
+/// A WebM movie FFmpeg decodes: DocType `webm`, exactly one video track holding VP9 or AV1, at
+/// most one audio track holding Opus or Vorbis, and no other track.
+fn webm_tracks(bytes: &[u8]) -> Option<AssetFormat> {
+    const EBML: u32 = 0x1A45_DFA3;
+    const DOC_TYPE: u32 = 0x4282;
+    const SEGMENT: u32 = 0x1853_8067;
+    const TRACKS: u32 = 0x1654_AE6B;
+    const CLUSTER: u32 = 0x1F43_B675;
+    const TRACK_ENTRY: u32 = 0xAE;
+    const TRACK_TYPE: u32 = 0x83;
+    const CODEC_ID: u32 = 0x86;
+
+    let (id, header, rest) = element(bytes, false)?;
+    (id == EBML).then_some(())?;
+    let doc_type = ebml_child(header, DOC_TYPE)?;
+    let end = doc_type
+        .iter()
+        .rposition(|&b| b != 0)
+        .map_or(0, |at| at.saturating_add(1));
+    (doc_type.get(..end)? == b"webm").then_some(())?;
+    let (id, segment, _) = element(rest, true)?;
+    (id == SEGMENT).then_some(())?;
+    let tracks = elements(segment)
+        .take_while(|(id, _)| *id != CLUSTER)
+        .find_map(|(id, body)| (id == TRACKS).then_some(body))?;
+    let mut video = None;
+    let mut audio = 0usize;
+    for (id, entry) in elements(tracks) {
+        if id != TRACK_ENTRY {
+            continue;
+        }
+        let kind = ebml_child(entry, TRACK_TYPE)?;
+        let kind = kind.iter().try_fold(0u64, |acc, &b| {
+            acc.checked_mul(256)?.checked_add(u64::from(b))
+        })?;
+        let codec = ebml_child(entry, CODEC_ID)?;
+        match kind {
+            1 if video.is_none() => {
+                video = Some(match codec {
+                    b"V_VP9" => AssetFormat::WebmVp9,
+                    b"V_AV1" => AssetFormat::WebmAv1,
+                    _ => return None,
+                });
+            }
+            2 if audio == 0 && matches!(codec, b"A_OPUS" | b"A_VORBIS") => audio = 1,
+            _ => return None,
+        }
+    }
+    video
 }
 
 /// An MPEG-4 descriptor at the start of `bytes`: its tag, payload and the bytes after it.

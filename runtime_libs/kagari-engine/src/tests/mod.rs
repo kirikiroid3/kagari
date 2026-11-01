@@ -5,6 +5,7 @@
 
 mod debug;
 mod focus;
+mod movies;
 mod reactive;
 mod reveal;
 mod saves;
@@ -162,6 +163,10 @@ impl Platform for TestPlatform {
 
     fn audio_duration_ms(&mut self, _path: &str, _bytes: &[u8]) -> Option<u32> {
         Some(1000)
+    }
+
+    fn video_info(&mut self, _path: &str) -> Option<crate::VideoInfo> {
+        Some(crate::test_support::FAKE_VIDEO)
     }
 
     fn render_thumbnail(

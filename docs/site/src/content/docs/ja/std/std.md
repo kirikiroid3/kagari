@@ -381,8 +381,6 @@ impl Asset for FontAsset {}
 
 ランタイムがどのファイル形式をデコードできるかは [ランタイムプロファイル](./appendix/profiles.md) に記載しています。
 
-- `VideoAsset` — Profile: not in `native_v0`。
-
 ## Function: `asset(path)` {#function-assetpath}
 
 ```kis

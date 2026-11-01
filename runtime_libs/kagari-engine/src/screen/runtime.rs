@@ -15,7 +15,7 @@ use crate::Platform;
 use crate::anim::decimal_f32;
 use crate::assets::AssetStore;
 use crate::audio::AudioModel;
-use crate::values::{EffectSpec, LocalMotionBehavior, PaintSpec, TransitionKind};
+use crate::values::{EffectSpec, LocalMotionBehavior, MovieSpec, PaintSpec, TransitionKind};
 
 /// Records every image on the logical screen as seen; a new one invalidates `SeenImage`.
 pub(crate) fn mark_seen_images(
@@ -74,6 +74,15 @@ impl EffectKey {
         }
     }
 
+    /// The clock of a movie: for a movie, `shader` holds the video asset.
+    pub fn of_movie(m: &MovieSpec) -> EffectKey {
+        EffectKey {
+            shader: m.video,
+            mask: None,
+            behavior: None,
+        }
+    }
+
     fn of_prop(value: &PropValue) -> Option<EffectKey> {
         match value {
             PropValue::Effect(Some(e)) => Some(EffectKey::of_effect(e)),
@@ -84,6 +93,7 @@ impl EffectKey {
     fn of_layer(content: Option<&LayerContent>) -> Option<EffectKey> {
         match content {
             Some(LayerContent::Paint(p)) => Some(EffectKey::of_paint(p)),
+            Some(LayerContent::Movie(m)) => Some(EffectKey::of_movie(m)),
             _ => None,
         }
     }
@@ -148,7 +158,8 @@ fn screen_obj(screen: &HostObj) -> ScreenObj {
 }
 
 /// The length of a scheduled item; animations count as 0 when they are off, audio never does.
-fn item_length(kind: &ScheduledKind, animations: bool) -> u32 {
+/// A non-looping movie lasts at least its length, even with animations off.
+fn item_length(kind: &ScheduledKind, animations: bool, assets: &AssetStore) -> u32 {
     match kind {
         ScheduledKind::Tween { tween, .. } => {
             if animations {
@@ -157,15 +168,27 @@ fn item_length(kind: &ScheduledKind, animations: bool) -> u32 {
                 0
             }
         }
-        ScheduledKind::Transition { transition, .. } => {
-            if !animations {
-                return 0;
-            }
-            match transition.kind {
-                TransitionKind::ThroughColor { hold_ms, .. } => {
-                    transition.duration_ms.saturating_add(hold_ms)
+        ScheduledKind::Transition {
+            transition,
+            content,
+        } => {
+            let swap = if !animations {
+                0
+            } else {
+                match transition.kind {
+                    TransitionKind::ThroughColor { hold_ms, .. } => {
+                        transition.duration_ms.saturating_add(hold_ms)
+                    }
+                    _ => transition.duration_ms,
                 }
-                _ => transition.duration_ms,
+            };
+            match content {
+                Some(LayerContent::Movie(m)) if !m.looping => swap.max(
+                    assets
+                        .video_info(m.video)
+                        .map_or(0, |info| info.duration_ms),
+                ),
+                _ => swap,
             }
         }
         ScheduledKind::Motion(motion) => {
@@ -214,12 +237,13 @@ impl ScreenRuntime {
     }
 
     /// The runtime of a step entered at `entry_ms` whose render returned `screen`, over the
-    /// logical screen `base` of the step before.
+    /// logical screen `base` of the step before. `assets` gives the movie lengths.
     pub fn from_step(
         base: LogicalScreen,
         screen: HostObj,
         entry_ms: u64,
         animations: bool,
+        assets: &AssetStore,
     ) -> ScreenRuntime {
         let screen = screen_obj(&screen);
         let scheduled = &screen.step.scheduled;
@@ -227,7 +251,7 @@ impl ScreenRuntime {
             .iter()
             .map(|item| ItemState {
                 start: None,
-                length_ms: item_length(&item.kind, animations),
+                length_ms: item_length(&item.kind, animations, assets),
                 fired: false,
             })
             .collect();
@@ -253,7 +277,8 @@ impl ScreenRuntime {
     }
 
     /// Step entry: `out` is what the step's render returned. The previous step completes, the
-    /// images the step shows are loaded, and its timeline starts at `entry_ms`.
+    /// images, shaders and movies the step shows are loaded, and its timeline starts at
+    /// `entry_ms`.
     pub fn enter_step(
         &mut self,
         out: Value,
@@ -271,6 +296,9 @@ impl ScreenRuntime {
             for shader in shaders_of(&obj.logical).chain(shaders_of(&base)) {
                 assets.ensure_shader(shader, platform)?;
             }
+            for movie in movies_of(&obj.logical).chain(movies_of(&base)) {
+                assets.ensure_video(movie, platform)?;
+            }
             for item in &obj.step.scheduled {
                 match &item.kind {
                     ScheduledKind::Transition {
@@ -285,6 +313,9 @@ impl ScreenRuntime {
                                 for shader in paint_shaders(paint) {
                                     assets.ensure_shader(shader, platform)?;
                                 }
+                            }
+                            Some(LayerContent::Movie(movie)) => {
+                                assets.ensure_video(movie.video, platform)?;
                             }
                             _ => {}
                         }
@@ -310,7 +341,7 @@ impl ScreenRuntime {
             }
         }
         let carried = self.final_origins();
-        *self = ScreenRuntime::from_step(base, screen, entry_ms, animations);
+        *self = ScreenRuntime::from_step(base, screen, entry_ms, animations, &*assets);
         self.carried = carried;
         Ok(())
     }
@@ -396,6 +427,12 @@ impl ScreenRuntime {
                     slots.push((slot, EffectKey::of_paint(paint)));
                 }
             }
+            if let Some(movie) = &entity.movie {
+                slots.push((
+                    EffectSlot::Layer(LayerTarget::Movie(*id)),
+                    EffectKey::of_movie(movie),
+                ));
+            }
         }
         if let Some(PartContent::Paint(paint)) = &logical.hud.side_image {
             let slot = EffectSlot::Layer(LayerTarget::SideImage);
@@ -438,9 +475,17 @@ impl ScreenRuntime {
             })
     }
 
-    /// Fires the audio of every item that has started by `now_ms`.
-    pub fn tick(&mut self, now_ms: u64, marks: &dyn MarkTimes, audio: &mut AudioModel) {
+    /// Fires the audio of every item that has started by `now_ms`, after starting and stopping
+    /// the audio of the movies shown at `now_ms`.
+    pub fn tick(
+        &mut self,
+        now_ms: u64,
+        marks: &dyn MarkTimes,
+        audio: &mut AudioModel,
+        assets: &AssetStore,
+    ) {
         self.store_starts(marks);
+        audio.sync_movies(&self.movies_at(now_ms), assets, now_ms);
         for (index, item) in self.screen.step.scheduled.iter().enumerate() {
             let Some(state) = self.items.get_mut(index) else {
                 continue;
@@ -475,7 +520,13 @@ impl ScreenRuntime {
 
     /// A click or skip: one-shots not started yet are dropped, every resolved item ends now,
     /// and the remaining audio fires. Items waiting on a mark are kept.
-    pub fn complete_all(&mut self, now_ms: u64, marks: &dyn MarkTimes, audio: &mut AudioModel) {
+    pub fn complete_all(
+        &mut self,
+        now_ms: u64,
+        marks: &dyn MarkTimes,
+        audio: &mut AudioModel,
+        assets: &AssetStore,
+    ) {
         self.store_starts(marks);
         for (state, item) in self.items.iter_mut().zip(&self.screen.step.scheduled) {
             let Some(start) = state.start else {
@@ -487,7 +538,7 @@ impl ScreenRuntime {
             state.start = Some(start.min(now_ms));
             state.length_ms = 0;
         }
-        self.tick(now_ms, marks, audio);
+        self.tick(now_ms, marks, audio, assets);
     }
 
     /// The absolute start of every item: the stored ones, plus those resolvable now.
@@ -588,6 +639,14 @@ fn images_of(logical: &LogicalScreen) -> impl Iterator<Item = AssetId> + '_ {
         PartContent::Image(image) => Some(*image),
         PartContent::Paint(_) => None,
     })
+}
+
+/// Every video a logical screen's movie layers show.
+fn movies_of(logical: &LogicalScreen) -> impl Iterator<Item = AssetId> + '_ {
+    logical
+        .entities
+        .values()
+        .filter_map(|entity| entity.movie.as_ref().map(|m| m.video))
 }
 
 /// The texture and mask shader of a paint.

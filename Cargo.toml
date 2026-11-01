@@ -20,6 +20,7 @@ members = [
     "runtime_libs/kagari-engine",
     "runtime_libs/kagari-debugger",
     "runtime_libs/kagari-render",
+    "runtime_libs/kagari-video",
     "runtime/kagari-desktop-runtime"
 ]
 exclude = ["tooling/zed-kagari"]
@@ -48,6 +49,7 @@ kagari-compat = { path = "runtime_libs/kagari-compat" }
 kagari-engine = { path = "runtime_libs/kagari-engine" }
 kagari-debugger = { path = "runtime_libs/kagari-debugger" }
 kagari-render = { path = "runtime_libs/kagari-render" }
+kagari-video = { path = "runtime_libs/kagari-video" }
 kagari-desktop-runtime = { path = "runtime/kagari-desktop-runtime" }
 rowan = "0.17"
 salsa = "0.28"
@@ -87,6 +89,7 @@ naga = { version = "30", features = ["wgsl-in"] }
 bytemuck = { version = "1", features = ["derive"] }
 winit = "0.30"
 kira = { version = "0.12", default-features = false, features = ["cpal", "ogg", "vorbis", "flac", "wav", "pcm", "mp3", "aac", "isomp4", "alac"] }
+ffmpeg-next = { version = "9", default-features = false, features = ["codec", "format", "software-scaling", "software-resampling"] }
 gilrs = "0.11"
 directories = "6"
 pollster = "1"

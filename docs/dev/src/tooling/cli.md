@@ -183,7 +183,7 @@ kagari build [--manifest-path PATH] [--target TARGET]... [--profile debug|releas
 
    ```text
    error: asset `bgimage/title.gif` (image): GIF is not supported by runtime profile `native_v0`
-   error: asset `movie/intro.webm` (video): video assets are not supported by runtime profile `native_v0`
+   error: asset `movie/intro.webm` (video): WebM/Matroska with another codec, several video tracks or an unreadable header is not supported by runtime profile `native_v0`
    ```
 
    Any such line → exit 1, and the output directory is neither created nor cleaned. The format
@@ -249,8 +249,12 @@ runtime.
    toolchain's version. HTTP 404 says the platform's runtime is not published; a checksum
    mismatch, any other HTTP or network error → `Failure` (exit 2), and no image is written. The
    body limit is 1 GiB. The Windows runtime imports `VCRUNTIME140.dll`, which a clean Windows
-   lacks; Windows loads DLLs from the executable's directory first, so the image carries
-   `vcruntime140.dll` (the library list is `["vcruntime140.dll"]` on Windows, empty on Linux).
+   lacks, and both runtimes load FFmpeg's shared libraries; Windows loads DLLs from the
+   executable's directory first and the Linux runtime's RUNPATH is `$ORIGIN`, so the image
+   carries them next to the runtime. The library list is `vcruntime140.dll`, `avcodec-63.dll`,
+   `avformat-63.dll`, `avutil-61.dll`, `swscale-10.dll`, `swresample-7.dll` and
+   `ffmpeg-LICENSE.txt` on Windows; `libavcodec.so.63`, `libavformat.so.63`, `libavutil.so.61`,
+   `libswscale.so.10`, `libswresample.so.7` and `ffmpeg-LICENSE.txt` on Linux.
 3. Create `<out-dir>/release/<platform>/`, delete the `*.iso` files in it, and write
    `<name>.iso.part`, renamed to `<name>.iso` when complete (removed on failure). `<name>` is
    `project.name` with `/ \ : * ? " < > |` and controls replaced by `_`, surrounding whitespace
@@ -387,12 +391,12 @@ that.
 | `tooling/kagari-project/src/tests.rs` | Defaults, unknown keys, unknown/duplicate/empty targets and profiles, absolute paths, toolchain check, parent-directory discovery |
 | `tooling/kagari-cli/tests/init.rs` | Template files, refusal to overwrite, name escaping, system-font choice and the no-font fallback |
 | `tooling/kagari-cli/tests/check.rs` | Fresh project has no diagnostics (also from a subdirectory), assets outside the asset dir, `system-fonts = false`, missing manifest (2), toolchain mismatch (2) |
-| `tooling/kagari-cli/tests/build.rs` | Bytecode decodes and verifies, archive names and contents, stale archive removal, unlisted target (2), rejected image/audio/video formats (1, no bytecode written), invalid WGSL (1, `error: shader … line`), std shaders packed into `std.kiarchive`, `disasm` of the result |
+| `tooling/kagari-cli/tests/build.rs` | Bytecode decodes and verifies, archive names and contents, stale archive removal, unlisted target (2), rejected image/audio/video formats (1, no bytecode written), a supported WebM (VP9 + Opus fixture) builds, invalid WGSL (1, `error: shader … line`), std shaders packed into `std.kiarchive`, `disasm` of the result |
 | `tooling/kagari-cli/tests/debug.rs` | A debug build writes `game.kagari-cache` (script hash, one debug entry per function, every reached step is a bytecode step) and the same bytecode as a release build, which removes the artifact; `check` and `build` reuse a cached analysis (a diagnostic only the cache holds is printed) until a source edit, and replace an invalid cache; `clean` removes outputs and caches only |
 | `tooling/kagari-cli/tests/debugger.rs` | `kagari debug` on a story with scene calls, a guarded choice and a draw: `ls`, `nav` and the `push` that follows it, `goto`, `stack`, `pop`, `detail`, `seed`; breakpoints by step ID and by `file:line`; `swap` after a source edit rebuilds and moves the story onto the new sources |
 | `tooling/kagari-cli/tests/dap.rs` | `kagari dap` end to end over DAP: launch headless, breakpoints by line, stack trace, `kagari/push` and `kagari/nav`, `evaluate`, continue to a breakpoint; `kagari/swap` rebuilds, calls the changed scene again and sets the breakpoints again |
 | `tooling/kagari-cli/tests/fmt.rs` | Fresh project is formatted, rewriting, syntax errors |
-| `tooling/kagari-cli/tests/release.rs` | `kagari release` against a local download server (`KAGARI_DOWNLOAD_URL`): the image's Joliet and Rock Ridge trees hold the runtime (executable) and the game files byte for byte, for Linux, and `run.exe` with `vcruntime140.dll` for Windows; `clean` removes the image; an unpublished runtime or C runtime DLL and a checksum mismatch (2, no image); build errors (1, no download) |
+| `tooling/kagari-cli/tests/release.rs` | `kagari release` against a local download server (`KAGARI_DOWNLOAD_URL`): the image's Joliet and Rock Ridge trees hold the runtime (executable), every library of `Platform::libraries` (the FFmpeg libraries and `ffmpeg-LICENSE.txt`; for Windows also `vcruntime140.dll`) and the game files byte for byte, for Linux, and `run.exe` for Windows; `clean` removes the image; an unpublished runtime or C runtime DLL and a checksum mismatch (2, no image); build errors (1, no download) |
 
 The integration tests run the real binary (`env!("CARGO_BIN_EXE_kagari")`) through
 `tests/common/mod.rs`, inside a temp dir created by `kagari init`. Run them with

@@ -14,6 +14,7 @@ kagari-archive = { workspace = true }
 kagari-debugger = { workspace = true }
 kagari-engine = { workspace = true }
 kagari-render = { workspace = true }
+kagari-video = { workspace = true }
 wgpu = { workspace = true }
 winit = { workspace = true }
 kira = { workspace = true }

@@ -145,7 +145,9 @@ fn fade_window(nodes: &mut [Node], k: f32) {
     for node in nodes {
         match node {
             Node::Fill { color, .. } => *color = color.map(|c| c * k),
-            Node::Image { tint, .. } | Node::NineSlice { tint, .. } => *tint = tint.map(|c| c * k),
+            Node::Image { tint, .. } | Node::Video { tint, .. } | Node::NineSlice { tint, .. } => {
+                *tint = tint.map(|c| c * k);
+            }
             Node::Group { children, .. }
             | Node::Filter { children, .. }
             | Node::Mix { children, .. }

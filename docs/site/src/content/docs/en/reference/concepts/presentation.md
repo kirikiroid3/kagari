@@ -147,6 +147,11 @@ settings that cannot be interpolated are set directly: `set_plane`, `set_z`, `se
 `set_flip`, `set_fill_size` and `gate` on an entity, and `set_resize` (how the layer sizes its
 content, see [`Resize`](../../std/screen.md#resize)) on an image layer.
 
+A movie layer (`entity.movie()`) plays its video from the swap on, fitted inside the entity's box
+and centred, above the image parts and under the label. The step waits for a movie that does not
+loop to end, as it waits for a one-shot sound; a looping movie does not hold the step. See
+[`MovieLayer`](../../std/screen.md#movielayer).
+
 ### Animations never change the logical screen
 
 The **logical screen** of a step is the persistent state after its render:

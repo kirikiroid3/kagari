@@ -3,22 +3,26 @@
 use std::rc::Rc;
 
 use kagari_shader::ArgValue;
-use kagari_vm::{AssetId, Decimal, HostObj, Value};
+use kagari_vm::{AssetId, Decimal, HostObj, Program, Value};
 
 use super::model::{
     Animation, ChannelId, Cursor, EntityProp, LayerContent, LayerTarget, PartContent,
     PendingChange, PropTarget, PropValue, ScheduledKind, ScreenObj, Target,
 };
 use super::runtime::{NoReveal, ScreenRuntime};
-use super::sample::VisualScreen;
+use super::sample::{VisualContent, VisualLayer, VisualMovie, VisualScreen};
 use crate::HostCtx;
 use crate::anim::decimal_f32;
+use crate::assets::AssetStore;
 use crate::audio::{AudioCommand, AudioModel};
 use crate::frame::{MotionStage, ShaderEffect};
-use crate::test_support::{FakePlatform, STD_TYPES, TestHost, engine};
+use crate::test_support::{
+    FAKE_VIDEO, FakePlatform, STD_TYPES, TestHost, VideoPlatform, compile, engine,
+};
 use crate::values::{
-    AudioFade, Easing, EffectSpec, Flip, LocalMotionBehavior, LoopSpec, Plane, PoseSpec, Resize,
-    SoundSpec, Transition, TransitionKind, TransitionalMotionSpec, Tween, VAlign, Visibility,
+    AudioFade, Easing, EffectSpec, Flip, LocalMotionBehavior, LoopSpec, MovieSpec, Plane, PoseSpec,
+    Resize, SoundSpec, Transition, TransitionKind, TransitionalMotionSpec, Tween, VAlign,
+    Visibility,
 };
 
 fn tween(duration_ms: u32) -> Animation {
@@ -108,8 +112,24 @@ fn opacity_out_of_range_is_rejected() {
     );
 }
 
+thread_local! {
+    /// The compiled `STD_TYPES`, shared by the tests of this thread.
+    static STD_PROGRAM: Rc<Program> = Program::load(&compile(STD_TYPES)).unwrap();
+}
+
+/// An asset store over `STD_TYPES` with nothing loaded.
+fn no_assets() -> AssetStore {
+    AssetStore::new(STD_PROGRAM.with(Rc::clone))
+}
+
 fn runtime(base: &ScreenObj, screen: ScreenObj, animations: bool) -> ScreenRuntime {
-    ScreenRuntime::from_step(base.logical.clone(), HostObj::new(screen), 0, animations)
+    ScreenRuntime::from_step(
+        base.logical.clone(),
+        HostObj::new(screen),
+        0,
+        animations,
+        &no_assets(),
+    )
 }
 
 #[test]
@@ -168,7 +188,7 @@ fn despawned_entities_draw_until_the_cursor_and_their_animations_end() {
     assert_eq!(rt.text_start_ms(), 3000);
     assert!(rt.timeline_running(2999, &NoReveal(0)));
     // A click completes the despawn with everything else.
-    rt.complete_all(1000, &NoReveal(0), &mut AudioModel::new());
+    rt.complete_all(1000, &NoReveal(0), &mut AudioModel::new(), &no_assets());
     assert_eq!(entity_opacity(&rt.sample(1000), 2), None);
 }
 
@@ -261,8 +281,8 @@ fn a_click_drops_one_shots_not_started() {
     let mut rt = runtime(&base, screen, true);
     let mut audio = AudioModel::new();
     audio.begin_game();
-    rt.complete_all(100, &NoReveal(0), &mut audio);
-    rt.tick(1000, &NoReveal(0), &mut audio);
+    rt.complete_all(100, &NoReveal(0), &mut audio, &no_assets());
+    rt.tick(1000, &NoReveal(0), &mut audio, &no_assets());
     assert!(
         !audio
             .take_commands()
@@ -279,10 +299,10 @@ fn ticks_fire_sounds_at_their_start() {
     let mut rt = runtime(&base, screen, true);
     let mut audio = AudioModel::new();
     audio.begin_game();
-    rt.tick(499, &NoReveal(0), &mut audio);
+    rt.tick(499, &NoReveal(0), &mut audio, &no_assets());
     assert!(audio.take_commands().is_empty());
     assert!(rt.timeline_running(499, &NoReveal(0)));
-    rt.tick(500, &NoReveal(0), &mut audio);
+    rt.tick(500, &NoReveal(0), &mut audio, &no_assets());
     assert!(matches!(
         audio.take_commands().as_slice(),
         [AudioCommand::Play { path, .. }] if path == "s.ogg"
@@ -649,4 +669,239 @@ fn imports_build_effects() {
     changed.args = Value::Decimal(Decimal::ONE);
     other.entity_mut(1).filter = Some(Rc::new(changed));
     assert!(other.logical != screen.logical);
+}
+
+fn cut() -> Animation {
+    Animation::Transition(Transition {
+        kind: TransitionKind::Cut,
+        duration_ms: 0,
+        easing: Easing::LINEAR,
+        delay_ms: 0,
+    })
+}
+
+/// Shows `video` on entity 1's movie layer.
+fn show_movie(video: AssetId, looping: bool) -> PendingChange {
+    PendingChange::Layer(
+        LayerTarget::Movie(1),
+        Some(LayerContent::Movie(MovieSpec { video, looping })),
+    )
+}
+
+/// Engine state over `STD_TYPES` with `m.webm` and `n.webm` loaded as `info`; their ids.
+fn movie_state(info: crate::VideoInfo) -> (crate::EngineState, AssetId, AssetId) {
+    let (_vm, mut state) = engine(STD_TYPES);
+    let m = asset_id(&state, "m.webm");
+    let n = asset_id(&state, "n.webm");
+    for video in [m, n] {
+        state
+            .assets
+            .ensure_video(video, &mut VideoPlatform(info))
+            .unwrap();
+    }
+    (state, m, n)
+}
+
+/// The movie entity `id` shows.
+fn movie_of(v: &VisualScreen, id: u32) -> Option<VisualMovie> {
+    match &v.entities.iter().find(|e| e.id == id)?.movie {
+        VisualLayer::Shown(VisualContent::Movie(movie)) => Some(movie.clone()),
+        _ => None,
+    }
+}
+
+#[test]
+fn a_movie_lasts_its_length_in_the_timeline_unless_it_loops() {
+    let (state, m, _) = movie_state(FAKE_VIDEO);
+    for animations in [true, false] {
+        let mut screen = ScreenObj::empty();
+        screen.entity_mut(1);
+        let base = screen.clone();
+        let mut looping = screen.clone();
+        screen.commit(show_movie(m, false), cut()).unwrap();
+        let rt = ScreenRuntime::from_step(
+            base.logical.clone(),
+            HostObj::new(screen),
+            0,
+            animations,
+            &state.assets,
+        );
+        assert!(rt.timeline_running(1999, &NoReveal(0)));
+        assert!(!rt.timeline_running(2000, &NoReveal(0)));
+
+        looping.commit(show_movie(m, true), cut()).unwrap();
+        let rt = ScreenRuntime::from_step(
+            base.logical.clone(),
+            HostObj::new(looping),
+            0,
+            animations,
+            &state.assets,
+        );
+        assert!(!rt.timeline_running(1, &NoReveal(0)));
+    }
+}
+
+#[test]
+fn a_movie_plays_with_animations_off() {
+    let (state, m, _) = movie_state(FAKE_VIDEO);
+    let mut screen = ScreenObj::empty();
+    screen.entity_mut(1);
+    let base = screen.clone();
+    screen.commit(show_movie(m, false), cut()).unwrap();
+    let rt = ScreenRuntime::from_step(
+        base.logical.clone(),
+        HostObj::new(screen),
+        0,
+        false,
+        &state.assets,
+    );
+    let movie = movie_of(&rt.sample(700), 1).unwrap();
+    assert_eq!(
+        movie,
+        VisualMovie {
+            entity: 1,
+            video: m,
+            looping: false,
+            position_ms: 700,
+        }
+    );
+}
+
+#[test]
+fn movie_clock_carries_over_steps_until_the_video_changes() {
+    let (mut state, m, n) = movie_state(FAKE_VIDEO);
+    let mut rt = ScreenRuntime::new(HostObj::new(ScreenObj::empty()));
+    let mut enter = |rt: &mut ScreenRuntime, screen: ScreenObj, at: u64| {
+        rt.enter_step(
+            Value::Host(HostObj::new(screen)),
+            at,
+            true,
+            &mut state.assets,
+            &mut FakePlatform,
+        )
+        .unwrap();
+    };
+    let position = |rt: &ScreenRuntime, t: u64| movie_of(&rt.sample(t), 1).unwrap().position_ms;
+
+    let mut first = ScreenObj::empty();
+    first.commit(show_movie(m, false), cut()).unwrap();
+    enter(&mut rt, first, 1000);
+    assert_eq!(position(&rt, 1700), 700);
+
+    // The same movie in the next step: its clock keeps running.
+    let second = next_screen(&rt);
+    enter(&mut rt, second, 3000);
+    assert_eq!(position(&rt, 3500), 2500);
+    let mut again = next_screen(&rt);
+    again.commit(show_movie(m, false), cut()).unwrap();
+    enter(&mut rt, again, 4000);
+    assert_eq!(position(&rt, 4000), 3000);
+
+    // Another video: it starts from its beginning.
+    let mut third = next_screen(&rt);
+    third.commit(show_movie(n, false), cut()).unwrap();
+    enter(&mut rt, third, 5000);
+    assert_eq!(position(&rt, 5000), 0);
+    assert_eq!(position(&rt, 5300), 300);
+}
+
+#[test]
+fn a_movie_with_audio_stops_one_shots_and_the_voice_then_plays_on_music() {
+    let (mut state, m, _) = movie_state(FAKE_VIDEO);
+    let mut audio = AudioModel::new();
+    audio.begin_game();
+    audio.play_one_shot(&sound(0), None, 0);
+    audio.play_voice("v.ogg", 0, None, 0);
+    let ids: Vec<u64> = audio
+        .take_commands()
+        .iter()
+        .filter_map(|c| match c {
+            AudioCommand::Play { id, .. } => Some(*id),
+            _ => None,
+        })
+        .collect();
+    let [sound_id, voice_id] = ids[..] else {
+        panic!("{ids:?}")
+    };
+
+    let mut rt = ScreenRuntime::new(HostObj::new(ScreenObj::empty()));
+    let mut first = ScreenObj::empty();
+    first.commit(show_movie(m, false), cut()).unwrap();
+    rt.enter_step(
+        Value::Host(HostObj::new(first)),
+        0,
+        true,
+        &mut state.assets,
+        &mut FakePlatform,
+    )
+    .unwrap();
+    rt.tick(0, &NoReveal(0), &mut audio, &state.assets);
+    let commands = audio.take_commands();
+    let [
+        AudioCommand::Stop { id: stop_sound, .. },
+        AudioCommand::Stop { id: stop_voice, .. },
+        AudioCommand::PlayMovie {
+            id: movie_id,
+            path,
+            looping: false,
+            gain,
+        },
+    ] = commands.as_slice()
+    else {
+        panic!("{commands:?}")
+    };
+    assert_eq!((*stop_sound, *stop_voice), (sound_id, voice_id));
+    assert_eq!((path.as_str(), *gain), ("m.webm", 1.0));
+    assert_eq!(audio.drain_watched(), [m]);
+    // Still shown: nothing new.
+    rt.tick(500, &NoReveal(0), &mut audio, &state.assets);
+    assert!(audio.take_commands().is_empty());
+    assert!(audio.drain_watched().is_empty());
+
+    // Cleared: its audio stops.
+    let mut cleared = next_screen(&rt);
+    cleared
+        .commit(PendingChange::Layer(LayerTarget::Movie(1), None), cut())
+        .unwrap();
+    rt.enter_step(
+        Value::Host(HostObj::new(cleared)),
+        1000,
+        true,
+        &mut state.assets,
+        &mut FakePlatform,
+    )
+    .unwrap();
+    rt.tick(1000, &NoReveal(0), &mut audio, &state.assets);
+    assert_eq!(
+        audio.take_commands(),
+        [AudioCommand::Stop {
+            id: *movie_id,
+            fade_out_ms: 0
+        }]
+    );
+}
+
+#[test]
+fn a_silent_movie_plays_no_audio_but_counts_as_watched() {
+    let silent = crate::VideoInfo {
+        has_audio: false,
+        ..FAKE_VIDEO
+    };
+    let (state, m, _) = movie_state(silent);
+    let mut audio = AudioModel::new();
+    audio.begin_game();
+    let mut screen = ScreenObj::empty();
+    screen.entity_mut(1);
+    let base = screen.clone();
+    screen.commit(show_movie(m, false), cut()).unwrap();
+    let mut rt = ScreenRuntime::from_step(
+        base.logical.clone(),
+        HostObj::new(screen),
+        0,
+        true,
+        &state.assets,
+    );
+    rt.tick(0, &NoReveal(0), &mut audio, &state.assets);
+    assert!(audio.take_commands().is_empty());
+    assert_eq!(audio.drain_watched(), [m]);
 }

@@ -41,6 +41,7 @@ flowchart TD
   desktop["kagari-desktop-runtime (bin)"] ==> render["kagari-render"]
   cli ==> debugger["kagari-debugger"]
   desktop ==> debugger
+  desktop ==> video["kagari-video"]
   debugger ==> engine
   debugger ==> debug
   render ==> engine["kagari-engine"]
@@ -80,7 +81,8 @@ The graph omits edges that other edges imply (for example `kagari-cli` also depe
 | `kagari-engine` | `kagari-bytecode`, `kagari-vm`, `kagari-text`, `kagari-archive` (dev: `kagari-lang`) | `image`, `jxl-oxide`, `png`, `sha2` |
 | `kagari-render` | `kagari-bytecode`, `kagari-engine`, `kagari-text` | `wgpu`, `bytemuck` |
 | `kagari-debugger` | `kagari-archive`, `kagari-bytecode`, `kagari-debug`, `kagari-engine`, `kagari-vm`, `kagari-std` (feature `client`) (dev: `kagari-lang`) | `serde`, `serde_json`, `log` |
-| `kagari-desktop-runtime` | `kagari-archive`, `kagari-debugger`, `kagari-engine`, `kagari-render` | `winit`, `wgpu`, `kira`, `gilrs`, `directories`, `clap`, `jiff`, `embed-resource` (build, Windows icon) |
+| `kagari-video` | — | `ffmpeg-next` (FFmpeg, linked dynamically), `log` |
+| `kagari-desktop-runtime` | `kagari-archive`, `kagari-debugger`, `kagari-engine`, `kagari-render`, `kagari-video` | `winit`, `wgpu`, `kira`, `gilrs`, `directories`, `clap`, `jiff`, `embed-resource` (build, Windows icon) |
 
 Two rules follow from the graph and must stay true:
 
@@ -186,6 +188,10 @@ from `PATH` or from the `lsp.kagari.binary.path` setting.
 **`kagari-compat`** — Runtime profiles (today only `native_v0`) and the asset formats each can
 decode. `sniff` identifies an asset by content, not by extension; `kagari build` rejects assets a
 listed profile cannot decode.
+
+**`kagari-video`** — Movie decoding through FFmpeg (`ffmpeg-next`): probing, video frames as
+sRGB RGBA with hardware decoding and a software fallback, and movie audio. It depends on no
+Kagari crate. See [The Desktop Runtime](../runtime/desktop.md#kagari-video).
 
 **`kagari-vm`** — The bytecode interpreter: `Program::load` (decode, verify, reject required
 features), tagged values with copy-on-write sharing, references, the instruction loop, story

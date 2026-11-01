@@ -60,12 +60,30 @@ impl Platform {
     }
 
     /// The libraries the runtime needs and a player's system may lack, downloaded from the
-    /// runtime's directory on the server and shipped next to it under the same name.
+    /// runtime's directory on the server and shipped next to it under the same name, and
+    /// FFmpeg's licence.
     fn libraries(self) -> &'static [&'static str] {
         match self {
-            // The MSVC C runtime: Windows loads it from the executable's directory first.
-            Platform::Windows => &["vcruntime140.dll"],
-            Platform::Linux => &[],
+            // The MSVC C runtime and FFmpeg: Windows loads DLLs from the executable's
+            // directory first.
+            Platform::Windows => &[
+                "vcruntime140.dll",
+                "avcodec-63.dll",
+                "avformat-63.dll",
+                "avutil-61.dll",
+                "swscale-10.dll",
+                "swresample-7.dll",
+                "ffmpeg-LICENSE.txt",
+            ],
+            // FFmpeg: the runtime's RUNPATH is `$ORIGIN`.
+            Platform::Linux => &[
+                "libavcodec.so.63",
+                "libavformat.so.63",
+                "libavutil.so.61",
+                "libswscale.so.10",
+                "libswresample.so.7",
+                "ffmpeg-LICENSE.txt",
+            ],
         }
     }
 }

@@ -2,13 +2,15 @@
 
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use kagari_engine::{AssetStore, Frame, Platform, Timestamp};
+use kagari_engine::{AssetStore, Frame, Platform, Timestamp, VideoInfo};
 
 use kagari_archive::archive::ArchiveDir;
 
 use crate::gpu::Gpu;
+use crate::movies::{Movies, Pace};
 use crate::sounds::{Sound, SoundCache};
 use crate::store::Store;
 
@@ -39,6 +41,7 @@ pub struct DesktopPlatform {
     archives: ArchiveDir,
     store: Store,
     pub sounds: SoundCache,
+    pub movies: Movies,
     /// Set once the GPU exists (after the window opens, or at headless start).
     pub gpu: Option<Gpu>,
     time: TimeSource,
@@ -51,12 +54,14 @@ impl DesktopPlatform {
         store: Store,
         time: TimeSource,
         seed: SeedSource,
+        pace: Pace,
     ) -> DesktopPlatform {
         DesktopPlatform {
             game_dir: game_dir.to_path_buf(),
             archives: ArchiveDir::new(game_dir),
             store,
             sounds: SoundCache::default(),
+            movies: Movies::new(pace),
             gpu: None,
             time,
             seed,
@@ -82,6 +87,21 @@ impl DesktopPlatform {
                 None
             }
         }
+    }
+
+    /// The encoded movie at an asset path, for its audio.
+    pub fn movie_bytes(&mut self, path: &str) -> Option<Arc<[u8]>> {
+        self.movies.bytes(path, &mut self.archives)
+    }
+
+    /// Decodes and uploads the movie frames `frame` draws.
+    pub fn update_movies(&mut self, frame: &Frame, assets: &AssetStore) {
+        self.movies.update(
+            &frame.video_requests(),
+            assets,
+            self.gpu.as_mut().map(|g| &mut g.renderer),
+            &mut self.archives,
+        );
     }
 }
 
@@ -110,6 +130,17 @@ impl Platform for DesktopPlatform {
             None => self.sounds.load(path, bytes.to_vec())?,
         };
         sound.duration_ms()
+    }
+
+    fn video_info(&mut self, path: &str) -> Option<VideoInfo> {
+        self.movies
+            .info(path, &mut self.archives)
+            .map(|i| VideoInfo {
+                width: i.width,
+                height: i.height,
+                duration_ms: i.duration_ms,
+                has_audio: i.has_audio,
+            })
     }
 
     fn render_thumbnail(
@@ -161,11 +192,12 @@ impl Platform for DesktopPlatform {
         self.store.set_title(title);
     }
 
-    /// A debugger swapped in a rebuild: the archives are opened again, and the decoded sounds
-    /// and the renderer's textures and pipelines are dropped.
+    /// A debugger swapped in a rebuild: the archives are opened again, and the decoded sounds,
+    /// the movies and the renderer's textures and pipelines are dropped.
     fn program_changed(&mut self) {
         self.archives = ArchiveDir::new(&self.game_dir);
         self.sounds = SoundCache::default();
+        self.movies.reset();
         if let Some(gpu) = self.gpu.as_mut() {
             gpu.renderer = kagari_render::Renderer::new(&gpu.device, &gpu.queue, gpu.format);
         }

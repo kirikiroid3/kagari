@@ -28,11 +28,11 @@ is a manifest error. See [Projects](../../reference/tools/projects.md).
 
 |Module|Support in `native_v0`|
 |---|---|
-|`std` (types, traits, `asset`, `system_font`)|Supported, except that `VideoAsset` files cannot be used (see below)|
+|`std` (types, traits, `asset`, `system_font`)|Supported|
 |`std::time`|Supported|
 |`std::narrative`|Supported: `Say`, `Choice` with disabled arms, `rng_choose`, `Meta`, every `Narrative` method. Timed input is Planned and exists in no profile|
 |`std::narrative::text`|Supported: ruby and mono ruby, every text effect (styles, emphasis dots, reveal speeds, pauses, marks), every `TextStyle` field including `hanging_indent` and `vertical`|
-|`std::screen`|Supported, except movie layers (`Entity::movie`, `MovieLayer`), which need video assets|
+|`std::screen`|Supported, including movie layers (`Entity::movie`, `MovieLayer`)|
 |`std::screen::shader`, `std::shaders`|Supported. Every shader is validated at `kagari build`; on a GPU without storage buffers (or without compute, for the motion roles) the runtime draws the content without the effect|
 |`std::screen::anim`|Supported|
 |`std::screen::audio`|Supported|
@@ -49,7 +49,7 @@ Formats are recognized by file content, not by extension.
 |`ImageAsset`|PNG; baseline and progressive JPEG; lossy, lossless and extended (alpha or metadata) WebP; BMP (uncompressed, RLE or bitfields); still JPEG XL (RGB or greyscale)|JPEG with arithmetic, lossless, hierarchical or 12-bit coding; animated WebP; GIF; BMP with embedded JPEG or PNG, or CMYK; AVIF; animated or CMYK JPEG XL|
 |`AudioAsset`, `VoiceAsset`|Ogg Vorbis; Ogg FLAC; FLAC; WAV (PCM); WAV (IEEE float); MP3; mono or stereo AAC-LC (ADTS or MP4/M4A); mono or stereo ALAC (MP4/M4A)|Ogg Opus; other Ogg codecs; compressed WAV; HE-AAC and other AAC profiles; AAC or ALAC with more than two channels; MP4/M4A with another codec|
 |`FontAsset`|TrueType; OpenType (CFF); TrueType/OpenType collections (`.ttc`)|WOFF; WOFF2|
-|`VideoAsset`|—|every format: video assets are not supported|
+|`VideoAsset`|WebM with VP9 or AV1 video and Opus or Vorbis audio, or no audio; MP4 with H.264 video and AAC-LC audio, or no audio|VP8 and other video codecs; several video tracks; other audio codecs; WebM with other tracks; other containers|
 |`ColorShader`, `MixShader`, `TextureShader`, `MaskShader`, `LocalMotionShader`, `TransitionalMotionShader`|WGSL source (UTF-8 text) that validates as its role|non-text data; WGSL with errors|
 
 ## Using an unsupported item
@@ -58,22 +58,18 @@ Formats are recognized by file content, not by extension.
 cannot decode, `kagari build` prints one error and produces no output:
 
 ```text
-error: asset `movie/intro.webm` (video): video assets are not supported by runtime profile `native_v0`
+error: asset `movie/intro.webm` (video): WebM/Matroska with another codec, several video tracks or an unreadable header is not supported by runtime profile `native_v0`
 error: asset `music/theme.ogg` (audio): Ogg Opus is not supported by runtime profile `native_v0`
 error: asset `bgimage/title.gif` (image): GIF is not supported by runtime profile `native_v0`
 ```
 
-So a game that targets `native_v0` cannot use a `VideoAsset` constant anywhere. Convert other
-assets to a supported format. For the items that take video assets, this means:
+Convert such assets to a supported format. For a movie, for example:
 
-|Item|At `kagari build`|At runtime in `native_v0`|
-|---|---|---|
-|`MovieLayer::change(…)` (a `Movie` holds a `VideoAsset`)|rejected (video asset)|—|
-|`system::watched(VIDEO)`|rejected (video asset)|—|
-|`Entity::movie()`, `MovieLayer::clear(…)`|accepted|kept in the logical screen (saves, equality, consistency) but never drawn; there is nothing to draw|
+```sh
+ffmpeg -i in.mov -c:v libvpx-vp9 -c:a libopus out.webm
+```
 
-The renderer of the desktop runtime has no movie playback, so movie layers never produce pixels
-in `native_v0`, and the `watched` set is never filled.
+Use `-c:v libsvtav1` for AV1, or `-c:v libx264 -c:a aac` with an `.mp4` output for H.264.
 
 **Invalid shaders fail the build.** `kagari build` compiles every shader the program uses, the
 `std::shaders` ones included, as the role its type names, and prints one error per invalid shader
