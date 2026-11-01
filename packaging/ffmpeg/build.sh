@@ -98,10 +98,17 @@ tar -xzf "$work/dav1d-$DAV1D_VERSION.tar.gz" -C "$work"
 tar -xJf "$work/ffmpeg-$FFMPEG_VERSION.tar.xz" -C "$work"
 
 say "building dav1d $DAV1D_VERSION"
+dav1d_flags=(
+    "--prefix=$native_prefix" --libdir=lib --buildtype=release
+    -Ddefault_library=static -Denable_tools=false -Denable_tests=false
+)
+if [ "$target" = windows ]; then
+    # The dynamic C runtime (/MD), as FFmpeg's `-MD` below and the Rust runtime use.
+    dav1d_flags+=(-Db_vscrt=md)
+fi
 (
     cd "$work/dav1d-$DAV1D_VERSION"
-    meson setup build-dav1d "--prefix=$native_prefix" --libdir=lib --buildtype=release \
-        -Ddefault_library=static -Denable_tools=false -Denable_tests=false
+    meson setup build-dav1d "${dav1d_flags[@]}"
     ninja -C build-dav1d install
 )
 if [ "$target" = windows ]; then
@@ -131,8 +138,10 @@ case "$target" in
         )
         ;;
     windows)
+        # cl defaults to the static C runtime (/MT), which cannot link the /MD dav1d and would
+        # give each DLL its own heap; `-MD` imports VCRUNTIME140.dll like the Rust runtime.
         flags+=(
-            --toolchain=msvc --enable-d3d11va
+            --toolchain=msvc --enable-d3d11va --extra-cflags=-MD
             --enable-hwaccel=h264_d3d11va2,vp9_d3d11va2,av1_d3d11va2
         )
         ;;
