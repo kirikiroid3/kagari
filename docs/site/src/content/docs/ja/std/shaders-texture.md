@@ -2,9 +2,9 @@
 title: "std::shaders::texture"
 ---
 
-> **安定性:** 暫定 — 生成された画像内容です。単色、グラデーション、ガウスの光点、雨、雪を含みます。
+> **安定性:** 暫定 — 画像の内容を生成するシェーダー集です。単色、グラデーション、ガウス状の光の玉、雨、雪があります。
 
-[`ImageLayer::paint`](./screen.md#imagelayer) のためのテクスチャーシェーダーです。どの関数も `size` ピクセルの [`Paint`](./screen-shader.md#paint) を返します。ペイントは画像レイヤーが画像の代わりに表示し、画像と同じようにトランジションで差し替えられます。ペイントには [`Paint::masked`](./screen-shader.md#paint-masked) でマスクを付けられます。ペイント内の位置は、左上の角からのピクセル数です。
+[`ImageLayer::paint`](./screen.md#imagelayer) で使うテクスチャーシェーダーです。どの関数も `size` ピクセルの[`Paint`](./screen-shader.md#paint)（塗り）を返します。画像レイヤーは画像の代わりにこの塗りを表示し、画像と同じようにトランジションで差し替えます。塗りには [`Paint::masked`](./screen-shader.md#paint-masked) でマスクをかけられます。塗りの中の位置は、左上の角からのピクセル数で表します。
 
 ```kis
 use std::screen::{CENTER, degrees, rgba, size};
@@ -26,12 +26,12 @@ screen.entity(GLOW).image().paint(gaussian_spots([
 | -------- | --------- | ------- |
 | [`solid(color, size)`](#solid) | [`Solid`](#solid) | 単色 |
 | [`linear_gradient(angle, from, to, size)`](#linear_gradient) | [`LinearGradient`](#linear_gradient) | 線形グラデーション |
-| [`radial_gradient(center, inner, outer, size)`](#radial_gradient) | [`RadialGradient`](#radial_gradient) | 放射グラデーション |
-| [`gaussian_spots(spots, size)`](#gaussian_spots) | [`GaussianSpot`](#gaussian_spots)、[`GaussianSpots<N>`](#gaussian_spots) | 柔らかく丸い光点 |
-| [`rain(color, density, speed, angle, size)`](#rain) | [`Rain`](#rain) | 降る雨の筋 |
-| [`snow(color, density, speed, radius, size)`](#snow) | [`Snow`](#snow) | 降る雪片 |
+| [`radial_gradient(center, inner, outer, size)`](#radial_gradient) | [`RadialGradient`](#radial_gradient) | 放射状グラデーション |
+| [`gaussian_spots(spots, size)`](#gaussian_spots) | [`GaussianSpot`](#gaussian_spots)、[`GaussianSpots<N>`](#gaussian_spots) | ぼんやりした丸い光の玉 |
+| [`rain(color, density, speed, angle, size)`](#rain) | [`Rain`](#rain) | 降りしきる雨の筋 |
+| [`snow(color, density, speed, radius, size)`](#snow) | [`Snow`](#snow) | 舞い落ちる雪 |
 
-以下の各節に、引数の構造体、シェーダー定数、関数を載せます。関数は `const fn` で、ビルトインではありません。
+以下の各節では、引数の構造体、シェーダーの定数、関数をまとめて示します。関数はどれも `const fn` で、組み込みではありません。
 
 ## 単色 {#solid}
 
@@ -44,7 +44,7 @@ pub const SOLID: TextureShader<Solid> = asset("shaders/texture/solid.wgsl");
 pub const fn solid(color: Color, size: Size) -> Paint
 ```
 
-`color` で塗った `size` ピクセルです。マスクを付ければ形を描けます。`solid(WHITE, s).masked(rounded_rect(16.0, 1.0))` は角の丸い白いパネルです。
+`size` ピクセルを `color` 一色で塗ります。マスクと組み合わせると図形を描けます。たとえば `solid(WHITE, s).masked(rounded_rect(16.0, 1.0))` は角の丸い白いパネルになります。
 
 ## 線形グラデーション {#linear_gradient}
 
@@ -61,9 +61,9 @@ pub const LINEAR_GRADIENT: TextureShader<LinearGradient> = asset(
 pub const fn linear_gradient(angle: Angle, from: Color, to: Color, size: Size) -> Paint
 ```
 
-`angle`（0° は左から右、90° は上から下）に沿って、始まりの辺の `from` から終わりの辺の `to` へ変わる `size` ピクセルです。ランプは [`mask::linear`](./shaders-mask.md#linear) と同じです。色はリニア光で混ぜます。
+`size` ピクセルの線形グラデーションです。`angle` の方向（0° で左から右、90° で上から下）に沿って、始点側の辺の `from` から終点側の辺の `to` へ色が変わります。変化のしかたは [`mask::linear`](./shaders-mask.md#linear) と同じです。色はリニア色空間で混ぜます。
 
-## 放射グラデーション {#radial_gradient}
+## 放射状グラデーション {#radial_gradient}
 
 ```kis
 #[shader_arg]
@@ -78,9 +78,9 @@ pub const RADIAL_GRADIENT: TextureShader<RadialGradient> = asset(
 pub const fn radial_gradient(center: Anchor, inner: Color, outer: Color, size: Size) -> Paint
 ```
 
-`center`（ペイントに対する割合）の `inner` から最も遠い角の `outer` へ変わる `size` ピクセルです。ランプは [`mask::radial`](./shaders-mask.md#radial) と同じです。
+`size` ピクセルの放射状グラデーションです。`center`（塗りの大きさに対する割合）で `inner`、そこから最も遠い角で `outer` になるように色が変わります。変化のしかたは [`mask::radial`](./shaders-mask.md#radial) と同じです。
 
-## ガウスの光点 {#gaussian_spots}
+## ガウス状の光の玉 {#gaussian_spots}
 
 ```kis
 #[shader_arg]
@@ -97,11 +97,11 @@ pub struct GaussianSpots<const N: usize> {
 pub const fn gaussian_spots<const N: usize>(spots: [GaussianSpot; N], size: Size) -> Paint
 ```
 
-`spots` を足し合わせた `size` ピクセルです。光点は `position`（ペイントの左上の角からのピクセル数）にある柔らかく丸い光で、中心の色が `color`、標準偏差 `radius` ピクセルのガウス関数で減衰します。`radius` が 0.0 以下なら何も描きません。足し合わせたアルファが 1.0 を超える場所では、アルファが 1.0 になるよう合計を縮小します。
+`spots` の光の玉をすべて足し合わせた、`size` ピクセルの塗りです。光の玉はそれぞれ `position`（塗りの左上の角からのピクセル数）を中心とするぼんやりした丸い光です。中心の色が `color` で、標準偏差 `radius` ピクセルのガウス分布に従って周囲へ薄くなります。`radius` が 0.0 以下の光の玉は何も描きません。足し合わせたアルファが 1.0 を超える場所では、アルファがちょうど 1.0 になるよう合計を縮めます。
 
-- 描かれる光点は最大 64 個で、65 個目以降は無視されます。
-- `GaussianSpots<N>` が引数の型で、`count` は `N` です。シェーダーの型が `N` に依存するので、公開の定数はありません。
-- 同じ `N` の 2 つの `gaussian_spots` ペイントの間をトゥイーンすると、すべての光点が動きます。
+- 描けるのは 64 個までです。65 個目以降は無視します。
+- 引数の型は `GaussianSpots<N>` で、`count` には `N` が入ります。シェーダーの型が `N` によって変わるため、このシェーダーには公開の定数がありません。
+- `N` が同じ 2 つの `gaussian_spots` の塗りの間を補間すると、すべての光の玉が動きます。
 
 ## 雨 {#rain}
 
@@ -118,7 +118,7 @@ pub const RAIN: TextureShader<Rain> = asset("shaders/texture/rain.wgsl");
 pub const fn rain(color: Color, density: u32, speed: Decimal, angle: Angle, size: Size) -> Paint
 ```
 
-雨の `size` ピクセルです。ペイントを幅 8 ピクセルの列に分け、そのうち `density` パーセントの列に雨粒があります。雨粒は `color` の筋で、真下から `angle` だけ傾いて毎秒 `speed` ピクセルで落ちます。`rain` は長さ 24 ピクセルの筋を描きます。別の `length` にするには、[`paint`](./screen-shader.md#paint-fn) と `RAIN` で `Rain` を組み立ててください。
+`size` ピクセルの雨です。塗りを幅 8 ピクセルの列に分け、そのうち `density` パーセントの列に雨粒を置きます。雨粒は `color` の筋で、真下から `angle` だけ傾いた向きに、毎秒 `speed` ピクセルの速さで落ちます。`rain` が描く筋の長さは 24 ピクセルです。長さ（`length`）を変えたい場合は、[`paint`](./screen-shader.md#paint-fn) と `RAIN` を使って `Rain` を自分で組み立ててください。
 
 ## 雪 {#snow}
 
@@ -140,4 +140,4 @@ pub const fn snow(
 ) -> Paint
 ```
 
-奥行きの異なる 3 層で揺れながら降る雪片の `size` ピクセルです。48 ピクセルの格子のマスのうち `density` パーセントに雪片があります。最も手前の層の雪片は半径 `radius` ピクセルで毎秒 `speed` ピクセルで落ち、奥の 2 層はより小さく、より遅くなります。
+`size` ピクセルの雪です。雪は奥行きの違う 3 つの層に分かれ、揺れながら降ります。48 ピクセル間隔の格子のマスのうち、`density` パーセントに雪片を置きます。いちばん手前の層では雪片の半径が `radius` ピクセル、落ちる速さが毎秒 `speed` ピクセルです。奥の 2 層では、雪片はそれより小さく、落ちるのも遅くなります。

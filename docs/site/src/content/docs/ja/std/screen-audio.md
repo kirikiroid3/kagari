@@ -2,23 +2,23 @@
 title: "std::screen::audio"
 ---
 
-> **安定性:** 安定 — 画面上のオーディオです。ループするチャンネルとワンショットサウンドを扱います。
+> **安定性:** 安定 — 画面の音声。ループ再生するチャンネルと単発のサウンドを扱います。
 
-オーディオは画面の一部です。レンダーはほかのコンポーネントと同じようにオーディオを変更し、チャンネルは[論理画面](./screen.md#the-logical-screen)に含まれます。このモジュールは、ループするトラック（[`Loop`](#loop)）、ワンショットサウンド（[`Sound`](#sound)）、チャンネルのフェード（[`AudioFade`](#audiofade)）、状態型 [`Channel`](#channel) を宣言します。アイテムはすべて `const fn` か単純なデータです。
+音声も画面の一部です。レンダーはほかのコンポーネントと同じ方法で音声を変更し、チャンネルの状態は[論理画面](./screen.md#the-logical-screen)に含まれます。このモジュールは、ループ再生するトラック（[`Loop`](#loop)）、単発のサウンド（[`Sound`](#sound)）、チャンネルのフェード（[`AudioFade`](#audiofade)）、状態を表す型 [`Channel`](#channel) を宣言します。アイテムはどれも `const fn` か単純なデータです。
 
-プレリュードは `looped`、`sound`、`crossfade` を再エクスポートします。残りには `use std::screen::audio::…` が必要です。
+プレリュードには `looped`、`sound`、`crossfade` が含まれます。それ以外は `use std::screen::audio::…` で取り込みます。
 
-ゲームに同梱できる音声形式はランタイムプロファイルによって決まります。`native_v0` は Ogg Vorbis、Ogg FLAC、FLAC、WAV、MP3、AAC-LC（ADTS または MP4/M4A）、ALAC（MP4/M4A）を受け付け、Ogg Opus は受け付けません。[ランタイムプロファイル](./appendix/profiles.md) を参照してください。
+ゲームに同梱できる音声形式は、ランタイムプロファイルによって決まります。`native_v0` で使えるのは Ogg Vorbis、Ogg FLAC、FLAC、WAV、MP3、AAC-LC（ADTS または MP4/M4A）、ALAC（MP4/M4A）で、Ogg Opus には対応していません。詳しくは[ランタイムプロファイル](./appendix/profiles.md)を参照してください。
 
 ## 概要 {#overview}
 
 | アイテム | 種類 | 概要 |
 | ---- | ---- | ------- |
-| [`Loop`](#loop)、`looped` | 構造体 + コンストラクター | ループするトラック |
-| [`Sound`](#sound)、`sound` | 構造体 + コンストラクター | ワンショットサウンド |
-| [`AudioFade`](#audiofade)、`crossfade`、`fade_out_in`、`switch` | 構造体 + コンストラクター | チャンネルのトラックの切り替え方 |
-| [`Channel`](#channel) | ビルトイン構造体 | 画面のチャンネル |
-| [`ChannelChange`](#channelchange) | ビルトイン構造体 | 保留中のチャンネル変更 |
+| [`Loop`](#loop)、`looped` | 構造体とコンストラクター | ループ再生するトラック |
+| [`Sound`](#sound)、`sound` | 構造体とコンストラクター | 単発のサウンド |
+| [`AudioFade`](#audiofade)、`crossfade`、`fade_out_in`、`switch` | 構造体とコンストラクター | チャンネルのトラックの切り替え方 |
+| [`Channel`](#channel) | 組み込みの構造体 | 画面のチャンネル |
+| [`ChannelChange`](#channelchange) | 組み込みの構造体 | 適用待ちのチャンネル変更 |
 
 ## チャンネル {#channels}
 
@@ -32,25 +32,25 @@ impl Screen {
 }
 ```
 
-- 画面は音楽チャンネル 1 つと、環境音チャンネル 4 つ（`ambience(0)` 〜 `ambience(3)`）を持ちます。各チャンネルはループするトラックを最大 1 つ再生します。
-- ワンショットサウンドは `play` で再生し、チャンネルには乗りません。
-- `Screen::empty()` ではすべてのチャンネルが無音で、音量は 1.0 です。
+- 画面には音楽チャンネルが 1 つ、環境音チャンネルが 4 つ（`ambience(0)`〜`ambience(3)`）あります。各チャンネルで同時に再生できるループトラックは 1 つまでです。
+- 単発のサウンドは `play` で鳴らします。チャンネルは使いません。
+- `Screen::empty()` では、どのチャンネルも無音で、音量は 1.0 です。
 
-### 同一トラック規則 {#the-same-track-rule}
+### 同一トラックの規則 {#the-same-track-rule}
 
-- 現在のトラックと構造的に等しい `l` での `change(l)` は何もしません。トラックは再開されずに再生を続けます。そのためシーンの各ステップで音楽を明示しても、実際に変わったときだけ聞こえ方が変わります。
-- そうでなければ、古いトラックが `fade_out` かけてフェードアウトし、新しいトラックが `fade_in` かけてフェードインします。`overlap` が true なら同時に、false なら順番に行われます。
-- `stop()` は現在のトラックを `fade_out` かけてフェードアウトします。
+- 現在のトラックと構造的に等しい `l` を `change(l)` に渡しても、何も起きません。トラックは最初から再生し直されず、そのまま流れ続けます。そのため、シーンのステップごとに音楽を指定しても、実際に曲が変わったときにしか聞こえ方は変わりません。
+- 異なるトラックを渡すと、古いトラックが `fade_out` をかけて消え、新しいトラックが `fade_in` をかけて現れます。`overlap` が true なら 2 つのフェードを同時に、false なら順に行います。
+- `stop()` は現在のトラックを `fade_out` をかけて消します。
 
-音楽はステップをまたいで引き継がれます。すでに再生中のトラックはステップをまたいで再生を続け、ひとりでに再開することはありません。レンダーは `screen.replay_bgm()` で、タイムラインのカーソル位置からトラックを先頭から再開できます。再開はタイムラインにだけスケジュールされ、論理画面は変わらないので画面の等価性には影響しません。トラックがなければ `replay_bgm()` は何もしません。
+音楽はステップを越えて引き継がれます。再生中のトラックは次のステップでもそのまま流れ、勝手に最初から再生し直されることはありません。曲を頭から再生し直したいときは、レンダーで `screen.replay_bgm()` を呼びます。タイムラインのカーソルの位置から再生し直します。これはタイムラインに予約されるだけで論理画面は変わらないため、画面の等価性には影響しません。トラックがなければ `replay_bgm()` は何もしません。
 
-### システム音楽 {#system-music}
+### システムの音楽 {#system-music}
 
 ```kis
 #[builtin] pub fn set_music(track: Option<crate::screen::audio::Loop>, fade: crate::screen::audio::AudioFade);
 ```
 
-`std::system::set_music` はシステム音楽チャンネルを設定します。モードスタック上でゲームが実行されていない間に聞こえ、ゲームの実行中はゲーム画面の音楽チャンネルが代わりに鳴ります。`None` は停止です。これは `fn` で、たとえばタイトルページなどシステムのコードから呼びます。[`std::system`](./system.md) を参照してください。
+`std::system::set_music` は、システム用の音楽チャンネルを設定します。このチャンネルが聞こえるのは、モードスタック上でゲームが動いていない間です。ゲームが動いている間は、代わりに物語の画面の音楽チャンネルが鳴ります。`None` を渡すと停止します。`fn` なので、タイトル画面などシステム側のコードから呼びます。[`std::system`](./system.md) を参照してください。
 
 ## 構造体：`Loop` {#loop}
 
@@ -62,7 +62,7 @@ pub struct Loop {
 }
 ```
 
-ループするトラックです。0 から再生し、`loop_end`（`None` ならファイルの終わり）から `loop_start` へ戻ります。`loop_start` より前の部分はイントロとして 1 回だけ再生されます。
+ループ再生するトラックです。0 から再生を始め、`loop_end`（`None` ならファイルの終わり）に達すると `loop_start` に戻ります。`loop_start` より前はイントロとして最初の 1 回だけ再生します。
 
 ### `looped(audio)` {#looped}
 
@@ -70,8 +70,8 @@ pub struct Loop {
 pub const fn looped(audio: AudioAsset) -> Loop
 ```
 
-- 戻り値：全体をループする `audio`（`loop_start` 0、`loop_end` `None`）。
-- 種別：`const fn` · ビルトイン：いいえ。
+- 戻り値：`audio` 全体をループするトラック（`loop_start` が 0、`loop_end` が `None`）。
+- 種別：`const fn` · 組み込み：いいえ。
 
 ### `track.region(start, end)` {#loop-region}
 
@@ -79,8 +79,8 @@ pub const fn looped(audio: AudioAsset) -> Loop
 pub const fn region(mut self, start: Duration, end: Option<Duration>) -> Loop
 ```
 
-- 戻り値：`start..end` をループするこのトラック。`None` はファイルの終わりです。
-- 種別：`const fn` · ビルトイン：いいえ。
+- 戻り値：ループ範囲を `start..end` にしたトラック。`None` はファイルの終わりを表します。
+- 種別：`const fn` · 組み込み：いいえ。
 
 ```kis
 screen.music().change(looped(THEME).region(secs(16), Some(secs(80)))).apply_animation(crossfade(ms(1000)));
@@ -99,12 +99,12 @@ pub struct Sound {
 }
 ```
 
-ワンショットサウンドです。`volume` は `0.0..=1.0`、`end` が `None` ならファイルの終わりです。
+単発のサウンドです。`volume` の範囲は `0.0..=1.0` で、`end` が `None` ならファイルの終わりまで再生します。
 
-- `screen.play(s)` は `cursor + s.delay` で始まり、ファイルの `start..end` の範囲を再生します。
-- ワンショットは論理画面に含まれず、ステップをまたいで再生を続けます。
-- `screen.stop_sounds(d)` はカーソル位置で再生中のすべてのワンショットを `d` かけてフェードアウトします。
-- ステップのエントリーでは、まだ始まっていないワンショットは破棄されます。プレイヤーがクリックしたときも、まだ始まっていないものは破棄されます。
+- `screen.play(s)` は `cursor + s.delay` の時点で、ファイルの `start..end` の範囲を再生します。
+- 単発のサウンドは論理画面に含まれず、ステップが変わっても鳴り続けます。
+- `screen.stop_sounds(d)` は、カーソルの時点で鳴っている単発のサウンドをすべて、`d` をかけてフェードアウトします。
+- ステップの開始時点で、まだ始まっていない単発のサウンドは破棄します。プレイヤーがクリックしたときも同様です。
 
 ### `sound(audio)` {#sound-fn}
 
@@ -112,8 +112,8 @@ pub struct Sound {
 pub const fn sound(audio: AudioAsset) -> Sound
 ```
 
-- 戻り値：全体を最大音量で、遅延なしに再生する `audio`。
-- 種別：`const fn` · ビルトイン：いいえ。
+- 戻り値：`audio` 全体を最大音量で、遅延なしに再生するサウンド。
+- 種別：`const fn` · 組み込み：いいえ。
 
 ### `sound.volume(volume)`、`sound.range(start, end)`、`sound.delay(delay)` {#sound-volume}
 
@@ -125,13 +125,13 @@ pub const fn delay(mut self, delay: Duration) -> Sound
 
 | メソッド | 戻り値 |
 | ------ | ------- |
-| `volume(v)` | 音量 `v`（`0.0..=1.0`）のこのサウンド |
-| `range(start, end)` | ファイルの `start..end` だけを再生するこのサウンド |
-| `delay(d)` | カーソルから `d` 後に始まるこのサウンド |
+| `volume(v)` | 音量を `v`（`0.0..=1.0`）にしたサウンド |
+| `range(start, end)` | ファイルの `start..end` だけを再生するサウンド |
+| `delay(d)` | カーソルから `d` 遅れて鳴るサウンド |
 
-種別：`const fn` · ビルトイン：いいえ。
+種別：`const fn` · 組み込み：いいえ。
 
-複数のワンショットに遅延を付けると連続音になります。
+単発のサウンドを遅延をずらして並べると、連続した効果音になります。
 
 ```kis
 const fn knocking(mut screen: Screen) -> Screen {
@@ -155,13 +155,13 @@ pub const fn fade_out_in(fade_out: Duration, fade_in: Duration) -> AudioFade
 pub const fn switch() -> AudioFade
 ```
 
-チャンネルが古いトラックから新しいトラックへどう移るかです。`overlap` は 2 つのフェードを同時に行うか順番に行うかを表します。コンストラクターはいずれも `const fn` で、ビルトインではありません。
+チャンネルで古いトラックから新しいトラックへ切り替える方法です。`overlap` は、2 つのフェードを同時に行うか順に行うかを表します。コンストラクターはどれも `const fn` で、組み込みではありません。
 
 | コンストラクター | 効果 |
 | ----------- | ------ |
-| `crossfade(d)` | 古いトラックのアウトと新しいトラックのインを `d` かけて同時に行う |
-| `fade_out_in(o, i)` | 古いトラックを `o` かけてアウトし、その後新しいトラックを `i` かけてインする |
-| `switch()` | 古いトラックを止め、新しいトラックを即座に始める |
+| `crossfade(d)` | 古いトラックのフェードアウトと新しいトラックのフェードインを、`d` をかけて同時に行う |
+| `fade_out_in(o, i)` | 古いトラックを `o` かけてフェードアウトし、続けて新しいトラックを `i` かけてフェードインする |
+| `switch()` | 古いトラックを止め、すぐに新しいトラックを始める |
 
 ## 構造体：`Channel` {#channel}
 
@@ -175,12 +175,12 @@ impl Channel {
 }
 ```
 
-ループするトラックを 1 つ再生するチャンネルです。種別：`const fn` · ビルトイン：はい。
+ループトラックを 1 つ再生するチャンネルです。種別：`const fn` · 組み込み：はい。
 
-- `get()` は論理画面上のトラックで、チャンネルが無音なら `None` です。
-- `change(track)` はトラックを変更します。[同一トラック規則](#the-same-track-rule)に従います。
-- `stop()` はトラックを停止します。
-- `volume()` はチャンネル音量で、`0.0..=1.0` の [`Prop<Decimal>`](./screen.md#prop) をトゥイーンで変更します。
+- `get()` は論理画面上のトラックを返します。無音なら `None` です。
+- `change(track)` はトラックを変更します。[同一トラックの規則](#the-same-track-rule)が適用されます。
+- `stop()` はトラックを止めます。
+- `volume()` はチャンネルの音量です。範囲 `0.0..=1.0` の [`Prop<Decimal>`](./screen.md#prop) で、補間を指定して変更します。
 
 ```kis
 screen.music().volume().change(0.5).apply_animation(tween(ms(1000)));
@@ -196,26 +196,26 @@ impl ChannelChange {
 }
 ```
 
-保留中のチャンネル変更です。`apply_animation` を通してのみ起こり、古いトラックから新しいトラックへフェードします。`ChannelChange` は `#[must_use]` です。種別：`const fn` · ビルトイン：はい。
+適用待ちのチャンネル変更です。変更は `apply_animation` を呼んだときにだけ反映され、古いトラックから新しいトラックへフェードします。`ChannelChange` には `#[must_use]` が付いています。種別：`const fn` · 組み込み：はい。
 
 ## 音量 {#volume}
 
-最終音量 = マスター × バス × チャンネル音量 × サウンド音量。
+最終的な音量 = マスター × バス × チャンネル音量 × サウンド音量。
 
 | 音源 | バス |
 | ------ | --- |
 | 音楽チャンネル | music |
-| 環境音チャンネル、ワンショットサウンド、UI サウンド | sound |
+| 環境音チャンネル、単発のサウンド、UI の効果音 | sound |
 | ボイス | voice |
 
-- マスターとバスの音量は `Settings` のフィールド `master`、`music`、`sound`、`voice` で、それぞれ `level` が `Int<0, 100>` の `Setting<Volume>` です。ミュートされたバスは 0 として扱われます。
-- チャンネル音量とサウンド音量は割合 `0.0..=1.0` です。
+- マスターとバスの音量は、`Settings` のフィールド `master`、`music`、`sound`、`voice` で決まります。いずれも `Setting<Volume>` で、`level` は `Int<0, 100>` です。ミュート中のバスは 0 として扱います。
+- チャンネル音量とサウンド音量は `0.0..=1.0` の割合です。
 
 ## ボイス {#voice}
 
-行のボイスは `Say::voice` で、`s!(voice = AZUSA_0072, …)` と書きます。
+台詞のボイスは `Say::voice` で指定し、`s!(voice = AZUSA_0072, …)` のように書きます。
 
-- ボイスはテキストと同時に [`begin_text`](./screen-anim.md#the-timeline) で始まります。レンダーが動かさない限り、これはステップのエントリーです。
-- 次のステップのエントリーで止まります。ただし `voice_sustain` 設定がオンなら止まりません。
-- `wait_for_voice` 設定がオンなら、オートモードはボイスを待ちます。
+- ボイスはテキストと同時に [`begin_text`](./screen-anim.md#the-timeline) の時点で始まります。レンダーで動かさなければ、ステップの開始時点です。
+- 次のステップが始まると止まります。ただし `voice_sustain` 設定がオンのときは止まりません。
+- `wait_for_voice` 設定がオンなら、オートモードはボイスが終わるまで待ちます。
 - バックログからは `Narrative::replay_voice` で再生し直せます。

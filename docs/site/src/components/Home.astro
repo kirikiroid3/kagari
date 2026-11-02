@@ -19,8 +19,8 @@ const text = {
     eyebrow: 'ビジュアルノベルエンジン',
     title: '解析できる物語を、Rust に近い言語で。',
     lead:
-      'Kagari の物語は有限のデータの上の pushdown fn として書きます。そのためコンパイラは、汎用のスクリプトでは答えられない問いに答えられます。',
-    start: 'チュートリアル',
+      'Kagari では、物語を有限のデータを扱う pushdown fn として書きます。そのためコンパイラは、汎用のスクリプト言語では答えられない問いにも答えを出せます。',
+    start: '入門',
     reference: '言語リファレンス',
     whyTitle: 'Kagari の特徴',
     why: [
@@ -28,26 +28,26 @@ const text = {
         icon: 'lucide:scan-search',
         title: '解析できる物語',
         description:
-          'すべてのステップが終了するか、選択肢が行き詰まらないか、到達できないシーンはないか、各ステップの画面が一貫しているかをコンパイラが検査します。',
+          'どのステップも必ず終わるか、行き詰まる選択肢はないか、たどり着けないシーンはないか、各ステップの画面が食い違っていないかを、コンパイラが検査します。',
       },
       {
         icon: 'lucide:braces',
         title: 'Rust に近い言語',
         description:
-          '物語も演出もゲームシステムも一つの言語で書きます。演出（const fn）とゲームシステム（fn）は自由に計算できます。',
+          '物語も演出もゲームシステムも、一つの言語で書けます。演出（const fn）とゲームシステム（fn）では、どんな計算も自由に書けます。',
       },
       {
         icon: 'lucide:wrench',
-        title: '揃ったツール',
+        title: 'そろった道具',
         description:
-          'kagari コマンドで検査、ビルド、整形を行い、言語サーバーと Zed 拡張で編集し、Windows、macOS、Linux のランタイムで実行します。',
+          'kagari コマンドで検査・ビルド・整形を行い、言語サーバーと Zed 拡張で編集し、Windows・macOS・Linux 向けのランタイムで動かします。',
       },
     ],
     docsTitle: 'ドキュメント',
     docs: [
-      { icon: 'lucide:graduation-cap', href: '/tutorial/', title: 'チュートリアル', description: 'Kagari を導入して、最初のゲームを作ります。' },
-      { icon: 'lucide:book-open', href: '/reference/', title: '言語リファレンス', description: '概念、言語、プロジェクト、CLI、ランタイム。' },
-      { icon: 'lucide:library', href: '/std/', title: 'STD リファレンス', description: '標準ライブラリ std のすべてのアイテムとレシピ。' },
+      { icon: 'lucide:graduation-cap', href: '/tutorial/', title: '入門', description: 'Kagari をインストールして、最初のゲームを作ります。' },
+      { icon: 'lucide:book-open', href: '/reference/', title: '言語リファレンス', description: '基本概念、言語、プロジェクト、CLI、ランタイム。' },
+      { icon: 'lucide:library', href: '/std/', title: '標準ライブラリ', description: '標準ライブラリ std の全アイテムと実例。' },
       { icon: 'lucide:circle-alert', href: '/diagnostics/', title: '診断', description: 'コンパイラが報告するすべての診断コード。' },
     ],
   },

@@ -4,9 +4,9 @@ title: "std::ui::style"
 
 > **安定性:** 安定 — UI コントロールの見た目。
 
-`std::ui::style` は背景とコントロールの見た目を記述します。[`Paint`](#paint) はボックスを塗り、[`Look`](#look) は背景とテキストスタイルの組、[`ButtonStyle`](#buttonstyle) はボタン・トグル・セレクトのインタラクション状態ごとの見た目、[`SliderStyle`](#sliderstyle) はスライダーの塗りです。
+`std::ui::style` では背景とコントロールの見た目を記述します。[`Paint`](#paint) は枠の塗り、[`Look`](#look) は背景とテキストスタイルの組です。[`ButtonStyle`](#buttonstyle) はボタン・トグル・セレクトの操作状態ごとの見た目を、[`SliderStyle`](#sliderstyle) はスライダーの塗りを表します。
 
-スタイルは `const fn` で作る普通のデータです。スタジオはスタイルを `const` アイテムとして宣言し、コントロールフォームの `style` 属性や [`Element::background`](./ui.md#element-background) に渡します。
+スタイルは `const fn` で作る普通のデータです。制作者はスタイルを `const` アイテムとして宣言し、コントロール構文の `style` 属性や [`Element::background`](./ui.md#element-background) に渡します。
 
 ```kis
 use std::ui::style::{ButtonStyle, Look, Paint, SliderStyle, button_style};
@@ -16,14 +16,14 @@ use std::ui::style::{ButtonStyle, Look, Paint, SliderStyle, button_style};
 
 | アイテム | 種別 | 概要 |
 | -------- | ---- | ---- |
-| [`Paint`](#paint) | 列挙型 | ボックスを埋めるもの |
+| [`Paint`](#paint) | 列挙型 | 枠を埋める塗り |
 | [`Look`](#look) | 構造体 | 背景とテキストスタイル |
-| [`ButtonStyle`](#buttonstyle) | 構造体 | ボタン型コントロールのインタラクション状態ごとの見た目 |
-| [`button_style(idle)`](#button_style) | `const fn` | 通常時の見た目だけを持つスタイル |
-| [`ButtonStyle` のビルダーメソッド](#buttonstyle-hover) | `const fn` | 見た目、トゥイーン、サウンドを追加する |
+| [`ButtonStyle`](#buttonstyle) | 構造体 | ボタン型コントロールの操作状態ごとの見た目 |
+| [`button_style(idle)`](#button_style) | `const fn` | 通常時の見た目だけを指定したスタイル |
+| [`ButtonStyle` のビルダーメソッド](#buttonstyle-hover) | `const fn` | 見た目、補間、サウンドの追加 |
 | [`SliderStyle`](#sliderstyle) | 構造体 | スライダーの塗り |
 
-## 列挙型: `Paint` {#paint}
+## 列挙型：`Paint` {#paint}
 
 ```kis
 pub enum Paint {
@@ -37,12 +37,12 @@ pub enum Paint {
 
 | バリアント | 意味 |
 | ---------- | ---- |
-| `None` | 何もなし。ボックスは透明です |
-| `Color(c)` | 単色。例: `rgba(0, 0, 0, 200)` |
-| `Image(i)` | ボックス全体に引き伸ばした画像 |
-| `NineSlice { image, insets }` | 9 スライス画像。`insets` で指定した大きさの四隅は拡大縮小されず、辺と中央が伸びます。サイズが変わるウィンドウ枠やボタンに使います |
+| `None` | 塗りなし。枠は透明になります |
+| `Color(c)` | 単色。例：`rgba(0, 0, 0, 200)` |
+| `Image(i)` | 枠全体に引き伸ばした画像 |
+| `NineSlice { image, insets }` | 9 スライス画像。`insets` で指定した大きさの四隅は拡大縮小せず、辺と中央だけを伸ばします。大きさが変わるウィンドウ枠やボタンに使います |
 
-## 構造体: `Look` {#look}
+## 構造体：`Look` {#look}
 
 ```kis
 pub struct Look {
@@ -51,9 +51,9 @@ pub struct Look {
 }
 ```
 
-背景とテキストスタイルです。`text` のスタイルはコントロール内のラベルに適用されます（[インタラクションの見た目](#interaction-looks) を参照）。
+背景とテキストスタイルの組です。`text` のスタイルは、コントロールの中のラベルに使われます（[操作に応じた見た目](#interaction-looks) を参照）。
 
-## 構造体: `ButtonStyle` {#buttonstyle}
+## 構造体：`ButtonStyle` {#buttonstyle}
 
 ```kis
 pub struct ButtonStyle {
@@ -70,17 +70,17 @@ pub struct ButtonStyle {
 }
 ```
 
-ボタン型のコントロール（`button!`、`toggle!`、`select!`）の、インタラクション状態ごとの見た目、その間の変化のアニメーション、再生するサウンドです。UI のサウンドはサウンドバスで再生されます。
+ボタン型のコントロール（`button!`、`toggle!`、`select!`）について、操作状態ごとの見た目、見た目が切り替わるときのアニメーション、再生するサウンドをまとめたものです。UI のサウンドはサウンドバスで再生します。
 
-### インタラクションの見た目 {#interaction-looks}
+### 操作に応じた見た目 {#interaction-looks}
 
-- コントロールが無効な間は、`disabled` の見た目が他のすべての見た目を置き換えます。`disabled` の見た目がなければ、無効なコントロールは `idle` を半分の不透明度で表示します。
-- そうでなければ、`pressed`（コントロールの上でポインタを押している間）、`focus`（コントロールにフォーカスがあり、フォーカスが表示されている間）、`hover` のうち当てはまる最初の `Some` が使われ、`idle` が既定です。
-- 値が `true` のトグルが `idle` を表示するはずのときは、代わりに **オンの見た目** を表示します。`pressed` の見た目があればそれ、なければ `hover` の見た目、それもなければ `idle` に、通常時のテキスト色で 2 px の枠線を付けたものです。
-- 見た目の変化は `change` でアニメーションします。
-- ボタンやトグルの中のラベルは、現在の見た目の `text` を使います。それ以外では、`text!` に `style` を指定しない限り、`label` と `text!` は [`System::text`](./system.md#system) を使います。これ以外の継承はありません。
+- コントロールが無効な間は、ほかのどの見た目よりも `disabled` が優先されます。`disabled` を指定していなければ、無効なコントロールは `idle` を半透明（不透明度は半分）で表示します。
+- 無効でなければ、`pressed`（コントロール上でポインタを押している間）、`focus`（フォーカスがあり、かつフォーカスが表示されている間）、`hover` の順に調べ、条件に当てはまり `Some` である最初のものを使います。どれも当てはまらなければ `idle` です。
+- 値が `true` のトグルは、本来 `idle` を表示する場面で **オンの見た目** を表示します。オンの見た目は `pressed` があればそれ、なければ `hover`、それもなければ `idle` に通常時のテキスト色で 2 px の枠線を付けたものです。
+- 見た目の切り替わりは `change` に従ってアニメーションします。
+- ボタンやトグルの中のラベルは、そのときの見た目の `text` を使います。それ以外の場所では、`text!` で `style` を指定しない限り、`label` も `text!` も [`System::text`](./system.md#system) を使います。これ以外にスタイルが引き継がれることはありません。
 
-### 関数: `button_style(idle)` {#button_style}
+### 関数：`button_style(idle)` {#button_style}
 
 ```kis
 pub const fn button_style(idle: Look) -> ButtonStyle {
@@ -98,10 +98,10 @@ pub const fn button_style(idle: Look) -> ButtonStyle {
 ```
 
 - `idle` `Look` — 通常時の見た目。
-- 戻り値: `ButtonStyle` — 通常時の見た目だけを持ち、変化は即時で、サウンドのないスタイル。
-- 種別: `const fn` · ビルトイン: いいえ
+- 戻り値：`ButtonStyle` — 通常時の見た目だけを指定し、切り替わりは即時、サウンドなしのスタイル。
+- 種別：`const fn` · 組み込み：いいえ
 
-その他の部分は以下のビルダーメソッドで追加します。どれもスタイルを値で受け取り、変更して返すので、連鎖できます。
+残りは以下のビルダーメソッドで追加します。どのメソッドもスタイルを値で受け取り、変更したものを返すので、つなげて書けます。
 
 ### `ButtonStyle::hover(look)` {#buttonstyle-hover}
 
@@ -109,7 +109,7 @@ pub const fn button_style(idle: Look) -> ButtonStyle {
 pub const fn hover(mut self, look: Look) -> ButtonStyle
 ```
 
-- 戻り値: ホバー時の見た目を加えたこのスタイル。
+- 戻り値：ホバー時の見た目を加えたスタイル。
 
 ### `ButtonStyle::focus(look)` {#buttonstyle-focus}
 
@@ -117,7 +117,7 @@ pub const fn hover(mut self, look: Look) -> ButtonStyle
 pub const fn focus(mut self, look: Look) -> ButtonStyle
 ```
 
-- 戻り値: フォーカス時の見た目を加えたこのスタイル。コントロールがキーボードやパッドのフォーカスを持つ間に表示されます。
+- 戻り値：フォーカス時の見た目を加えたスタイル。キーボードやパッドでフォーカスしている間に表示します。
 
 ### `ButtonStyle::pressed(look)` {#buttonstyle-pressed}
 
@@ -125,7 +125,7 @@ pub const fn focus(mut self, look: Look) -> ButtonStyle
 pub const fn pressed(mut self, look: Look) -> ButtonStyle
 ```
 
-- 戻り値: 押下時の見た目を加えたこのスタイル。
+- 戻り値：押している間の見た目を加えたスタイル。
 
 ### `ButtonStyle::disabled(look)` {#buttonstyle-disabled}
 
@@ -133,7 +133,7 @@ pub const fn pressed(mut self, look: Look) -> ButtonStyle
 pub const fn disabled(mut self, look: Look) -> ButtonStyle
 ```
 
-- 戻り値: 無効時の見た目を加えたこのスタイル。
+- 戻り値：無効時の見た目を加えたスタイル。
 
 ### `ButtonStyle::change(tween)` {#buttonstyle-change}
 
@@ -141,8 +141,8 @@ pub const fn disabled(mut self, look: Look) -> ButtonStyle
 pub const fn change(mut self, tween: Tween) -> ButtonStyle
 ```
 
-- `tween` `Tween` — 見た目の変化の長さ、イージング、遅延（[`std::screen::anim`](./screen-anim.md) を参照）。
-- 戻り値: 見た目の変化を `tween` でアニメーションするこのスタイル。
+- `tween` `Tween` — 見た目の切り替わりにかける時間、イージング、遅延（[`std::screen::anim`](./screen-anim.md) を参照）。
+- 戻り値：見た目の切り替わりを `tween` でアニメーションさせるスタイル。
 
 ### `ButtonStyle::hover_sound(sound)` {#buttonstyle-hover_sound}
 
@@ -150,8 +150,8 @@ pub const fn change(mut self, tween: Tween) -> ButtonStyle
 pub const fn hover_sound(mut self, sound: Sound) -> ButtonStyle
 ```
 
-- `sound` `Sound` — ワンショットのサウンド（[`std::screen::audio`](./screen-audio.md) を参照）。
-- 戻り値: ホバー時に `sound` を再生するこのスタイル。
+- `sound` `Sound` — 単発のサウンド（[`std::screen::audio`](./screen-audio.md) を参照）。
+- 戻り値：ホバー時に `sound` を鳴らすスタイル。
 
 ### `ButtonStyle::click_sound(sound)` {#buttonstyle-click_sound}
 
@@ -159,10 +159,10 @@ pub const fn hover_sound(mut self, sound: Sound) -> ButtonStyle
 pub const fn click_sound(mut self, sound: Sound) -> ButtonStyle
 ```
 
-- `sound` `Sound` — ワンショットのサウンド。
-- 戻り値: クリック時に `sound` を再生するこのスタイル。
+- `sound` `Sound` — 単発のサウンド。
+- 戻り値：クリック時に `sound` を鳴らすスタイル。
 
-ビルダーメソッドはすべて `const fn` · ビルトイン: いいえ です。
+ビルダーメソッドはいずれも、種別：`const fn` · 組み込み：いいえ です。
 
 ```kis
 use std::narrative::text::text_style;
@@ -177,7 +177,7 @@ const MENU_BUTTON: ButtonStyle = button_style(Look { background: Paint::None, te
     .click_sound(sound(CLICK));
 ```
 
-画像ボタンは、ホバー時とフォーカス時に背景画像を差し替えます。
+画像ボタンでは、ホバー時とフォーカス時に背景画像を差し替えます。
 
 ```kis
 const fn image_style(idle: ImageAsset, hover: ImageAsset) -> ButtonStyle {
@@ -188,7 +188,7 @@ const fn image_style(idle: ImageAsset, hover: ImageAsset) -> ButtonStyle {
 }
 ```
 
-## 構造体: `SliderStyle` {#sliderstyle}
+## 構造体：`SliderStyle` {#sliderstyle}
 
 ```kis
 pub struct SliderStyle {
@@ -199,9 +199,9 @@ pub struct SliderStyle {
 }
 ```
 
-[`slider!`](./ui.md#slider) の塗りです。
+[`slider!`](./ui.md#slider) の塗りを指定します。
 
-- `track` — トラック。最小値でのつまみの中心から、最大値でのつまみの中心まで。
-- `fill` — トラックの始点からつまみの中心までの部分。`track` の上に描かれます。
-- `thumb` — つまみ。大きさは `thumb_size` で、値の位置を中心に置かれます。
-- `thumb_size` — つまみのピクセル単位のサイズ。
+- `track` — 溝の部分。最小値でのつまみの中心から、最大値でのつまみの中心までです。
+- `fill` — 溝の始点からつまみの中心までの部分。`track` の上に描きます。
+- `thumb` — つまみ。大きさは `thumb_size` で、値の位置を中心に置きます。
+- `thumb_size` — つまみの大きさ（ピクセル）。

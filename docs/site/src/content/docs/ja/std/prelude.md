@@ -2,11 +2,11 @@
 title: "std::prelude"
 ---
 
-> **安定性:** 安定 — すべてのモジュールにインポートされる名前。
+> **安定性:** 安定 — どのモジュールにも自動でインポートされる名前。
 
-ゲームのすべてのモジュールは、先頭に `use std::prelude::*;` があるかのように `std::prelude` を暗黙にインポートします。モジュール内で宣言した名前やインポートした名前はプレリュードの名前より優先されるため、プレリュードがゲーム自身の名前を曖昧にすることはありません。
+ゲームのどのモジュールにも、`std::prelude` が暗黙にインポートされます。先頭に `use std::prelude::*;` と書いてあるのと同じです。モジュール内で宣言した名前やインポートした名前は、プレリュードの名前より優先されます。そのため、プレリュードのせいでゲーム側の名前があいまいになることはありません。
 
-ここにないものはパスを指定してインポートします。例：`use std::screen::anim::rule_with;`、`use std::narrative::text::speed;`。
+ここに挙げていないものは、`use std::screen::anim::rule_with;` や `use std::narrative::text::speed;` のようにパスを指定してインポートします。
 
 ## 宣言 {#declaration}
 
@@ -27,7 +27,7 @@ pub use crate::ui::{signal, Element};
 
 ## スコープに入る名前 {#names-in-scope}
 
-|元|名前|ページ|
+|モジュール|名前|ページ|
 |---|---|---|
 |`std`|`String`、`Vec`、`Rat`、`Decimal`、`Range`、`Option`、`Result`、`Eq`、`Integer`、`RandChoose`、`ImageAsset`、`AudioAsset`、`VoiceAsset`、`VideoAsset`、`FontAsset`、`asset`、`system_font`|[std](./std.md)|
 |`std::Option`|`None`、`Some`|[std](./std.md#enum-optiont)|
@@ -42,17 +42,17 @@ pub use crate::ui::{signal, Element};
 |`std::system`|`nav`（モジュール）、`Setting`、`setting`、`System`、`Settings`、`Volume`、`volume`、`RootPage`、`Overlay`、`GameOverlay`、`Dialog`|[std::system](./system.md)|
 |`std::ui`|`signal`、`Element`|[std::ui](./ui.md)|
 
-`nav` はモジュールそのものなので、その関数は `use` なしで `nav::start(…)`、`nav::back()` のように呼べます。
+プレリュードに入っているのは `nav` モジュールそのものなので、`use` を書かなくても `nav::start(…)` や `nav::back()` のように関数を呼べます。
 
 ## プレリュードにないもの {#not-in-the-prelude}
 
-`use` が必要なよく使うアイテム：
+よく使うもののうち、`use` が必要なアイテムは次のとおりです。
 
 |アイテム|`use`|
 |---|---|
 |`ZERO`|`use std::time::ZERO;`|
 |`Step`、`Line`、`Menu`、`MenuArm`、`Arm`、`HudState`、`Entry`、`PlayMode`、`Mark`|`use std::narrative::{…};`|
-|`ruby`、`mono_ruby`、`effect`、`concat`、`to_text`、`ToText`|`use std::narrative::text::{…};`（通常は `t![…]` を通して書きます）|
+|`ruby`、`mono_ruby`、`effect`、`concat`、`to_text`、`ToText`|`use std::narrative::text::{…};`（ふつうは `t![…]` の中で書きます）|
 |`size`、`italic`、`font`、`outline`、`shadow`、`speed`、`speed_scale`、`reveal_instant`|`use std::narrative::text::{…};`|
 |`TextStyle`、`text_style`、`Outline`、`Shadow`、`TextAlign`、`EmphasisStyle`|`use std::narrative::text::{…};`|
 |`Asset`|`use std::Asset;`|

@@ -2,9 +2,9 @@
 title: "std::shaders::color"
 ---
 
-> **安定性:** 暫定 — 色フィルターです。CSS のフィルター関数、まとめたフィルター、ガウスぼかしを含みます。
+> **安定性:** 暫定 — 色フィルターのシェーダー集です。CSS のフィルター関数、それらをまとめたフィルター、ガウスぼかしがあります。
 
-[`Screen::filter`](./screen.md#screen-filter) と [`Entity::filter`](./screen.md#entity-filter) のための色シェーダーです。どの関数も [`Filter`](./screen-shader.md#filter) を返します。CSS のフィルター関数は CSS と同じく sRGB の値で計算するので、`sepia(1.0)` は CSS の `sepia(1)` と同じ見た目になります。同じ関数の 2 つのフィルターの間をトゥイーンすると、量が動きます。
+[`Screen::filter`](./screen.md#screen-filter) と [`Entity::filter`](./screen.md#entity-filter) で使う色シェーダーです。どの関数も [`Filter`](./screen-shader.md#filter) を返します。CSS のフィルター関数は CSS と同じく sRGB の値で計算するため、`sepia(1.0)` は CSS の `sepia(1)` と同じ見た目になります。同じ関数で作った 2 つのフィルターの間を補間すると、効果の強さが連続的に変わります。
 
 ```kis
 use std::shaders::color::{NEUTRAL, adjust, blur, grayscale};
@@ -26,11 +26,11 @@ screen.filter().change(Some(night())).apply_animation(tween(ms(800)));
 
 | アイテム | 種類 | 概要 |
 | ---- | ---- | ------- |
-| [`Amount`](#amount) | 構造体 | パラメーターが 1 つのフィルターの強さ |
-| [`GRAYSCALE` … `CONTRAST`](#amount-shaders) | 定数 | パラメーターが 1 つの 6 つのシェーダー |
+| [`Amount`](#amount) | 構造体 | 引数が 1 つのフィルターの強さ |
+| [`GRAYSCALE` … `CONTRAST`](#amount-shaders) | 定数 | 引数が 1 つの 6 種類のシェーダー |
 | [`grayscale`、`sepia`、`saturate`、`invert`、`brightness`、`contrast`](#amount-filters) | 関数 | CSS のフィルター関数 |
-| [`HueRotate`](#huerotate)、[`HUE_ROTATE`](#hue_rotate)、[`hue_rotate`](#hue_rotate-fn) | 構造体、定数、関数 | すべての色相を回す |
-| [`Adjust`](#adjust)、[`NEUTRAL`](#neutral)、[`ADJUST`](#adjust-shader)、[`adjust`](#adjust-fn) | 構造体、定数、関数 | 7 つのフィルターを 1 パスで |
+| [`HueRotate`](#huerotate)、[`HUE_ROTATE`](#hue_rotate)、[`hue_rotate`](#hue_rotate-fn) | 構造体、定数、関数 | すべての色相を回転させる |
+| [`Adjust`](#adjust)、[`NEUTRAL`](#neutral)、[`ADJUST`](#adjust-shader)、[`adjust`](#adjust-fn) | 構造体、定数、関数 | 7 種類のフィルターを 1 パスでまとめてかける |
 | [`Blur`](#blur)、[`BLUR`](#blur-shader)、[`blur`](#blur-fn) | 構造体、定数、関数 | ガウスぼかし |
 
 ## 構造体：`Amount` {#amount}
@@ -42,7 +42,7 @@ pub struct Amount {
 }
 ```
 
-パラメーターが 1 つのフィルターの強さで、CSS の量と同じです。`grayscale`、`sepia`、`invert` は 0.0 で、`saturate`、`brightness`、`contrast` は 1.0 で効果がなくなります。
+引数が 1 つのフィルターの強さで、CSS のフィルター関数に渡す値と同じ意味です。`grayscale`、`sepia`、`invert` は 0.0 のとき、`saturate`、`brightness`、`contrast` は 1.0 のときに効果がなくなります。
 
 ## 定数：`GRAYSCALE`、`SEPIA`、`SATURATE`、`INVERT`、`BRIGHTNESS`、`CONTRAST` {#amount-shaders}
 
@@ -55,7 +55,7 @@ pub const BRIGHTNESS: ColorShader<Amount> = asset("shaders/color/brightness.wgsl
 pub const CONTRAST: ColorShader<Amount> = asset("shaders/color/contrast.wgsl");
 ```
 
-CSS の `grayscale()`、`sepia()`、`saturate()`、`invert()`、`brightness()`、`contrast()` のシェーダーです。
+CSS の `grayscale()`、`sepia()`、`saturate()`、`invert()`、`brightness()`、`contrast()` に当たるシェーダーです。
 
 ## 関数：`grayscale`、`sepia`、`saturate`、`invert`、`brightness`、`contrast` {#amount-filters}
 
@@ -70,15 +70,15 @@ pub const fn contrast(amount: Decimal) -> Filter
 
 | 関数 | 効果 |
 | -------- | ------ |
-| `grayscale(a)` | 色を抜く。0.0 でそのまま、1.0 で完全な灰色。`a` は 0.0..=1.0 に収められる |
-| `sepia(a)` | 茶色に色付けする。0.0 でそのまま、1.0 で完全なセピア。0.0..=1.0 に収められる |
-| `saturate(a)` | 彩度を拡大縮小する。0.0 で灰色、1.0 でそのまま、1.0 を超えると過飽和 |
-| `invert(a)` | 色を反転する（`a·(1 − c) + (1 − a)·c`）。0.0 でそのまま、1.0 で完全に反転。0.0..=1.0 に収められる |
-| `brightness(a)` | 色に `a` を掛ける。1.0 でそのまま、0.0 で黒 |
-| `contrast(a)` | 中間の灰色を中心にコントラストを拡大縮小する（`a·c + 0.5 − 0.5·a`）。1.0 でそのまま、0.0 で中間の灰色 |
+| `grayscale(a)` | 色を抜く。0.0 で元のまま、1.0 で完全なグレー。`a` は 0.0..=1.0 に丸める |
+| `sepia(a)` | 茶色がかった色にする。0.0 で元のまま、1.0 で完全なセピア。0.0..=1.0 に丸める |
+| `saturate(a)` | 彩度を `a` 倍にする。0.0 でグレー、1.0 で元のまま、1.0 を超えると元より鮮やかになる |
+| `invert(a)` | 色を反転する（`a·(1 − c) + (1 − a)·c`）。0.0 で元のまま、1.0 で完全に反転。0.0..=1.0 に丸める |
+| `brightness(a)` | 色に `a` を掛ける。1.0 で元のまま、0.0 で黒 |
+| `contrast(a)` | 中間のグレーを基準にコントラストを `a` 倍にする（`a·c + 0.5 − 0.5·a`）。1.0 で元のまま、0.0 で一面の中間のグレー |
 
-`grayscale`、`sepia`、`saturate` は W3C Filter Effects 仕様の行列を使います。
-種別：`const fn` · ビルトイン：いいえ。
+`grayscale`、`sepia`、`saturate` は、W3C の Filter Effects 仕様にある行列で計算します。
+種別：`const fn` · 組み込み：いいえ。
 
 ## 構造体：`HueRotate` {#huerotate}
 
@@ -89,7 +89,7 @@ pub struct HueRotate {
 }
 ```
 
-`HUE_ROTATE` の引数で、色相を回す角度です。
+`HUE_ROTATE` の引数で、色相を回転させる角度です。
 
 ## 定数：`HUE_ROTATE` {#hue_rotate}
 
@@ -97,7 +97,7 @@ pub struct HueRotate {
 pub const HUE_ROTATE: ColorShader<HueRotate> = asset("shaders/color/hue_rotate.wgsl");
 ```
 
-CSS の `hue-rotate()` のシェーダーです。
+CSS の `hue-rotate()` に当たるシェーダーです。
 
 ## 関数：`hue_rotate(angle)` {#hue_rotate-fn}
 
@@ -105,8 +105,8 @@ CSS の `hue-rotate()` のシェーダーです。
 pub const fn hue_rotate(angle: Angle) -> Filter
 ```
 
-- 戻り値：W3C の hue-rotate 行列で、すべての色相を `angle` だけ回すフィルター。
-- 種別：`const fn` · ビルトイン：いいえ。
+- 戻り値：すべての色相を `angle` だけ回転させるフィルター。計算には W3C の hue-rotate 行列を使います。
+- 種別：`const fn` · 組み込み：いいえ。
 
 ## 構造体：`Adjust` {#adjust}
 
@@ -123,7 +123,7 @@ pub struct Adjust {
 }
 ```
 
-[`adjust`](#adjust-fn) が使う 7 つの CSS フィルターの量です。各フィールドの意味は同名の関数が受け取る値と同じで、`hue` は `hue_rotate` の角度です。
+[`adjust`](#adjust-fn) に渡す、7 種類の CSS フィルターの強さです。各フィールドの意味は同じ名前の関数の引数と同じで、`hue` だけは `hue_rotate` の角度に当たります。
 
 ## 定数：`NEUTRAL` {#neutral}
 
@@ -139,7 +139,7 @@ pub const NEUTRAL: Adjust = Adjust {
 };
 ```
 
-何も変えない量です。これを出発点にして、必要なものだけを設定してください。
+何も変えない設定値です。これを元に、必要なフィールドだけを書き換えて使ってください。
 
 ## 定数：`ADJUST` {#adjust-shader}
 
@@ -147,7 +147,7 @@ pub const NEUTRAL: Adjust = Adjust {
 pub const ADJUST: ColorShader<Adjust> = asset("shaders/color/adjust.wgsl");
 ```
 
-7 つのフィルターを 1 パスで適用します（TyranoScript の `[filter]`）。
+7 種類のフィルターを 1 パスでまとめてかけるシェーダーです（TyranoScript の `[filter]` に相当）。
 
 ## 関数：`adjust(a)` {#adjust-fn}
 
@@ -155,10 +155,10 @@ pub const ADJUST: ColorShader<Adjust> = asset("shaders/color/adjust.wgsl");
 pub const fn adjust(a: Adjust) -> Filter
 ```
 
-- 戻り値：`a` の量を TyranoScript の `[filter]` の順序（grayscale、sepia、saturate、hue、invert、brightness、contrast）で適用するフィルター。
-- 種別：`const fn` · ビルトイン：いいえ。
+- 戻り値：`a` の各フィルターを、TyranoScript の `[filter]` と同じ順序（grayscale、sepia、saturate、hue、invert、brightness、contrast）でかけるフィルター。
+- 種別：`const fn` · 組み込み：いいえ。
 
-2 つの `adjust` フィルターの間をトゥイーンするとすべての量が同時に動くので、1 つのフィルターでセピアの回想から暗い夜の場面へフェードできます。
+2 つの `adjust` フィルターの間を補間すると、すべての強さが同時に変わります。そのため、フィルター 1 つで、セピア調の回想から暗い夜の場面へなめらかに移り変わらせることができます。
 
 ## 構造体：`Blur` {#blur}
 
@@ -169,7 +169,7 @@ pub struct Blur {
 }
 ```
 
-`BLUR` の引数で、ピクセル単位の標準偏差です。0.0 以下ならぼかしません。
+`BLUR` の引数で、ぼかしの標準偏差（ピクセル単位）です。0.0 以下ではぼかしません。
 
 ## 定数：`BLUR` {#blur-shader}
 
@@ -177,7 +177,7 @@ pub struct Blur {
 pub const BLUR: ColorShader<Blur> = asset("shaders/color/blur.wgsl");
 ```
 
-ガウスぼかしです。
+ガウスぼかしのシェーダーです。
 
 ## 関数：`blur(radius)` {#blur-fn}
 
@@ -185,7 +185,7 @@ pub const BLUR: ColorShader<Blur> = asset("shaders/color/blur.wgsl");
 pub const fn blur(radius: Decimal) -> Filter
 ```
 
-- 戻り値：CSS の `blur()` と同じく、標準偏差 `radius` ピクセルでぼかすフィルター。
-- 種別：`const fn` · ビルトイン：いいえ。
+- 戻り値：CSS の `blur()` と同じように、標準偏差 `radius` ピクセルでぼかすフィルター。
+- 種別：`const fn` · 組み込み：いいえ。
 
-ぼかしは、`radius / 2` ピクセル間隔で並ぶ 13 × 13 の格子点をサンプリングし、各方向に標準偏差の 3 倍まで届きます。
+ぼかしでは、`radius / 2` ピクセル間隔に並んだ 13 × 13 の格子点から色を取ります。範囲は上下左右それぞれ標準偏差の 3 倍までです。

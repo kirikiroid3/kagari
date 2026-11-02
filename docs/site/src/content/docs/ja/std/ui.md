@@ -2,13 +2,13 @@
 title: "std::ui"
 ---
 
-> **安定性:** 安定 — UI の値、リアクティビティ、UI フォームの脱糖先となる関数。
+> **安定性:** 安定 — UI の値、リアクティビティ、UI 構文の展開先となる関数。
 
-`std::ui` はゲームシステムの UI ツールキットです。要素型、リアクティブなシグナル、コンテンツとレイアウトの関数、そして UI フォーム（`column![…]`、`button!{…}`、`text!(…)` など）の脱糖先を提供します。コントロールの見た目は [`std::ui::style`](./ui-style.md) で宣言します。
+`std::ui` はゲームシステム用の UI ツールキットです。要素の型、リアクティブなシグナル、内容とレイアウトを扱う関数のほか、UI 構文（`column![…]`、`button!{…}`、`text!(…)` など）の展開先をまとめています。コントロールの見た目は [`std::ui::style`](./ui-style.md) で宣言します。
 
-UI は `fn` のコードです。**コンポーネント** は [`Element`](#element) を返す `fn` で、その要素をモード型（[`RootPage`、`Overlay`、`GameOverlay`、`Dialog`](./system.md#mode-types)）で包むか、ゲームビューならそのまま `Element` を返します。スタイルは `const fn` のデータです。
+UI は `fn` のコードで書きます。**コンポーネント** とは [`Element`](#element) を返す `fn` のことです。モードの画面ではその要素をモード型（[`RootPage`、`Overlay`、`GameOverlay`、`Dialog`](./system.md#mode-types)）で包み、ゲーム画面では `Element` をそのまま返します。スタイルは `const fn` で作るデータです。
 
-プレリュードは `signal` と `Element` をインポートします。その他のアイテムは `use std::ui::{Fit, each, show, thumbnail};` のようにパスでインポートしてください。
+プレリュードには `signal` と `Element` が含まれます。それ以外のアイテムは `use std::ui::{Fit, each, show, thumbnail};` のようにパスを指定してインポートしてください。
 
 ```kis
 pub mod style;
@@ -18,34 +18,34 @@ pub mod style;
 
 | アイテム | 種別 | 概要 |
 | -------- | ---- | ---- |
-| [`Element`](#element)、[`Placed`](#placed) | ビルトイン構造体 | UI 要素、レイヤーに配置された要素 |
-| [`Align`](#align)、[`Fit`](#fit) | 列挙型 | フレックスの整列、画像のボックスへの収め方 |
+| [`Element`](#element)、[`Placed`](#placed) | 組み込みの構造体 | UI 要素、レイヤーに配置した要素 |
+| [`Align`](#align)、[`Fit`](#fit) | 列挙型 | フレックスの整列、枠への画像の収め方 |
 | [`signal`](#signal)、[`effect`](#effect)、[`each`](#each)、[`show`](#show) | `fn` | リアクティビティ |
-| [`label`](#label)、[`spacer`](#spacer)、[`scroll`](#scroll)、[`thumbnail`](#thumbnail)、[`message`](#message) | `fn` | コンテンツ |
+| [`label`](#label)、[`spacer`](#spacer)、[`scroll`](#scroll)、[`thumbnail`](#thumbnail)、[`message`](#message) | `fn` | 内容 |
 | [`Element` のメソッド](#layout) | `fn` | サイズ、余白、整列、塗り、フォーカス順、配置 |
-| [`column`](#column)、[`row`](#row)、[`layer`](#layer) | `fn` | レイアウトフォームの脱糖先 |
-| [`text`](#text)、[`image`](#image)、[`game_screen`](#game_screen) | `fn` | コンテンツフォームの脱糖先 |
-| [`button`](#button)、[`slider`](#slider)、[`toggle`](#toggle)、[`select`](#select)、[`option`](#option) | `fn` | コントロールフォームの脱糖先 |
+| [`column`](#column)、[`row`](#row)、[`layer`](#layer) | `fn` | レイアウト構文の展開先 |
+| [`text`](#text)、[`image`](#image)、[`game_screen`](#game_screen) | `fn` | 内容を表す構文の展開先 |
+| [`button`](#button)、[`slider`](#slider)、[`toggle`](#toggle)、[`select`](#select)、[`option`](#option) | `fn` | コントロール構文の展開先 |
 
 ## 要素 {#elements}
 
-### 構造体: `Element` {#element}
+### 構造体：`Element` {#element}
 
 ```kis
 #[builtin] pub struct Element;
 ```
 
-エンジンがレイアウトする UI 要素のツリーです。`Element` は不透明な値です。このモジュールの関数とフォームで作り、[レイアウトのメソッド](#layout) で調整します。
+エンジンがレイアウトする UI 要素のツリーです。中身を直接見ることはできません。このモジュールの関数や UI 構文で作り、[レイアウトのメソッド](#layout) で調整します。
 
-### 構造体: `Placed` {#placed}
+### 構造体：`Placed` {#placed}
 
 ```kis
 #[builtin] pub struct Placed;
 ```
 
-[`layer![…]`](#layer) に配置された要素です。[`Element::at`](#element-at) または [`Element::cover`](#element-cover) で作ります。
+[`layer![…]`](#layer) に配置した要素です。[`Element::at`](#element-at) か [`Element::cover`](#element-cover) で作ります。
 
-### 列挙型: `Align` {#align}
+### 列挙型：`Align` {#align}
 
 ```kis
 pub enum Align {
@@ -57,7 +57,7 @@ pub enum Align {
 }
 ```
 
-行または列の子のフレックス整列で、[`Element::align`](#element-align) で使います。
+行や列の子をフレックスでどう整列するかを表し、[`Element::align`](#element-align) に渡します。
 
 | バリアント | 行・列に沿った方向（`main`） | 交差する方向（`cross`） |
 | ---------- | ---------------------------- | ----------------------- |
@@ -67,7 +67,7 @@ pub enum Align {
 | `Stretch` | `Start` と同じ | 固定サイズでない子を交差方向いっぱいに引き伸ばす |
 | `SpaceBetween` | 空き領域を子の間に等しく分ける（子が 1 つなら `Start` と同じ） | `Start` と同じ |
 
-### 列挙型: `Fit` {#fit}
+### 列挙型：`Fit` {#fit}
 
 ```kis
 pub enum Fit {
@@ -78,138 +78,138 @@ pub enum Fit {
 }
 ```
 
-画像がボックスをどう埋めるかで、[`image!`](#image) で使います。
+画像で枠をどう埋めるかを表し、[`image!`](#image) で使います。
 
 | バリアント | 意味 |
 | ---------- | ---- |
-| `Stretch` | 縦横比を無視してボックスを埋めます |
-| `Contain` | 縦横比を保ち、ボックスに収まる最大のサイズにして、ボックスの中央に置きます |
-| `Cover` | 縦横比を保ってボックスを埋めます。はみ出す方向の両側が均等に切り取られます |
-| `Natural` | 画像本来のピクセルサイズで、ボックスの左上に置きます |
+| `Stretch` | 縦横比を無視して枠いっぱいに広げます |
+| `Contain` | 縦横比を保ったまま枠に収まる最大の大きさにし、枠の中央に置きます |
+| `Cover` | 縦横比を保ったまま枠を埋めます。はみ出した方向は両端を均等に切り取ります |
+| `Natural` | 画像本来のピクセルサイズのまま、枠の左上に置きます |
 
 ## コンポーネントとリアクティビティ {#components-and-reactivity}
 
-コンポーネントとリアクティビティは [SolidJS](https://www.solidjs.com/) に倣っています。
+コンポーネントとリアクティビティの仕組みは [SolidJS](https://www.solidjs.com/) を手本にしています。
 
-- コンポーネントは、そのモードが表示されるときに **一度だけ** 実行されます。
-- **リアクティブなソース** は、シグナルのゲッター、`Setting::get`、`Meta::get`、`Narrative` ハンドルの読み取り、[`saves::info`](./system-saves.md#info)、[既見セット](./system.md#seen-sets) です。
-- **リアクティブなクロージャ** は、読み取ったソースが変わると再実行されます。リアクティブな属性と UI フォームの要素はこのようなクロージャです（[UI フォーム](#ui-forms) を参照）。そのため `text!(t!["Music: " {music().level}])` は `music` が変わるたびに更新されますが、コンポーネントの残りの部分は再実行されません。
+- コンポーネントは、モードが表示されるときに **一度だけ** 実行されます。
+- **リアクティブなソース** には、シグナルのゲッター、`Setting::get`、`Meta::get`、`Narrative` ハンドルからの読み取り、[`saves::info`](./system-saves.md#info)、[既見セット](./system.md#seen-sets) があります。
+- **リアクティブなクロージャ** は、読み取ったソースが変わると実行し直されます。リアクティブな属性や UI 構文の要素がこれに当たります（[UI 構文](#ui-forms) を参照）。たとえば `text!(t!["Music: " {music().level}])` は `music` が変わるたびに更新されますが、コンポーネントのほかの部分は実行し直されません。
 - `on_click` などのハンドラは普通のクロージャで、イベントが起きたときに実行されます。
 
-シグナルは `fn` のコードにしか存在しません。物語と `const fn` はシグナルを使えません。
+シグナルは `fn` のコードの中にしかありません。物語や `const fn` からは使えません。
 
-### 関数: `signal(init)` {#signal}
+### 関数：`signal(init)` {#signal}
 
 ```kis
 #[builtin] pub fn signal<T>(init: T) -> (Fn() -> T, Fn(T));
 ```
 
 - `init` `T` — 初期値。
-- 戻り値: `(Fn() -> T, Fn(T))` — ゲッターとセッター。ゲッターはリアクティブなソースです。
-- 種別: `fn` · ビルトイン: はい
+- 戻り値：`(Fn() -> T, Fn(T))` — ゲッターとセッター。ゲッターはリアクティブなソースです。
+- 種別：`fn` · 組み込み：はい
 
 ```kix
 let (hidden, set_hidden) = signal(false);
 ```
 
-### 関数: `effect(run)` {#effect}
+### 関数：`effect(run)` {#effect}
 
 ```kis
 #[builtin] pub fn effect(run: Fn());
 ```
 
 - `run` `Fn()` — 実行するクロージャ。
-- 種別: `fn` · ビルトイン: はい
+- 種別：`fn` · 組み込み：はい
 
-`run` を今すぐ実行し、読み取ったソースが変わるたびに再実行します。
+`run` をすぐに一度実行し、その後は読み取ったソースが変わるたびに実行し直します。
 
-### 関数: `each(items, item)` {#each}
+### 関数：`each(items, item)` {#each}
 
 ```kis
 #[builtin] pub fn each<T>(items: Fn() -> Vec<T>, item: Fn(T) -> Element) -> Element;
 ```
 
-- `items` `Fn() -> Vec<T>` — 項目。リアクティブです。
-- `item` `Fn(T) -> Element` — 1 つの項目の要素を作ります。
-- 戻り値: `Element` — 項目ごとに 1 つの要素。`items` と同期し続けます。
-- 種別: `fn` · ビルトイン: はい
+- `items` `Fn() -> Vec<T>` — 項目の一覧。リアクティブです。
+- `item` `Fn(T) -> Element` — 項目ひとつ分の要素を作ります。
+- 戻り値：`Element` — 項目ごとの要素。常に `items` と同じ内容に保たれます。
+- 種別：`fn` · 組み込み：はい
 
-`column![…]` や `row![…]` の中では、項目の要素がその列や行の子になり、`each` 自身のレイアウトメソッドは無視されます。それ以外の場所では、項目は列としてレイアウトされます。[行と列の中の `each` と `show`](#flattening) を参照してください。
+`column![…]` や `row![…]` の中に置くと、各項目の要素がその列や行の子になり、`each` 自体に付けたレイアウトメソッドは無視されます。それ以外の場所では、項目を縦に並べた列になります。詳しくは [行・列の中の `each` と `show`](#flattening) を参照してください。
 
 ```kix
 scroll(|| each(|| game.history(), |entry| entry_view(entry)))
 ```
 
-### 関数: `show(when, then)` {#show}
+### 関数：`show(when, then)` {#show}
 
 ```kis
 #[builtin] pub fn show(when: Fn() -> bool, then: Fn() -> Element) -> Element;
 ```
 
-- `when` `Fn() -> bool` — 条件。リアクティブです。
-- `then` `Fn() -> Element` — 内容を作ります。
-- 戻り値: `Element` — `when()` が `true` の間は `then()`、そうでなければ何もなし。
-- 種別: `fn` · ビルトイン: はい
+- `when` `Fn() -> bool` — 表示する条件。リアクティブです。
+- `then` `Fn() -> Element` — 表示する内容を作ります。
+- 戻り値：`Element` — `when()` が `true` の間は `then()`、それ以外は何も表示しません。
+- 種別：`fn` · 組み込み：はい
 
-[`each`](#each) と同じく、親が `column![…]` か `row![…]` なら平坦化され、それ以外の場所では列としてレイアウトされます。[行と列の中の `each` と `show`](#flattening) を参照してください。
+[`each`](#each) と同じく、親が `column![…]` か `row![…]` なら平坦化され、それ以外の場所では列になります。詳しくは [行・列の中の `each` と `show`](#flattening) を参照してください。
 
-## コンテンツ {#content}
+## 内容 {#content}
 
-### 関数: `label(text)` {#label}
+### 関数：`label(text)` {#label}
 
 ```kis
 #[builtin] pub fn label(text: Text) -> Element;
 ```
 
-- `text` `Text` — テキスト。
-- 戻り値: `Element` — 静的なテキスト。
-- 種別: `fn` · ビルトイン: はい
+- `text` `Text` — 表示するテキスト。
+- 戻り値：`Element` — 変化しないテキスト。
+- 種別：`fn` · 組み込み：はい
 
-テキストには [`System::text`](./system.md#system) が使われます。ボタンやトグルの中では現在の見た目のテキストスタイルが使われます（[インタラクションの見た目](./ui-style.md#interaction-looks) を参照）。`text!(…)` は、スタイルを任意で指定できるリアクティブな形です。`column!`、`row!`、`button!`、`toggle!` の中では、裸の `t![…]` 要素は `label(t![…])` になります。
+文字の体裁には [`System::text`](./system.md#system) を使います。ただしボタンやトグルの中では、そのときの見た目に設定されたテキストスタイルを使います（[操作に応じた見た目](./ui-style.md#interaction-looks) を参照）。リアクティブにしたい場合やスタイルを指定したい場合は `text!(…)` を使います。`column!`、`row!`、`button!`、`toggle!` の中に `t![…]` をそのまま書くと、`label(t![…])` として扱われます。
 
-### 関数: `spacer()` {#spacer}
+### 関数：`spacer()` {#spacer}
 
 ```kis
 #[builtin] pub fn spacer() -> Element;
 ```
 
-- 戻り値: `Element` — 伸びて兄弟要素を押し広げる空の要素。
-- 種別: `fn` · ビルトイン: はい
+- 戻り値：`Element` — 伸びて隣の要素を押し広げる、空の要素。
+- 種別：`fn` · 組み込み：はい
 
-### 関数: `scroll(child)` {#scroll}
+### 関数：`scroll(child)` {#scroll}
 
 ```kis
 #[builtin] pub fn scroll(child: Fn() -> Element) -> Element;
 ```
 
-- `child` `Fn() -> Element` — 内容。
-- 戻り値: `Element` — 内容を囲むスクロール可能なボックス。
-- 種別: `fn` · ビルトイン: はい
+- `child` `Fn() -> Element` — 中身。
+- 戻り値：`Element` — 中身を収めたスクロールできる枠。
+- 種別：`fn` · 組み込み：はい
 
-### 関数: `thumbnail(slot)` {#thumbnail}
+### 関数：`thumbnail(slot)` {#thumbnail}
 
 ```kis
 #[builtin] pub fn thumbnail(slot: SaveSlot) -> Element;
 ```
 
-- `slot` [`SaveSlot`](./system-saves.md#saveslot) — スロット。
-- 戻り値: `Element` — `slot` のセーブと一緒に保存されたスクリーンショット。
-- 種別: `fn` · ビルトイン: はい
+- `slot` [`SaveSlot`](./system-saves.md#saveslot) — 対象のスロット。
+- 戻り値：`Element` — `slot` にセーブしたときに一緒に保存したスクリーンショット。
+- 種別：`fn` · 組み込み：はい
 
-### 関数: `message(game, style)` {#message}
+### 関数：`message(game, style)` {#message}
 
 ```kis
 #[builtin] pub fn message(game: Narrative, style: TextStyle) -> Element;
 ```
 
 - `game` `Narrative` — 実行中のゲーム。
-- `style` `TextStyle` — ウィンドウのテキストスタイル（[`std::narrative::text`](./narrative-text.md) を参照）。
-- 戻り値: `Element` — 現在の行。文字送り、テキスト効果、ポーズ、マーク、クリック待ちグリフを含みます。
-- 種別: `fn` · ビルトイン: はい
+- `style` `TextStyle` — メッセージウィンドウのテキストスタイル（[`std::narrative::text`](./narrative-text.md) を参照）。
+- 戻り値：`Element` — 現在の行。文字送り、テキスト効果、一時停止、マーク、クリック待ち記号まで含みます。
+- 種別：`fn` · 組み込み：はい
 
-`message` はメッセージウィンドウの本体です。`Narrative` ハンドルが存在する場所、つまりゲームビューとゲームオーバーレイでだけ使えます。
+`message` はメッセージウィンドウの本体です。`Narrative` ハンドルがある場所、すなわちゲーム画面とゲームオーバーレイの中でだけ使えます。
 
-> **安定性:** 予定 — NVL モード（改ページまで複数の行が画面に残る全画面テキストモード）はまだ設計されていません。テキストウィンドウの表示内容と、バックログや `Narrative::line` がステップを表す方法が変わる予定です。
+> **安定性:** 予定 — NVL モード（改ページまで複数の行を画面に残す全画面表示のテキストモード）はまだ設計していません。導入時には、テキストウィンドウに表示する内容と、バックログや `Narrative::line` でのステップの表し方が変わる予定です。
 
 ## レイアウト {#layout}
 
@@ -229,21 +229,21 @@ impl Element {
 }
 ```
 
-レイアウトはフレックスボックスに似ています。
+レイアウトの考え方はフレックスボックスに近いものです。
 
-- [`column![…]`](#column) と [`row![…]`](#row) はフレックスコンテナです。`gap` と `align` が子の間隔と整列を決め、`grow` は子のフレックス伸長係数です。子の [`each` と `show`](#flattening) は平坦化されます。
-- [`layer![…]`](#layer) は [`Placed`](#placed) の子を重ねます。`at` は子のアンカーを点に置き、`cover` はレイヤー全体を埋めます。
-- サイズと位置はデザイン解像度（[`System::resolution`](./system.md#system)）のピクセルです。
-- レイアウトは要素ツリーに対するエンジンの処理です。リサイズ時に再計算され、セーブされることはありません。
+- [`column![…]`](#column) と [`row![…]`](#row) はフレックスコンテナです。子の間隔は `gap`、整列は `align` で決まり、`grow` は子ごとの伸長係数です。子にある [`each` と `show`](#flattening) は平坦化されます。
+- [`layer![…]`](#layer) は [`Placed`](#placed) の子を重ねて表示します。`at` は子のアンカーを指定した点に合わせ、`cover` はレイヤー全体を覆います。
+- サイズと位置の単位は、デザイン解像度（[`System::resolution`](./system.md#system)）でのピクセルです。
+- レイアウトはエンジンが要素ツリーに対して行う処理です。リサイズのたびに計算し直し、セーブには含まれません。
 
-すべてのメソッドは要素を値で受け取り、調整した要素を返すので、`column![…].gap(16).align(Align::Center, Align::Center)` のように連鎖できます。いずれもビルトインの `fn` です。
+どのメソッドも要素を値で受け取り、調整後の要素を返します。そのため `column![…].gap(16).align(Align::Center, Align::Center)` のようにつなげて書けます。いずれも組み込みの `fn` です。
 
-### 行と列の中の `each` と `show` {#flattening}
+### 行・列の中の `each` と `show` {#flattening}
 
-[`each`](#each) と [`show`](#show) のレイアウトは親によって変わります。
+[`each`](#each) と [`show`](#show) のレイアウトは、親が何かによって変わります。
 
-- **`column![…]` か `row![…]` の子: 平坦化されます。** `each` の要素（`show` なら `then()`）は、兄弟の中で `each` があった位置に、その列や行の子として入ります。間隔は列や行の `gap`、整列はその `align` で決まり、要素自身の `grow` が効きます。平坦化された `each` や `show` の中の `each` や `show` も平坦化されるので、`column![show(…, || each(…))]` は項目を直接列に入れます。平坦化された `each` や `show` は自身の箱を持たず、それに対して呼んだ `width`、`height`、`padding`、`gap`、`align`、`grow`、`background`、`opacity` は無視されます。
-- **それ以外の場所: 列になります。** `layer![…]` に配置したとき、`scroll(…)`、`button!`、`toggle!` の内容としたとき、平坦化されていない `each` や `show` の中、モードのルート要素としたときは、`each` や `show` は要素を並べた列としてレイアウトされ、自身のメソッドが効きます。
+- **`column![…]` か `row![…]` の子のとき：平坦化されます。** `each` の要素（`show` では `then()`）は、`each` が置かれていた位置に、列や行の子として直接入ります。間隔は列や行の `gap`、整列は列や行の `align` に従い、各要素の `grow` も効きます。平坦化された `each` や `show` の中にさらに `each` や `show` があれば、それも平坦化されます。そのため `column![show(…, || each(…))]` では項目が列に直接入ります。平坦化された `each` や `show` は自分の枠を持たないので、そこに呼んだ `width`、`height`、`padding`、`gap`、`align`、`grow`、`background`、`opacity` は無視されます。
+- **それ以外の場所：列になります。** `layer![…]` に配置した場合、`scroll(…)`、`button!`、`toggle!` の中身にした場合、平坦化されない `each` や `show` の中に置いた場合、モードのルート要素にした場合は、要素を縦に並べた列としてレイアウトされ、`each` や `show` 自体に付けたメソッドが効きます。
 
 ```kix
 // 40 px between all the children, items included: the gap belongs to the column.
@@ -260,7 +260,7 @@ layer![each(|| items(), |i| tile(i)).gap(40).at(point(100, 100), TOP_LEFT)]
 #[builtin] pub fn width(self, px: u32) -> Element;
 ```
 
-- `px` `u32` — ピクセル単位の固定幅。
+- `px` `u32` — 固定の幅（ピクセル）。
 
 ### `Element::height(px)` {#element-height}
 
@@ -268,7 +268,7 @@ layer![each(|| items(), |i| tile(i)).gap(40).at(point(100, 100), TOP_LEFT)]
 #[builtin] pub fn height(self, px: u32) -> Element;
 ```
 
-- `px` `u32` — ピクセル単位の固定高さ。
+- `px` `u32` — 固定の高さ（ピクセル）。
 
 ### `Element::padding(insets)` {#element-padding}
 
@@ -284,7 +284,7 @@ layer![each(|| items(), |i| tile(i)).gap(40).at(point(100, 100), TOP_LEFT)]
 #[builtin] pub fn gap(self, px: u32) -> Element;
 ```
 
-- `px` `u32` — 行または列の子の間隔。平坦化された `each` や `show` では無視されます（[行と列の中の `each` と `show`](#flattening) を参照）。
+- `px` `u32` — 行や列の子どうしの間隔。平坦化された `each` や `show` では無視されます（[行・列の中の `each` と `show`](#flattening) を参照）。
 
 ### `Element::align(main, cross)` {#element-align}
 
@@ -292,8 +292,8 @@ layer![each(|| items(), |i| tile(i)).gap(40).at(point(100, 100), TOP_LEFT)]
 #[builtin] pub fn align(self, main: Align, cross: Align) -> Element;
 ```
 
-- `main` `Align` — 行または列に沿った子の整列。
-- `cross` `Align` — それと交差する方向の整列。
+- `main` `Align` — 行や列の並ぶ方向での子の整列。
+- `cross` `Align` — それと直交する方向での整列。
 
 ### `Element::grow(factor)` {#element-grow}
 
@@ -301,7 +301,7 @@ layer![each(|| items(), |i| tile(i)).gap(40).at(point(100, 100), TOP_LEFT)]
 #[builtin] pub fn grow(self, factor: u32) -> Element;
 ```
 
-- `factor` `u32` — フレックス伸長係数。行または列の空き領域のうち、この要素が取る割合です。
+- `factor` `u32` — フレックスの伸長係数。行や列の空き領域をどれだけの割合で受け取るかを表します。
 
 ### `Element::background(paint)` {#element-background}
 
@@ -309,7 +309,7 @@ layer![each(|| items(), |i| tile(i)).gap(40).at(point(100, 100), TOP_LEFT)]
 #[builtin] pub fn background(self, paint: Paint) -> Element;
 ```
 
-- `paint` [`Paint`](./ui-style.md#paint) — 要素の背後に描くもの。
+- `paint` [`Paint`](./ui-style.md#paint) — 要素の背面に描く塗り。
 
 ### `Element::opacity(opacity)` {#element-opacity}
 
@@ -317,7 +317,7 @@ layer![each(|| items(), |i| tile(i)).gap(40).at(point(100, 100), TOP_LEFT)]
 #[builtin] pub fn opacity(self, opacity: Decimal) -> Element;
 ```
 
-- `opacity` `Decimal` — 要素の不透明度。`0.0..=1.0`。
+- `opacity` `Decimal` — 要素の不透明度。範囲は `0.0..=1.0` です。
 
 ### `Element::focus_order(order)` {#element-focus_order}
 
@@ -325,7 +325,7 @@ layer![each(|| items(), |i| tile(i)).gap(40).at(point(100, 100), TOP_LEFT)]
 #[builtin] pub fn focus_order(self, order: u32) -> Element;
 ```
 
-- `order` `u32` — フォーカス順における要素の位置（[フォーカス](#focus) を参照）。
+- `order` `u32` — フォーカスが移動する順番での位置（[フォーカス](#focus) を参照）。
 
 ### `Element::at(position, anchor)` {#element-at}
 
@@ -334,8 +334,8 @@ layer![each(|| items(), |i| tile(i)).gap(40).at(point(100, 100), TOP_LEFT)]
 ```
 
 - `position` `Point` — レイヤー上の点。
-- `anchor` `Anchor` — そこに置く要素側の点。`TOP_LEFT` や `CENTER` など（[`std::screen`](./screen.md) を参照）。
-- 戻り値: `Placed` — `layer![…]` 用。
+- `anchor` `Anchor` — 要素のうち、`position` に合わせる点。`TOP_LEFT` や `CENTER` など（[`std::screen`](./screen.md) を参照）。
+- 戻り値：`Placed` — `layer![…]` に渡す値。
 
 ### `Element::cover()` {#element-cover}
 
@@ -343,7 +343,7 @@ layer![each(|| items(), |i| tile(i)).gap(40).at(point(100, 100), TOP_LEFT)]
 #[builtin] pub fn cover(self) -> Placed;
 ```
 
-- 戻り値: `Placed` — レイヤー全体を埋める要素。
+- 戻り値：`Placed` — レイヤー全体を覆う要素。
 
 ```kix
 use std::screen::CENTER;
@@ -363,28 +363,28 @@ fn Title() -> RootPage {
 
 ## フォーカス {#focus}
 
-- フォーカス可能な要素は、ボタン、スライダー、トグル、セレクトです。
-- `focus_order`（[`focus_order`](#element-focus_order)）が設定されていなければ、フォーカスは文書順に従います。
-- モードが開くと、最初のフォーカス可能な要素にフォーカスが当たります。フォーカスは最初のフォーカスキーから表示され、Enter と `PadButton::South` がフォーカス中のコントロールを実行するのは、フォーカスが表示されている間だけです。
-- 上下左右キー、十字キー、Tab と Shift+Tab はフォーカスを移動します。フォーカス中のスライダーとセレクトでは、左右キーは代わりに値を変えます。スライダーは `step` ずつ、セレクトは前後の選択肢に切り替わります。
-- これらのキーは組み込みで、バインドできません（[バインディング](./system.md#bindings) を参照）。
+- フォーカスできる要素は、ボタン、スライダー、トグル、セレクトです。
+- [`focus_order`](#element-focus_order) を指定しなければ、フォーカスは記述順に移動します。
+- モードが開くと、最初のフォーカス可能な要素にフォーカスが当たります。ただしフォーカスが表示されるのは、フォーカス移動のキーを初めて押したときからです。Enter や `PadButton::South` でフォーカス中のコントロールを実行できるのも、フォーカスが表示されている間だけです。
+- 上下左右キー、十字キー、Tab、Shift+Tab でフォーカスが移動します。ただしスライダーやセレクトにフォーカスがあるときは、左右キーで値が変わります。スライダーは `step` ずつ増減し、セレクトは前後の選択肢に切り替わります。
+- これらのキーは組み込みのもので、割り当てを変えることはできません（[バインディング](./system.md#bindings) を参照）。
 
-## UI フォーム {#ui-forms}
+## UI 構文 {#ui-forms}
 
-UI フォームは `.kix` ファイルに書き、props 構造体を伴う以下の関数の呼び出しに脱糖されます。`fn` と `const fn` のコードでは値を作るもので、ステップになることはありません。言語の区切り文字の規則に従います（リファレンスの [フォーム](../reference/syntax/forms.md) の章を参照）。
+UI 構文は `.kix` ファイルに書きます。展開すると、props 構造体を渡す以下の関数の呼び出しになります。`fn` や `const fn` のコードで値を作るための構文であり、ステップにはなりません。区切り文字の規則は言語全体と同じです（リファレンスの [組み込み構文](../reference/syntax/forms.md) を参照）。
 
-- `name![…]` は要素だけを取ります。
-- `name!(…)` は属性と、決まった数の要素を取ります。
-- `name!{…}` は属性と、任意の数の要素を取ります。
+- `name![…]` は要素だけを受け取ります。
+- `name!(…)` は属性と、決まった数の要素を受け取ります。
+- `name!{…}` は属性と、任意の数の要素を受け取ります。
 
-### 脱糖 {#desugaring}
+### 展開 {#desugaring}
 
 - **リアクティブな属性** は `key: Some(|| expr)` になります。必須の属性なら `key: || expr` です。
 - **ハンドラ属性**（`on_*`）は `key: Some(expr)` になります。
-- **省略された任意の属性** は `None` になります。必須の属性の欠落、未知の属性、要素の数の誤り（`text!` と `image!` はちょうど 1 つ、`game_screen!` と `slider!` は 0 個）は構文エラーです。
-- **要素。** 各要素 `e` は `|| e` になります。`column!`、`row!`、`button!`、`toggle!` の中では、構文上 `t![…]` である要素は `|| ui::label(t![…])` になります。
+- **省略した任意の属性** は `None` になります。必須の属性がない場合、未知の属性がある場合、要素の数が合わない場合（`text!` と `image!` はちょうど 1 つ、`game_screen!` と `slider!` は 0 個）は構文エラーです。
+- **要素** は、それぞれ `e` が `|| e` になります。`column!`、`row!`、`button!`、`toggle!` の中で、書かれた形が `t![…]` である要素は `|| ui::label(t![…])` になります。
 
-| フォーム | 脱糖先 | 属性 | 要素 |
+| 構文 | 展開先 | 属性 | 要素 |
 | -------- | ------ | ---- | ---- |
 | `column![…]`、`row![…]` | `ui::column([…])`、`ui::row([…])` | なし | `Element` |
 | `layer![…]` | `ui::layer([…])` | なし | `Placed` |
@@ -396,13 +396,13 @@ UI フォームは `.kix` ファイルに書き、props 構造体を伴う以下
 | `toggle!{…}` | `ui::toggle(ToggleProps { … })` | `value`: リアクティブな `bool`、必須、`on_change`: ハンドラ `Fn(bool)`、`disabled`: リアクティブな `bool`、`style`: リアクティブな `ButtonStyle` | `Element` → `children` |
 | `select!{…}` | `ui::select(SelectProps { … })` | `value`: リアクティブな `T`、必須、`on_change`: ハンドラ `Fn(T)`、`disabled`: リアクティブな `bool`、`style`: リアクティブな `ButtonStyle` | `ui::option(v, label)` → `options` |
 
-例えば
+たとえば次のコードは、
 
 ```kix
 button!{on_click = || nav::back(), t!["Back"]}
 ```
 
-は次のように脱糖されます。
+次のように展開されます。
 
 ```kis
 ui::button(ButtonProps {
@@ -413,7 +413,7 @@ ui::button(ButtonProps {
 })
 ```
 
-また
+同様に、
 
 ```kix
 slider!{value = music().level, on_change = |v| set_level(v)}
@@ -431,31 +431,31 @@ ui::slider(SliderProps {
 })
 ```
 
-### 関数: `column(children)` {#column}
+### 関数：`column(children)` {#column}
 
 ```kis
 #[builtin] pub fn column<const N: usize>(children: [Fn() -> Element; N]) -> Element;
 ```
 
-`column![…]` の脱糖先です。子を上から下へ積みます。子の `each` や `show` は平坦化され、その要素が列の子として積まれます（[行と列の中の `each` と `show`](#flattening) を参照）。
+`column![…]` の展開先です。子を上から下へ積み重ねます。子にある `each` や `show` は平坦化され、その要素が列の子として積まれます（[行・列の中の `each` と `show`](#flattening) を参照）。
 
-### 関数: `row(children)` {#row}
+### 関数：`row(children)` {#row}
 
 ```kis
 #[builtin] pub fn row<const N: usize>(children: [Fn() -> Element; N]) -> Element;
 ```
 
-`row![…]` の脱糖先です。子を左から右へ並べます。子の `each` や `show` は平坦化され、その要素が行の子として並びます（[行と列の中の `each` と `show`](#flattening) を参照）。
+`row![…]` の展開先です。子を左から右へ並べます。子にある `each` や `show` は平坦化され、その要素が行の子として並びます（[行・列の中の `each` と `show`](#flattening) を参照）。
 
-### 関数: `layer(children)` {#layer}
+### 関数：`layer(children)` {#layer}
 
 ```kis
 #[builtin] pub fn layer<const N: usize>(children: [Fn() -> Placed; N]) -> Element;
 ```
 
-`layer![…]` の脱糖先です。[`Placed`](#placed) の子を重ね、後の子ほど上に描かれます。
+`layer![…]` の展開先です。[`Placed`](#placed) の子を重ね、後に書いた子ほど手前に描きます。
 
-### 構造体: `TextProps` {#textprops}
+### 構造体：`TextProps` {#textprops}
 
 ```kis
 pub struct TextProps {
@@ -464,21 +464,21 @@ pub struct TextProps {
 }
 ```
 
-`text!(…)` の属性と内容です。
+`text!(…)` の属性と内容をまとめた構造体です。
 
-### 関数: `text(props)` {#text}
+### 関数：`text(props)` {#text}
 
 ```kis
 #[builtin] pub fn text(props: TextProps) -> Element;
 ```
 
-`text!(…)` の脱糖先で、リアクティブなテキストです。`style` がなければ [`System::text`](./system.md#system) が使われ、ボタンやトグルの中では現在の見た目のテキストスタイルが使われます。
+`text!(…)` の展開先で、リアクティブなテキストを作ります。`style` を省略すると [`System::text`](./system.md#system) を使います。ボタンやトグルの中では、そのときの見た目に設定されたテキストスタイルを使います。
 
 ```kix
 text!(style = NAME_STYLE, who_text(game))
 ```
 
-### 構造体: `ImageProps` {#imageprops}
+### 構造体：`ImageProps` {#imageprops}
 
 ```kis
 pub struct ImageProps {
@@ -487,17 +487,17 @@ pub struct ImageProps {
 }
 ```
 
-`image!(…)` の属性とソースです。
+`image!(…)` の属性と画像のソースをまとめた構造体です。
 
-### 関数: `image(props)` {#image}
+### 関数：`image(props)` {#image}
 
 ```kis
 #[builtin] pub fn image(props: ImageProps) -> Element;
 ```
 
-`image!(…)` の脱糖先で、画像です。ソースはリアクティブなので、`image!(if seen_image(cg) { cg } else { LOCKED })` は条件が変わるとすぐに切り替わります。
+`image!(…)` の展開先で、画像を表示します。ソースもリアクティブなので、`image!(if seen_image(cg) { cg } else { LOCKED })` は条件が変わるとすぐに画像が切り替わります。
 
-### 構造体: `GameScreenProps` {#gamescreenprops}
+### 構造体：`GameScreenProps` {#gamescreenprops}
 
 ```kis
 pub struct GameScreenProps {
@@ -505,15 +505,15 @@ pub struct GameScreenProps {
 }
 ```
 
-`game_screen!(…)` の属性です。
+`game_screen!(…)` の属性をまとめた構造体です。
 
-### 関数: `game_screen(props)` {#game_screen}
+### 関数：`game_screen(props)` {#game_screen}
 
 ```kis
 #[builtin] pub fn game_screen(props: GameScreenProps) -> Element;
 ```
 
-`game_screen!(…)` の脱糖先で、物語のレンダーが描く実行中のゲームの画面です。ゲームビューでは通常、`layer![…]` の最初に `.cover()` 付きで置きます。
+`game_screen!(…)` の展開先で、物語の画面（実行中のゲームでレンダーが描いたもの）を表示します。ゲーム画面（`System::game`）では普通、`layer![…]` の先頭に `.cover()` を付けて置きます。
 
 ```kix
 use std::narrative::text::text_style;
@@ -528,7 +528,7 @@ fn GameView(game: Narrative) -> Element {
 }
 ```
 
-### 構造体: `ButtonProps` {#buttonprops}
+### 構造体：`ButtonProps` {#buttonprops}
 
 ```kis
 pub struct ButtonProps<const N: usize> {
@@ -539,21 +539,21 @@ pub struct ButtonProps<const N: usize> {
 }
 ```
 
-`button!{…}` の属性と子です。
+`button!{…}` の属性と子をまとめた構造体です。
 
-### 関数: `button(props)` {#button}
+### 関数：`button(props)` {#button}
 
 ```kis
 #[builtin] pub fn button<const N: usize>(props: ButtonProps<N>) -> Element;
 ```
 
-`button!{…}` の脱糖先で、フォーカス可能なボタンです。`on_click` はクリックまたは実行時に走ります。無効なボタンは入力を無視し、無効時の見た目を表示します（[インタラクションの見た目](./ui-style.md#interaction-looks) を参照）。ボタンは現在の見た目の背景をボックス全体に塗り、その上に子を中央揃えで配置します。そのため子のないボタンは背景だけで描かれ、画像ボタンを作れます。
+`button!{…}` の展開先で、フォーカスできるボタンを作ります。クリックするか実行操作をすると `on_click` が呼ばれます。無効にしたボタンは入力を受け付けず、無効時の見た目になります（[操作に応じた見た目](./ui-style.md#interaction-looks) を参照）。ボタンはそのときの見た目の背景を枠全体に塗り、その上に子を中央揃えで置きます。子のないボタンは背景だけになるので、画像だけのボタンも作れます。
 
 ```kix
 button!{style = image_style(START, START_HOVER), on_click = || start_game()}.width(300).height(70)
 ```
 
-### 構造体: `SliderProps` {#sliderprops}
+### 構造体：`SliderProps` {#sliderprops}
 
 ```kis
 pub struct SliderProps<const LO: i64, const HI: i64> {
@@ -565,15 +565,15 @@ pub struct SliderProps<const LO: i64, const HI: i64> {
 }
 ```
 
-`slider!{…}` の属性です。範囲は値の `Int` 型の範囲で、`min` や `max` の属性はありません。
+`slider!{…}` の属性をまとめた構造体です。値の範囲は `Int` 型の範囲で決まるので、`min` や `max` の属性はありません。
 
-### 関数: `slider(props)` {#slider}
+### 関数：`slider(props)` {#slider}
 
 ```kis
 #[builtin] pub fn slider<const LO: i64, const HI: i64>(props: SliderProps<LO, HI>) -> Element;
 ```
 
-`slider!{…}` の脱糖先で、`LO` から `HI` まで `step` 刻みで動く、フォーカス可能なスライダーです。`Volume::level` は `Int<0, 100>` なので、音量スライダーに範囲の指定は要りません。
+`slider!{…}` の展開先で、`LO` から `HI` まで `step` 刻みで動く、フォーカスできるスライダーを作ります。`Volume::level` は `Int<0, 100>` なので、音量のスライダーでは範囲を指定する必要がありません。
 
 ```kix
 slider!{
@@ -582,7 +582,7 @@ slider!{
 }
 ```
 
-### 構造体: `ToggleProps` {#toggleprops}
+### 構造体：`ToggleProps` {#toggleprops}
 
 ```kis
 pub struct ToggleProps<const N: usize> {
@@ -594,21 +594,21 @@ pub struct ToggleProps<const N: usize> {
 }
 ```
 
-`toggle!{…}` の属性と子です。
+`toggle!{…}` の属性と子をまとめた構造体です。
 
-### 関数: `toggle(props)` {#toggle}
+### 関数：`toggle(props)` {#toggle}
 
 ```kis
 #[builtin] pub fn toggle<const N: usize>(props: ToggleProps<N>) -> Element;
 ```
 
-`toggle!{…}` の脱糖先で、フォーカス可能なオン・オフのコントロールです。実行する（クリック、Enter、`PadButton::South`）と、`!value()` で `on_change` を呼びます。値が `true` の間、トグルはオンの見た目を表示します（[インタラクションの見た目](./ui-style.md#interaction-looks) を参照）。
+`toggle!{…}` の展開先で、オンとオフを切り替える、フォーカスできるコントロールを作ります。実行（クリック、Enter、`PadButton::South`）すると、`!value()` を引数に `on_change` を呼びます。値が `true` の間はオンの見た目になります（[操作に応じた見た目](./ui-style.md#interaction-looks) を参照）。
 
 ```kix
 toggle!{value = SKIP_UNREAD.get(), on_change = |v| SKIP_UNREAD.set(v), t!["Skip unread text"]}
 ```
 
-### 構造体: `SelectOption<T>` {#selectoption}
+### 構造体：`SelectOption<T>` {#selectoption}
 
 ```kis
 pub struct SelectOption<T> {
@@ -617,9 +617,9 @@ pub struct SelectOption<T> {
 }
 ```
 
-`select!{…}` の選択肢です。
+`select!{…}` の選択肢ひとつ分です。
 
-### 関数: `option(value, label)` {#option}
+### 関数：`option(value, label)` {#option}
 
 ```kis
 pub fn option<T>(value: T, label: Element) -> SelectOption<T> {
@@ -627,12 +627,12 @@ pub fn option<T>(value: T, label: Element) -> SelectOption<T> {
 }
 ```
 
-- `value` `T` — 選択肢が表す値。
-- `label` `Element` — 選択肢の表示。
-- 戻り値: `SelectOption<T>` — `label` として表示される選択肢 `value`。
-- 種別: `fn` · ビルトイン: いいえ
+- `value` `T` — この選択肢が表す値。
+- `label` `Element` — 選択肢として表示するもの。
+- 戻り値：`SelectOption<T>` — `label` を表示し、値 `value` を表す選択肢。
+- 種別：`fn` · 組み込み：いいえ
 
-### 構造体: `SelectProps<T, N>` {#selectprops}
+### 構造体：`SelectProps<T, N>` {#selectprops}
 
 ```kis
 pub struct SelectProps<T, const N: usize> {
@@ -644,15 +644,15 @@ pub struct SelectProps<T, const N: usize> {
 }
 ```
 
-`select!{…}` の属性と選択肢です。
+`select!{…}` の属性と選択肢をまとめた構造体です。
 
-### 関数: `select(props)` {#select}
+### 関数：`select(props)` {#select}
 
 ```kis
 #[builtin] pub fn select<T: Eq, const N: usize>(props: SelectProps<T, N>) -> Element;
 ```
 
-`select!{…}` の脱糖先で、選択肢を順に切り替えるフォーカス可能なコントロールです。値が `value()` と等しい選択肢のラベルを表示するため、`T` は `Eq` でなければなりません。実行すると次の選択肢の値で `on_change` を呼び、最後の次は最初に戻ります。フォーカス中は、右キーと左キーで次と前の選択肢に切り替わります。`value()` と等しい選択肢がないときは、最初の選択肢の値が次の値になります。
+`select!{…}` の展開先で、選択肢を順に切り替える、フォーカスできるコントロールを作ります。値が `value()` と等しい選択肢のラベルを表示するので、`T` は `Eq` を満たす型でなければなりません。実行すると次の選択肢の値で `on_change` を呼び、最後の選択肢の次は最初に戻ります。フォーカス中は右キーで次の選択肢、左キーで前の選択肢に切り替わります。`value()` と等しい選択肢がない場合は、最初の選択肢の値が次の値になります。
 
 ```kix
 use std::ui::{label, option};
@@ -666,4 +666,4 @@ select!{
 }
 ```
 
-> **安定性:** 予定 — UI 要素のフェードとトランジションはまだサポートされていません。アニメーションするのはコントロールの見た目の変化だけです（[`ButtonStyle::change`](./ui-style.md#buttonstyle-change) を参照）。
+> **安定性:** 予定 — UI 要素のフェードやトランジションにはまだ対応していません。アニメーションするのは、コントロールの見た目が切り替わるときだけです（[`ButtonStyle::change`](./ui-style.md#buttonstyle-change) を参照）。

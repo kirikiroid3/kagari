@@ -1,12 +1,12 @@
 ---
-title: "システムのレシピ"
+title: "ゲームシステムの実例"
 sidebar:
-  label: "システムレシピ"
+  label: "ゲームシステムの実例"
 ---
 
-ゲームシステムの実例です。プログラムとタイトル画面、ゲームビュー、設定画面、セーブ・ロード画面、CG ギャラリー、音楽鑑賞、回想の解放、バックログを扱います。[`std::system`](../system.md)、[`std::system::nav`](../system-nav.md)、[`std::system::saves`](../system-saves.md)、[`std::ui`](../ui.md)、[`std::ui::style`](../ui-style.md) を使います。UI フォームには `.kix` ファイルが必要です。
+ゲームシステムの実例集です。プログラムとタイトル画面、ゲーム画面、設定画面、セーブ・ロード画面、CG ギャラリー、音楽鑑賞、回想の解放、バックログを取り上げます。使うモジュールは [`std::system`](../system.md)、[`std::system::nav`](../system-nav.md)、[`std::system::saves`](../system-saves.md)、[`std::ui`](../ui.md)、[`std::ui::style`](../ui-style.md) です。UI 構文を使うので、ファイルは `.kix` にします。
 
-レシピは次のような構成のプロジェクトを想定しています。
+以下の例は、次の構成のプロジェクトを前提にしています。
 
 ```text
 src/
@@ -15,11 +15,11 @@ src/
   ui.kix        // the modes
 ```
 
-`kagari.toml` には `entry = "src/main.kix"` を設定します。以下の各ファイルは、そのスニペットをページの順に連結したもので、ページ全体でコンパイルが通ります。アセットのパスは、プロジェクトの `assets/` ディレクトリ以下のファイルを指します。
+`kagari.toml` には `entry = "src/main.kix"` を指定します。各ファイルの内容は、このページに出てくるコード片を順につなげたもので、全部そろえるとコンパイルが通ります。アセットのパスは、プロジェクトの `assets/` ディレクトリからの相対パスです。
 
 ## プログラムとタイトル画面 {#the-program}
 
-`main` は [`System`](../system.md#system) を返します。設定ハンドルは不変の `static` で、エンジンは `Settings` に挙げられたものを読みます。
+`main` は [`System`](../system.md#system) を返します。設定のハンドルは不変の `static` として宣言し、エンジンは `Settings` に並べたものを読み込みます。
 
 ```kix
 // main.kix
@@ -83,7 +83,7 @@ const fn bindings() -> Vec<Binding> {
 }
 ```
 
-タイトル画面は [`RootPage`](../system.md#rootpage) です。[`nav::start`](../system-nav.md#start) で物語を始め、`nav::call` でオーバーレイを開き、`nav::goto` でページを切り替え、[`set_music`](../system.md#set_music) でシステム音楽を再生します。
+タイトル画面は [`RootPage`](../system.md#rootpage) です。[`nav::start`](../system-nav.md#start) で物語を始め、`nav::call` でオーバーレイを開き、`nav::goto` で別のページへ移り、[`set_music`](../system.md#set_music) でシステム音楽を流します。
 
 ```kix
 // ui.kix
@@ -133,9 +133,9 @@ fn ConfirmQuit() -> Dialog {
 }
 ```
 
-`Title` コンポーネントはページが表示されるたびに一度実行されるので、プレイヤーがタイトルに戻るたびに `set_music` がタイトル曲を再生し直します。`nav::quit` は確認をしないので、`ConfirmQuit` ダイアログが確認します。
+`Title` コンポーネントはページを表示するたびに一度実行されます。そのため、タイトルに戻るたびに `set_music` がタイトル曲を最初から流し直します。`nav::quit` は確認を出さないので、確認は `ConfirmQuit` ダイアログで行います。
 
-物語がエンディングを返す場合は、終了ハンドラで処理し、[`Meta`](../narrative.md) の値に記録します。
+物語がエンディングを返したら、終了ハンドラで受け取り、[`Meta`](../narrative.md) の値に記録します。
 
 ```kix
 pub static CLEARED_AZUSA: Meta<bool> = meta(false);
@@ -155,7 +155,7 @@ fn Credits() -> RootPage {
 }
 ```
 
-`story.kix` はエントリーシーンとその結果から始まります。残りは [回想シーン](#replay) で追加します。
+`story.kix` は開始シーンとその結果の型から始めます。残りは [回想シーン](#replay) の節で追加します。
 
 ```kix
 // story.kix
@@ -177,9 +177,9 @@ const fn festival(screen: Screen) -> Screen {
 }
 ```
 
-## ゲームビュー {#the-game-view}
+## ゲーム画面 {#the-game-view}
 
-[`System::game`](../system.md#system) は、ゲーム画面、メッセージウィンドウ、選択肢のボタン、クイックメニューを描きます。`Narrative` ハンドルから読み取るものはすべてリアクティブです。
+[`System::game`](../system.md#system) では、物語の画面（`game_screen!`）、メッセージウィンドウ、選択肢のボタン、クイックメニューを描きます。`Narrative` ハンドルからの読み取りはすべてリアクティブです。
 
 ```kix
 use std::narrative::{MenuArm, PlayMode};
@@ -269,11 +269,11 @@ fn has_menu(game: Narrative) -> bool {
 }
 ```
 
-`each` はアームごとに 1 つのボタンを保ちます。無効なアーム（`arm.arm` が `None`）はグレーアウトして表示されます。
+`each` はアームごとにボタンを一つずつ保持します。無効なアーム（`arm.arm` が `None`）はグレーアウトして表示します。
 
 ## 設定画面 {#settings-page}
 
-コンフィグ画面は [`Overlay`](../system.md#overlay) なので、タイトルからもゲームからも開けます。設定は `get` で読み、`set` で書きます。`get` はリアクティブなので、どのコントロールもシグナルなしで現在の値を表示します。
+コンフィグ画面は [`Overlay`](../system.md#overlay) なので、タイトルからもゲーム中からも開けます。設定値は `get` で読み、`set` で書き込みます。`get` はリアクティブなので、シグナルを用意しなくても各コントロールに現在の値が表示されます。
 
 ```kix
 use std::ui::option;
@@ -333,13 +333,13 @@ fn Config() -> Overlay {
 }
 ```
 
-スライダーの範囲は値の `Int` 型の範囲なので、音量スライダーは `min` や `max` なしで 0 から 100 まで動きます。
+スライダーの範囲は値の `Int` 型の範囲で決まるので、音量スライダーは `min` や `max` を指定しなくても 0 から 100 まで動きます。
 
-> **安定性:** 予定 — ゲームビューの外でのテキスト表示のプレビュー（現在の文字速度を示すサンプル行）は、まだ使えません。
+> **安定性:** 予定 — ゲーム画面以外の場所でのテキスト表示のプレビュー（現在の文字速度で表示する見本の行）には、まだ対応していません。
 
 ## セーブ・ロード画面 {#save-and-load}
 
-セーブには実行中のゲームが必要なので、セーブ画面は `Narrative` ハンドルを受け取る [`GameOverlay`](../system.md#gameoverlay) です。ロード画面は通常のオーバーレイで、タイトルからも使えます。[`saves::info`](../system-saves.md#info) はリアクティブなので、スロットは書き込みや削除のすぐ後に更新されます。
+セーブには実行中のゲームが必要です。そのためセーブ画面は、`Narrative` ハンドルを受け取る [`GameOverlay`](../system.md#gameoverlay) にします。ロード画面は通常のオーバーレイなので、タイトルからも使えます。[`saves::info`](../system-saves.md#info) はリアクティブなので、書き込みや削除をするとスロットの表示がすぐに更新されます。
 
 ```kix
 use std::system::saves;
@@ -397,13 +397,13 @@ fn Load() -> Overlay {
 }
 ```
 
-- 空のスロットは「Empty」と表示され、サムネイルは空です。
-- スクリプトが変更されてセーブが合わなくなった場合、[`nav::load`](../system-nav.md#load) は `Err` を返します。スタックは変わらず、画面に `Divergence::describe()` を表示します。
-- オートセーブは `SaveSlot::Auto(0)` … `Auto(auto_slots - 1)` で、エンジンが選択肢ごとと終了時に書き込みます。ロード画面で同じように一覧できます。
+- 空のスロットには「Empty」と表示し、サムネイルは空になります。
+- スクリプトを変更してセーブと合わなくなると、[`nav::load`](../system-nav.md#load) は `Err` を返します。スタックはそのままなので、`Divergence::describe()` の内容を画面に表示します。
+- オートセーブのスロットは `SaveSlot::Auto(0)` … `Auto(auto_slots - 1)` で、選択肢のたびと終了時にエンジンが書き込みます。ロード画面に同じ方法で並べられます。
 
 ## CG ギャラリー {#gallery}
 
-[`seen_image`](../system.md#seen_image) は画像がこれまでに画面に出たかどうかを返すので、ギャラリーのために物語側で記録をする必要はありません。`image!` のソースはリアクティブです。
+[`seen_image`](../system.md#seen_image) は画像がこれまでに画面に表示されたかどうかを返します。そのため、ギャラリーのために物語側で記録しておく必要はありません。`image!` の画像の指定もリアクティブです。
 
 ```kix
 use std::system::seen_image;
@@ -456,11 +456,11 @@ fn Gallery() -> RootPage {
 }
 ```
 
-ギャラリーはルートページで、`nav::goto(Gallery)` で入り、`nav::goto(Title)` で出ます。ルートページはベースなので、ここで `nav::back()` を使うとエラー `E6002` になります。
+ギャラリーはルートページなので、`nav::goto(Gallery)` で入り、`nav::goto(Title)` で戻ります。ルートページは土台なので、ここで `nav::back()` を使うとエラー `E6002` になります。
 
 ## 音楽鑑賞 {#music-room}
 
-[`heard`](../system.md#heard) はトラックがこれまでに再生されたかどうかを返し、[`set_music`](../system.md#set_music) はシステム音楽チャンネルでトラックを再生します。このチャンネルはゲームが実行されていない間に聞こえます。
+[`heard`](../system.md#heard) は曲がこれまでに再生されたかどうかを返します。[`set_music`](../system.md#set_music) はシステム音楽チャンネルで曲を流します。このチャンネルが聞こえるのは、ゲームを実行していない間です。
 
 ```kix
 use std::system::{heard, set_music};
@@ -486,11 +486,11 @@ fn MusicRoom() -> RootPage {
 }
 ```
 
-> **安定性:** 予定 — 現在再生中のものの読み取り（現在のトラックの強調表示や、再生位置・一時停止状態の表示のため）は、まだ設計されていません。
+> **安定性:** 予定 — 再生中の曲の情報を読み取る手段（再生中の曲の強調表示や、再生位置・一時停止状態の表示に使うもの）は、まだ設計していません。
 
 ## 回想シーン {#replay}
 
-回想は別の `#[entry]` シーンで、[`nav::start`](../system-nav.md#start) で開始します。プレイヤーが初めてそのシーンに到達したときに物語が `write` で書き込む `Meta<bool>` によって解放されます。
+回想は別の `#[entry]` シーンとして用意し、[`nav::start`](../system-nav.md#start) で始めます。解放には `Meta<bool>` を使います。プレイヤーがそのシーンに初めて到達したとき、物語が `write` で書き込みます。
 
 ```kix
 // story.kix
@@ -528,13 +528,13 @@ fn on_replay_end(_end: ()) {
 }
 ```
 
-- 回想は新しい物語として始まり、物語変数は初期値を持ちます。回想するシーンに必要な状態は、エントリーの引数として渡します。
-- `Meta::get` はリアクティブなので、メタの値が変わるとすぐにボタンが有効になります。
-- 物語はメタに書き込むだけで（`write` は `pushdown fn` です）、読むことはありません。メタが物語に届くのはエントリーの引数を通してだけです。
+- 回想は新しい物語として始まるので、物語変数は初期値に戻ります。回想するシーンに必要な状態は、開始引数として渡します。
+- `Meta::get` はリアクティブなので、メタデータの値が変わるとすぐにボタンが押せるようになります。
+- 物語はメタデータに書き込むだけで（`write` は `pushdown fn` です）、読むことはできません。メタデータが物語に届くのは開始引数を通してだけです。
 
 ## バックログ {#backlog}
 
-バックログは `Narrative::history()` を一覧するゲームオーバーレイです。ゲームビューから `game.call(Backlog)` で、またはバインディングの `Action::OpenInGame(Backlog)` で開きます。
+バックログは `Narrative::history()` を一覧表示するゲームオーバーレイです。ゲーム画面の `game.call(Backlog)` か、バインディングの `Action::OpenInGame(Backlog)` で開きます。
 
 ```kix
 use std::narrative::{Entry, Line};
@@ -562,4 +562,4 @@ pub fn Backlog(game: Narrative) -> GameOverlay {
 }
 ```
 
-エントリー、ボイスの再生（`Narrative::replay_voice`）、巻き戻し（`Narrative::rewind`）については [`std::narrative`](../narrative.md) で説明しています。
+バックログの項目、ボイスの再生（`Narrative::replay_voice`）、巻き戻し（`Narrative::rewind`）については [`std::narrative`](../narrative.md) を参照してください。

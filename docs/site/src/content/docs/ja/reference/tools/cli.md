@@ -2,7 +2,7 @@
 title: "kagari CLI"
 ---
 
-`kagari` は Kagari のツールチェインです。プロジェクトの作成・検査・ビルド・掃除・整形、プレイヤー向けのゲームのパッケージ化、`.kagari` ファイルの逆アセンブル、言語サーバーの実行、物語のデバッグを行います。
+`kagari` は Kagari のツールチェインです。プロジェクトの作成、検査、ビルド、出力の削除、整形のほか、プレイヤー向けのパッケージ作成、`.kagari` ファイルの逆アセンブル、言語サーバーの起動、物語のデバッグもこのコマンドで行います。
 
 ```text
 kagari <COMMAND>
@@ -21,60 +21,60 @@ Commands:
   help     Print this message or the help of the given subcommand(s)
 ```
 
-`kagari --version` はツールチェインのバージョンを表示します。`kagari.toml` の `[toolchain] kagari` はこのバージョンに合致する必要があります。`kagari help <COMMAND>` または `kagari <COMMAND> --help` で各コマンドのヘルプを表示します。
+`kagari --version` でツールチェインのバージョンを表示します。`kagari.toml` の `[toolchain] kagari` は、このバージョンと合っている必要があります。個々のコマンドのヘルプは `kagari help <COMMAND>` か `kagari <COMMAND> --help` で表示できます。
 
 ## インストール {#installing}
 
-[Kagari のインストール](../../tutorial/install.md) のインストーラーは、Linux、macOS、Windows で `kagari` と `kagari-desktop-runtime` を `PATH` に置きます。NixOS ではそこで説明している flake を使います。
+[Kagari のインストール](../../tutorial/install.md)で紹介しているインストーラーを使うと、Linux、macOS、Windows のいずれでも `kagari` と `kagari-desktop-runtime` が `PATH` に入ります。NixOS では、同じページで説明している flake を使ってください。
 
-代わりに Kagari リポジトリから両方をビルドするには、次のようにします（Rust と Cargo が必要です）。
+Kagari リポジトリから両方をビルドすることもできます（Rust と Cargo が必要です）。
 
 ```sh
 cargo install --path tooling/kagari-cli
 cargo install --path runtime/kagari-desktop-runtime
 ```
 
-これで両方が Cargo の `bin` ディレクトリにインストールされます。リポジトリ内では、インストールせずに `cargo run -p kagari-cli -- <COMMAND>` で `kagari` を実行することもできます。
+これで、両方が Cargo の `bin` ディレクトリにインストールされます。リポジトリの中であれば、インストールせずに `cargo run -p kagari-cli -- <COMMAND>` で `kagari` を実行することもできます。
 
-## プロジェクトの探索 {#finding-the-project}
+## プロジェクトの探し方 {#finding-the-project}
 
-`check`、`build`、`clean`、`release`、（ファイル指定なしの）`fmt` はプロジェクトに対して動作します。`--manifest-path <PATH>` で指定された `kagari.toml` を使い、指定がなければカレントディレクトリとその親ディレクトリで最初に見つかった `kagari.toml` を使います。マニフェストについては[プロジェクト](./projects.md)を参照してください。
+`check`、`build`、`clean`、`release`、およびファイルを指定しない `fmt` は、プロジェクトを対象に動きます。`--manifest-path <PATH>` で `kagari.toml` を指定すればそれを使い、指定しなければカレントディレクトリから親ディレクトリへさかのぼって最初に見つかった `kagari.toml` を使います。マニフェストの書き方は[プロジェクト](./projects.md)を参照してください。
 
 ## 終了ステータス {#exit-statuses}
 
-すべてのコマンドが同じ終了ステータスを使います。
+終了ステータスは、どのコマンドでも共通です。
 
 | ステータス | 意味 |
 | ---------: | ---- |
 | 0 | 成功。 |
-| 1 | コマンドは実行され、問題が見つかった。エラーの診断、非対応のアセット形式、整形されていないファイル、不正な `.kagari` ファイルなど。 |
-| 2 | コマンドを実行できなかった。使い方の誤り、IO エラー、`kagari.toml` が見つからない、マニフェストが不正、ツールチェインのバージョン不一致、ランタイムをダウンロードできないなど。メッセージは `kagari: <message>` の形で stderr に出力されます。 |
+| 1 | コマンドは実行できたが、問題が見つかった。エラーの診断、対応していないアセット形式、整形されていないファイル、不正な `.kagari` ファイルなど。 |
+| 2 | コマンドを実行できなかった。使い方の誤り、入出力エラー、`kagari.toml` が見つからない、マニフェストが不正、ツールチェインのバージョンが合わない、ランタイムをダウンロードできない、など。メッセージは `kagari: <message>` の形で標準エラー出力に出ます。 |
 
 ## コンパイラオプション {#compiler-options}
 
-コンパイラにはコマンドラインフラグがありません。オプションは `kagari.toml` のキーなので、`check`、`build`、言語サーバーの結果は常に一致します。
+コンパイラ用のコマンドラインフラグはありません。オプションはすべて `kagari.toml` のキーで指定するので、`check`、`build`、言語サーバーの結果が食い違うことはありません。
 
 | キー | 既定値 | 効果 |
 | ---- | -----: | ---- |
-| `[build] state-cap` | 200 000 | 解析が探索する物語の状態数の上限（超えると `W5006`）。 |
-| `[build] recursion-depth` | 2048 | 実行時の呼び出しの入れ子の上限。 |
-| `[build] keyframe-check` | `false` | キーフレーム配置の検査（`W5011`）を行う。 |
-| `[assets] system-fonts` | `true` | `system_font("…")` がインストール済みフォントを指せるようにする（オフのときは `E1031`）。 |
+| `[build] state-cap` | 200 000 | 解析で探索する物語の状態数の上限（超えると `W5006`）。 |
+| `[build] recursion-depth` | 2048 | 実行時に入れ子にできる呼び出しの上限。 |
+| `[build] keyframe-check` | `false` | キーフレームの配置を検査する（`W5011`）。 |
+| `[assets] system-fonts` | `true` | `system_font("…")` でインストール済みのフォントを指定できるようにする（オフのときは `E1031`）。 |
 
 詳しくは[コンパイラオプション](./projects.md#compiler-options)を参照してください。
 
 ## 解析キャッシュ {#the-analysis-cache}
 
-物語の解析は、プロジェクトのコンパイルで最も時間のかかる部分です。停止性、到達可能性、行き詰まり選択肢、画面とその一貫性、キーフレーム、ゲームシステムを検査するために、物語のすべての状態を探索します（[物語の解析](../../diagnostics/analysis.md)、[ゲームシステム](../../diagnostics/system.md)）。`kagari check` と `kagari build` はその結果を `<out-dir>/analysis.kagari-cache`（既定では `target/analysis.kagari-cache`）に保存し、解析が依存するものが変わらない間はそれを再利用します。
+プロジェクトのコンパイルで最も時間がかかるのは物語の解析です。停止性、到達可能性、行き詰まる選択肢、画面とその一貫性、キーフレーム、ゲームシステムを検査するため、物語のすべての状態を探索します（[物語の解析](../../diagnostics/analysis.md)、[ゲームシステム](../../diagnostics/system.md)を参照）。`kagari check` と `kagari build` は、解析結果を `<out-dir>/analysis.kagari-cache`（既定では `target/analysis.kagari-cache`）に保存します。次の項目がどれも変わっていなければ、保存した結果をそのまま使います。
 
-- プログラムのすべてのソースファイルの内容（標準ライブラリを含む）
+- プログラムを構成するすべてのソースファイルの内容（標準ライブラリを含む）
 - [コンパイラオプション](#compiler-options)（`state-cap`、`recursion-depth`、`keyframe-check`、`system-fonts`）
 - アセットディレクトリとシステムフォントのディレクトリの場所
 - ツールチェインのバージョン
 
-ファイルを書き出した時点からこれらがすべて変わっていなければ、解析は再実行されず、その診断はファイルから取り出されます。出力は新たに解析した場合と同じです。そうでなければ解析が実行され、ファイルは書き直されます。それより前の検査がエラーを報告している間は、解析もファイルの書き出しも行われません。このため、`kagari check` も出力ディレクトリに書き込みます。
+キャッシュを書いた時点からこれらが一つも変わっていなければ、解析はやり直さず、診断もキャッシュから取り出します。出力は解析をやり直した場合と変わりません。どれかが変わっていれば解析を実行し、キャッシュを書き直します。それより前の段階の検査でエラーが出ている間は、解析を行わないので、キャッシュも書きません。なお、このキャッシュがあるため、`kagari check` も出力ディレクトリに書き込みを行います。
 
-ファイルが存在しない、読めない、または不正な場合は無視され、置き換えられます。ファイルを書き出せないときは `kagari: warning: cannot write the analysis cache: <reason>` を stderr に出力し、終了ステータスを変えずにコマンドを続けます。ファイルは [`kagari clean`](#kagari-clean) で削除できます。コンパイラ自体を開発していて、バージョンを変えずにコンパイラを変更した場合は `kagari clean` を実行してください。キャッシュは 2 つのコンパイラを区別できないためです。
+キャッシュファイルがない、読めない、または内容が不正な場合は、無視して作り直します。書き込めないときは標準エラー出力に `kagari: warning: cannot write the analysis cache: <reason>` と出し、終了ステータスはそのままで処理を続けます。キャッシュは [`kagari clean`](#kagari-clean) で削除できます。コンパイラ自体を開発していて、バージョンを変えずにコンパイラに手を入れた場合は、`kagari clean` を実行してください。キャッシュからは、変更前と変更後のコンパイラを見分けられません。
 
 ## `kagari init` {#kagari-init}
 
@@ -89,9 +89,9 @@ kagari init [PATH] [--name <NAME>]
 | `PATH` | プロジェクトのディレクトリ。既定は `.`。 |
 | `--name <NAME>` | プロジェクト名。既定はディレクトリ名。 |
 
-`kagari init` は新しいファイルしか作りません。テンプレートのファイルが 1 つでも `PATH` に既に存在すれば、何も変更せずにステータス 2 で止まります。書き出す構成は[プロジェクトの構成](./projects.md#project-layout)のとおりで、`[toolchain] kagari` には実行中のツールチェインの `major.minor` が入ります。
+`kagari init` は新しいファイルを作るだけで、既存のファイルは上書きしません。テンプレートに含まれるファイルが `PATH` に 1 つでもあれば、何も変更せずに終了ステータス 2 で止まります。作成される構成は[プロジェクトの構成](./projects.md#project-layout)のとおりで、`[toolchain] kagari` には実行したツールチェインの `major.minor` が入ります。
 
-テンプレートの `src/main.kis` はゲームの既定フォント（`FONT`）を宣言します。`kagari init` は[システムフォントのディレクトリ](./projects.md#assets)からインストール済みのフォントを選び、`system_font("…")` を書き込みます。日本語のゴシック体（游ゴシック、メイリオ、MS ゴシック、ヒラギノ角ゴシック、Noto Sans CJK/JP）を優先し、次に一般的なサンセリフ体（Segoe UI、Arial、Helvetica、Noto Sans、DejaVu Sans、Liberation Sans）を選び、どれもなければ最初に見つかったフォントファイルを使います。フォントが 1 つもインストールされていない場合は `asset("fonts/default.ttf")` を書き込み、`assets/fonts/default.ttf` にフォントを置くか `FONT` を変更するよう警告します。
+テンプレートの `src/main.kis` では、ゲームの既定のフォント（`FONT`）を宣言しています。`kagari init` は[システムフォントのディレクトリ](./projects.md#assets)からインストール済みのフォントを 1 つ選び、`system_font("…")` として書き込みます。優先するのは日本語のゴシック体（游ゴシック、メイリオ、MS ゴシック、ヒラギノ角ゴシック、Noto Sans CJK/JP）で、次に一般的なサンセリフ体（Segoe UI、Arial、Helvetica、Noto Sans、DejaVu Sans、Liberation Sans）です。どれもなければ、最初に見つかったフォントファイルを使います。フォントが 1 つもインストールされていなければ `asset("fonts/default.ttf")` と書き込み、`assets/fonts/default.ttf` にフォントを置くか `FONT` を書き換えるよう警告します。
 
 ```sh
 kagari init my-game
@@ -104,14 +104,14 @@ kagari init --name "My Game"
 kagari check [--manifest-path <PATH>] [--resolutions]
 ```
 
-プロジェクトをコンパイルし、すべての診断を stdout に出力します。ビルド出力は書き出さず、書き出すのは[解析キャッシュ](#the-analysis-cache)だけです。
+プロジェクトをコンパイルし、すべての診断を標準出力に出します。ビルド出力は作らず、書き込むのは[解析キャッシュ](#the-analysis-cache)だけです。
 
 | オプション | 意味 |
 | ---------- | ---- |
 | `--manifest-path <PATH>` | プロジェクトの `kagari.toml`。 |
-| `--resolutions` | プログラム中の各名前が何に解決されるかも出力します。インポートのデバッグに便利です。 |
+| `--resolutions` | プログラム中の各名前が何に解決されたかも出力する。インポートの問題を調べるときに便利。 |
 
-エラーの診断が 1 つでもあればステータス 1 で終了します。警告だけならステータス 0 です。診断コードの一覧は[診断](../../diagnostics/index.md)にあります。
+エラーの診断が 1 つでもあれば終了ステータス 1 で終わります。警告だけなら 0 です。診断コードの一覧は[診断](../../diagnostics/index.md)にあります。
 
 ## `kagari build` {#kagari-build}
 
@@ -119,19 +119,19 @@ kagari check [--manifest-path <PATH>] [--resolutions]
 kagari build [--manifest-path <PATH>] [--target <TARGET>]... [--profile <PROFILE>]
 ```
 
-プロジェクトをコンパイルし、ターゲットごとに `<out-dir>/<target>/game.kagari` とアセットアーカイブを書き出します。`--profile debug` のときは `game.kagari-cache` も書き出します。[ターゲットと出力ディレクトリ](./projects.md#targets-and-output-directories)と[アセットとアーカイブ](./projects.md#assets-and-archives)を参照してください。`kagari check` と同じく、[解析キャッシュ](#the-analysis-cache)を再利用・更新します。
+プロジェクトをコンパイルし、ターゲットごとに `<out-dir>/<target>/game.kagari` とアセットのアーカイブを書き出します。`--profile debug` を付けると `game.kagari-cache` も書き出します。[ターゲットと出力ディレクトリ](./projects.md#targets-and-output-directories)と[アセットとアーカイブ](./projects.md#assets-and-archives)も参照してください。`kagari check` と同じく、[解析キャッシュ](#the-analysis-cache)を使い、必要に応じて更新します。
 
 | オプション | 意味 |
 | ---------- | ---- |
 | `--manifest-path <PATH>` | プロジェクトの `kagari.toml`。 |
-| `--target <TARGET>` | このターゲットだけをビルドします。複数回指定できます。それぞれ `build.targets` に含まれている必要があり、含まれていなければステータス 2 です。既定は `build.targets` のすべてのターゲット。 |
-| `--profile <PROFILE>` | `release` または `debug`。[ビルドプロファイル](#build-profiles)を参照してください。既定は `release`。 |
+| `--target <TARGET>` | 指定したターゲットだけをビルドする。複数回指定可。`build.targets` にないターゲットを指定すると終了ステータス 2。既定では `build.targets` のすべてのターゲット。 |
+| `--profile <PROFILE>` | `release` か `debug`（[ビルドプロファイル](#build-profiles)を参照）。既定は `release`。 |
 
-処理の順序:
+処理は次の順に進みます。
 
-1. コンパイルします。診断は stderr に出力されます。エラーの診断があればステータス 1 で止まります。
-2. 参照されるすべてのアセットを `build.runtime-compatibility` に照らして検査します（[ランタイムプロファイル](./projects.md#runtime-profiles)）。問題があればステータス 1 で止まります。この時点ではまだビルド出力を何も書き出しも削除もしていません。更新されている可能性があるのは解析キャッシュだけです。
-3. ターゲットごとに、出力ディレクトリを作り、そこにある古い `game.kagari`、`.kiarchive`、`.kagari-cache` ファイルを削除し、`game.kagari`、続いてアーカイブ、（デバッグプロファイルのときだけ）`game.kagari-cache` を書き出します。書き出したファイルは 1 つずつ表示されます。
+1. コンパイルします。診断は標準エラー出力に出ます。エラーの診断があれば終了ステータス 1 で止まります。
+2. 参照しているすべてのアセットを `build.runtime-compatibility` に照らして検査します（[ランタイムプロファイル](./projects.md#runtime-profiles)を参照）。問題があれば終了ステータス 1 で止まります。この段階ではビルド出力の書き込みも削除もまだ行っておらず、更新されている可能性があるのは解析キャッシュだけです。
+3. ターゲットごとに出力ディレクトリを作り、そこにある古い `game.kagari`、`.kiarchive`、`.kagari-cache` を削除します。続いて `game.kagari`、アーカイブ、`game.kagari-cache`（デバッグプロファイルのときだけ）の順に書き出します。書き出したファイルは 1 つずつ表示します。
 
 ```text
 wrote target/v0/game.kagari
@@ -147,20 +147,20 @@ kagari build --profile debug
 
 ### ビルドプロファイル {#build-profiles}
 
-プロファイルは、`kagari build` がバイトコードとアーカイブのほかに何を書き出すかを決めます。`game.kagari` ファイルはどちらのプロファイルでもバイト単位で同一なので、デバッグビルドはリリースビルドとまったく同じように動作します。
+プロファイルによって、`kagari build` がバイトコードとアーカイブ以外に何を書き出すかが決まります。`game.kagari` はどちらのプロファイルでもバイト単位で同じなので、デバッグビルドもリリースビルドとまったく同じように動きます。
 
 | プロファイル | 書き出すもの |
 | ------------ | ------------ |
 | `release`（既定） | `game.kagari` とアーカイブ。 |
-| `debug` | 同じものに加えて、デバッグ用成果物 `game.kagari-cache`。 |
+| `debug` | 上記に加えて、デバッグ用の成果物 `game.kagari-cache`。 |
 
-デバッグ用成果物は[デバッガー](./debugger.md)などのツールのためのもので、次の内容を収めます。
+デバッグ用の成果物は[デバッガー](./debugger.md)などのツールが使うもので、次の内容を含みます。
 
-- 探索された物語のグラフ。解析が見つけた到達可能なすべての物語状態を、シーンと呼び出し文脈ごとに収めます。各状態には、ステップ（[ステップ ID](../concepts/steps.md#step-ids) で示します）、シーン呼び出し、乱数の抽選、その状態で保持されるローカル変数と物語変数、選択肢のアーム・抽選された値・シーンの終了ごとの後続状態、どのレンダーがキーフレームかが含まれます。
-- すべての関数のデバッグ情報。ローカル変数の名前、関数のコード上でそれらが置かれる場所、レキシカルスコープです。
-- 対応する `game.kagari` のハッシュ。古い成果物を別のビルドに対して読まず、拒否できるようにするためのものです。
+- 探索した物語のグラフ。解析で見つかった到達可能な物語の状態を、シーンと呼び出し文脈ごとにすべて収めています。各状態には、ステップ（[ステップ ID](../concepts/steps.md#step-ids) で表します）、シーンの呼び出し、乱数の抽選、その状態で保持しているローカル変数と物語変数が記録されます。さらに、選択肢のアーム、抽選された値、シーンの終了のそれぞれについて次の状態と、どのレンダーがキーフレームかも記録されます。
+- すべての関数のデバッグ情報。ローカル変数の名前、関数のコード上で各変数がどこに置かれているか、レキシカルスコープを含みます。
+- 対応する `game.kagari` のハッシュ。古い成果物を別のビルドと取り違えて読まないよう、照合して拒否するためのものです。
 
-これはアーカイブの後に表示されます。
+成果物はアーカイブの後に表示されます。
 
 ```text
 wrote target/v0/game.kagari
@@ -168,7 +168,7 @@ wrote target/v0/bgimage.kiarchive (3 files)
 wrote target/v0/game.kagari-cache
 ```
 
-リリースビルドは、以前のデバッグビルドがターゲットディレクトリに残した `game.kagari-cache` を削除します。ランタイムが `game.kagari-cache` を読むのはデバッガーが接続したときだけなので、出荷するゲームには不要です。
+リリースビルドでは、以前のデバッグビルドがターゲットディレクトリに残した `game.kagari-cache` を削除します。ランタイムが `game.kagari-cache` を読むのはデバッガーが接続したときだけなので、配布するゲームには含める必要がありません。
 
 ## `kagari clean` {#kagari-clean}
 
@@ -178,23 +178,23 @@ kagari clean [--manifest-path <PATH>]
 
 `kagari check`、`kagari build`、`kagari release` が出力ディレクトリ（`build.out-dir`）に書き出したものを削除します。
 
-- [解析キャッシュ](#the-analysis-cache)。出力ディレクトリ直下のすべての `.kagari-cache` ファイルです。
-- すべてのターゲット（`v0`）のディレクトリにある `game.kagari`、すべての `.kiarchive` ファイル、すべての `.kagari-cache` ファイル。ターゲットが `build.targets` に含まれているかどうかは問いません。
+- [解析キャッシュ](#the-analysis-cache)。出力ディレクトリ直下にあるすべての `.kagari-cache` ファイルです。
+- 各ターゲット（`v0`）のディレクトリにある `game.kagari`、すべての `.kiarchive` ファイル、すべての `.kagari-cache` ファイル。`build.targets` に挙げたターゲットかどうかは問いません。
 - `release/windows`、`release/linux`、`release/macos` にあるすべての `.iso` と `.zip` のパッケージ。
 
-その後、空になったターゲットとリリースのディレクトリ、出力ディレクトリを削除します。それ以外のファイルは残り、それを収めたディレクトリも残ります。
+削除した結果、ターゲットのディレクトリ、リリースのディレクトリ、出力ディレクトリが空になれば、それらも削除します。上記以外のファイルは残し、そのファイルを含むディレクトリも残します。
 
 | オプション | 意味 |
 | ---------- | ---- |
 | `--manifest-path <PATH>` | プロジェクトの `kagari.toml`。 |
 
-削除したファイルの数を、プロジェクトのディレクトリからの相対パスで示した出力ディレクトリとともに表示します。
+削除したファイルの数を、出力ディレクトリ（プロジェクトのディレクトリからの相対パス）と一緒に表示します。
 
 ```text
 removed 4 files from target
 ```
 
-ステータス 0 で終了します。実行できないとき（`kagari.toml` が見つからない、IO エラー）はステータス 2 です。
+終了ステータスは 0 です。実行できなかった場合（`kagari.toml` が見つからない、入出力エラーなど）は 2 になります。
 
 ```sh
 kagari clean
@@ -207,26 +207,26 @@ kagari clean --manifest-path example/test_game1/kagari.toml
 kagari release [--manifest-path <PATH>] (--windows | --linux | --macos)
 ```
 
-1 つのプラットフォームのプレイヤー向けにゲームをパッケージ化します。ゲームをビルドし、そのプラットフォームのランタイムをダウンロードして、両方を `<out-dir>/release/<platform>/` の 1 つのパッケージに書き出します。Windows と Linux では ISO ディスクイメージ `<name>.iso`、macOS ではアプリ `<name>.app` を収めた ZIP アーカイブ `<name>.zip` です。`<name>` はプロジェクト名（`[project] name`）で、`/ \ : * ? " < > |` と制御文字は `_` に置き換えられ、前後の空白と末尾のドットは取り除かれます。インターネット接続が必要です。
+特定のプラットフォームのプレイヤー向けに、ゲームをパッケージにまとめます。ゲームをビルドし、そのプラットフォーム用のランタイムをダウンロードして、両方を 1 つのパッケージとして `<out-dir>/release/<platform>/` に書き出します。パッケージは、Windows と Linux では ISO ディスクイメージ `<name>.iso`、macOS ではアプリ `<name>.app` を収めた ZIP アーカイブ `<name>.zip` です。`<name>` はプロジェクト名（`[project] name`）をもとに、`/ \ : * ? " < > |` と制御文字を `_` に置き換え、前後の空白と末尾のドットを取り除いたものです。実行にはインターネット接続が必要です。
 
 | オプション | 意味 |
 | ---------- | ---- |
 | `--manifest-path <PATH>` | プロジェクトの `kagari.toml`。 |
-| `--windows` | Windows（x86_64）のランタイムを `run.exe` として、必要な C ランタイムライブラリ `vcruntime140.dll` と FFmpeg のライブラリと一緒にパッケージ化します。 |
-| `--linux` | Linux（x86_64）のランタイム `kagari-desktop-runtime` を、FFmpeg のライブラリと一緒にパッケージ化します。 |
-| `--macos` | macOS（Apple シリコン）のランタイムを、FFmpeg のライブラリと一緒にアドホック署名したアプリとしてパッケージ化します。[`project.identifier`](./projects.md#project) が必要です。 |
+| `--windows` | Windows（x86_64）のランタイムを `run.exe` という名前で、必要な C ランタイムライブラリ `vcruntime140.dll` と FFmpeg のライブラリとともにパッケージにする。 |
+| `--linux` | Linux（x86_64）のランタイム `kagari-desktop-runtime` を、FFmpeg のライブラリとともにパッケージにする。 |
+| `--macos` | macOS（Apple シリコン）のランタイムを、FFmpeg のライブラリとともにアドホック署名したアプリとしてパッケージにする。[`project.identifier`](./projects.md#project) が必要。 |
 
-`--windows`、`--linux`、`--macos` のどれか 1 つだけが必要です。macOS 向けのリリースには `kagari.toml` の `project.identifier` が必要で、これがアプリのバンドル識別子になります。ない場合は、ビルドもダウンロードもせずにステータス 2 で止まります。
+`--windows`、`--linux`、`--macos` のうち、ちょうど 1 つを指定する必要があります。macOS 向けには `kagari.toml` に `project.identifier` が必要で、この値がアプリのバンドル識別子になります。書かれていなければ、ビルドもダウンロードもせずに終了ステータス 2 で止まります。
 
 ```text
 kagari: a macOS release needs `project.identifier` in kagari.toml (a reverse-DNS name such as `com.example.game`)
 ```
 
-手順は次の順です。
+処理は次の順に進みます。
 
-1. `build.targets` の最初のターゲットを、[`kagari build`](#kagari-build) とまったく同じようにリリースプロファイルでビルドし、同じ行を表示します。問題があれば、何もダウンロードせずにステータス 1 で止まります。
-2. `kagari` と同じバージョンのランタイムを `https://kagari-download.suitsu31.club` のそのプラットフォームのディレクトリ（`windows_x86_installer`、`linux_x86_bin`、`macos_arm64_bin`）からダウンロードし、公開されている SHA-256 チェックサムと照合します。そのため、ランタイムはバイトコードをビルドしたコンパイラと常に一致します。ランタイムがムービーのデコードに使う FFmpeg のライブラリと、そのライセンス `ffmpeg-LICENSE.txt` もダウンロードして照合します。Windows 向けでは、Microsoft Visual C++ のランタイムライブラリ `vcruntime140.dll` もダウンロードして照合します。ランタイムはこれがないと起動できず、プレイヤーの Windows には入っていないことがよくあります。`run.exe` の隣に置けば、インストールせずに使われます。macOS 向けでは、アプリのアイコン `kagari.icns`（Kagari のロゴ）もダウンロードして照合します。ダウンロードに失敗したとき、またはこのバージョンのランタイムが公開されていないとき（Kagari 0.1.0 は公開しておらず、0.3.0 より前のバージョンは macOS のランタイムを公開していません）はステータス 2 で止まります。環境変数 `KAGARI_DOWNLOAD_URL` でサーバーを置き換えられます。
-3. そのプラットフォームの以前のパッケージ（`.iso` と `.zip` のファイル）を削除し、新しいパッケージを書き出します。まず `<name>.iso.part` または `<name>.zip.part` として書き、完成したら名前を変えます。失敗したときは書きかけのファイルを削除します。Windows と Linux のイメージのルートディレクトリには、ランタイム（Windows では `run.exe` と `vcruntime140.dll`、Linux では `kagari-desktop-runtime`）、FFmpeg のライブラリと `ffmpeg-LICENSE.txt`（[ゲームの配布](./projects.md#shipping-a-game)を参照）、`game.kagari`、アーカイブが入ります。macOS のアーカイブには [macOS のアプリ](#the-macos-app)で説明するアプリが入ります。
+1. `build.targets` の最初のターゲットを、リリースプロファイルでビルドします。処理も表示内容も [`kagari build`](#kagari-build) とまったく同じです。問題があれば、何もダウンロードせずに終了ステータス 1 で止まります。
+2. `kagari` と同じバージョンのランタイムを、`https://kagari-download.suitsu31.club` にあるプラットフォームごとのディレクトリ（`windows_x86_installer`、`linux_x86_bin`、`macos_arm64_bin`）からダウンロードし、公開されている SHA-256 チェックサムと照合します。そのため、ランタイムは常にバイトコードをビルドしたコンパイラと同じバージョンになります。ランタイムが動画のデコードに使う FFmpeg のライブラリと、そのライセンス文書 `ffmpeg-LICENSE.txt` も、同様にダウンロードして照合します。Windows 向けには、Microsoft Visual C++ ランタイムライブラリの `vcruntime140.dll` もダウンロードして照合します。ランタイムはこれがないと起動できませんが、入っていない Windows は珍しくありません。`run.exe` と同じ場所に置けば、インストールしなくても使えます。macOS 向けには、アプリのアイコン `kagari.icns`（Kagari のロゴ）もダウンロードして照合します。ダウンロードに失敗した場合や、このバージョンのランタイムが公開されていない場合は、終了ステータス 2 で止まります（Kagari 0.1.0 はランタイムを公開しておらず、0.3.0 より前のバージョンには macOS 用のランタイムがありません）。ダウンロード元のサーバーは、環境変数 `KAGARI_DOWNLOAD_URL` で変更できます。
+3. そのプラットフォーム用の以前のパッケージ（`.iso` と `.zip` のファイル）を削除し、新しいパッケージを書き出します。いったん `<name>.iso.part` または `<name>.zip.part` として書き、完成した時点で名前を変えます。途中で失敗した場合は、書きかけのファイルを削除します。Windows 用と Linux 用のイメージのルートディレクトリには、ランタイム（Windows では `run.exe` と `vcruntime140.dll`、Linux では `kagari-desktop-runtime`）、FFmpeg のライブラリと `ffmpeg-LICENSE.txt`（[ゲームの配布](./projects.md#shipping-a-game)を参照）、`game.kagari`、アーカイブが入ります。macOS 用のアーカイブには、[macOS のアプリ](#the-macos-app)で説明するアプリが入ります。
 
 ```text
 downloading https://kagari-download.suitsu31.club/linux_x86_bin/<version>/kagari-desktop-runtime-<version>-x86_64-linux
@@ -239,7 +239,7 @@ downloading https://kagari-download.suitsu31.club/linux_x86_bin/<version>/ffmpeg
 wrote target/release/linux/My Game.iso (10 files)
 ```
 
-イメージは Windows（ダブルクリックでマウントされます）でも Linux（デスクトップがマウントするか、`mount -o loop`）でも開け、ファイル名は書き出したとおりで、Linux のランタイムは実行可能です。プレイヤーはその中のランタイム（Windows では `run.exe`）を引数なしで起動します。[ゲームの配布](./projects.md#shipping-a-game)を参照してください。
+イメージは Windows でも（ダブルクリックでマウント）、Linux でも（デスクトップ環境が自動でマウントするか、`mount -o loop` を使う）開けます。ファイル名は書き出したときのままで、Linux 用のランタイムには実行権限が付いています。プレイヤーは、イメージの中にあるランタイム（Windows では `run.exe`）を引数なしで起動します。詳しくは[ゲームの配布](./projects.md#shipping-a-game)を参照してください。
 
 ```sh
 kagari release --windows
@@ -249,7 +249,7 @@ kagari release --macos
 
 ### macOS のアプリ {#the-macos-app}
 
-同じプロジェクトで `kagari release --macos` を実行すると、次のように表示します。
+同じプロジェクトで `kagari release --macos` を実行すると、次のように表示されます。
 
 ```text
 downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/kagari-desktop-runtime-<version>-aarch64-macos
@@ -263,7 +263,7 @@ downloading https://kagari-download.suitsu31.club/macos_arm64_bin/<version>/kaga
 wrote target/release/macos/My Game.zip (13 files)
 ```
 
-アーカイブには 1 つのアプリバンドルが入ります。
+アーカイブには、アプリバンドルが 1 つ入っています。
 
 ```text
 <name>.app/Contents/
@@ -274,9 +274,9 @@ wrote target/release/macos/My Game.zip (13 files)
   _CodeSignature/CodeResources the hashes of the files the signature covers
 ```
 
-アプリの名前はプロジェクト名（`[project] name`）、バンドル識別子は `project.identifier`、バージョンは `project.version` の `major.minor.patch` で、macOS 11 以降が必要です。ランタイムはゲームを `Contents/Resources` から、FFmpeg のライブラリを `Contents/Frameworks` から見つけます。アーカイブはファイルのパーミッションを記録しているので、Finder（ダブルクリック）や `ditto -x -k` で展開すればアプリはそのまま動きます。プレイヤーは展開した `<name>.app` を開きます。
+アプリの名前はプロジェクト名（`[project] name`）、バンドル識別子は `project.identifier`、バージョンは `project.version` の `major.minor.patch` になります。動作には macOS 11 以降が必要です。ランタイムは、ゲームを `Contents/Resources` から、FFmpeg のライブラリを `Contents/Frameworks` から読み込みます。アーカイブにはファイルのパーミッションも記録されているので、Finder（ダブルクリック）や `ditto -x -k` で展開すれば、アプリはそのまま起動できます。プレイヤーは、展開した `<name>.app` を開きます。
 
-ランタイムと FFmpeg のライブラリはアドホック署名されており、署名はアプリのすべてのファイルを対象にします。ファイルを変えると署名は壊れます。署名には Apple の Developer ID が含まれないため、ダウンロードしたアプリを初めて起動すると、macOS は Apple が検証できなかったと表示して開きません。プレイヤーは一度だけ **システム設定 → プライバシーとセキュリティ → このまま開く** から開きます（macOS 14 以前では、アプリを Control キーを押しながらクリックして **開く** を選びます）。その後の起動では何も必要ありません。署名に Mac は不要で、`kagari release --macos` は Linux と Windows でも動きます。ダウンロードしたランタイムが arm64 の macOS 実行ファイルでないときは、アーカイブを書き出さずにステータス 2 で止まります。
+ランタイムと FFmpeg のライブラリにはアドホック署名を施してあり、署名はアプリ内のすべてのファイルを対象にしています。ファイルを 1 つでも変更すると、署名は無効になります。この署名には Apple の Developer ID が含まれないため、ダウンロードしたアプリを初めて起動すると、macOS は「Apple が検証できなかった」と表示して開きません。プレイヤーは最初の 1 回だけ、**システム設定 → プライバシーとセキュリティ → このまま開く** から開く必要があります（macOS 14 以前では、Control キーを押しながらアプリをクリックし、**開く** を選びます）。2 回目以降は何もしなくても起動します。署名に Mac は必要なく、`kagari release --macos` は Linux や Windows でも実行できます。ダウンロードしたランタイムが arm64 の macOS 用実行ファイルでなかった場合は、アーカイブを書き出さずに終了ステータス 2 で止まります。
 
 ## `kagari fmt` {#kagari-fmt}
 
@@ -284,15 +284,15 @@ wrote target/release/macos/My Game.zip (13 files)
 kagari fmt [--check] [--manifest-path <PATH>] [FILES]...
 ```
 
-ソースファイルをその場で整形します。`FILES` がなければ、プロジェクトのルートファイルのディレクトリ（通常は `src/`）以下にあるすべての `.kis` と `.kix` ファイルを整形します。名前が `.` で始まるディレクトリは飛ばします。`FILES` を指定すると、そのファイルだけを整形し、プロジェクトは不要です。
+ソースファイルを整形し、その場で書き換えます。`FILES` を指定しなければ、プロジェクトのルートファイルがあるディレクトリ（通常は `src/`）以下の `.kis` と `.kix` ファイルをすべて整形します。名前が `.` で始まるディレクトリは対象外です。`FILES` を指定すると、そのファイルだけを整形します。この場合、プロジェクトは必要ありません。
 
 | オプション | 意味 |
 | ---------- | ---- |
-| `FILES` | プロジェクトのファイルの代わりに整形するファイル。`.kis` か `.kix` で終わる必要があります（そうでなければステータス 2）。 |
-| `--check` | 書き込まず、変更されるファイルごとに `would reformat <file>` を表示します。 |
-| `--manifest-path <PATH>` | プロジェクトの `kagari.toml`（`FILES` を指定したときは無視されます）。 |
+| `FILES` | プロジェクトのファイルの代わりに整形するファイル。拡張子は `.kis` か `.kix`（それ以外は終了ステータス 2）。 |
+| `--check` | ファイルを書き換えず、変更が必要なファイルごとに `would reformat <file>` と表示する。 |
+| `--manifest-path <PATH>` | プロジェクトの `kagari.toml`（`FILES` を指定したときは無視）。 |
 
-変更したファイルごとに `formatted <file>` を表示します。構文エラーのあるファイルは変更せず、`<file>: cannot format: N syntax error(s)` と、最初のエラーの位置とメッセージを表示します。`--check` で整形が必要なファイルが見つかったとき、または整形できないファイルがあったときはステータス 1 で終了します。整形のスタイルは[エディタ対応](./editors.md#the-formatter)で説明しています。
+整形したファイルごとに `formatted <file>` と表示します。構文エラーのあるファイルは書き換えず、`<file>: cannot format: N syntax error(s)` と、最初のエラーの位置とメッセージを表示します。`--check` で整形の必要なファイルが見つかった場合や、整形できないファイルがあった場合は、終了ステータス 1 で終わります。整形のスタイルについては[エディタ対応](./editors.md#the-formatter)で説明しています。
 
 ```sh
 kagari fmt
@@ -306,14 +306,14 @@ kagari fmt src/scenario/mod.kix
 kagari disasm <FILE> [--all]
 ```
 
-`.kagari` ファイルをデコード・検証し、その関数をテキストで表示します。コンパイラが何を生成したかを見たり、受け取ったファイルを調べたりするのに使います。
+`.kagari` ファイルをデコードして検証し、中の関数をテキストで表示します。コンパイラが何を出力したかを確かめたり、受け取ったファイルの中身を調べたりするときに使います。
 
 | オプション | 意味 |
 | ---------- | ---- |
-| `FILE` | `.kagari` ファイル。 |
-| `--all` | std の関数も表示します。既定ではゲーム自身の関数（パスが `crate::` で始まるもの）だけを表示します。 |
+| `FILE` | 対象の `.kagari` ファイル。 |
+| `--all` | 標準ライブラリの関数も表示する。既定では、ゲーム自身の関数（パスが `crate::` で始まるもの）だけを表示。 |
 
-ファイルが正しい `.kagari` ファイルでなければ、理由を stderr に出力してステータス 1 になります。テキスト形式は安定していません。
+正しい `.kagari` ファイルでなければ、理由を標準エラー出力に出し、終了ステータス 1 で終わります。出力するテキストの形式は安定していません。
 
 ```sh
 kagari disasm target/v0/game.kagari
@@ -325,7 +325,7 @@ kagari disasm target/v0/game.kagari
 kagari lsp
 ```
 
-言語サーバーを実行し、stdin と stdout で Language Server Protocol を話します。エディタが起動するもので、手で実行するものではありません。[エディタ対応](./editors.md#the-language-server)を参照してください。
+言語サーバーを起動します。通信には標準入出力上の Language Server Protocol を使います。エディタが起動するもので、手で実行することはありません。[エディタ対応](./editors.md#the-language-server)を参照してください。
 
 ## `kagari debug` {#kagari-debug}
 
@@ -335,7 +335,7 @@ kagari debug --window [--runtime <PATH>] [--manifest-path <PATH>] [--target <TAR
 kagari debug --attach <ADDRESS> [--manifest-path <PATH>] [--target <TARGET>] [--watch]
 ```
 
-プロジェクトをデバッグプロファイルでビルドし、その物語をデバッグします。既定ではクエリエンジン（ウィンドウなしのゲーム）上で、`--window` ではウィンドウで、`--attach` では `--debug-port` 付きですでに実行中のゲームでデバッグします。stdin から 1 行に 1 コマンドを読みます。`--watch` は、プロジェクトのファイルが変わるたびにゲームを再ビルドしてホットスワップします。オプションとコマンドは[デバッガー](./debugger.md#kagari-debug)にあります。入力が終わるか `quit` の後はステータス 0、プロジェクトをビルドできないかゲームに接続できないときはステータス 2 です。
+プロジェクトをデバッグプロファイルでビルドし、物語をデバッグします。既定ではクエリエンジン（ウィンドウを出さないゲーム）の上でデバッグし、`--window` を付けるとウィンドウ付きのゲームで、`--attach` を付けると `--debug-port` 付きで実行中のゲームに接続してデバッグします。コマンドは標準入力から 1 行に 1 つずつ読み込みます。`--watch` を付けると、プロジェクトのファイルが変わるたびにゲームを再ビルドし、ホットスワップします。オプションとコマンドの詳細は[デバッガー](./debugger.md#kagari-debug)にあります。入力が終わるか `quit` で終了すると終了ステータス 0、プロジェクトをビルドできない場合やゲームに接続できない場合は 2 になります。
 
 ## `kagari dap` {#kagari-dap}
 
@@ -343,4 +343,4 @@ kagari debug --attach <ADDRESS> [--manifest-path <PATH>] [--target <TARGET>] [--
 kagari dap
 ```
 
-デバッグアダプターを実行し、stdin と stdout で Debug Adapter Protocol を話します。エディタが起動するもので、手で実行するものではありません。launch と attach の設定は[デバッガー](./debugger.md#editors)にあります。
+デバッグアダプターを起動します。通信には標準入出力上の Debug Adapter Protocol を使います。エディタが起動するもので、手で実行することはありません。launch と attach の設定は[デバッガー](./debugger.md#editors)にあります。

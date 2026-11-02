@@ -93,7 +93,7 @@ because the guide is not published with the site.
   code blocks. A change to an English page changes its Japanese page in the same commit, and the
   reverse.
 - **Shared anchors.** Every heading of a `ja` file carries an explicit id equal to the English
-  file's anchor: `## エントリーシーン {#entry-scenes}`. The automatic anchor is mdBook's: the
+  file's anchor: `## 開始シーン {#entry-scenes}`. The automatic anchor is mdBook's: the
   heading text in lowercase, spaces replaced by `-`, punctuation such as backticks, `:`, `.` and
   `(` removed: ``## `std::screen` `` → `stdscreen`, ``## Rust integers, `Rat` and `Decimal` `` →
   `rust-integers-rat-and-decimal`. `remarkBookHeadingIds` (`docs/site/src/markdown.ts`) gives the
@@ -102,19 +102,39 @@ because the guide is not published with the site.
   too, and use the same id in `ja`. Links are then identical in both languages.
 - **Identical code blocks.** Code blocks are byte-identical between `en` and `ja`, including
   comments and string contents.
-- **Japanese style.** です・ます調; full-width `、。`; a half-width space between Japanese text and
-  inline code or ASCII words (`` `Screen` 型 ``, `Rust の`). Identifiers, keywords, attribute names
-  and diagnostic codes stay in ASCII code spans. Write natural Japanese, not a word-for-word
-  translation.
+- **Japanese style.** See [Japanese style](#japanese-style) below.
 - **Diagnostics.** Every diagnostic code has exactly one `## E1234 …` (or `## W…`) heading in
   `docs/site/src/content/docs/en/diagnostics/*.md` and one in the `ja` mirror. The
   `diagnostics_book` test in `kagari-lang` enforces it, so adding, removing or renumbering a code
   without updating both languages fails `cargo test`.
 
+### Japanese style
+
+The `ja` pages are written in Japanese, not translated into it: the same facts as the `en` page,
+phrased the way a Japanese engineer or visual-novel creator would write them. A 1:1 rendering of
+the English sentence is a defect even when every word is correct.
+
+- です・ます調; full-width `、。（）：`; a half-width space between Japanese text and inline code or
+  ASCII words (`` `Screen` 型 ``, `Rust の`), none before `、。（）`. Identifiers, keywords,
+  attribute names and diagnostic codes stay in ASCII code spans.
+- **Few katakana.** Use an established Japanese word when one exists (入門, not チュートリアル;
+  組み込み, not ビルトイン; 補助関数, not ヘルパー; 役割, not ロール; 既定, not デフォルト).
+  Keep katakana only for terms Japanese engineers and game developers normally write in katakana
+  (シーン, セーブ, エンティティ, シェーダー, クロージャ, トレイト, …) and for the rows of the
+  glossary below. Never coin katakana for English verbs (スポーンする → 生成する).
+- **Japanese sentence shape.** No 「〜は `E3002` です」 for "… is E3002" (write 「〜とエラー
+  `E3002` になります」); drop the "it / its / this" that Japanese leaves implicit; prefer active
+  voice to translated passives; no 「1 つの」 for an English article; split long English
+  sentences; avoid long の chains; tables and list items may end in nouns.
+- Headings are short noun phrases; link text to another page uses that page's Japanese title.
+- Sentences may be split, merged and reordered freely, as long as the facts, the heading
+  structure, the `{#id}`s and the code blocks match the English page.
+
 ### Glossary
 
-Use these renderings consistently. The Japanese edition of the engine proposal
-(`../proposal/vn-engine/proposal2-jp/vn-engine-proposal.typ`) is the tie-breaker.
+Use these renderings consistently. This table is authoritative; it deliberately prefers natural
+Japanese over the katakana of the Japanese edition of the engine proposal
+(`../proposal/vn-engine/proposal2-jp/vn-engine-proposal.typ`).
 
 | en | ja | en | ja |
 | -- | -- | -- | -- |
@@ -122,7 +142,7 @@ Use these renderings consistently. The Japanese edition of the engine proposal
 | scene | シーン | instant procedure | 即時手続き |
 | step | ステップ | choice (step) | 選択肢（ステップ） |
 | arm (of choice/match) | アーム | guard | ガード |
-| entry scene | エントリーシーン | ending | エンディング |
+| entry scene / entry arguments | 開始シーン / 開始引数 | ending | エンディング |
 | function kind / kind | 関数種別 / 種別 | finite type | 有限型 |
 | pushdown system | プッシュダウンシステム | reachability | 到達可能性 |
 | decidable | 決定可能 | termination | 停止性 |
@@ -131,27 +151,37 @@ Use these renderings consistently. The Japanese edition of the engine proposal
 | entity / component | エンティティ / コンポーネント | keyframe | キーフレーム |
 | consistency | 一貫性 | unbounded screen | 非有界な画面 |
 | constant expression | 定数式 | const evaluation | 定数評価 |
-| tabulation / folding | 表化 / 畳み込み | form (`s!` etc.) | フォーム |
-| text effect | テキスト効果 | mark | マーク |
-| timeline / cursor | タイムライン / カーソル | transition / tween / easing | トランジション / トゥイーン / イージング |
-| motion | モーション | layer / plane | レイヤー / プレーン |
-| save / trace / snapshot | セーブ / トレース / スナップショット | meta | メタ |
+| tabulation / folding | 表化 / 畳み込み | form (`s!` etc.) | 組み込み構文（`s!` 構文、UI 構文） |
+| text effect | テキスト効果 | mark / pause (text effect) | マーク / 一時停止 |
+| timeline / cursor | タイムライン / カーソル | transition / tween / easing | トランジション / 補間 / イージング |
+| motion | モーション | layer / plane | レイヤー / 描画面 |
+| save / trace / snapshot / replay | セーブ / トレース / スナップショット / 再生 | meta (`Meta<T>`) | メタデータ |
 | setting | 設定 | mode | モード |
 | game system | ゲームシステム | signal | シグナル |
 | closure | クロージャ | reference (`&T`) | 参照 |
 | second-class | 第二級 | value semantics | 値セマンティクス |
 | module / item | モジュール / アイテム | attribute | 属性 |
 | trait | トレイト | generics | ジェネリクス |
-| builtin | ビルトイン | prelude | プレリュード |
+| builtin | 組み込み | prelude | プレリュード |
 | asset | アセット | diagnostic | 診断 |
 | runtime | ランタイム | headless mode | ヘッドレスモード |
-| stability: Stable / Tentative / Planned | 安定 / 暫定 / 予定 | studio | スタジオ |
-| shader / role / effect value | シェーダー / ロール / 効果値 | mix / mask / paint | ミックス / マスク / ペイント |
-| local motion / transitional motion | ローカルモーション / 遷移モーション | travel / pose | トラベル / ポーズ |
+| stability: Stable / Tentative / Planned | 安定 / 暫定 / 予定 | studio | 制作者 |
+| shader / role / effect value | シェーダー / 役割 / 効果値 | mix / mask / paint | 合成 / マスク / 塗り |
+| local motion / transitional motion | ローカルモーション / 遷移モーション | travel / pose | 移動 / 姿勢 |
 | step ID | ステップ ID | analysis cache | 解析キャッシュ |
 | debug build / release build | デバッグビルド / リリースビルド | query engine | クエリエンジン |
 | debug adapter | デバッグアダプター | debugger | デバッガー |
 | breakpoint (step / instruction) | ブレークポイント（ステップ / 命令） | resize / box (of a layer) | リサイズ / 矩形 |
+| spawn / despawn | 生成 / 消去 | one-shot (sound) | 単発 |
+| Tutorial / STD Reference / Develop Guide | 入門 / 標準ライブラリ / 開発者ガイド | quick reference / recipes / guides | 早見表 / 実例 / 手引き |
+| architecture | 全体構成 | core concepts | 基本概念 |
+| desugar (a form) | 展開 | divergence (of a save) | 食い違い |
+| game view (`System::game`) | ゲーム画面 | interpolation (`{expr}` in `t![…]`) | 値の埋め込み |
+| constructor | コンストラクター | game screen (`game_screen!`) | 物語の画面 |
+
+Spelling of loanwords: コンパイラ, パラメータ, ハンドラ, ポインタ, エディタ (no ー); コンストラクター,
+デバッガー, アダプター, デコーダー, レンダラー, サーバー, ユーザー, プレイヤー, フィルター,
+キャラクター, レシーバー, ビルダー (with ー).
 
 A new term that recurs gets a row here and in the Reference's glossary appendix in the same change.
 

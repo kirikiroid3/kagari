@@ -2,14 +2,14 @@
 title: "std::shaders::mask"
 ---
 
-> **安定性:** 暫定 — 手続き的なマスクです。ランプや形を画素ごとに計算するので、マスクやトランジションにマスク画像が要りません。
+> **安定性:** 暫定 — 手続き的なマスクのシェーダー集です。グラデーションや図形をピクセルごとに計算するため、マスクにもトランジションにもマスク画像が要りません。
 
-[`Entity::mask`](./screen.md#entity-mask)、[`Paint::masked`](./screen-shader.md#paint-masked)、[`anim::masked`](./screen-anim.md#transition-constructors) のためのマスクシェーダーです。どの関数も、マスクする矩形（エンティティの矩形、ペイント、トランジションのレイヤー）の上で値が 0.0..=1.0 に収まる [`Mask`](./screen-shader.md#mask) を返します。
+[`Entity::mask`](./screen.md#entity-mask)、[`Paint::masked`](./screen-shader.md#paint-masked)、[`anim::masked`](./screen-anim.md#transition-constructors) で使うマスクシェーダーです。どの関数も [`Mask`](./screen-shader.md#mask) を返します。マスクの値は、マスクをかける矩形（エンティティの矩形、塗り、トランジションのレイヤーのいずれか）全体で 0.0..=1.0 の範囲に収まります。
 
-- アルファマスクとしては、1.0 で画素を残し、0.0 で隠します。
-- トランジションでは、値 × 255 が移動するしきい値以下になった画素から切り替わるので、値の小さい画素が先に切り替わります。`masked_with(…, reverse = true, …)` は逆向きに進みます。
+- アルファマスクとして使う場合、1.0 のピクセルは残り、0.0 のピクセルは隠れます。
+- トランジションでは、しきい値が徐々に上がっていき、値 × 255 がしきい値以下になったピクセルから切り替わります。そのため、値の小さいピクセルほど先に切り替わります。`masked_with(…, reverse = true, …)` を使うと逆向きに進みます。
 
-位置はマスクする矩形のピクセル単位で測るので、横長の矩形でも放射マスクは円のままです。
+位置はマスクをかける矩形のピクセル単位で測るので、横長の矩形でも放射状のマスクは真円のままです。
 
 ```kis
 use std::screen::{CENTER, degrees};
@@ -26,17 +26,17 @@ screen.entity(PORTRAIT).mask().change(Some(rounded_rect(24.0, 2.0))).apply_anima
 
 | 関数 | 引数 | 値 |
 | -------- | --------- | ----- |
-| [`linear(angle)`](#linear) | [`LinearMask`](#linear) | 矩形を横切るランプ |
-| [`radial(center)`](#radial) | [`RadialMask`](#radial) | 点からの距離 |
-| [`diamond(center)`](#diamond) | [`DiamondMask`](#diamond) | 点からの L1 距離 |
-| [`clock(center, start)`](#clock) | [`ClockMask`](#clock) | 点の周りの角度 |
-| [`stripes(angle, count)`](#stripes) | [`StripesMask`](#stripes) | 繰り返す線形ランプ |
-| [`checker(columns, rows)`](#checker) | [`CheckerMask`](#checker) | ランプの市松模様 |
-| [`noise(scale, seed)`](#noise) | [`NoiseMask`](#noise) | 滑らかな乱数値 |
-| [`gaussian(center, sigma)`](#gaussian) | [`GaussianMask`](#gaussian) | ガウスの光点 |
+| [`linear(angle)`](#linear) | [`LinearMask`](#linear) | 矩形を横切る線形のグラデーション |
+| [`radial(center)`](#radial) | [`RadialMask`](#radial) | ある点からの距離 |
+| [`diamond(center)`](#diamond) | [`DiamondMask`](#diamond) | ある点からの L1 距離 |
+| [`clock(center, start)`](#clock) | [`ClockMask`](#clock) | ある点を中心とした角度 |
+| [`stripes(angle, count)`](#stripes) | [`StripesMask`](#stripes) | 線形のグラデーションの繰り返し |
+| [`checker(columns, rows)`](#checker) | [`CheckerMask`](#checker) | グラデーションを市松模様に並べたもの |
+| [`noise(scale, seed)`](#noise) | [`NoiseMask`](#noise) | 滑らかな乱数 |
+| [`gaussian(center, sigma)`](#gaussian) | [`GaussianMask`](#gaussian) | ガウス状の光の玉 |
 | [`rounded_rect(radius, feather)`](#rounded_rect) | [`RoundedRectMask`](#rounded_rect) | 角丸矩形 |
 
-以下の各節に、引数の構造体、シェーダー定数、関数を載せます。関数は `const fn` で、ビルトインではありません。式の中で、`p` は矩形内の画素の位置、`size` は矩形のサイズ、`c = center × size` です。
+以下の各節では、引数の構造体、シェーダーの定数、関数をまとめて示します。関数はどれも `const fn` で、組み込みではありません。式の中の `p` は矩形内でのピクセルの位置、`size` は矩形の大きさで、`c = center × size` とします。
 
 ## 線形 {#linear}
 
@@ -49,9 +49,9 @@ pub const LINEAR: MaskShader<LinearMask> = asset("shaders/mask/linear.wgsl");
 pub const fn linear(angle: Angle) -> Mask
 ```
 
-線形のランプです。方向 `angle` の始まる辺で 0.0、反対の辺で 1.0 になります。0° は左から右、90° は上から下です。`d = (cos angle, sin angle)`、`e = (|d.x|·w + |d.y|·h) / 2` とすると、値は `dot(p − size/2, d) / (2e) + 0.5` です。
+線形のグラデーションです。`angle` の方向の始点側の辺で 0.0、反対側の辺で 1.0 になります。0° で左から右、90° で上から下に向かいます。`d = (cos angle, sin angle)`、`e = (|d.x|·w + |d.y|·h) / 2` とすると、値は `dot(p − size/2, d) / (2e) + 0.5` です。
 
-## 放射 {#radial}
+## 放射状 {#radial}
 
 ```kis
 #[shader_arg]
@@ -62,7 +62,7 @@ pub const RADIAL: MaskShader<RadialMask> = asset("shaders/mask/radial.wgsl");
 pub const fn radial(center: Anchor) -> Mask
 ```
 
-円形のランプです。`center`（矩形に対する割合）で 0.0、最も遠い角で 1.0 になります。トランジションでは `center` から円が開きます。
+円形のグラデーションです。`center`（矩形の大きさに対する割合）で 0.0、そこから最も遠い角で 1.0 になります。トランジションに使うと、`center` から円が広がるように切り替わります。
 
 ## ひし形 {#diamond}
 
@@ -75,9 +75,9 @@ pub const DIAMOND: MaskShader<DiamondMask> = asset("shaders/mask/diamond.wgsl");
 pub const fn diamond(center: Anchor) -> Mask
 ```
 
-`radial` と同様ですが、距離を `|dx| + |dy|` で測ります。表示される範囲はひし形に広がります。
+`radial` と同じですが、距離を `|dx| + |dy|` で測ります。そのため、ひし形に広がるように現れます。
 
-## 時計 {#clock}
+## 時計回り {#clock}
 
 ```kis
 #[shader_arg]
@@ -89,7 +89,7 @@ pub const CLOCK: MaskShader<ClockMask> = asset("shaders/mask/clock.wgsl");
 pub const fn clock(center: Anchor, start: Angle) -> Mask
 ```
 
-時計回りのワイプです。`start` から `center` の周りを時計回りに進みながら 0.0 から 1.0 へ上がります（0° は右、90° は下を向くので、−90° は 12 時の位置から始まります）。
+時計の針のように回るワイプです。`center` を中心に、`start` の角度から時計回りに進むにつれて 0.0 から 1.0 へ増えます。0° が右、90° が下を指すので、−90° を指定すると 12 時の位置から始まります。
 
 ## 縞 {#stripes}
 
@@ -103,7 +103,7 @@ pub const STRIPES: MaskShader<StripesMask> = asset("shaders/mask/stripes.wgsl");
 pub const fn stripes(angle: Angle, count: u32) -> Mask
 ```
 
-`count` 本の縞で、それぞれが `angle` に沿った `linear` のランプです。任意の方向のブラインドになります。`count` が 0 なら 1 として扱います。
+`count` 本の縞です。各縞は `angle` 方向の `linear` のグラデーションになっているので、好きな向きのブラインドを作れます。`count` に 0 を指定すると 1 として扱います。
 
 ## 市松 {#checker}
 
@@ -117,7 +117,7 @@ pub const CHECKER: MaskShader<CheckerMask> = asset("shaders/mask/checker.wgsl");
 pub const fn checker(columns: u32, rows: u32) -> Mask
 ```
 
-`columns` × `rows` のマスの市松模様で、各マスは左から右へのランプです。一方の色のマスが 0.0..0.5、もう一方が 0.5..1.0 を受け持つので、トランジションは一方の色のマスを拭き取ってから、もう一方を拭き取ります。数が 0 なら 1 として扱います。
+`columns` × `rows` マスの市松模様です。各マスは左から右へのグラデーションです。片方の色のマスが 0.0..0.5、もう片方の色のマスが 0.5..1.0 の範囲を受け持つため、トランジションでは片方の色のマスが先に切り替わり、続いてもう片方が切り替わります。列数や行数に 0 を指定すると 1 として扱います。
 
 ## ノイズ {#noise}
 
@@ -131,7 +131,7 @@ pub const NOISE: MaskShader<NoiseMask> = asset("shaders/mask/noise.wgsl");
 pub const fn noise(scale: Decimal, seed: u32) -> Mask
 ```
 
-`scale` ピクセル（最低 1 ピクセル）のマスの格子上の滑らかな乱数値で、`seed` で変わります。トランジションではディゾルブになります。`scale` が小さいと細かい粒に、大きいと柔らかいまだらになります。
+一辺 `scale` ピクセル（最小 1 ピクセル）の格子の上で滑らかに変化する乱数です。`seed` を変えると模様が変わります。トランジションに使うとディゾルブになります。`scale` が小さいと細かい粒状に、大きいと柔らかいまだら状になります。
 
 ## ガウス {#gaussian}
 
@@ -145,7 +145,7 @@ pub const GAUSSIAN: MaskShader<GaussianMask> = asset("shaders/mask/gaussian.wgsl
 pub const fn gaussian(center: Anchor, sigma: Decimal) -> Mask
 ```
 
-`center` で 1.0 となり、`exp(−|p − c|² / (2·sigma²))`（`sigma` はピクセル単位）で減衰します。ビネットやスポットライトになります。`sigma` が 0.0 以下なら、どこでも 0.0 です。
+`center` で 1.0 になり、そこから `exp(−|p − c|² / (2·sigma²))` に従って減っていきます（`sigma` はピクセル単位）。周辺減光（ビネット）やスポットライトに使えます。`sigma` が 0.0 以下のときは、どこでも 0.0 になります。
 
 ## 角丸矩形 {#rounded_rect}
 
@@ -159,4 +159,4 @@ pub const ROUNDED_RECT: MaskShader<RoundedRectMask> = asset("shaders/mask/rounde
 pub const fn rounded_rect(radius: Decimal, feather: Decimal) -> Mask
 ```
 
-角を `radius` ピクセルで丸めた矩形の内側で 1.0、外側で 0.0 となり、境界をまたぐ `feather` ピクセルでぼかされます。立ち絵やパネルの角を丸めるのに使います。
+角を半径 `radius` ピクセルで丸めた矩形の内側で 1.0、外側で 0.0 になります。境界は `feather` ピクセルの幅でなめらかにぼかします。立ち絵やパネルの角を丸めたいときに使います。

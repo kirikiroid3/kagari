@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="100%" style="max-width:760px" role="img" aria-label="モジュールツリーと各モジュールのファイル：ルートファイル src/main.kix が characters、story、ui を宣言し、story.kix が story/day1.kix の story::day1 を、ui/mod.kis が ui/menu.kis の ui::menu を宣言する">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="100%" style="max-width:760px" role="img" aria-label="モジュールの木と各モジュールのファイル：ルートファイル src/main.kix が characters、story、ui を宣言し、さらに story.kix が story::day1（story/day1.kix）を、ui/mod.kis が ui::menu（ui/menu.kis）を宣言しています">
 <style>
 .kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
 .kg-hl{fill:var(--quote-bg,#f6f7f6);stroke:var(--links,#2f5d8a);stroke-width:2}

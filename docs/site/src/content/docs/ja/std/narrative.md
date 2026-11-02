@@ -2,17 +2,23 @@
 title: "std::narrative"
 ---
 
-> **安定性:** 安定 — ステップ、乱択、メタフィールド、実行中の物語に対するシステムの視点。
+> **安定性:** 安定 — ステップ、乱択、メタフィールド、ゲームシステムから見た実行中の物語。
 
-`std::narrative` は、ステップの基本操作 `push_step`、フォーム `s!(…)` と `choice!{…}` が作る 2 つの標準ステップ `Say` と `Choice`、物語の乱択 `rng_choose`、メタフィールド（`Meta`）、そしてゲームシステムが実行中のゲームを見るためのハンドル `Narrative` を宣言します。
+`std::narrative` では次のものを宣言しています。
 
-アイテムの種別は 3 つです。
+- ステップの基本操作 `push_step`
+- `s!(…)` 構文と `choice!{…}` 構文が作る標準のステップ `Say` と `Choice`
+- 物語の中の乱択 `rng_choose`
+- メタフィールド（`Meta`）
+- ゲームシステムが実行中のゲームに触れるためのハンドル `Narrative`
 
-- `pushdown fn`：`push_step`、`rng_choose`、`Meta::write` — 物語のコード
-- `fn`：`Narrative` のすべてのメソッド、`Meta::get`、`Meta::set` — システムのコード
-- `const fn`：`meta` — メタフィールドの初期化子
+アイテムの種別は次の 3 通りです。
 
-このモジュールは [`std::narrative::text`](./narrative-text.md) の 3 つのアイテムを再エクスポートします。
+- `pushdown fn`：`push_step`、`rng_choose`、`Meta::write`（物語のコード）
+- `fn`：`Narrative` の全メソッド、`Meta::get`、`Meta::set`（システムのコード）
+- `const fn`：`meta`（メタフィールドの初期化子）
+
+また、[`std::narrative::text`](./narrative-text.md) の 3 つのアイテムを再エクスポートしています。
 
 ```kis
 pub mod text;
@@ -20,25 +26,25 @@ pub mod text;
 pub use self::text::{Mark, Text, TextEffect};
 ```
 
-ステップ、シーン、物語の関係は [ステップ](../reference/concepts/steps.md) と [シーンと即時手続き](../reference/concepts/scenes.md) で説明しています。
+ステップ、シーン、物語の関係については [ステップ](../reference/concepts/steps.md) と [シーンと即時手続き](../reference/concepts/scenes.md) を参照してください。
 
 ## 概要 {#overview}
 
 |アイテム|種類|概要|
 |---|---|---|
-|[`Step`](#trait-step)|ビルトイントレイト|物語が中断するステップ|
-|[`push_step`](#function-push_steps)|ビルトイン `pushdown fn`|ステップを実行する|
-|[`rng_choose`](#function-rng_choose)|ビルトイン `pushdown fn`|乱数で値を選ぶ|
+|[`Step`](#trait-step)|組み込みのトレイト|物語を中断させるステップ|
+|[`push_step`](#function-push_steps)|組み込みの `pushdown fn`|ステップを実行する|
+|[`rng_choose`](#function-rng_choose)|組み込みの `pushdown fn`|乱数で値を選ぶ|
 |[`Say`](#struct-say)|構造体|`s!(…)` で書くステップ|
 |[`Choice`](#struct-choicea-n)|構造体|`choice!{…}` で書くステップ|
 |[`ChoiceArm`](#struct-choicearma)|構造体|`Choice` のアーム|
-|[`Meta<T>`](#struct-metat)|ビルトイン構造体|セーブの外にある永続的な大域値|
-|[`meta`](#function-metainit)|ビルトイン `const fn`|メタフィールドを宣言する|
+|[`Meta<T>`](#struct-metat)|組み込みの構造体|セーブとは別に永続化される大域値|
+|[`meta`](#function-metainit)|組み込みの `const fn`|メタフィールドを宣言する|
 |[時間付き入力](#timed-input)|—|予定|
-|[`Narrative`](#struct-narrative)|ビルトイン構造体|実行中のゲームへのハンドル|
-|[`Line`](#struct-line)、[`Arm`](#struct-arm)、[`MenuArm`](#struct-menuarm)、[`Menu`](#struct-menu)、[`HudState`](#struct-hudstate)、[`Entry`](#enum-entry)、[`PlayMode`](#enum-playmode)|レコード|`Narrative` が返すもの|
+|[`Narrative`](#struct-narrative)|組み込みの構造体|実行中のゲームへのハンドル|
+|[`Line`](#struct-line)、[`Arm`](#struct-arm)、[`MenuArm`](#struct-menuarm)、[`Menu`](#struct-menu)、[`HudState`](#struct-hudstate)、[`Entry`](#enum-entry)、[`PlayMode`](#enum-playmode)|レコード|`Narrative` が返す値|
 
-## Trait: `Step` {#trait-step}
+## トレイト：`Step` {#trait-step}
 
 ```kis
 #[builtin] pub trait Step {
@@ -46,36 +52,36 @@ pub use self::text::{Mark, Text, TextEffect};
 }
 ```
 
-物語が中断するステップです。`Output` は物語が再開するときに受け取る型です。ステップは `Say` と `Choice` だけで、ゲームが `Step` を実装することはできません。
+物語を中断させるステップです。`Output` は、物語が再開するときに受け取る値の型です。ステップは `Say` と `Choice` の 2 つだけで、ゲーム側で `Step` を実装することはできません。
 
-- Kind: — · Builtin: yes
+- 種別：— · 組み込み：はい
 
-## Function: `push_step(s)` {#function-push_steps}
+## 関数：`push_step(s)` {#function-push_steps}
 
 ```kis
 #[builtin] pub pushdown fn push_step<S: Step>(s: S) -> S::Output;
 ```
 
 - `s` `S` — 表示するステップ。
-- Returns: `S::Output` — プレイヤーの入力が運んだもの：`Say` なら `()`、`Choice` なら選ばれたアームの値。
-- Kind: `pushdown fn` · Builtin: yes
+- 戻り値：`S::Output` — プレイヤーの入力の結果。`Say` なら `()`、`Choice` なら選ばれたアームの値。
+- 種別：`pushdown fn` · 組み込み：はい
 
-`push_step` はステップを表示し、入力を待ち、入力が運んだものを返します。呼べるのはシーンだけで、シーン外のステップは [`E3002`](../diagnostics/kinds.md#e3002) です。通常はフォーム `s!(…)` と `choice!{…}` を通して書きます。
+ステップを表示して入力を待ち、入力の結果を返します。呼び出せるのはシーンの中だけで、シーン以外でステップを使うとエラー [`E3002`](../diagnostics/kinds.md#e3002) になります。ふつうは直接呼ばず、`s!(…)` 構文や `choice!{…}` 構文で書きます。
 
-## Function: `rng_choose()` {#function-rng_choose}
+## 関数：`rng_choose()` {#function-rng_choose}
 
 ```kis
 #[builtin] pub pushdown fn rng_choose<T: RandChoose>() -> T;
 ```
 
-- `T` — フィールドを持たない列挙型、または `Int<lo, hi>`。
-- Returns: `T` — 物語の擬似乱数生成器（xoroshiro128++）が選んだ値。どの値も等確率です。
-- Kind: `pushdown fn` · Builtin: yes
+- `T` — フィールドのない列挙型、または `Int<lo, hi>`。
+- 戻り値：`T` — 物語の擬似乱数生成器（xoroshiro128++）が選んだ値。どの値も等確率で選ばれます。
+- 種別：`pushdown fn` · 組み込み：はい
 
-`rng_choose::<T>()` は、フィールドを持たない列挙型のバリアント、または `Int<lo, hi>` の整数を 1 つ選びます。呼べるのはシーンだけです（[`E3024`](../diagnostics/kinds.md#e3024)）。
+`rng_choose::<T>()` は、フィールドのない列挙型のバリアントか、`Int<lo, hi>` の範囲の整数を 1 つ選びます。呼び出せるのはシーンの中だけです（[`E3024`](../diagnostics/kinds.md#e3024)）。
 
-- 擬似乱数生成器の状態は物語の状態の一部で、そのシードはセーブに含まれます。そのため、セーブをロードするとすべての乱択が再現されます。
-- 物語の解析は、各乱択を `T` のすべての値にわたる自由な選択として扱います：すべての結果を扱う必要があります。
+- 擬似乱数生成器の状態は物語の状態に含まれ、シードもセーブに保存されます。そのため、セーブをロードすると乱択の結果はすべて同じになります。
+- 物語の解析では、乱択を「`T` のどの値にもなりうる自由な選択」として扱います。したがって、すべての結果に対応しておく必要があります。
 
 ```kix
 enum Coin { Heads, Tails }
@@ -89,9 +95,9 @@ pushdown fn Toss() {
 }
 ```
 
-乱択はプレイヤーを待って中断しません：中断が `rng_choose` だけのループは、ステップを通過しません（[`E5001`](../diagnostics/analysis.md#e5001)）。
+乱択ではプレイヤーの入力を待たないので、物語は中断しません。`rng_choose` しか含まないループはステップを通らないため、エラーになります（[`E5001`](../diagnostics/analysis.md#e5001)）。
 
-## Struct: `Say` {#struct-say}
+## 構造体：`Say` {#struct-say}
 
 ```kis
 pub struct Say {
@@ -107,14 +113,14 @@ impl Step for Say {
 }
 ```
 
-- `who` `Option<Text>` — 話者名。`None` ならメッセージは地の文です。
-- `voice` `Option<VoiceAsset>` — テキストと同時に始まり、行に結び付くボイス。[`std::screen::audio`](./screen-audio.md) を参照してください。
-- `render` `Option<Render>` — ステップに入るときに実行されるレンダー。[`std::screen`](./screen.md) を参照してください。
+- `who` `Option<Text>` — 話者名。`None` なら地の文になります。
+- `voice` `Option<VoiceAsset>` — テキストと同時に再生が始まり、その行に結び付くボイス。[`std::screen::audio`](./screen-audio.md) を参照してください。
+- `render` `Option<Render>` — ステップに入るときに実行するレンダー。[`std::screen`](./screen.md) を参照してください。
 - `text` `Option<Text>` — メッセージ。
-- `history` `Option<Text>` — `text` の代わりにバックログに記録するテキスト。`None` なら、埋め込んだ値を表示時のまま含めた `text` を記録します。
-- Kind: — · Builtin: no
+- `history` `Option<Text>` — `text` の代わりにバックログへ記録するテキスト。`None` なら `text` を記録し、埋め込んだ値は表示したときの値のまま残ります。
+- 種別：— · 組み込み：いいえ
 
-`s!(who = …, voice = …, render = …, history = …, t![…])` は `push_step(Say { … })` で、省略した属性はそれぞれ `None` になります。`Say` は `NextStep`（クリックやキー入力）を待ちます。`NextStep` は情報を運ばず、セーブにも記録されません。
+`s!(who = …, voice = …, render = …, history = …, t![…])` は `push_step(Say { … })` と同じで、省略した属性は `None` になります。`Say` は `NextStep`（クリックやキー入力）を待ちます。`NextStep` は何の情報も持たず、セーブにも記録されません。
 
 ```kix
 use std::narrative::text::speed;
@@ -128,7 +134,7 @@ pushdown fn Morning() {
 }
 ```
 
-## Struct: `Choice<A, N>` {#struct-choicea-n}
+## 構造体：`Choice<A, N>` {#struct-choicea-n}
 
 ```kis
 pub struct Choice<A, const N: usize> {
@@ -142,20 +148,20 @@ impl<A, const N: usize> Step for Choice<A, N> {
 }
 ```
 
-- `id` `Text` — 選択肢の安定した id。セーブは選択をこの id で記録します。
-- `render` `Option<Render>` — ステップに入るときに実行されるレンダー。
-- `arms` `[ChoiceArm<A>; N]` — 表示順のアーム。
-- Kind: — · Builtin: no
+- `id` `Text` — 選択肢の固定の id。セーブにはこの id で選択を記録します。
+- `render` `Option<Render>` — ステップに入るときに実行するレンダー。
+- `arms` `[ChoiceArm<A>; N]` — 表示順に並べたアーム。
+- 種別：— · 組み込み：いいえ
 
-`choice!{ id = …, render = …, t![…] if guard => V, … }` は `push_step(Choice { … })` です。各アームは `ChoiceArm` になり、その `shown` はアームのガード、ガードがなければ `true` です。ステップは選ばれたアームの `value` を返します。
+`choice!{ id = …, render = …, t![…] if guard => V, … }` は `push_step(Choice { … })` と同じです。各アームは `ChoiceArm` になり、`shown` にはアームのガードが入ります（ガードがなければ `true`）。ステップは選ばれたアームの `value` を返します。
 
-- `id` は文字列リテラルで、関数内で一意でなければなりません（[`E3019`](../diagnostics/kinds.md#e3019)）。
-- `arms` は `ChoiceArm { … }` レコードの配列リテラルでなければなりません。各値はフィールドを持たない列挙型のバリアントで、各バリアントは 1 回までしか現れません（[`E3020`](../diagnostics/kinds.md#e3020)）。
-- すべてのアームが同時に隠れうる選択肢は、物語解析のエラーです（[`E5003`](../diagnostics/analysis.md#e5003)）。
+- `id` は文字列リテラルで、関数の中で重複してはいけません（[`E3019`](../diagnostics/kinds.md#e3019)）。
+- `arms` は `ChoiceArm { … }` を並べた配列リテラルでなければなりません。値はフィールドのない列挙型のバリアントで、同じバリアントを 2 回以上使うことはできません（[`E3020`](../diagnostics/kinds.md#e3020)）。
+- すべてのアームが同時に隠れる可能性のある選択肢は、物語の解析でエラーになります（[`E5003`](../diagnostics/analysis.md#e5003)）。
 
 ### 無効なアーム {#disabled-arms}
 
-無効なアームはグレーアウトして表示され、選べません。表示専用です：値を持たず、`choice!` の一部でもないので、物語解析からは見えません。選択肢のレンダーがステップの選択肢メニュー（`ChoiceMenu::disabled_arm`、[`std::screen`](./screen.md) を参照）を通して追加し、どのレンダーで追加するかを物語が選びます。
+無効なアームはグレーアウトして表示され、選ぶことはできません。表示のためだけのもので、値を持たず `choice!` にも含まれないため、物語の解析からは見えません。選択肢のレンダーがステップの選択肢メニュー（`ChoiceMenu::disabled_arm`。[`std::screen`](./screen.md) を参照）を通して追加します。どのレンダーを使うかは物語が決めます。
 
 ```kix
 let place = choice!{
@@ -176,9 +182,9 @@ const fn map_leave_locked(mut screen: Screen) -> Screen {
 }
 ```
 
-`disabled_arm(at, text)` は、表示されるリストの位置 `at`（リストの長さに丸め込まれます）にアームを挿入します。
+`disabled_arm(at, text)` は、表示中のリストの位置 `at` にアームを挿入します。`at` がリストの長さを超える場合は末尾に入ります。
 
-## Struct: `ChoiceArm<A>` {#struct-choicearma}
+## 構造体：`ChoiceArm<A>` {#struct-choicearma}
 
 ```kis
 pub struct ChoiceArm<A> {
@@ -189,34 +195,34 @@ pub struct ChoiceArm<A> {
 ```
 
 - `text` `Text` — アームのラベル。
-- `shown` `bool` — アームを表示するかどうか：アームのガード、または `true`。
+- `shown` `bool` — アームを表示するかどうか。アームのガード、ガードがなければ `true`。
 - `value` `A` — アームが選ばれたときにステップが返す値。
-- Kind: — · Builtin: no
+- 種別：— · 組み込み：いいえ
 
-## Struct: `Meta<T>` {#struct-metat}
+## 構造体：`Meta<T>` {#struct-metat}
 
 ```kis
 #[builtin] pub struct Meta<T>;
 ```
 
-セーブの外にある永続的な大域値です。「ルート A をクリアした」「トゥルーエンドを見た」などに使います。`meta(init)` を保持する不変の `static` がメタフィールドを宣言します。
+セーブとは別に永続化される大域値です。「ルート A をクリアした」「トゥルーエンドを見た」といった情報に使います。メタフィールドは、`meta(init)` を値とする不変の `static` として宣言します。
 
-- Kind: — · Builtin: yes
+- 種別：— · 組み込み：はい
 
 ```kis
 static CLEARED_AZUSA: Meta<bool> = meta(false);
 ```
 
-- 書き込みはロードや巻き戻しで元に戻りません。
-- 物語はメタフィールドに書き込めますが、読み返すことはできません。メタが物語に届くのは、エントリーシーンの引数を通してだけです。
-- `const` のコードからメタは見えません（[`E3013`](../diagnostics/kinds.md#e3013)）。
-- `Meta` ハンドルは不変の `static` の初期化子にしかなれません（[`E3011`](../diagnostics/kinds.md#e3011)、[`E4007`](../diagnostics/eval.md#e4007)）。
+- 書き込んだ値は、ロードや巻き戻しをしても元に戻りません。
+- 物語からメタフィールドに書き込むことはできますが、読むことはできません。メタデータを物語に渡す方法は、開始シーンの引数だけです。
+- `const` のコードからはメタデータを参照できません（[`E3013`](../diagnostics/kinds.md#e3013)）。
+- `Meta` ハンドルは不変の `static` の初期化子にしか書けません（[`E3011`](../diagnostics/kinds.md#e3011)、[`E4007`](../diagnostics/eval.md#e4007)）。
 
 |メソッド|種別|用途|
 |---|---|---|
-|`get()`|`fn`|システムのコードが読む。リアクティブ|
-|`set(v)`|`fn`|システムのコードが書く|
-|`write(v)`|`pushdown fn`|物語が書く|
+|`get()`|`fn`|システムのコードから読む（リアクティブ）|
+|`set(v)`|`fn`|システムのコードから書く|
+|`write(v)`|`pushdown fn`|物語から書く|
 
 ### `Meta::get(&self)` {#metagetself}
 
@@ -224,8 +230,8 @@ static CLEARED_AZUSA: Meta<bool> = meta(false);
 #[builtin] pub fn get(&self) -> T;
 ```
 
-- Returns: `T` — 現在の値。リアクティブです：これを読む UI は値が変わると更新されます。
-- Kind: `fn` · Builtin: yes
+- 戻り値：`T` — 現在の値。リアクティブなので、この値を読む UI は値が変わると更新されます。
+- 種別：`fn` · 組み込み：はい
 
 ### `Meta::set(&self, value)` {#metasetself-value}
 
@@ -234,7 +240,7 @@ static CLEARED_AZUSA: Meta<bool> = meta(false);
 ```
 
 - `value` `T` — 新しい値。
-- Kind: `fn` · Builtin: yes
+- 種別：`fn` · 組み込み：はい
 
 システムのコードから値を設定します。
 
@@ -245,7 +251,7 @@ static CLEARED_AZUSA: Meta<bool> = meta(false);
 ```
 
 - `value` `T` — 新しい値。
-- Kind: `pushdown fn` · Builtin: yes
+- 種別：`pushdown fn` · 組み込み：はい
 
 物語から値を設定します。
 
@@ -256,33 +262,33 @@ pushdown fn AzusaEnding() {
 }
 ```
 
-## Function: `meta(init)` {#function-metainit}
+## 関数：`meta(init)` {#function-metainit}
 
 ```kis
 #[builtin] pub const fn meta<T>(init: T) -> Meta<T>;
 ```
 
-- `init` `T` — メタファイルに値がないときに使う値。
-- Returns: `Meta<T>` — メタフィールド。
-- Kind: `const fn` · Builtin: yes
+- `init` `T` — メタファイルに値がないときに使う初期値。
+- 戻り値：`Meta<T>` — メタフィールド。
+- 種別：`const fn` · 組み込み：はい
 
 ## 時間付き入力 {#timed-input}
 
 > **安定性:** 予定。
 
-時間付き入力や、物語が駆動するオートプレイにはまだ対応していません。予定している API は、`fn` のコードで一定の `Duration` の後にクロージャを 1 回だけ呼ぶワンショットのタイマーで、JavaScript の `setTimeout` に近いものです。繰り返すタイマー（`setInterval` 相当）は用意しません。
+時間制限付きの入力や、物語側から制御するオートプレイにはまだ対応していません。予定しているのは、`fn` のコードから使う単発のタイマーです。指定した `Duration` が過ぎたらクロージャを 1 回だけ呼ぶもので、JavaScript の `setTimeout` に近いものです。繰り返し呼ぶタイマー（`setInterval` に相当するもの）は用意しません。
 
-## Struct: `Narrative` {#struct-narrative}
+## 構造体：`Narrative` {#struct-narrative}
 
 ```kis
 #[builtin] pub struct Narrative;
 ```
 
-実行中のゲームへのハンドルで、ゲームビューとゲームオーバーレイに渡されます。読み取りはリアクティブです。
+実行中のゲームへのハンドルで、ゲーム画面とゲームオーバーレイに渡されます。読み取りはリアクティブです。
 
-- Kind: — · Builtin: yes
+- 種別：— · 組み込み：はい
 
-システムが実行中のゲームを見るのは、このハンドルを通してだけです。内部表現は隠されているので、システムのコードが物語変数を読むことはできません。ハンドルはゲームビュー（`System::game: fn(Narrative) -> Element`）とゲームオーバーレイ（`fn(Narrative) -> GameOverlay`）にしか存在しないため、実行中のゲームを必要とする操作はすべて、型の上でハンドルを必要とします。メソッドはすべて `fn` です。
+ゲームシステムが実行中のゲームに触れる手段は、このハンドルだけです。内部は隠されているので、システムのコードから物語変数を読むことはできません。ハンドルを受け取れるのはゲーム画面（`System::game: fn(Narrative) -> Element`）とゲームオーバーレイ（`fn(Narrative) -> GameOverlay`）だけなので、実行中のゲームを必要とする操作には、型の上でもハンドルが必要になります。メソッドはすべて `fn` です。
 
 |メソッド|効果|
 |---|---|
@@ -292,13 +298,13 @@ pushdown fn AzusaEnding() {
 |`history()`|バックログ（古い順）|
 |`mode()`、`set_mode(m)`|プレイモード|
 |`advance()`|物語に `NextStep` を送る|
-|`select(arm)`|現在の選択肢の表示中のアームを選ぶ|
-|`save(slot)`|実行中のゲームを `slot` に書き込む|
-|`rewind(i)`|物語を `history()` の `i` 番目のエントリーまで戻す|
+|`select(arm)`|現在の選択肢で表示中のアームを選ぶ|
+|`save(slot)`|実行中のゲームを `slot` に保存する|
+|`rewind(i)`|物語を `history()` の `i` 番目の項目まで巻き戻す|
 |`call(o)`|ゲームオーバーレイ `o` を開く|
 |`replay_voice(v)`|ボイスバスで `v` をもう一度再生する|
 
-> **安定性:** 予定 — NVL モード。複数の行が改ページまで画面に残る全画面テキストモードは、まだ設計されていません。テキストウィンドウの表示内容と、バックログや `Narrative::line` によるステップの記述が変わる予定です。
+> **安定性:** 予定 — NVL モード。複数の行を改ページまで画面に残す全画面のテキスト表示は、まだ設計していません。対応すると、テキストウィンドウの表示内容や、バックログと `Narrative::line` でのステップの扱いが変わる予定です。
 
 ### `Narrative::line(&self)` {#narrativelineself}
 
@@ -306,8 +312,8 @@ pushdown fn AzusaEnding() {
 #[builtin] pub fn line(&self) -> Option<Line>;
 ```
 
-- Returns: `Option<Line>` — 表示中の行。選択肢の間や最初のステップの前は `None`。
-- Kind: `fn` · Builtin: yes
+- 戻り値：`Option<Line>` — 表示中の行。選択肢の表示中や最初のステップの前は `None`。
+- 種別：`fn` · 組み込み：はい
 
 ### `Narrative::menu(&self)` {#narrativemenuself}
 
@@ -315,8 +321,8 @@ pushdown fn AzusaEnding() {
 #[builtin] pub fn menu(&self) -> Option<Menu>;
 ```
 
-- Returns: `Option<Menu>` — 無効なアームを含む、表示中の選択肢。選択肢の外では `None`。
-- Kind: `fn` · Builtin: yes
+- 戻り値：`Option<Menu>` — 表示中の選択肢（無効なアームも含む）。選択肢の表示中でなければ `None`。
+- 種別：`fn` · 組み込み：はい
 
 ### `Narrative::hud(&self)` {#narrativehudself}
 
@@ -324,8 +330,8 @@ pushdown fn AzusaEnding() {
 #[builtin] pub fn hud(&self) -> HudState;
 ```
 
-- Returns: `HudState` — ゲームビューが描く、現在のステップの Hud。
-- Kind: `fn` · Builtin: yes
+- 戻り値：`HudState` — 現在のステップの Hud。ゲーム画面がこれを描きます。
+- 種別：`fn` · 組み込み：はい
 
 ### `Narrative::history(&self)` {#narrativehistoryself}
 
@@ -333,10 +339,10 @@ pushdown fn AzusaEnding() {
 #[builtin] pub fn history(&self) -> Vec<Entry>;
 ```
 
-- Returns: `Vec<Entry>` — 古い順のバックログ。
-- Kind: `fn` · Builtin: yes
+- 戻り値：`Vec<Entry>` — 古い順に並んだバックログ。
+- 種別：`fn` · 組み込み：はい
 
-バックログの長さは `System::backlog` で制限され、古いエントリーから捨てられます。`Entry::Line` は表示時のままのテキスト、またはステップに `history` があればそのテキストを保持します。`Entry::Chosen` は選ばれたアームのテキストを保持します。
+バックログの長さの上限は `System::backlog` で決まり、超えた分は古い項目から捨てます。`Entry::Line` には表示したときのテキストが入ります。ステップに `history` があれば、そちらのテキストが入ります。`Entry::Chosen` には選ばれたアームのテキストが入ります。
 
 ### `Narrative::mode(&self)` {#narrativemodeself}
 
@@ -344,8 +350,8 @@ pushdown fn AzusaEnding() {
 #[builtin] pub fn mode(&self) -> PlayMode;
 ```
 
-- Returns: `PlayMode` — プレイモード。
-- Kind: `fn` · Builtin: yes
+- 戻り値：`PlayMode` — プレイモード。
+- 種別：`fn` · 組み込み：はい
 
 ### `Narrative::set_mode(&self, mode)` {#narrativeset_modeself-mode}
 
@@ -354,7 +360,7 @@ pushdown fn AzusaEnding() {
 ```
 
 - `mode` `PlayMode` — 新しいプレイモード。
-- Kind: `fn` · Builtin: yes
+- 種別：`fn` · 組み込み：はい
 
 ### `Narrative::advance(&self)` {#narrativeadvanceself}
 
@@ -362,9 +368,9 @@ pushdown fn AzusaEnding() {
 #[builtin] pub fn advance(&self);
 ```
 
-- Kind: `fn` · Builtin: yes
+- 種別：`fn` · 組み込み：はい
 
-次のステップへ進みます：テキストのクリックと同じく、物語に `NextStep` を送ります。
+次のステップへ進みます。テキストをクリックしたときと同じく、物語に `NextStep` を送ります。
 
 ### `Narrative::select(&self, arm)` {#narrativeselectself-arm}
 
@@ -372,8 +378,8 @@ pushdown fn AzusaEnding() {
 #[builtin] pub fn select(&self, arm: Arm);
 ```
 
-- `arm` `Arm` — `menu()` から得た、現在の選択肢の表示中のアーム。
-- Kind: `fn` · Builtin: yes
+- `arm` `Arm` — 現在の選択肢で表示中のアーム。`menu()` から取得します。
+- 種別：`fn` · 組み込み：はい
 
 ### `Narrative::save(&self, slot)` {#narrativesaveself-slot}
 
@@ -381,8 +387,8 @@ pushdown fn AzusaEnding() {
 #[builtin] pub fn save(&self, slot: SaveSlot);
 ```
 
-- `slot` `SaveSlot` — 書き込むスロット。[`std::system::saves`](./system-saves.md) を参照してください。
-- Kind: `fn` · Builtin: yes
+- `slot` `SaveSlot` — 保存先のスロット。[`std::system::saves`](./system-saves.md) を参照してください。
+- 種別：`fn` · 組み込み：はい
 
 実行中のゲームを `slot` にセーブします。
 
@@ -393,9 +399,9 @@ pushdown fn AzusaEnding() {
 ```
 
 - `entry` `u32` — `history()` のインデックス。
-- Kind: `fn` · Builtin: yes
+- 種別：`fn` · 組み込み：はい
 
-物語をバックログの `entry` 番目のエントリーまで戻します。
+物語をバックログの `entry` 番目の項目まで巻き戻します。
 
 ### `Narrative::call(&self, overlay)` {#narrativecallself-overlay}
 
@@ -403,8 +409,8 @@ pushdown fn AzusaEnding() {
 #[builtin] pub fn call(&self, overlay: fn(Narrative) -> GameOverlay);
 ```
 
-- `overlay` `fn(Narrative) -> GameOverlay` — 開くオーバーレイ。このハンドルを受け取ります。
-- Kind: `fn` · Builtin: yes
+- `overlay` `fn(Narrative) -> GameOverlay` — 開くオーバーレイ。このハンドルを引数に受け取ります。
+- 種別：`fn` · 組み込み：はい
 
 ゲームオーバーレイを開きます（モードスタックに積みます）。[`std::system`](./system.md) を参照してください。
 
@@ -415,11 +421,11 @@ pushdown fn AzusaEnding() {
 ```
 
 - `voice` `VoiceAsset` — 再生するボイス。
-- Kind: `fn` · Builtin: yes
+- 種別：`fn` · 組み込み：はい
 
-ボイスバスで `voice` をもう一度再生します。主にバックログから使います。
+ボイスバスで `voice` をもう一度再生します。主にバックログで使います。
 
-## Struct: `Line` {#struct-line}
+## 構造体：`Line` {#struct-line}
 
 ```kis
 pub struct Line {
@@ -432,21 +438,21 @@ pub struct Line {
 
 `Say` ステップの行です。
 
-- `who`、`text`、`voice` — `Say` ステップと同じ（バックログでは、ステップに `history` があれば `text` はそのテキストです）。
+- `who`、`text`、`voice` — `Say` ステップと同じ。ただしバックログでは、ステップに `history` があれば `text` はそのテキストになります。
 - `read` `bool` — プレイヤーがこの行を以前に読んだかどうか。エンジンの既読フラグに基づきます。
-- Kind: — · Builtin: no
+- 種別：— · 組み込み：いいえ
 
-## Struct: `Arm` {#struct-arm}
+## 構造体：`Arm` {#struct-arm}
 
 ```kis
 #[builtin] pub struct Arm;
 ```
 
-現在の選択肢の選択可能なアームです。`Narrative::select` のための不透明なハンドルです。
+現在の選択肢で選べるアームを指す、`Narrative::select` 用の不透明なハンドルです。
 
-- Kind: — · Builtin: yes
+- 種別：— · 組み込み：はい
 
-## Struct: `MenuArm` {#struct-menuarm}
+## 構造体：`MenuArm` {#struct-menuarm}
 
 ```kis
 pub struct MenuArm {
@@ -458,10 +464,10 @@ pub struct MenuArm {
 表示中の選択肢のアームです。
 
 - `text` `Text` — ラベル。
-- `arm` `Option<Arm>` — 選ぶためのハンドル。ステップの選択肢メニューから追加された無効なアームでは `None`。
-- Kind: — · Builtin: no
+- `arm` `Option<Arm>` — 選ぶときに使うハンドル。ステップの選択肢メニューから追加した無効なアームでは `None`。
+- 種別：— · 組み込み：いいえ
 
-## Struct: `Menu` {#struct-menu}
+## 構造体：`Menu` {#struct-menu}
 
 ```kis
 pub struct Menu {
@@ -472,11 +478,11 @@ pub struct Menu {
 
 表示中の選択肢です。
 
-- `arms` `Vec<MenuArm>` — 表示されるアームを順に並べ、無効なアームをそれぞれの `at` の位置に挿入したもの。
+- `arms` `Vec<MenuArm>` — 表示するアームを順に並べ、無効なアームをそれぞれの `at` の位置に挿入したもの。
 - `align` `VAlign` — メニューの位置。レンダーが設定します（`ChoiceMenu::set_align`）。
-- Kind: — · Builtin: no
+- 種別：— · 組み込み：いいえ
 
-## Struct: `HudState` {#struct-hudstate}
+## 構造体：`HudState` {#struct-hudstate}
 
 ```kis
 pub struct HudState {
@@ -486,14 +492,14 @@ pub struct HudState {
 }
 ```
 
-ゲームビューが描く Hud です。
+ゲーム画面が描く Hud です。
 
 - `text_window` `Visibility` — テキストウィンドウを表示するかどうか。
 - `quick_menu` `Visibility` — クイックメニューを表示するかどうか。
-- `side_image` `Option<ImageAsset>` — サイド画像（あれば）。
-- Kind: — · Builtin: no
+- `side_image` `Option<ImageAsset>` — サイド画像（ある場合）。
+- 種別：— · 組み込み：いいえ
 
-## Enum: `Entry` {#enum-entry}
+## 列挙型：`Entry` {#enum-entry}
 
 ```kis
 pub enum Entry {
@@ -502,11 +508,11 @@ pub enum Entry {
 }
 ```
 
-バックログのエントリーです：行、または選ばれたアームのテキスト。
+バックログの項目です。行か、選ばれたアームのテキストのどちらかです。
 
-- Kind: — · Builtin: no
+- 種別：— · 組み込み：いいえ
 
-## Enum: `PlayMode` {#enum-playmode}
+## 列挙型：`PlayMode` {#enum-playmode}
 
 ```kis
 pub enum PlayMode {
@@ -519,9 +525,9 @@ pub enum PlayMode {
 ゲームの進め方です。
 
 - `Normal` — プレイヤーの入力で進みます。
-- `Auto` — `auto_delay` 設定（に 1 文字ごとの `auto_delay_per_char` を加えた時間）の後に進みます。`wait_for_voice` がオンならボイスの終了を待ちます。
-- `Skip` — できるだけ速く進みます。`skip_unread` 設定がオンでない限り未読のテキストで止まり、選択肢では常に止まります。
-- Kind: — · Builtin: no
+- `Auto` — `auto_delay` 設定の時間（と、1 文字ごとに `auto_delay_per_char`）が過ぎると進みます。`wait_for_voice` がオンなら、ボイスが終わるまで待ちます。
+- `Skip` — できるだけ速く進みます。`skip_unread` 設定がオンでなければ未読のテキストで止まり、選択肢では必ず止まります。
+- 種別：— · 組み込み：いいえ
 
 ## 例：バックログ {#example-a-backlog}
 
@@ -543,4 +549,4 @@ fn Backlog(game: Narrative) -> GameOverlay {
 }
 ```
 
-ゲームビューやバインディングから `game.call(Backlog)` で開きます。
+ゲーム画面やキー割り当てから `game.call(Backlog)` で開きます。

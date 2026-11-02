@@ -1,15 +1,15 @@
 ---
-title: "チュートリアル"
+title: "入門"
 sidebar:
   label: "はじめに"
 ---
 
-このチュートリアルは準備中です。Kagari をインストールし、最初のビジュアルノベルを書いて実行するまでを順に説明する予定です。
+入門は準備中です。Kagari のインストールから、最初のビジュアルノベルを書いて動かすまでを順を追って説明する予定です。
 
-まず [Kagari のインストール](./install.md) から始めてください。
+まずは [Kagari のインストール](./install.md) から始めてください。
 
-## それまでの間 {#in-the-meantime}
+## 準備が整うまで {#in-the-meantime}
 
-- [はじめに](../reference/index.md) は、Kagari の構成要素と各リファレンスの読み方を説明します。
-- [プロジェクト](../reference/tools/projects.md) と [`kagari` CLI](../reference/tools/cli.md) は、プロジェクトの作成、検査、ビルドを説明します。
-- [標準ライブラリの使い方](../std/usage.md) は、`std` を使い始めるための入口です。
+- Kagari の構成と各リファレンスの読み方は [はじめに](../reference/index.md) で説明しています。
+- プロジェクトの作成、検査、ビルドの方法は [プロジェクト](../reference/tools/projects.md) と [`kagari` CLI](../reference/tools/cli.md) にあります。
+- `std` を使い始めるなら、[標準ライブラリの使い方](../std/usage.md) が入り口です。

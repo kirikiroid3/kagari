@@ -2,33 +2,33 @@
 title: "Kagari のインストール"
 ---
 
-Kagari は 2 つのプログラムからなります。
+Kagari は次の 2 つのプログラムで構成されています。
 
-- `kagari`：ツールチェインです。プロジェクトの作成、検査、ビルド、整形を行い、言語サーバーとストーリーデバッガを動かします。
+- `kagari`：ツールチェインです。プロジェクトの作成、検査、ビルド、整形を行うほか、言語サーバーとストーリーデバッガーも動かします。
 - `kagari-desktop-runtime`：ランタイムです。`kagari build` でビルドしたゲームを再生します。ゲームを配布するときにも同梱します。
 
-以下のインストーラーは、この 2 つを `PATH` に置きます。Rust や Cargo は必要ありません。
+以下のインストーラーを使うと、どちらも `PATH` から使えるようになります。Rust や Cargo は必要ありません。
 
 ## Linux {#linux}
 
-x86_64 の Linux で次を実行します。
+x86_64 の Linux では次を実行します。
 
 ```sh
 curl -fsSL https://kagari-download.suitsu31.club/installer.sh | bash
 ```
 
-スクリプトは最新版をダウンロードし、チェックサムを確かめてから `~/.local/share/kagari` にインストールし（ランタイムがムービーの再生に使う FFmpeg のライブラリもプログラムの隣に置きます）、2 つのプログラムを `~/.local/bin` にリンクします。管理者権限は不要です。`~/.local/bin` が `PATH` に含まれていない場合は、`~/.profile` に追加する行を表示します。追加したら新しいターミナルを開いてください。
+スクリプトは最新版をダウンロードし、チェックサムを確かめたうえで `~/.local/share/kagari` にインストールします。ランタイムがムービー再生に使う FFmpeg のライブラリも、プログラムと同じ場所に置きます。そのあと 2 つのプログラムへのリンクを `~/.local/bin` に作ります。管理者権限は要りません。`~/.local/bin` が `PATH` に入っていなければ、`~/.profile` に追記する行を表示するので、追記してから新しいターミナルを開いてください。
 
-Linux 版には glibc 2.35 以降（Ubuntu 22.04、Debian 12、Fedora 36 以降）が必要です。Alpine など musl ベースのディストリビューションには対応していません。ランタイムにはさらに ALSA、libudev、libva（Debian、Ubuntu では `libasound2 libudev1 libva2 libva-drm2`、Fedora では `alsa-lib systemd-libs libva`）、Wayland または X11、GPU ドライバが必要です。これらのライブラリのどれかがなければスクリプトが警告します。[システム要件](../reference/tools/runtime.md#system-requirements)を参照してください。
+Linux 版は glibc 2.35 以降（Ubuntu 22.04、Debian 12、Fedora 36 以降）で動きます。Alpine など musl ベースのディストリビューションには対応していません。ランタイムを動かすには、さらに ALSA、libudev、libva（Debian と Ubuntu では `libasound2 libudev1 libva2 libva-drm2`、Fedora では `alsa-lib systemd-libs libva`）、Wayland または X11、GPU ドライバーが必要です。これらのライブラリが欠けていると、スクリプトが警告を出します。詳しくは [システム要件](../reference/tools/runtime.md#system-requirements) を参照してください。
 
-スクリプトは次のオプションを受け取ります（パイプで渡すときは `bash -s --` の後に書きます）。
+スクリプトには次のオプションを指定できます（パイプで渡すときは `bash -s --` の後ろに書きます）。
 
 | オプション | 意味 |
 | ---------- | ---- |
-| `--version <VERSION>` | 最新版の代わりにこのバージョンをインストールします。 |
-| `--uninstall` | スクリプトがインストールしたものを削除します。 |
+| `--version <VERSION>` | 最新版ではなく、指定したバージョンをインストールします。 |
+| `--uninstall` | スクリプトでインストールしたものを削除します。 |
 
-`KAGARI_HOME` と `KAGARI_BIN_DIR` で 2 つのディレクトリを変更できます。たとえばバージョン 0.1.0 をインストールするには次のようにします。
+インストール先の 2 つのディレクトリは `KAGARI_HOME` と `KAGARI_BIN_DIR` で変えられます。たとえばバージョン 0.1.0 を入れるには次のようにします。
 
 ```sh
 curl -fsSL https://kagari-download.suitsu31.club/installer.sh | bash -s -- --version 0.1.0
@@ -36,7 +36,7 @@ curl -fsSL https://kagari-download.suitsu31.club/installer.sh | bash -s -- --ver
 
 ## Windows {#windows}
 
-インストーラー `kagari-<version>-x86_64-windows-setup.exe` をダウンロードして実行します。PowerShell では、次のコマンドで最新版をダウンロードして起動できます。
+インストーラー `kagari-<version>-x86_64-windows-setup.exe` をダウンロードして実行します。PowerShell なら、次のコマンドで最新版をダウンロードして起動できます。
 
 ```powershell
 $v = (Invoke-RestMethod https://kagari-download.suitsu31.club/windows_x86_installer/latest).Trim()
@@ -44,27 +44,27 @@ Invoke-WebRequest "https://kagari-download.suitsu31.club/windows_x86_installer/$
 .\kagari-setup.exe
 ```
 
-インストーラーは `%LOCALAPPDATA%\Programs\Kagari` にインストールし、その `bin` ディレクトリをユーザーの `PATH` に追加します。反映させるには新しいターミナルを開く（またはエディタを再起動する）必要があります。対応するのは x86_64 の 64 ビット Windows です。
+インストール先は `%LOCALAPPDATA%\Programs\Kagari` で、その中の `bin` ディレクトリがユーザーの `PATH` に追加されます。新しいターミナルを開く（またはエディタを再起動する）と反映されます。対応しているのは x86_64 の 64 ビット版 Windows です。
 
-Kagari のプログラムには Microsoft Visual C++ 再頒布可能パッケージ（x64）が必要です。入っていない、または古い場合、インストーラーは同梱のものを先にインストールします。このときだけ Windows が管理者権限を求めます。断るとインストールは止まります。すでに入っていれば、管理者権限は不要です。
+Kagari のプログラムを動かすには Microsoft Visual C++ 再頒布可能パッケージ（x64）が必要です。入っていないか古い場合は、インストーラーが同梱のパッケージを先にインストールします。Windows が管理者権限を求めるのはこのときだけで、拒否するとインストールは中止されます。すでに入っていれば管理者権限は要りません。
 
-インストーラーとプログラムにはまだコード署名がありません。「Windows によって PC が保護されました」と表示されたら、**詳細情報** を選び、**実行** を選んでください。Kagari が公開したファイルであることを確かめるには、`(Get-FileHash kagari-setup.exe).Hash` を、ダウンロードサーバーでインストーラーの隣にある `.sha256` ファイル（同じ URL の末尾に `.sha256` を付けたもの）と比べます。
+インストーラーとプログラムには、まだコード署名がありません。「Windows によって PC が保護されました」と表示されたら、**詳細情報** を押してから **実行** を押してください。Kagari が公開したファイルかどうかを確かめるには、`(Get-FileHash kagari-setup.exe).Hash` の結果を、ダウンロードサーバー上でインストーラーと並んでいる `.sha256` ファイル（同じ URL の末尾に `.sha256` を付けたもの）と照合します。
 
 ## macOS {#macos}
 
-Apple シリコン（M1 以降）を搭載し macOS 11 以降を実行している Mac では、Linux と同じスクリプトを実行します。
+Apple シリコン（M1 以降）搭載で macOS 11 以降の Mac では、Linux と同じスクリプトを実行します。
 
 ```sh
 curl -fsSL https://kagari-download.suitsu31.club/installer.sh | bash
 ```
 
-インストールの仕方も同じです。`~/.local/share/kagari` にインストールし（FFmpeg のライブラリもプログラムの隣に置きます）、2 つのプログラムを `~/.local/bin` にリンクします。管理者権限は不要です。`~/.local/bin` が `PATH` に含まれていない場合は、`~/.zprofile` に追加する行を表示します。追加したら新しいターミナルを開いてください。オプションと環境変数も [Linux](#linux) と同じです。macOS 版がある最初のバージョンは 0.3.0 で、それより古いバージョンはスクリプトが拒否します。
+インストールの流れも Linux と同じです。`~/.local/share/kagari` にインストールし（FFmpeg のライブラリもプログラムと同じ場所に置きます）、2 つのプログラムへのリンクを `~/.local/bin` に作ります。管理者権限は要りません。`~/.local/bin` が `PATH` に入っていなければ `~/.zprofile` に追記する行を表示するので、追記してから新しいターミナルを開いてください。オプションと環境変数も [Linux](#linux) と共通です。macOS 版が用意されているのは 0.3.0 からで、それより古いバージョンを指定するとスクリプトが拒否します。
 
-macOS 版にはほかのライブラリは必要ありません。FFmpeg は同梱されています。Intel Mac には対応しておらず、スクリプトはそこで止まります。スクリプトでインストールしたプログラムは、セキュリティの確認なしで起動します。Mac のプレイヤー向けにゲームをパッケージ化するには [`kagari release`](../reference/tools/cli.md#kagari-release) を参照してください。
+macOS 版では、ほかのライブラリは必要ありません。FFmpeg も同梱されています。Intel Mac には対応しておらず、スクリプトはその時点で止まります。スクリプトでインストールしたプログラムは、セキュリティの確認ダイアログなしで起動します。Mac のプレイヤー向けにゲームをパッケージにする方法は [`kagari release`](../reference/tools/cli.md#kagari-release) を参照してください。
 
 ## NixOS {#nixos}
 
-ビルド済みの Linux バイナリは NixOS では動きません。インストーラースクリプトもここを案内します。システムの flake の入力に Kagari の flake を加え、そのパッケージを `environment.systemPackages` に入れます。
+ビルド済みの Linux 版バイナリは NixOS では動きません。インストーラースクリプトを実行しても、この節を案内します。システムの flake の入力に Kagari の flake を追加し、そのパッケージを `environment.systemPackages` に入れてください。
 
 ```nix
 {
@@ -89,7 +89,7 @@ macOS 版にはほかのライブラリは必要ありません。FFmpeg は同�
 }
 ```
 
-そのあと `sudo nixos-rebuild switch --flake .#my-machine` で適用します。`stable` は最新のリリース、`unstable` は `main` ブランチの先頭をビルドしたものです。Home Manager を使う場合は、同じパッケージを `home.packages` に入れます。
+あとは `sudo nixos-rebuild switch --flake .#my-machine` で適用します。`stable` は最新リリース、`unstable` は `main` ブランチの最新コミットをビルドしたものです。Home Manager を使っている場合は、同じパッケージを `home.packages` に入れます。
 
 ## インストールの確認 {#checking-the-installation}
 
@@ -98,16 +98,16 @@ kagari --version
 kagari-desktop-runtime --version
 ```
 
-どちらも同じバージョンを表示します。プロジェクトが受け付けるツールチェインのバージョンは [`[toolchain] kagari`](../reference/tools/projects.md#toolchain) で決まります。`kagari init` はプロジェクトを作成したバージョンを書き込みます。
+どちらも同じバージョンが表示されれば成功です。プロジェクトで使えるツールチェインのバージョンは [`[toolchain] kagari`](../reference/tools/projects.md#toolchain) で決まり、`kagari init` はプロジェクトを作ったときのバージョンをここに書き込みます。
 
-エディタから Kagari を使うには[エディタ](../reference/tools/editors.md)を参照してください。言語サーバーは `kagari lsp` で、エディタは `PATH` からこれを見つけます。
+エディタで Kagari を使う方法は [エディタ対応](../reference/tools/editors.md) を参照してください。言語サーバーは `kagari lsp` で、エディタは `PATH` からこれを見つけます。
 
 ## 更新とアンインストール {#updating-and-uninstalling}
 
 | システム | 更新 | アンインストール |
 | -------- | ---- | ---------------- |
-| Linux、macOS | インストーラースクリプトをもう一度実行します。 | `--uninstall` を付けて実行します。 |
-| Windows | 新しいインストーラーを実行します。インストール済みのバージョンを置き換えます。 | **設定 → アプリ → インストールされているアプリ → Kagari → アンインストール**。 |
-| NixOS | `nix flake update kagari` を実行し、`nixos-rebuild switch` します。 | パッケージ（と入力）を削除し、`nixos-rebuild switch` します。 |
+| Linux、macOS | インストーラースクリプトをもう一度実行 | `--uninstall` を付けて実行 |
+| Windows | 新しいインストーラーを実行（インストール済みのバージョンを置き換えます） | **設定 → アプリ → インストールされているアプリ → Kagari → アンインストール** |
+| NixOS | `nix flake update kagari` のあと `nixos-rebuild switch` | パッケージ（と flake の入力）を削除してから `nixos-rebuild switch` |
 
-自動では更新されません。
+自動更新はありません。

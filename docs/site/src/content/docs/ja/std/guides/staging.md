@@ -1,23 +1,23 @@
 ---
-title: "演出レシピ"
+title: "演出の実例"
 ---
 
-> **安定性:** 安定 — 現在の `std` アイテムだけで組み立てたレシピです。
+> **安定性:** 安定 — 現在の `std` のアイテムだけで組んだ実例です。
 
-## レンダーの組み立て {#composing-renders}
+## レンダーの組み立て方 {#composing-renders}
 
-レンダーは `const fn(Screen) -> Screen` です。大きな演出は 2 種類の関数を組み合わせて作ります。
+レンダーは `const fn(Screen) -> Screen` 型の関数です。大きな演出は、次の 2 種類の関数を組み合わせて作ります。
 
-- **ヘルパー**は `&mut Screen` を受け取って何も返しません。[`Character`](../stage.md#character) のメソッドがその例です。どのレンダーからも、ほかのヘルパーからも呼べます。
-- **レンダー**は画面を値で受け取り、ヘルパーや射影を呼んで画面を返します。ステップは `s!(render = name, …)` で使います。
+- **補助関数**：`&mut Screen` を受け取り、何も返しません。[`Character`](../stage.md#character) のメソッドがこの形です。どのレンダーからも、ほかの補助関数からも呼べます。
+- **レンダー**：画面を値で受け取り、補助関数や射影を呼んでから画面を返します。ステップからは `s!(render = name, …)` で指定します。
 
-レンダーの中では、[タイムラインのカーソル](../screen-anim.md#the-timeline)が各変更の開始時刻を決めます。2 回のカーソル移動の間にある文は同時に始まり、`barrier()`、`wait(d)`、`at_mark(m)` がカーソルを動かします。すべての変更はアニメーションを明示し、生成されたエンティティは不透明度 0.0 から始まるので、登場のたびに不透明度をフェードやトゥイーンで上げます。
+レンダーの中で各変更がいつ始まるかは、[タイムラインのカーソル](../screen-anim.md#the-timeline)で決まります。カーソルを動かすのは `barrier()`、`wait(d)`、`at_mark(m)` で、その間に書いた文は同時に始まります。変更にはすべてアニメーションを指定します。また、生成したエンティティは不透明度 0.0 から始まるので、登場させるときは毎回フェードか補間で不透明度を上げます。
 
-1 つの演出の間だけ存在すべきエンティティ（幕、カード）は、フェードアウトさせるのと同じレンダーで削除します。エンティティはすぐに[論理画面](../screen.md#the-logical-screen)から消え、フェードが終わるまでは描画され続けます。
+幕やカードのように一つの演出の間だけ使うエンティティは、フェードアウトさせるのと同じレンダーで消去します。消去したエンティティはすぐに[論理画面](../screen.md#the-logical-screen)から外れますが、フェードが終わるまでは描画されます。
 
 ## 共通の宣言 {#shared-declarations}
 
-以下のレシピはすべてこれらの宣言を前提とします。スタジオのエンティティはキャラクターより上にあります。
+以下の実例は、どれも次の宣言があるものとします。制作者が用意するエンティティはキャラクターより手前に置きます。
 
 ```kix
 use std::narrative::Mark;
@@ -64,11 +64,11 @@ const THEME: AudioAsset = asset("bgm_theme.ogg");
 const KNOCK: AudioAsset = asset("se_knock.ogg");
 ```
 
-スロット定数 `CENTER` は std のアンカー `std::screen::CENTER` を隠すので、アンカーが必要なレシピではパスで書きます。
+立ち位置の定数 `CENTER` が std のアンカー `std::screen::CENTER` を隠してしまうため、アンカーを使う実例ではパス付きで書いています。
 
 ## シーンの開始 {#opening-a-scene}
 
-音楽が始まると同時に背景がルールで現れ、`barrier` の後に花子がサイド画像とともに登場します。
+音楽が流れ始めると同時に、背景がルール画像で切り替わります。`barrier` の後、花子がサイド画像付きで登場します。
 
 ```kix
 const fn opening(mut screen: Screen) -> Screen {
@@ -83,7 +83,7 @@ const fn opening(mut screen: Screen) -> Screen {
 
 ## 暗転 {#dip-to-black}
 
-塗りだけを持つ `Front` エンティティが画面を覆います。塗りが `TRANSPARENT → BLACK` と変化し、画面が黒い間に背景が切り替わり、塗りが元に戻ります。幕はすぐに削除されるので論理画面には含まれませんが、フェードが終わるまでは描画されます。
+塗りだけを持つ `Front` のエンティティで画面を覆います。塗りを `TRANSPARENT → BLACK` と変化させ、画面が真っ黒な間に背景を切り替えてから、塗りを元に戻します。幕はすぐに消去するので論理画面には残りませんが、フェードが終わるまでは描画されます。
 
 ```kix
 /// Fades the screen to black, swaps the background while it is hidden, and fades back.
@@ -105,11 +105,11 @@ const fn night_falls(mut screen: Screen) -> Screen {
 }
 ```
 
-色を経由するだけの背景変更なら、背景の差し替えに `through(BLACK, d, hold)` を使えば、エンティティなしで同じことができます。
+単に色を挟んで背景を変えたいだけなら、背景の切り替えに `through(BLACK, d, hold)` を使えば、エンティティなしで同じ効果が得られます。
 
 ## 回想 {#flashback}
 
-舞台の上に `color` ミックスシェーダーで合成する塗りを重ね、型付きの引数を持つシェーダーの画面フィルターを加えます。色調は、終了用のレンダーがフェードさせて削除するまで論理画面に残ります。
+舞台の上に塗りを重ねて `color` 合成シェーダーで合成し、さらに型付きの引数をとるシェーダーで画面フィルターをかけます。色調は、終了用のレンダーでフェードさせて消去するまで論理画面に残ります。
 
 ```kix
 /// Tints the stage with a colour mix and a shader filter, for a memory.
@@ -131,11 +131,11 @@ const fn flashback_end(mut screen: Screen) -> Screen {
 }
 ```
 
-`MEMORY` は、シェーダーの書き方の [最初のシェーダー](./shaders.md#a-first-shader) にある色シェーダーです。そのソースを `assets/memory.wgsl` に置いてください。
+`MEMORY` は「シェーダーの書き方」の [最初のシェーダー](./shaders.md#a-first-shader) で作る色シェーダーです。ソースを `assets/memory.wgsl` に置いてください。
 
 ## スチル（CG） {#still-cg}
 
-まずテキストウィンドウが隠れ、`barrier` の後に CG がルールで現れます。次のステップでウィンドウが戻ります。
+まずテキストウィンドウを隠し、`barrier` の後で CG をルール画像で表示します。次のステップでウィンドウを戻します。
 
 ```kix
 /// Hides the text window, then reveals a CG through a rule.
@@ -160,11 +160,11 @@ s!(render = still);
 s!(render = still_text, t!["The fireworks lit the sky."]);
 ```
 
-CG はステップの論理画面に載った時点で、ギャラリー用に既読として扱われます（[`std::system`](../system.md#seen-sets) を参照）。
+CG は、いずれかのステップの論理画面に載った時点でギャラリー上は既読になります（[`std::system`](../system.md#seen-sets) を参照）。
 
 ## 章タイトル {#chapter-card}
 
-テキストウィンドウの上のラベルエンティティがフェードインし、待ってからフェードアウトし、削除されます。削除は論理画面上で即座に行われるので次のステップはカードを引き継ぎませんが、フェードアウトは描画されます。
+テキストウィンドウより手前にラベルのエンティティを置き、フェードインさせて少し待ち、フェードアウトさせてから消去します。論理画面からはすぐに消えるので次のステップにカードは引き継がれませんが、フェードアウトはきちんと描画されます。
 
 ```kix
 /// Shows a chapter title over the text window, then removes it once it has faded out.
@@ -182,9 +182,9 @@ const fn chapter_card(mut screen: Screen) -> Screen {
 }
 ```
 
-## アイテム表示 {#item-popup}
+## アイテムの表示 {#item-popup}
 
-アイテムは小さく生成され、フェードインしながら行き過ぎるイージングで大きくなります。
+アイテムを小さめに生成し、フェードインさせながら、一度行き過ぎて戻るイージングで拡大します。
 
 ```kix
 /// Pops an item up in the middle of the screen.
@@ -207,11 +207,11 @@ const fn item_popup_end(mut screen: Screen) -> Screen {
 }
 ```
 
-2 つの倍率変更は同じカーソル位置で始まります。1 つ目が即座に 0.8 を設定し、2 つ目が 0.8 から 1.0 へ補間します。
+2 つの拡大率の変更は、同じカーソル位置から始まります。1 つ目で即座に 0.8 にし、2 つ目で 0.8 から 1.0 へ補間します。
 
-## 行の途中のキュー {#mid-line-cue}
+## 台詞の途中での演出 {#mid-line-cue}
 
-テキストが `mark(1)` で位置に名前を付け、レンダーがそこにカーソルを固定します。
+テキスト側で `mark(1)` によって位置に名前を付け、レンダー側でカーソルをその位置に合わせます。
 
 ```kix
 /// Changes Hanako's face when the text reaches mark 1.
@@ -226,11 +226,11 @@ const fn surprised_at_mark(mut screen: Screen) -> Screen {
 s!(who = "Hanako", render = surprised_at_mark, t!["Wait" ![""](pause(ms(500)).and(mark(1))) "—what?"]);
 ```
 
-"Wait" の後で表示が 500 ms 止まり、"—what?" が始まると表情が変わります。クリックすると行全体が表示され、表情の変化もすぐに完了します。
+"Wait" を表示したところで文字送りが 500 ms 止まり、"—what?" が出始めると同時に表情が変わります。クリックすると台詞全体が表示され、表情の変化もその場で完了します。
 
-## 連続音とモーション {#sound-bursts-and-motion}
+## 連続する効果音とモーション {#sound-bursts-and-motion}
 
-遅延付きのワンショットで連続音を作り、キャラクターのモーションとカメラの揺れで重みを加えます。どちらのモーションも論理画面を変えません。
+遅延を付けた単発の効果音を重ねて連打音を作り、キャラクターのモーションとカメラの揺れで迫力を出します。どちらのモーションも論理画面は変えません。
 
 ```kix
 const fn knocking(mut screen: Screen) -> Screen {
@@ -249,9 +249,9 @@ const fn earthquake(mut screen: Screen) -> Screen {
 }
 ```
 
-## 無効なアーム {#disabled-arm}
+## 選べないアーム {#disabled-arm}
 
-ステップが表示する選択肢に、表示専用のアームを加えます。選択できず、どの解析にも見えません。このレンダーをいつ使うかは物語のコードが決めます（[`std::narrative`](../narrative.md#disabled-arms) を参照）。
+ステップが表示する選択肢に、表示するだけのアームを加えます。このアームは選択できず、どの解析からも見えません。このレンダーをいつ使うかは物語のコードで決めます（[`std::narrative`](../narrative.md#disabled-arms) を参照）。
 
 ```kix
 const fn locked_arm(mut screen: Screen) -> Screen {

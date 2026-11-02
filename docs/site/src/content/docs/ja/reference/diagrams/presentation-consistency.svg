@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 250" width="100%" style="max-width:860px" role="img" aria-label="選択肢の二つのアームが異なる背景を設定し、合流後のステップはどちらも表示しうる">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 250" width="100%" style="max-width:860px" role="img" aria-label="選択肢の二つのアームが別々の背景を設定するため、合流後のステップではどちらの背景も表示されうる">
 <style>
 .kg-box{fill:var(--quote-bg,#f6f7f6);stroke:var(--fg,#333);stroke-width:1.2}
 .kg-warn{fill:var(--quote-bg,#f6f7f6);stroke:#c98a2b;stroke-width:2;stroke-dasharray:6 4}
@@ -29,6 +29,6 @@
 <rect x="192" y="186" width="360" height="52" rx="4" class="kg-warn"/>
 <text x="372" y="208" class="kg-t kg-c">s!(who = "Azusa", …)</text>
 <text x="372" y="226" class="kg-s kg-m kg-c">background ∈ { ROOF, CLASSROOM }</text>
-<text x="566" y="208" class="kg-w">コンパイラがこのステップを報告 (W5004)</text>
-<text x="566" y="224" class="kg-w">両方の経路とともに</text>
+<text x="566" y="208" class="kg-w">コンパイラはこのステップを警告（W5004）</text>
+<text x="566" y="224" class="kg-w">両方の経路を添えて報告</text>
 </svg>

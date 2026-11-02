@@ -2,11 +2,11 @@
 title: "std"
 ---
 
-> **安定性:** 安定 — ビルトイン型、`Range`、`Option` と `Result`、std のトレイト、アセット型。
+> **安定性:** 安定 — 組み込み型、`Range`、`Option` と `Result`、std のトレイト、アセット型。
 
-クレートのルート `std` は、すべてのプログラムが必要とする型を宣言します：実行時の文字列とリスト、正確な数値、範囲、ジェネリックな直和型 `Option` と `Result`、std のシグネチャを書くためのトレイト、そしてアセット型と `asset`・`system_font` です。ルートの関数はすべて `const fn` です。
+クレートのルート `std` では、どのプログラムでも必要になる型を宣言しています。実行時の文字列とリスト、正確な数値、範囲、ジェネリックな直和型 `Option` と `Result`、std のシグネチャで使うトレイト、アセット型と `asset`・`system_font` です。ルートの関数はすべて `const fn` です。
 
-ルートはサブモジュールも宣言します。
+サブモジュールもルートで宣言しています。
 
 ```kis
 pub mod prelude;
@@ -19,47 +19,47 @@ pub mod system;
 pub mod shaders;
 ```
 
-`Int<lo, hi>`、Rust の整数型（`u8` … `u128`、`i8` … `i128`、`usize`、`isize`）、`bool` は言語の型で、std のアイテムではありません。`Int<lo, hi>` は整数 `lo..=hi` を保持し、物語が実行時に保持できる唯一の整数型です。[数値](../reference/syntax/numbers.md) を参照してください。
+`Int<lo, hi>`、Rust の整数型（`u8` … `u128`、`i8` … `i128`、`usize`、`isize`）、`bool` は言語の型であり、std のアイテムではありません。`Int<lo, hi>` は `lo..=hi` の整数を表す型で、物語が実行時に保持できる整数型はこれだけです。詳しくは [数値](../reference/syntax/numbers.md) を参照してください。
 
 ## 概要 {#overview}
 
 |アイテム|種類|概要|
 |---|---|---|
-|[`String`](#struct-string)|ビルトイン構造体|実行時の文字列|
-|[`Vec<T>`](#struct-vect)|ビルトイン構造体|伸長可能なリスト|
-|[`Rat`](#struct-rat)|ビルトイン構造体|正確な有理数|
-|[`Decimal`](#struct-decimal)|ビルトイン構造体|正確な十進小数|
+|[`String`](#struct-string)|組み込みの構造体|実行時の文字列|
+|[`Vec<T>`](#struct-vect)|組み込みの構造体|伸長できるリスト|
+|[`Rat`](#struct-rat)|組み込みの構造体|正確な有理数|
+|[`Decimal`](#struct-decimal)|組み込みの構造体|正確な十進小数|
 |[`Range<T>`](#struct-ranget)|構造体|`start..end` と `start..=end`|
 |[`Option<T>`](#enum-optiont)|列挙型|省略可能な値|
 |[`Result<T, E>`](#enum-resultt-e)|列挙型|成功値またはエラー値|
-|[`Eq`](#trait-eq)|ビルトイントレイト|構造的な等価性|
-|[`Integer`](#trait-integer)|ビルトイントレイト|整数型|
-|[`FromInteger`](#trait-frominteger)|ビルトイントレイト|`Integer::into` の変換先|
-|[`RandChoose`](#trait-randchoose)|ビルトイントレイト|物語が乱択できる型|
-|[`Asset`](#trait-asset)|ビルトイントレイト|アセット型|
-|[`ImageAsset` … `ShaderAsset`](#asset-types)|ビルトイン構造体|アセットファイルの種類ごとの型|
-|[`asset`](#function-assetpath)|ビルトイン `const fn`|プログラムのアセットを読み込む|
-|[`system_font`](#function-system_fontpath)|ビルトイン `const fn`|ビルドするマシンにインストールされたフォントを読み込む|
+|[`Eq`](#trait-eq)|組み込みのトレイト|構造的な等価性|
+|[`Integer`](#trait-integer)|組み込みのトレイト|整数型|
+|[`FromInteger`](#trait-frominteger)|組み込みのトレイト|`Integer::into` の変換先|
+|[`RandChoose`](#trait-randchoose)|組み込みのトレイト|物語で乱択できる型|
+|[`Asset`](#trait-asset)|組み込みのトレイト|アセット型|
+|[`ImageAsset` … `ShaderAsset`](#asset-types)|組み込みの構造体|アセットファイルの種類ごとの型|
+|[`asset`](#function-assetpath)|組み込みの `const fn`|プログラムのアセットを読み込む|
+|[`system_font`](#function-system_fontpath)|組み込みの `const fn`|ビルド環境にインストールされたフォントを読み込む|
 
-## Struct: `String` {#struct-string}
+## 構造体：`String` {#struct-string}
 
 ```kis
 #[builtin] pub struct String;
 ```
 
-`fn` のコードが組み立てる実行時の文字列です。文字列リテラルの型は `String` ではなく `Text` です。`String` は `fn` のコードが実行時に作るものです。`String` は `Eq` であり、`t![…]` に埋め込めます（`ToText` です）。有限型ではないので、物語は保持できません。
+`fn` のコードが実行時に組み立てる文字列です。文字列リテラルの型は `String` ではなく `Text` で、`String` は `fn` のコードが実行時に作るものです。`String` は `Eq` を満たし、`ToText` なので `t![…]` に埋め込めます。有限型ではないため、物語で保持することはできません。
 
-- Kind: — · Builtin: yes
+- 種別：— · 組み込み：はい
 
-## Struct: `Vec<T>` {#struct-vect}
+## 構造体：`Vec<T>` {#struct-vect}
 
 ```kis
 #[builtin] pub struct Vec<T>;
 ```
 
-伸長可能なリストです。`Vec` は他のすべての型と同じく値型です：`push` と `set` は呼び出された場所を変更し、コピーには影響しません。`T` が `Eq` なら `Vec<T>` も `Eq` です。`Vec` に対する `for x in v` はメソッドではなく言語の規則です（[コンパイラ規則](./appendix/rules.md#for-loops) を参照）。`Vec` は有限型ではありません。
+伸長できるリストです。ほかの型と同じく `Vec` も値型なので、`push` や `set` は呼び出した場所だけを書き換え、コピーには影響しません。`T` が `Eq` なら `Vec<T>` も `Eq` です。`Vec` に対する `for x in v` はメソッドではなく言語の規則です（[コンパイラの規則](./appendix/rules.md#for-loops) を参照）。`Vec` は有限型ではありません。
 
-- Kind: — · Builtin: yes
+- 種別：— · 組み込み：はい
 
 ### `Vec::new()` {#vecnew}
 
@@ -67,8 +67,8 @@ pub mod shaders;
 #[builtin] pub const fn new() -> Vec<T>;
 ```
 
-- Returns: `Vec<T>` — 空のリスト。
-- Kind: `const fn` · Builtin: yes
+- 戻り値：`Vec<T>` — 空のリスト。
+- 種別：`const fn` · 組み込み：はい
 
 ### `Vec::len(&self)` {#veclenself}
 
@@ -76,8 +76,8 @@ pub mod shaders;
 #[builtin] pub const fn len(&self) -> usize;
 ```
 
-- Returns: `usize` — 要素の数。
-- Kind: `const fn` · Builtin: yes
+- 戻り値：`usize` — 要素数。
+- 種別：`const fn` · 組み込み：はい
 
 ### `Vec::is_empty(&self)` {#vecis_emptyself}
 
@@ -85,8 +85,8 @@ pub mod shaders;
 #[builtin] pub const fn is_empty(&self) -> bool;
 ```
 
-- Returns: `bool` — 要素がないかどうか。
-- Kind: `const fn` · Builtin: yes
+- 戻り値：`bool` — 要素が一つもないかどうか。
+- 種別：`const fn` · 組み込み：はい
 
 ### `Vec::get(&self, index)` {#vecgetself-index}
 
@@ -95,8 +95,8 @@ pub mod shaders;
 ```
 
 - `index` `usize` — 0 から数えた位置。
-- Returns: `Option<T>` — `index` の要素。`index` が範囲外なら `None`。
-- Kind: `const fn` · Builtin: yes
+- 戻り値：`Option<T>` — `index` の位置の要素。`index` が範囲外なら `None`。
+- 種別：`const fn` · 組み込み：はい
 
 ### `Vec::set(&mut self, index, value)` {#vecsetmut-self-index-value}
 
@@ -106,9 +106,9 @@ pub mod shaders;
 
 - `index` `usize` — 置き換える位置。
 - `value` `T` — 新しい要素。
-- Kind: `const fn` · Builtin: yes
+- 種別：`const fn` · 組み込み：はい
 
-`index` の要素を置き換えます。範囲外の `index` は評価エラーで、定数評価では [`E4005`](../diagnostics/eval.md#e4005) です。
+`index` の位置の要素を置き換えます。`index` が範囲外だと評価エラーになり、定数評価ではエラー [`E4005`](../diagnostics/eval.md#e4005) になります。
 
 ### `Vec::push(&mut self, value)` {#vecpushmut-self-value}
 
@@ -117,7 +117,7 @@ pub mod shaders;
 ```
 
 - `value` `T` — 追加する要素。
-- Kind: `const fn` · Builtin: yes
+- 種別：`const fn` · 組み込み：はい
 
 `value` を末尾に追加します。
 
@@ -131,15 +131,15 @@ const fn first_three() -> Vec<u32> {
 }
 ```
 
-## Struct: `Rat` {#struct-rat}
+## 構造体：`Rat` {#struct-rat}
 
 ```kis
 #[builtin] pub struct Rat;
 ```
 
-正確な有理数です。`Rat` にはリテラルがないので、`Rat::new` で作ります。`Rat` は `Eq` かつ `ToText`（正確に書き出されます）です。有限型ではありません。
+正確な有理数です。リテラルはないので、`Rat::new` で作ります。`Rat` は `Eq` と `ToText` を満たし、文字列にすると正確な値で書き出されます。有限型ではありません。
 
-- Kind: — · Builtin: yes
+- 種別：— · 組み込み：はい
 
 ### `Rat::new(num, den)` {#ratnewnum-den}
 
@@ -149,10 +149,10 @@ const fn first_three() -> Vec<u32> {
 
 - `num` `i128` — 分子。
 - `den` `i128` — 分母。
-- Returns: `Rat` — 既約分数にした `num / den`。
-- Kind: `const fn` · Builtin: yes
+- 戻り値：`Rat` — `num / den` を既約分数にした値。
+- 種別：`const fn` · 組み込み：はい
 
-`den == 0` はゼロ除算です（定数評価では [`E4002`](../diagnostics/eval.md#e4002)）。`Rat::new(1, 3)` は 3 分の 1 です。
+`den == 0` のときはゼロ除算になります（定数評価ではエラー [`E4002`](../diagnostics/eval.md#e4002)）。たとえば `Rat::new(1, 3)` は 3 分の 1 です。
 
 ### `Rat::to_decimal(self)` {#ratto_decimalself}
 
@@ -160,20 +160,20 @@ const fn first_three() -> Vec<u32> {
 #[builtin] pub const fn to_decimal(self) -> Decimal;
 ```
 
-- Returns: `Decimal` — 整数部と小数点以下最大 7 桁を持つこの値。ゼロ方向に切り捨てます。
-- Kind: `const fn` · Builtin: yes
+- 戻り値：`Decimal` — 整数部と小数点以下最大 7 桁で表した値。超える桁はゼロ方向に切り捨てます。
+- 種別：`const fn` · 組み込み：はい
 
-`Rat::new(1, 3).to_decimal()` は `0.3333333` です。
+`Rat::new(1, 3).to_decimal()` は `0.3333333` になります。
 
-## Struct: `Decimal` {#struct-decimal}
+## 構造体：`Decimal` {#struct-decimal}
 
 ```kis
 #[builtin] pub struct Decimal;
 ```
 
-`0.5` のようなリテラルで書く正確な十進小数です。浮動小数点数の正確な代替（Kagari に浮動小数点型はありません）であり、`std` のすべての割合の型です。`Decimal / Decimal` は正確に計算したあと、小数点以下 7 桁にゼロ方向で切り捨てます。`Decimal` は `Eq` かつ `ToText`（正確に書き出されます）です。有限型ではありません。
+`0.5` のようなリテラルで書く、正確な十進小数です。Kagari には浮動小数点型がなく、その代わりに使う型です。`std` の割合もすべてこの型で表します。`Decimal / Decimal` は正確に計算したうえで、小数点以下 7 桁までをゼロ方向に切り捨てます。`Decimal` は `Eq` と `ToText` を満たし、文字列にすると正確な値で書き出されます。有限型ではありません。
 
-- Kind: — · Builtin: yes
+- 種別：— · 組み込み：はい
 
 ### `Decimal::from_int(value)` {#decimalfrom_intvalue}
 
@@ -182,10 +182,10 @@ const fn first_three() -> Vec<u32> {
 ```
 
 - `value` `I` — 任意の整数。
-- Returns: `Decimal` — `value` そのもの（正確な値）。
-- Kind: `const fn` · Builtin: yes
+- 戻り値：`Decimal` — `value` と等しい値（誤差なし）。
+- 種別：`const fn` · 組み込み：はい
 
-整数はすべて収まるので、この変換は失敗しません。変換先が `Decimal` の `value.into()` と同じです。`Decimal::from_int(3u32)` は `3.0` です。
+どの整数も表せるので、この変換は失敗しません。変換先を `Decimal` にした `value.into()` と同じです。`Decimal::from_int(3u32)` は `3.0` になります。
 
 ```kis
 const fn moon_angle(day: u32) -> Decimal {
@@ -193,7 +193,7 @@ const fn moon_angle(day: u32) -> Decimal {
 }
 ```
 
-## Struct: `Range<T>` {#struct-ranget}
+## 構造体：`Range<T>` {#struct-ranget}
 
 ```kis
 pub struct Range<T> {
@@ -206,11 +206,11 @@ pub struct Range<T> {
 - `start` `T` — 最初の値。
 - `end` `T` — 終端。
 - `inclusive` `bool` — `start..end`（終端を含まない）なら `false`、`start..=end` なら `true`。
-- Kind: — · Builtin: no
+- 種別：— · 組み込み：いいえ
 
-`a..b` と `a..=b` は `Range` の値です。式では両端が必要で、`a..`、`..b`、`..` はパターンにのみ書けます。`0..7` は使い方が別の整数型を期待しない限り `Range<i32>`、`last: Int<0, 7>` なら `0..last` は `Range<Int<0, 7>>` です。型付けは [コンパイラ規則](./appendix/rules.md#type-rules)、反復は [`for` ループ](./appendix/rules.md#for-loops) を参照してください。
+`a..b` と `a..=b` は `Range` の値です。式では両端とも省略できず、`a..`、`..b`、`..` はパターンでしか書けません。`0..7` は、使われる場所が別の整数型を求めていなければ `Range<i32>` になります。`last: Int<0, 7>` なら `0..last` は `Range<Int<0, 7>>` です。型付けは [コンパイラの規則](./appendix/rules.md#type-rules)、反復は [`for` ループ](./appendix/rules.md#for-loops) を参照してください。
 
-## Enum: `Option<T>` {#enum-optiont}
+## 列挙型：`Option<T>` {#enum-optiont}
 
 ```kis
 pub enum Option<T> {
@@ -219,11 +219,11 @@ pub enum Option<T> {
 }
 ```
 
-省略可能な値です。プレリュードは型とそのバリアント `None`、`Some` をインポートします。
+省略可能な値です。型とバリアント `None`、`Some` はプレリュードでインポートされます。
 
-- Kind: — · Builtin: no
+- 種別：— · 組み込み：いいえ
 
-## Enum: `Result<T, E>` {#enum-resultt-e}
+## 列挙型：`Result<T, E>` {#enum-resultt-e}
 
 ```kis
 pub enum Result<T, E> {
@@ -232,11 +232,11 @@ pub enum Result<T, E> {
 }
 ```
 
-成功値またはエラー値です。プレリュードは型とそのバリアント `Ok`、`Err` をインポートします。`nav::load` は `Result` を返します。
+成功値またはエラー値です。型とバリアント `Ok`、`Err` はプレリュードでインポートされます。`nav::load` の戻り値は `Result` です。
 
-- Kind: — · Builtin: no
+- 種別：— · 組み込み：いいえ
 
-## Trait: `Eq` {#trait-eq}
+## トレイト：`Eq` {#trait-eq}
 
 ```kis
 #[builtin] pub trait Eq {}
@@ -254,13 +254,13 @@ impl Eq for narrative::Text {}
 impl Eq for screen::Screen {}
 ```
 
-値を `==` と `!=` で比較できる型です。`ui::select` の境界です。
+`==` と `!=` で比較できる型です。`ui::select` の境界に使います。
 
-- Kind: — · Builtin: yes
+- 種別：— · 組み込み：はい
 
-`Eq` は、プリミティブ型、`Int`、関数ポインタ、そしてフィールドがすべて `Eq` の構造体・列挙型・タプル・配列に自動で付きます。`#[builtin]` 型には見えるフィールドがないため、`std` が上の `impl` で明示します：`String`、`Eq` な `T` の `Vec<T>`、`Rat`、`Decimal`、アセット型、`Text`、`Screen` は `Eq` です。ハンドルや保留中の変更（`Setting`、`Meta`、`Narrative`、`Entity`、`Prop`、`Change`、レイヤー、`Swap`、`Channel`、`ChannelChange`、`Element` など）とクロージャは `Eq` ではありません。`Eq` でない型の値の比較は [`E2017`](../diagnostics/types.md#e2017) です。
+プリミティブ型、`Int`、関数ポインタ、およびフィールドがすべて `Eq` である構造体・列挙型・タプル・配列は、自動的に `Eq` になります。`#[builtin]` 型には外から見えるフィールドがないため、`std` が上の `impl` で明示しています。`Eq` になるのは `String`、`T` が `Eq` の `Vec<T>`、`Rat`、`Decimal`、アセット型、`Text`、`Screen` です。ハンドルや保留中の変更（`Setting`、`Meta`、`Narrative`、`Entity`、`Prop`、`Change`、レイヤー、`Swap`、`Channel`、`ChannelChange`、`Element` など）とクロージャは `Eq` ではありません。`Eq` でない型の値を比較するとエラー [`E2017`](../diagnostics/types.md#e2017) になります。
 
-## Trait: `Integer` {#trait-integer}
+## トレイト：`Integer` {#trait-integer}
 
 ```kis
 #[builtin] pub trait Integer {
@@ -282,9 +282,9 @@ impl Integer for isize {}
 impl<const LO: i64, const HI: i64> Integer for Int<LO, HI> {}
 ```
 
-整数型：`Int<lo, hi>` と Rust の整数です。
+整数型、つまり `Int<lo, hi>` と Rust の整数型です。
 
-- Kind: — · Builtin: yes
+- 種別：— · 組み込み：はい
 
 ### `Integer::into(self)` {#integerintoself}
 
@@ -292,10 +292,10 @@ impl<const LO: i64, const HI: i64> Integer for Int<LO, HI> {}
 const fn into<T: FromInteger>(self) -> T;
 ```
 
-- Returns: `T` — `T` としてのこの値。
-- Kind: `const fn` · Builtin: yes
+- 戻り値：`T` — 同じ値を `T` で表したもの。
+- 種別：`const fn` · 組み込み：はい
 
-別の整数型か `Decimal` への損失のない変換です。`Self` のすべての値が `T` に収まらない限りコンパイルエラー（[`E2018`](../diagnostics/types.md#e2018)）です：`Int<0, 5>` は `u8` や `Int<0, 10>` に変換できますが、`u8` から `Int<0, 5>` への変換はコンパイルできません。整数はすべて `Decimal` に収まります：`7u8.into::<Decimal>()` は `7.0` です。
+別の整数型または `Decimal` へ、値を失わずに変換します。`Self` のどの値も `T` に収まる場合でなければコンパイルエラー（[`E2018`](../diagnostics/types.md#e2018)）になります。たとえば `Int<0, 5>` は `u8` や `Int<0, 10>` に変換できますが、`u8` から `Int<0, 5>` への変換はコンパイルできません。整数はどれも `Decimal` で表せるので、`7u8.into::<Decimal>()` は `7.0` になります。
 
 ### `Integer::saturate(self)` {#integersaturateself}
 
@@ -303,10 +303,10 @@ const fn into<T: FromInteger>(self) -> T;
 const fn saturate<T: Integer>(self) -> T;
 ```
 
-- Returns: `T` — `T` の範囲に丸め込んだこの値。
-- Kind: `const fn` · Builtin: yes
+- 戻り値：`T` — `T` の範囲内に丸め込んだ値。
+- 種別：`const fn` · 組み込み：はい
 
-`saturate` に収まる条件はありません：`300u32.saturate()` を `u8` にすると `255` です。
+`saturate` には収まるかどうかの制約がありません。`300u32.saturate()` を `u8` に変換すると `255` になります。
 
 ```kis
 const fn level(n: u32) -> Int<0, 10> {
@@ -314,29 +314,29 @@ const fn level(n: u32) -> Int<0, 10> {
 }
 ```
 
-## Trait: `FromInteger` {#trait-frominteger}
+## トレイト：`FromInteger` {#trait-frominteger}
 
 ```kis
 #[builtin] pub trait FromInteger {}
 impl FromInteger for Decimal {}
 ```
 
-[`Integer::into`](#integerintoself) で整数を変換できる型です：すべての `Integer` 型（暗黙に）と `Decimal`。`Integer` を境界に持つ型パラメータも `FromInteger` なので、`T: Integer` で書いたジェネリックなコードは `x.into::<T>()` を呼べます。`Integer::saturate` の変換先は整数型だけなので、`Decimal` への `saturate` は [`E2026`](../diagnostics/types.md#e2026) です。プレリュードは `FromInteger` をインポートしないので、ジェネリック関数では `std::FromInteger` と書きます。
+[`Integer::into`](#integerintoself) で整数から変換できる型です。すべての `Integer` 型（暗黙に実装）と `Decimal` が該当します。`Integer` を境界に持つ型パラメータも `FromInteger` なので、`T: Integer` を使ったジェネリックなコードから `x.into::<T>()` を呼べます。`Integer::saturate` の変換先は整数型に限られ、`Decimal` へ `saturate` するとエラー [`E2026`](../diagnostics/types.md#e2026) になります。`FromInteger` はプレリュードに含まれないため、ジェネリック関数では `std::FromInteger` と書きます。
 
-- Kind: — · Builtin: yes
+- 種別：— · 組み込み：はい
 
-## Trait: `RandChoose` {#trait-randchoose}
+## トレイト：`RandChoose` {#trait-randchoose}
 
 ```kis
 #[builtin] pub trait RandChoose {}
 impl<const LO: i64, const HI: i64> RandChoose for Int<LO, HI> {}
 ```
 
-物語が [`narrative::rng_choose`](./narrative.md#function-rng_choose) で乱択できる型です：フィールドを持たない列挙型（暗黙に）と `Int<lo, hi>`。
+物語が [`narrative::rng_choose`](./narrative.md#function-rng_choose) で乱択できる型です。フィールドのない列挙型（暗黙に実装）と `Int<lo, hi>` が該当します。
 
-- Kind: — · Builtin: yes
+- 種別：— · 組み込み：はい
 
-## Trait: `Asset` {#trait-asset}
+## トレイト：`Asset` {#trait-asset}
 
 ```kis
 #[builtin] pub trait Asset {}
@@ -347,11 +347,11 @@ impl Asset for VideoAsset {}
 impl Asset for FontAsset {}
 ```
 
-値がちょうどプログラムのアセット定数である型です。[`asset`](#function-assetpath) の境界です。下の 5 つのファイル型と、[`std::screen::shader`](./screen-shader.md) の 6 つのシェーダー型（`ColorShader<A>` など）が実装しています。
+取りうる値がプログラムのアセット定数そのものである型です。[`asset`](#function-assetpath) の境界に使います。下の 5 つのファイル型と、[`std::screen::shader`](./screen-shader.md) の 6 つのシェーダー型（`ColorShader<A>` など）が実装しています。
 
-- Kind: — · Builtin: yes
+- 種別：— · 組み込み：はい
 
-`std` のトレイトはすべて `#[builtin]` で、トレイトを宣言・実装できるのは `std` だけです。ゲーム内の `trait` アイテムや `impl Trait for T` はエラーです。[コンパイラ規則](./appendix/rules.md#traits) を参照してください。
+`std` のトレイトはすべて `#[builtin]` で、トレイトを宣言・実装できるのは `std` だけです。ゲーム側で `trait` アイテムや `impl Trait for T` を書くとエラーになります。[コンパイラの規則](./appendix/rules.md#traits) を参照してください。
 
 ## アセット型 {#asset-types}
 
@@ -364,32 +364,32 @@ impl Asset for FontAsset {}
 #[builtin] pub struct ShaderAsset;
 ```
 
-アセットファイルの種類ごとの不透明な型です。6 つすべてが `Eq` です。最初の 5 つは `Asset` で、有限型です：アセット型の値はちょうどその定数です。
+アセットファイルの種類ごとに用意した、中身の見えない型です。6 つとも `Eq` です。最初の 5 つは `Asset` を満たす有限型で、取りうる値はアセット定数そのものです。
 
-- Kind: — · Builtin: yes
+- 種別：— · 組み込み：はい
 
-|型|ファイル|使用箇所|
+|型|ファイル|使う場所|
 |---|---|---|
-|`ImageAsset`|画像：PNG、JPEG、WebP|画像レイヤー、ルールマスク、サイド画像、UI の画像とペイント|
-|`AudioAsset`|音楽または効果音のファイル|音楽と環境音のループ、ワンショットのサウンド|
-|`VoiceAsset`|行に結び付いたボイスファイル|`Say::voice`、`Narrative::replay_voice`|
+|`ImageAsset`|画像：PNG、JPEG、WebP|画像レイヤー、ルールマスク、サイド画像、UI の画像と塗り|
+|`AudioAsset`|音楽・効果音のファイル|音楽と環境音のループ、単発の効果音|
+|`VoiceAsset`|台詞に対応するボイスファイル|`Say::voice`、`Narrative::replay_voice`|
 |`VideoAsset`|動画ファイル|ムービーレイヤー|
 |`FontAsset`|フォントファイル|`System::font`、`TextEffect::font`、`TextStyle::font`|
-|`ShaderAsset`|任意のロールのシェーダーファイルの識別子。効果値が保持する|[`std::screen::shader`](./screen-shader.md) の効果値|
+|`ShaderAsset`|役割を問わないシェーダーファイルの識別子。効果値が保持する|[`std::screen::shader`](./screen-shader.md) の効果値|
 
-`ShaderAsset` は `Asset` ではなく、プレリュードにもありません。ゲームはシェーダーを `ColorShader<A>` などロールの型で宣言し、`ShaderAsset` を名前で書くことはありません。
+`ShaderAsset` は `Asset` ではなく、プレリュードにも含まれません。ゲームではシェーダーを `ColorShader<A>` など役割ごとの型で宣言するので、`ShaderAsset` という名前を書くことはありません。
 
-ランタイムがどのファイル形式をデコードできるかは [ランタイムプロファイル](./appendix/profiles.md) に記載しています。
+ランタイムが読めるファイル形式は [ランタイムプロファイル](./appendix/profiles.md) にまとめています。
 
-## Function: `asset(path)` {#function-assetpath}
+## 関数：`asset(path)` {#function-assetpath}
 
 ```kis
 #[builtin] pub const fn asset<A: Asset>(path: narrative::Text) -> A;
 ```
 
-- `path` `Text` — プログラムのアセットディレクトリからの相対パスを表す文字列リテラル。
-- Returns: `A` — アセット。
-- Kind: `const fn` · Builtin: yes
+- `path` `Text` — プログラムのアセットディレクトリからの相対パス（文字列リテラル）。
+- 戻り値：`A` — アセット。
+- 種別：`const fn` · 組み込み：はい
 
 アセットは定数として宣言します。
 
@@ -399,35 +399,35 @@ const AZUSA_0072: VoiceAsset = asset("voice/azusa_0072.ogg");
 const THEME: AudioAsset = asset("bgm/theme.ogg");
 ```
 
-- 型引数 `A` は定数の型から推論され、アセット型でなければなりません（そうでなければ [`E2026`](../diagnostics/types.md#e2026)）。
-- 引数は文字列リテラルでなければならず（[`E2028`](../diagnostics/types.md#e2028)）、空であってはなりません（[`E1028`](../diagnostics/modules.md#e1028)）。
-- パスはアセットディレクトリ（`kagari.toml` の `[assets] dir`、既定は `assets`。マニフェストがなければルートファイルのディレクトリ）からの相対パスで、そこから外へ出てはなりません（[`E1029`](../diagnostics/modules.md#e1029)）。`std` の中では、パスは `std` 自身からの相対パスで、`std` は [`std::shaders`](./shaders.md) のファイルを同梱しています。
-- ファイルがなければコンパイルエラーです（[`E1027`](../diagnostics/modules.md#e1027)）。表情、曲、ボイスは定数なので、名前の綴り間違いは実行時の失敗ではなく名前解決のエラーになります。
-- アセットディレクトリ直下の `system-fonts` と `std` ディレクトリは、システムフォントと std のアセットのために予約されています（[`E1032`](../diagnostics/modules.md#e1032)）。
-- `kagari build` は、プログラムが使うすべてのアセットの形式をプロジェクトのランタイムプロファイルに照らして検査し、すべてのシェーダーをそのロールに照らして検査します。[ランタイムプロファイル](./appendix/profiles.md) と [シェーダーの検査](./guides/shaders.md#checking-shaders) を参照してください。
+- 型引数 `A` は定数の型から推論します。アセット型以外だとエラー [`E2026`](../diagnostics/types.md#e2026) になります。
+- 引数は文字列リテラルに限られ（[`E2028`](../diagnostics/types.md#e2028)）、空文字列は書けません（[`E1028`](../diagnostics/modules.md#e1028)）。
+- パスはアセットディレクトリからの相対パスです。アセットディレクトリは `kagari.toml` の `[assets] dir` で指定し、既定は `assets` です（マニフェストがなければルートファイルのあるディレクトリ）。ディレクトリの外を指すパスはエラーです（[`E1029`](../diagnostics/modules.md#e1029)）。`std` の中では `std` 自身からの相対パスになり、`std` は [`std::shaders`](./shaders.md) のファイルを同梱しています。
+- ファイルが存在しなければコンパイルエラーです（[`E1027`](../diagnostics/modules.md#e1027)）。表情も曲もボイスも定数なので、名前を打ち間違えても実行時に失敗するのではなく、名前解決の段階でエラーになります。
+- アセットディレクトリ直下の `system-fonts` と `std` は、システムフォントと std のアセット用に予約されています（[`E1032`](../diagnostics/modules.md#e1032)）。
+- `kagari build` は、プログラムが使うアセットの形式をすべてプロジェクトのランタイムプロファイルと照合し、シェーダーもすべて役割に合っているか検査します。[ランタイムプロファイル](./appendix/profiles.md) と [シェーダーの検査](./guides/shaders.md#checking-shaders) を参照してください。
 
-## Function: `system_font(path)` {#function-system_fontpath}
+## 関数：`system_font(path)` {#function-system_fontpath}
 
 ```kis
 #[builtin] pub const fn system_font(path: narrative::Text) -> FontAsset;
 ```
 
-- `path` `Text` — システムフォントディレクトリのいずれかからの相対パスを表す文字列リテラル。
-- Returns: `FontAsset` — ゲームに同梱されるフォント。
-- Kind: `const fn` · Builtin: yes
+- `path` `Text` — いずれかのシステムフォントディレクトリからの相対パス（文字列リテラル）。
+- 戻り値：`FontAsset` — ゲームに同梱するフォント。
+- 種別：`const fn` · 組み込み：はい
 
-標準ライブラリはフォントを同梱しておらず、`System::font` には何かのフォントを指定する必要があります。ゲームをビルドするマシンにインストールされたフォントは、直接指定できます。
+標準ライブラリにはフォントが同梱されていませんが、`System::font` には何らかのフォントを指定しなければなりません。ゲームをビルドする環境にインストールされているフォントなら、そのまま指定できます。
 
 ```kis
 const GOTHIC: FontAsset = system_font("msgothic.ttc");
 const SANS: FontAsset = system_font("truetype/dejavu/DejaVuSans.ttf");
 ```
 
-- ディレクトリは順に探索され、最初にファイルが見つかったものが使われます。
+- 次のディレクトリを順に探し、最初に見つかったファイルを使います。
   - Windows：`%LOCALAPPDATA%\Microsoft\Windows\Fonts`、次に `%WINDIR%\Fonts`
   - macOS：`~/Library/Fonts`、`/Library/Fonts`、`/System/Library/Fonts`
-  - それ以外：`$XDG_DATA_HOME/fonts`、`~/.fonts`、次に `$XDG_DATA_DIRS` の各ディレクトリの `fonts`
-- どこにも見つからないフォントは [`E1030`](../diagnostics/modules.md#e1030) です。
-- `kagari.toml` の `[assets] system-fonts = false` はシステムフォントを禁止します。そのとき `system_font` はすべて [`E1031`](../diagnostics/modules.md#e1031) です。既定ではシステムフォントを使えます。
-- `kagari build` はシステムフォントを他のアセットと同じように `system-fonts.kiarchive` に詰め、パスは `system-fonts/` にソースに書いたパスを続けたものになります。そのため、アセットディレクトリ直下の `system-fonts` ディレクトリは予約されています（[`E1032`](../diagnostics/modules.md#e1032)）。
-- システムフォントは、`asset("…")` で作ったものと同じ `FontAsset` 定数です。
+  - その他：`$XDG_DATA_HOME/fonts`、`~/.fonts`、次に `$XDG_DATA_DIRS` の各ディレクトリの `fonts`
+- どこにも見つからなければエラー [`E1030`](../diagnostics/modules.md#e1030) になります。
+- `kagari.toml` で `[assets] system-fonts = false` とするとシステムフォントを使えなくなり、`system_font` はすべてエラー [`E1031`](../diagnostics/modules.md#e1031) になります。既定では使えます。
+- `kagari build` はシステムフォントもほかのアセットと同じく `system-fonts.kiarchive` にまとめます。格納時のパスは、`system-fonts/` の後にソースで書いたパスを続けたものです。このため、アセットディレクトリ直下の `system-fonts` ディレクトリは予約されています（[`E1032`](../diagnostics/modules.md#e1032)）。
+- システムフォントも、`asset("…")` で作ったものと同じ `FontAsset` 定数です。

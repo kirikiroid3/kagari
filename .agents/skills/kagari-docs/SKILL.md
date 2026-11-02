@@ -46,15 +46,34 @@ mdBook: `docs/dev/src/SUMMARY.md` lists every page.
 
 1. `ja/` mirrors `en/`: same files, same heading structure.
 2. Every `ja` heading has an explicit id equal to the English anchor:
-   `## エントリーシーン {#entry-scenes}`. English auto anchor (mdBook's, reproduced by
+   `## 開始シーン {#entry-scenes}`. English auto anchor (mdBook's, reproduced by
    `docs/site/src/markdown.ts`) = lowercase, spaces → `-`, punctuation (backticks, `:`, `.`, `(`)
    dropped: ``## `std::screen` `` → `stdscreen`. If the English anchor is ugly, give the English
    heading an explicit id and reuse it in ja.
 3. Code blocks are byte-identical in en and ja (comments and strings too).
-4. Japanese: です・ます調, `、。`, a half-width space between Japanese and inline code/ASCII
+4. Japanese: です・ます調, `、。（）：`, a half-width space between Japanese and inline code/ASCII
    (`` `Screen` 型 ``). Identifiers, keywords, attributes and codes stay in code spans.
-5. Terms: use the glossary table in `docs/dev/src/process/docs.md#glossary` (proposal-jp is the
-   tie-breaker). A new recurring term gets a row there and in the Language Reference glossary.
+5. Terms: use the glossary table in `docs/dev/src/process/docs.md#glossary` (authoritative; it
+   overrides proposal-jp's katakana). A new recurring term gets a row there and in the Language
+   Reference glossary.
+
+## Japanese: write it, don't translate it
+
+Known problem (fixed once, keep it fixed): the ja pages read like machine translations of en —
+too much katakana and English sentence shape. The ja page states the same facts as en, phrased
+the way a Japanese engineer would write them; it is never a 1:1 rendering. Full rules:
+`docs/dev/src/process/docs.md#japanese-style`.
+
+- **Katakana only when Japanese writers use it too** (シーン, セーブ, エンティティ, シェーダー,
+  クロージャ, トレイト …) or the glossary says so. Otherwise the Japanese word: 入門 (not
+  チュートリアル), 組み込み (ビルトイン), 制作者 (スタジオ), 補助関数 (ヘルパー), 実例 (レシピ),
+  役割 (ロール), 既定 (デフォルト), 補間 (トゥイーン), 生成 / 消去 (スポーン / デスポーン).
+- **Japanese sentence shape:** not 「〜は `E3002` です」 but 「〜とエラー `E3002` になります」;
+  drop translated "it / its / this"; active voice over translated passives; no 「1 つの」 for "a";
+  split long sentences; no long の chains; noun endings in tables.
+- Headings are short noun phrases; link text uses the target page's ja title.
+- Before finishing a ja edit, reread it as a Japanese reader: if a sentence only makes sense
+  after mentally translating it back to English, rewrite it.
 
 ## Diagnostics
 

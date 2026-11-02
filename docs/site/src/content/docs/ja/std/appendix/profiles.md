@@ -2,35 +2,35 @@
 title: "ランタイムプロファイル"
 ---
 
-**ランタイムプロファイル**は、ランタイムが提供するもの、つまり実装している std アイテムと、デコードできるアセットの種類・ファイル形式を表す名前です。プロジェクトは動作させたいプロファイルを `kagari.toml` に列挙し、`kagari build` はプログラムが使うすべてのアセットをそれぞれのプロファイルに照らして検査します。
+**ランタイムプロファイル**とは、ランタイムが何を提供するかを表す名前です。どの標準ライブラリのアイテムを実装しているか、どの種類・形式のアセットをデコードできるかが、プロファイルによって決まります。プロジェクトは動作対象のプロファイルを `kagari.toml` に並べて書き、`kagari build` はプログラムが使うすべてのアセットを、それぞれのプロファイルに照らして検査します。
 
 ```toml
 [build]
 runtime-compatibility = ["native_v0"]
 ```
 
-`runtime-compatibility` の既定値は `["native_v0"]` です。リストは空であってはならず、未知の名前はマニフェストのエラーです。[プロジェクト](../../reference/tools/projects.md) を参照してください。
+`runtime-compatibility` の既定値は `["native_v0"]` です。空のリストは指定できず、知らない名前を書くとマニフェストのエラーになります。[プロジェクト](../../reference/tools/projects.md)を参照してください。
 
 ## プロファイル {#profiles}
 
 |プロファイル|ランタイム|
 |---|---|
-|`native_v0`|デスクトップランタイム（`kagari-desktop-runtime`）、バージョン 0|
+|`native_v0`|デスクトップ版ランタイム（`kagari-desktop-runtime`）のバージョン 0|
 
-現在のプロファイルは `native_v0` だけです。
+現時点のプロファイルは `native_v0` だけです。
 
-## `native_v0` の対応表 {#native_v0-support-matrix}
+## `native_v0` の対応状況 {#native_v0-support-matrix}
 
-### モジュール別 {#by-module}
+### モジュールごとの対応 {#by-module}
 
 |モジュール|`native_v0` での対応|
 |---|---|
 |`std`（型、トレイト、`asset`、`system_font`）|対応|
 |`std::time`|対応|
-|`std::narrative`|対応：`Say`、無効なアームを含む `Choice`、`rng_choose`、`Meta`、`Narrative` のすべてのメソッド。時間付き入力は予定で、どのプロファイルにもありません|
-|`std::narrative::text`|対応：ルビとモノルビ、すべてのテキスト効果（スタイル、圏点、表示速度、ポーズ、マーク）、`hanging_indent` と `vertical` を含む `TextStyle` のすべてのフィールド|
-|`std::screen`|対応。ムービーレイヤー（`Entity::movie`、`MovieLayer`）も含みます|
-|`std::screen::shader`、`std::shaders`|対応。すべてのシェーダーは `kagari build` で検証されます。ストレージバッファを持たない GPU（モーションのロールではコンピュートを持たない GPU）では、ランタイムは効果をかけずに内容を描きます|
+|`std::narrative`|対応。`Say`、無効なアームを含む `Choice`、`rng_choose`、`Meta`、`Narrative` の全メソッド。時間制限付きの入力は予定の段階で、どのプロファイルにもありません|
+|`std::narrative::text`|対応。ルビとモノルビ、全テキスト効果（スタイル、圏点、表示速度、一時停止、マーク）、`hanging_indent` と `vertical` を含む `TextStyle` の全フィールド|
+|`std::screen`|対応。ムービーのレイヤー（`Entity::movie`、`MovieLayer`）も含む|
+|`std::screen::shader`、`std::shaders`|対応。シェーダーはすべて `kagari build` の時点で検証します。ストレージバッファに対応していない GPU（モーションの役割では、コンピュートシェーダーに対応していない GPU）では、効果をかけずに内容だけを描画します|
 |`std::screen::anim`|対応|
 |`std::screen::audio`|対応|
 |`std::stage`|対応|
@@ -39,19 +39,19 @@ runtime-compatibility = ["native_v0"]
 
 ### アセットの種類と形式 {#asset-kinds-and-formats}
 
-形式は拡張子ではなく、ファイルの内容から判定します。
+形式は拡張子ではなく、ファイルの中身で判定します。
 
 |アセット型|対応する形式|対応しない形式|
 |---|---|---|
-|`ImageAsset`|PNG、ベースラインおよびプログレッシブ JPEG、非可逆・可逆・拡張（アルファまたはメタデータ付き）WebP、BMP（非圧縮、RLE またはビットフィールド）、静止画の JPEG XL（RGB またはグレースケール）|算術・可逆・階層・12 ビット符号化の JPEG、アニメーション WebP、GIF、JPEG または PNG を埋め込んだ BMP や CMYK の BMP、AVIF、アニメーションまたは CMYK の JPEG XL|
-|`AudioAsset`、`VoiceAsset`|Ogg Vorbis、Ogg FLAC、FLAC、WAV（PCM）、WAV（IEEE 浮動小数点）、MP3、モノラルまたはステレオの AAC-LC（ADTS または MP4/M4A）、モノラルまたはステレオの ALAC（MP4/M4A）|Ogg Opus、その他の Ogg コーデック、圧縮 WAV、HE-AAC などその他の AAC プロファイル、3 チャンネル以上の AAC または ALAC、その他のコーデックの MP4/M4A|
+|`ImageAsset`|PNG、ベースラインおよびプログレッシブ JPEG、非可逆・可逆・拡張（アルファやメタデータ付き）WebP、BMP（非圧縮、RLE、ビットフィールド）、静止画の JPEG XL（RGB またはグレースケール）|算術符号化・可逆・階層型・12 ビットの JPEG、アニメーション WebP、GIF、JPEG や PNG を埋め込んだ BMP、CMYK の BMP、AVIF、アニメーションや CMYK の JPEG XL|
+|`AudioAsset`、`VoiceAsset`|Ogg Vorbis、Ogg FLAC、FLAC、WAV（PCM）、WAV（IEEE 浮動小数点）、MP3、モノラルまたはステレオの AAC-LC（ADTS または MP4/M4A）、モノラルまたはステレオの ALAC（MP4/M4A）|Ogg Opus、その他の Ogg コーデック、圧縮 WAV、HE-AAC などほかの AAC プロファイル、3 チャンネル以上の AAC や ALAC、ほかのコーデックの MP4/M4A|
 |`FontAsset`|TrueType、OpenType（CFF）、TrueType/OpenType コレクション（`.ttc`）|WOFF、WOFF2|
-|`VideoAsset`|VP9 または AV1 の映像と Opus または Vorbis の音声（音声なしも可）の WebM、H.264 の映像と AAC-LC の音声（音声なしも可）の MP4|VP8 などその他の映像コーデック、複数の映像トラック、その他の音声コーデック、その他のトラックを含む WebM、その他のコンテナ|
-|`ColorShader`、`MixShader`、`TextureShader`、`MaskShader`、`LocalMotionShader`、`TransitionalMotionShader`|そのロールとして検証を通る WGSL ソース（UTF-8 テキスト）|テキストでないデータ、誤りのある WGSL|
+|`VideoAsset`|映像が VP9 か AV1、音声が Opus か Vorbis（音声なしも可）の WebM。映像が H.264、音声が AAC-LC（音声なしも可）の MP4|VP8 などほかの映像コーデック、複数の映像トラック、ほかの音声コーデック、ほかのトラックを含む WebM、ほかのコンテナ|
+|`ColorShader`、`MixShader`、`TextureShader`、`MaskShader`、`LocalMotionShader`、`TransitionalMotionShader`|型が示す役割として検証を通る WGSL ソース（UTF-8 テキスト）|テキストでないデータ、誤りのある WGSL|
 
-## 対応していないアイテムを使った場合 {#using-an-unsupported-item}
+## 対応していないものを使った場合 {#using-an-unsupported-item}
 
-**対応していないアセットはビルドを失敗させます。** プログラムが使うアセットのうち、列挙されたプロファイルがデコードできないものごとに、`kagari build` はエラーを 1 行出力し、何も出力ファイルを書きません。
+**対応していないアセットがあるとビルドは失敗します。** プログラムが使うアセットのうち、指定したプロファイルでデコードできないものがあれば、`kagari build` はアセットごとにエラーを 1 行ずつ出し、出力ファイルは何も書きません。
 
 ```text
 error: asset `movie/intro.webm` (video): WebM/Matroska with another codec, several video tracks or an unreadable header is not supported by runtime profile `native_v0`
@@ -59,20 +59,20 @@ error: asset `music/theme.ogg` (audio): Ogg Opus is not supported by runtime pro
 error: asset `bgimage/title.gif` (image): GIF is not supported by runtime profile `native_v0`
 ```
 
-このようなアセットは対応する形式に変換してください。ムービーなら、たとえば次のようにします。
+このようなアセットは、対応している形式に変換してください。ムービーなら、たとえば次のようにします。
 
 ```sh
 ffmpeg -i in.mov -c:v libvpx-vp9 -c:a libopus out.webm
 ```
 
-AV1 にするには `-c:v libsvtav1` を、H.264 にするには `-c:v libx264 -c:a aac` と `.mp4` の出力を使います。
+AV1 にするなら `-c:v libsvtav1` を、H.264 にするなら `-c:v libx264 -c:a aac` を指定し、出力を `.mp4` にします。
 
-**不正なシェーダーはビルドを失敗させます。** `kagari build` はプログラムが使うすべてのシェーダーを、`std::shaders` のものも含め、その型が示すロールとしてコンパイルし、不正なシェーダーとロールの組ごとにエラーを 1 行出力します。誤りが `.wgsl` ファイル内にあればその行を示します。
+**不正なシェーダーがあるとビルドは失敗します。** `kagari build` は、`std::shaders` のものも含め、プログラムが使うすべてのシェーダーを、型が示す役割としてコンパイルします。不正なシェーダーがあれば、シェーダーと役割の組ごとにエラーを 1 行出します。誤りが `.wgsl` ファイルの中にあれば、その行番号も示します。
 
 ```text
 error: shader `shader/broken.wgsl` (color): line 4: no definition in scope for identifier: `undefined_name`
 ```
 
-`native_v0` は唯一のプロファイルで、`runtime-compatibility` は空にできないため、すべての `kagari build` は `native_v0` に照らして検査します。現在、プロジェクトがこの検査を外すことはできません。
+プロファイルは `native_v0` しかなく、`runtime-compatibility` は空にできないので、`kagari build` は必ず `native_v0` に照らして検査します。現時点では、この検査をプロジェクト側で外すことはできません。
 
-**存在しない std アイテムは起動時に失敗します。** より新しい `std` でビルドした `.kagari` ファイルは、インストールされたランタイムが提供しないビルトインを呼ぶことがあります。その場合ランタイムは「the bytecode imports `…`, which this runtime does not provide」としてゲームの起動を拒否します。ランタイムが知らないエンジン機能を必要とする `.kagari` ファイルも同様に拒否されます。出荷するランタイムに合ったツールチェーンでゲームをビルドしてください。
+**標準ライブラリのアイテムが足りないと起動時に失敗します。** 新しい `std` でビルドした `.kagari` ファイルは、インストール済みのランタイムが提供していない組み込みのアイテムを呼び出すことがあります。その場合、ランタイムは「the bytecode imports `…`, which this runtime does not provide」と出してゲームの起動を拒否します。ランタイムが知らないエンジン機能を必要とする `.kagari` ファイルも、同じように拒否します。ゲームは、配布するランタイムと対応するツールチェーンでビルドしてください。
