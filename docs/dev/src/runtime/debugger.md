@@ -1,18 +1,18 @@
 # The Debugger
 
 The story debugger lets an author move around the story and ask about it without playing it by
-hand: where the story is (`stack`, `ls`, `detail`), moving it (`goto`, `push`, `pop`, `seed`),
-whether a step can still be reached and how (`nav`), step breakpoints and stepping, and
-instruction breakpoints with stepping inside story code. The same commands work on the
-**headless query engine** (no window) and on a game **running in a window**, and editors reach
-both over the Debug Adapter Protocol. The user-facing description is the Reference's
-[The Debugger](https://kagari.suitsu31.club/en/reference/tools/debugger/).
+hand: where the story is (`stack`, `ls`, `detail`), which scenes it has (`scenario`), moving it
+(`goto`, `push`, `pop`, `seed`), whether a step can still be reached and how (`nav`), step
+breakpoints and stepping, and instruction breakpoints with stepping inside story code. The same
+commands work on the **headless query engine** (no window) and on a game **running in a window**,
+and editors reach both over the Debug Adapter Protocol. The user-facing description is the
+Reference's [The Debugger](https://kagari.suitsu31.club/en/reference/tools/debugger/).
 
 ## Where in the code
 
 | Path | Contents |
 | ---- | -------- |
-| `runtime_libs/kagari-debugger/src/session/` | `Debugger`: state, starting, breakpoints, stack and scopes (`mod.rs`, with the `probe`/`jump`/`step` drive helpers); `ls`, `goto`, `detail`, `push`, `pop`, `seed` (`moves.rs`); `nav` and the seed search (`navigate.rs`); step-level execution (`exec.rs`); hot swap (`swap.rs`); the pilots that steer the drives (`pilots.rs`); details, `ls` lines and the Step scope (`views.rs`) |
+| `runtime_libs/kagari-debugger/src/session/` | `Debugger`: state, starting, breakpoints, stack and scopes (`mod.rs`, with the `probe`/`jump`/`step` drive helpers, and `parse_step` and `scenario`, which read only the program); `ls`, `goto`, `detail`, `push`, `pop`, `seed` (`moves.rs`); `nav` and the seed search (`navigate.rs`); step-level execution (`exec.rs`); hot swap (`swap.rs`); the pilots that steer the drives (`pilots.rs`); details, `ls` lines and the Step scope (`views.rs`) |
 | `runtime_libs/kagari-debugger/src/tracker.rs` | `Tracker`: the story's node in the story graph, followed in lockstep |
 | `runtime_libs/kagari-debugger/src/nav.rs` | `Summaries`, `shortest`: shortest paths through the story graph |
 | `runtime_libs/kagari-debugger/src/hook.rs` | `HookState`, `Hook`: instruction breakpoints and code stepping (the VM's `InstrHook`) |
@@ -162,9 +162,10 @@ on its next poll. A load or a new game by the player ends the hold; the server t
 **Inside code.** Instruction breakpoints are code words of story functions (`fn` has none). The
 VM asks the hook before every instruction while it is installed (one `Option` check per
 instruction when no debugger is attached; [The VM](./vm.md)). A stop sends `stopped` with
-`inCode` and **blocks in the VM**, serving `stackTrace`, `scopes`, breakpoint changes and
-`continue`/`next`/`stepIn`/`stepOut`/`disconnect`; moves are refused (the VM is in the middle of
-the story). In a window the frame loop is blocked meanwhile, so the window does not redraw.
+`inCode` and **blocks in the VM**, serving `stackTrace`, `scopes`, `kagari/scenario`, breakpoint
+changes and `continue`/`next`/`stepIn`/`stepOut`/`disconnect`; moves are refused (the VM is in
+the middle of the story). In a window the frame loop is blocked meanwhile, so the window does not
+redraw.
 
 A code step stops at the next source **position** (a change of the Debug section's byte offset)
 at the same or a smaller call depth (`next`), at any depth (`stepIn`), or at a smaller depth
@@ -197,6 +198,7 @@ directory, or `std/…`) and a byte `offset`.
 | `kagari/pop` | — | a position |
 | `kagari/nav` | `step`, `seeds` | `answer`, `reason`, `path` (choices and draws), `push`, `length`, `seed` (the search) |
 | `kagari/seed` | `seed` | `seed` |
+| `kagari/scenario` | — | `scenes`, sorted by path: `name`, `steps` (distinct step IDs in its code) |
 | `kagari/swap` | — | `outcome` (`kept`, `recalled`, `restarted`, `reset`, `none`), `scene`, `reason`, `thrown`, `position`, `scriptHash` |
 | `disconnect` | — | — (the runtime removes the hook and the breakpoints and releases the story) |
 

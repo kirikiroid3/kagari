@@ -5,8 +5,8 @@ use serde_json::{Value, json};
 
 use super::locate::Locator;
 use crate::protocol::{
-    Detail, InitializeBody, LsBody, NavBody, PathItem, Position, PushBody, ScopesBody, SeedBody,
-    StackBody, StoppedBody, SwapBody, Var, command,
+    Detail, InitializeBody, LsBody, NavBody, PathItem, Position, PushBody, ScenarioBody,
+    ScopesBody, SeedBody, StackBody, StoppedBody, SwapBody, Var, command,
 };
 
 /// The `initialize` answer as a line for the user.
@@ -60,6 +60,7 @@ Story commands (positions are step IDs such as crate::Start#3):
   detail [<step>]            everything about a step (default: the current one)
   nav <step> [--seeds N]     whether a step can be reached from here, and how
   seed [<n>]                 show or set the PRNG seed (replays the trace)
+  scenario                   every scene with its number of steps
 Running:
   continue | c               run to a breakpoint, a choice or the end
   next | n                   to the next step in this scene
@@ -129,6 +130,8 @@ pub fn parse(line: &str) -> Result<Parsed, String> {
             }
             _ => Err("`seed` takes at most a number".to_owned()),
         },
+        "scenario" if rest.is_empty() => request(command::SCENARIO, Value::Null),
+        "scenario" => Err("`scenario` takes no arguments".to_owned()),
         "continue" | "c" => request(command::CONTINUE, Value::Null),
         "next" | "n" => request(command::NEXT, Value::Null),
         "step" | "s" => request(command::STEP_IN, Value::Null),
@@ -180,9 +183,27 @@ pub fn format(command: &str, body: &Value, loc: &Locator) -> String {
             let seed: SeedBody = de(body);
             format!("seed {}", seed.seed)
         }
+        command::SCENARIO => scenario(&de(body)),
         command::SWAP => de::<SwapBody>(body).summary(),
         _ => String::new(),
     }
+}
+
+/// One scene per line: its path, then its step count, aligned.
+fn scenario(body: &ScenarioBody) -> String {
+    if body.scenes.is_empty() {
+        return "no scenes".to_owned();
+    }
+    let width = body.scenes.iter().map(|s| s.name.len()).max().unwrap_or(0);
+    let lines: Vec<String> = body
+        .scenes
+        .iter()
+        .map(|s| {
+            let unit = if s.steps == 1 { "step" } else { "steps" };
+            format!("{:width$}  {} {unit}", s.name, s.steps)
+        })
+        .collect();
+    lines.join("\n")
 }
 
 pub fn position(p: &Position) -> String {

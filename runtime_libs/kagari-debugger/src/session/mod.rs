@@ -28,7 +28,7 @@ use crate::hook::HookState;
 use crate::nav::Summaries;
 use crate::protocol::{
     ArtifactInfo, BreakpointsBody, Incomplete, InitializeBody, InstructionPoint, Position,
-    ScopesBody, StackBody, StoppedBody,
+    ScenarioBody, SceneInfo, ScopesBody, StackBody, StoppedBody,
 };
 use crate::tracker::Track;
 use crate::values::Names;
@@ -325,4 +325,32 @@ pub fn parse_step(program: &Program, step: &str) -> Result<StepId> {
         return Err(format!("`{path}` has no step {id}"));
     }
     Ok(StepId { func, id })
+}
+
+/// `kagari/scenario`: every scene of `program`, sorted by path, with its step count.
+pub fn scenario(program: &Program) -> ScenarioBody {
+    let module = program.module();
+    let mut scenes: Vec<SceneInfo> = module
+        .functions
+        .iter()
+        .filter(|f| f.kind == FnKind::Scene)
+        .map(|f| {
+            let mut ids: Vec<u32> = f
+                .code
+                .iter()
+                .filter_map(|i| match i {
+                    Instr::Step { id, .. } => Some(*id),
+                    _ => None,
+                })
+                .collect();
+            ids.sort_unstable();
+            ids.dedup();
+            SceneInfo {
+                name: program.string(f.path).to_owned(),
+                steps: u32::try_from(ids.len()).unwrap_or(u32::MAX),
+            }
+        })
+        .collect();
+    scenes.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+    ScenarioBody { scenes }
 }

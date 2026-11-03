@@ -78,6 +78,7 @@ the game goes away while the prompt is up, the debugger exits after Enter.
 | `detail [<step>]` | Everything about a step (by default the current one; another one must lie between the last choice and the next): the speaker and the text with its rubies and effects, the voice, the render and whether it is a keyframe; for a choice, its `id` and every arm with its arm ID, its text and whether it is shown. |
 | `nav <step> [--seeds N]` | Whether the step can be reached from the current state, and how (below). |
 | `seed [<n>]` | Show the random seed, or replay the current position with seed `n` (an error when the choices no longer fit). |
+| `scenario` | Every scene of the game, sorted by path, with its number of steps. It also works at a stop inside code. |
 | `continue`, `c` | Go on: to a breakpoint, a choice or the end of the story (in a window: the player plays on). |
 | `next`, `n` | To the next step in this scene, past the steps of the scenes it calls. |
 | `step`, `s` | To the next step, into a called scene. |
@@ -217,8 +218,9 @@ variables of each frame and the story variables, breakpoints on lines, and conti
 step into and step out as above. The debug console evaluates the commands of this page (`ls`,
 `nav crate::Start#9`, `push B`, `swap`). The story commands are also custom requests
 `kagari/stack`, `kagari/ls`, `kagari/goto`, `kagari/push`, `kagari/pop`, `kagari/detail`,
-`kagari/nav` and `kagari/seed`, with structured results. The custom request `kagari/swap` rebuilds
-and hot swaps the game, sets the line breakpoints again and answers with the outcome (`kept`,
-`recalled`, `restarted` or `reset`), the scene called again, the reason, the scenes thrown off and
-the new position. Conditional, function and exception breakpoints are not supported. A window
-launch sends the game's log (its standard error) to the debug console as `stderr` output.
+`kagari/nav`, `kagari/seed` and `kagari/scenario`, with structured results. The custom request
+`kagari/swap` rebuilds and hot swaps the game, sets the line breakpoints again and answers with
+the outcome (`kept`, `recalled`, `restarted` or `reset`), the scene called again, the reason, the
+scenes thrown off and the new position. Conditional, function and exception breakpoints are not
+supported. A window launch sends the game's log (its standard error) to the debug console as
+`stderr` output.

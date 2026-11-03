@@ -693,6 +693,7 @@ fn push_runs_into_an_instruction_breakpoint() {
     let stack = client.request(command::STACK_TRACE, Value::Null);
     let scopes = client.request(command::SCOPES, json!({ "frame": 0 }));
     let refused = client.request(command::LS, Value::Null);
+    let scenario = client.request(command::SCENARIO, Value::Null);
     let cont = client.request(command::CONTINUE, Value::Null);
     server.poll(&mut game.t());
     let messages = drain(&client);
@@ -715,6 +716,18 @@ fn push_runs_into_an_instruction_breakpoint() {
     let (ok, error) = response(&messages, refused);
     assert!(!ok);
     assert!(error.as_str().unwrap().contains("inside code"), "{error}");
+    // Reading the program is no move: it is served inside code.
+    let (ok, scenario) = response(&messages, scenario);
+    assert!(ok, "{scenario}");
+    assert_eq!(
+        scenario,
+        json!({ "scenes": [
+            { "name": "crate::AmusementPark", "steps": 6 },
+            { "name": "crate::Greet", "steps": 1 },
+            { "name": "crate::Meet", "steps": 1 },
+            { "name": "crate::Start", "steps": 5 },
+        ] })
+    );
     assert!(response(&messages, cont).0);
     assert!(response(&messages, push).0);
     assert_eq!(at(&mut game, server.debugger()), "crate::Meet#0");

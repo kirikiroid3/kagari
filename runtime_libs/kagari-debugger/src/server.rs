@@ -22,7 +22,7 @@ use crate::protocol::{
     InstructionBreakpointsArgs, Message, NavArgs, PushArgs, ScopesArgs, ScopesBody, SeedArgs,
     StackBody, StepArgs, StepBreakpointsArgs, StoppedBody, SwapBody, command, event,
 };
-use crate::session::{Debugger, Run, Target, parse_step};
+use crate::session::{Debugger, Run, Target, parse_step, scenario};
 use crate::transport::{Connection, Link};
 use crate::values::Names;
 
@@ -267,6 +267,7 @@ impl Server {
                     .and_then(json);
                 respond(&self.conn, result);
             }
+            command::SCENARIO => respond(&self.conn, json(scenario(t.engine.program()))),
             command::GOTO | command::PUSH | command::POP | command::SEED => {
                 let result = match command.as_str() {
                     command::GOTO => args::<StepArgs>(arguments).and_then(|a| {
@@ -397,6 +398,7 @@ pub(crate) fn serve_code_stop(hook: &Hook, stop: &HookStop<'_>, breakpoint: bool
                     .collect();
                 respond(json(StackBody { frames }));
             }
+            command::SCENARIO => respond(json(scenario(stop.program))),
             command::SCOPES => {
                 let result = args::<ScopesArgs>(arguments).and_then(|a| {
                     let frame = stop

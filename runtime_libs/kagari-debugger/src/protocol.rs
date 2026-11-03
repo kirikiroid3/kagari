@@ -96,6 +96,8 @@ pub mod command {
     pub const DETAIL: &str = "kagari/detail";
     pub const NAV: &str = "kagari/nav";
     pub const SEED: &str = "kagari/seed";
+    /// Every scene of the program with its number of steps (works at a stop inside code too).
+    pub const SCENARIO: &str = "kagari/scenario";
     /// Scene hot swap: the runtime reloads `game.kagari` and its debug artifact from its game
     /// directory and swaps them in.
     pub const SWAP: &str = "kagari/swap";
@@ -373,6 +375,20 @@ pub struct SeedArgs {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct SeedBody {
     pub seed: u64,
+}
+
+/// `kagari/scenario`: the program's scenes, sorted by path.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ScenarioBody {
+    pub scenes: Vec<SceneInfo>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct SceneInfo {
+    /// The scene's path (`crate::story::Start`).
+    pub name: String,
+    /// How many steps (distinct step IDs) its code has.
+    pub steps: u32,
 }
 
 /// The `stopped` event.

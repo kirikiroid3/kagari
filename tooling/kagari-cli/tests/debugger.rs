@@ -196,6 +196,7 @@ fn the_repl_moves_through_the_story_and_navigates() {
          detail\n\
          nav crate::scenario::Start#0\n\
          seed 7\n\
+         scenario\n\
          quit\n",
     );
     let out = stdout(&output);
@@ -224,6 +225,11 @@ fn the_repl_moves_through_the_story_and_navigates() {
         // Already passed.
         "unreachable",
         "seed 7",
+        // scenario: every scene by path with its step count, names aligned.
+        "crate::scenario::AmusementPark  6 steps\n\
+         crate::scenario::Greet          1 step\n\
+         crate::scenario::Meet           1 step\n\
+         crate::scenario::Start          5 steps\n",
     ];
     for line in expect {
         assert!(out.contains(line), "missing `{line}` in\n{out}");

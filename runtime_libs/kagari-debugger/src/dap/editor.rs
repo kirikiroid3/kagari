@@ -12,7 +12,7 @@ use crate::client::text::{self, Parsed};
 use crate::protocol::{Message, command};
 
 /// The `kagari/…` requests passed through unchanged.
-const CUSTOM: [&str; 8] = [
+const CUSTOM: [&str; 9] = [
     command::STACK,
     command::LS,
     command::GOTO,
@@ -21,6 +21,7 @@ const CUSTOM: [&str; 8] = [
     command::DETAIL,
     command::NAV,
     command::SEED,
+    command::SCENARIO,
 ];
 
 /// The arguments the adapter reads, from whichever request has them.
