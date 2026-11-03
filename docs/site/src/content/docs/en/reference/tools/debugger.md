@@ -59,6 +59,13 @@ Locations are shown as `file:line:column`, with files relative to the directory 
 root file. Commands can be piped in (`kagari debug < commands.txt`); the debugger answers them in
 order and exits at the end of the input.
 
+On a terminal, the command line can be edited: ← and → move in the line, ↑ shows the earlier
+commands that start with what is typed, newest first, and ↓ goes back (past the newest, to what
+was typed). Ctrl-R searches the earlier commands, Ctrl-C drops the line and Ctrl-D ends the
+session. The commands are remembered until the debugger exits. Output that arrives while a
+command is being typed (a stop in a window, a `--watch` rebuild) is printed above the prompt. When
+the game goes away while the prompt is up, the debugger exits after Enter.
+
 ## Commands {#commands}
 
 | Command | Effect |

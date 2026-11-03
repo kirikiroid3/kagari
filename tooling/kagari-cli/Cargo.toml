@@ -26,6 +26,7 @@ crc32fast = { workspace = true }
 flate2 = { workspace = true }
 jiff = { workspace = true }
 serde_json = { workspace = true }
+rustyline = { workspace = true }
 semver = { workspace = true }
 sha1 = { workspace = true }
 sha2 = { workspace = true }

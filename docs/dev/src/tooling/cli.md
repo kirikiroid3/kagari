@@ -22,7 +22,7 @@ the outcome to output and an exit code. No compiler logic lives in the CLI.
 | `tooling/kagari-cli/src/analysis_cache.rs` | `path`, `offer`, `store`: the analysis cache shared by `check` and `build` |
 | `tooling/kagari-cli/src/outputs.rs` | `BYTECODE_FILE`, the game files of a target directory, the release directory, removing build outputs, images and caches, removing empty directories |
 | `tooling/kagari-cli/src/command/{check,clean,disasm,fmt,lsp}.rs` | One module per subcommand |
-| `tooling/kagari-cli/src/command/{debug,dap}.rs`, `src/debugger.rs` | `kagari debug` (the REPL) and `kagari dap` over `kagari-debugger`'s `client` and `dap` features; `debugger.rs` opens projects for them (`Projects`, the adapter's `Launcher`); see [The Debugger](../runtime/debugger.md) |
+| `tooling/kagari-cli/src/command/{debug,dap}.rs`, `command/debug/console.rs`, `src/debugger.rs` | `kagari debug` (the REPL; `console.rs` reads its lines and prints its output) and `kagari dap` over `kagari-debugger`'s `client` and `dap` features; `debugger.rs` opens projects for them (`Projects`, the adapter's `Launcher`); see [The Debugger](../runtime/debugger.md) |
 | `tooling/kagari-cli/src/command/build/{mod,archives,compat,shaders}.rs` | `kagari build` and its profiles, archive packing, runtime-profile check, shader check |
 | `tooling/kagari-cli/src/command/release/{mod,download,iso,zip}.rs` | `kagari release`: `Platform`, the runtime download (`DOWNLOAD_URL`, checksum), the ISO 9660 writer, the ZIP writer |
 | `tooling/kagari-cli/src/command/release/macos/{mod,sign}.rs` | The macOS app: bundle layout, `Info.plist`, `CodeResources`, `ICON` (`kagari.icns`); the ad hoc Mach-O code signer |
@@ -424,6 +424,22 @@ bytecode's source file names are relative to; `Projects` offers `open` to the ad
 when the editor disconnects. The REPL's `swap` and `--watch` (and the adapter's `kagari/swap` and
 `watch`) rebuild through the same `debugger::open` and hot swap the game; `Opened` names the
 project root to watch and its output directory to skip.
+
+The REPL's `Console` reads lines on a thread. When standard input and output are both terminals it
+uses rustyline: the main loop asks for one line at a time (`prompt`, once no request is waiting),
+so the terminal is in raw mode only while the prompt is up, and every output goes to a printer
+thread that hands it to rustyline's external printer, which prints above the prompt and redraws
+the line being typed. The printer has its own thread because it can block: in raw mode its queue
+holds one message, and a prompt that closes before taking it leaves the next message waiting for
+the next prompt; the REPL thread must never wait for that. ↑/↓
+are bound to `Recall`, a prefix search over the session's lines (each kept once, at its latest
+place): ↑ shows the newest older line that starts with the text typed before the search, ↓ the
+next newer one and finally the typed text; editing a shown line starts a new search. Ctrl-C
+sends an empty line, Ctrl-D ends the input. Raw mode ends only when `readline` returns, so when
+the runtime goes away with the prompt up, `close` waits for the line before the REPL returns;
+`close` then waits (up to half a second) for the printer thread to print what is left.
+Otherwise (a pipe, a file) lines are read as they come and a plain `(kagari) ` is printed, again
+after any output that follows it.
 
 ### `kagari init`
 

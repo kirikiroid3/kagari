@@ -2,11 +2,12 @@
 //! window, or a running game (`--attach`). `swap` (and `--watch`, on a change of the project's
 //! files) rebuilds the debug profile and hot swaps the game.
 
+mod console;
+
 use std::collections::HashMap;
-use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::sync::mpsc::{self, RecvTimeoutError};
+use std::sync::mpsc::RecvTimeoutError;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -21,6 +22,8 @@ use serde_json::{Value, json};
 
 use crate::debugger;
 use crate::failure::Failure;
+
+use console::Console;
 
 /// How often `--watch` looks at the project's files.
 const WATCH_INTERVAL: Duration = Duration::from_millis(500);
@@ -75,6 +78,7 @@ pub fn run(options: &Options<'_>) -> Result<ExitCode, Failure> {
         .ok_or_else(|| Failure("no connection".to_owned()))?;
     let mut repl = Repl {
         conn: Connection::new(link),
+        console: Console::start(),
         loc: opened.locator(),
         root: opened.source_root.clone(),
         pending: HashMap::new(),
@@ -103,6 +107,7 @@ enum Waiting {
 
 struct Repl {
     conn: Connection,
+    console: Console,
     loc: Locator,
     root: PathBuf,
     pending: HashMap<i64, Waiting>,
@@ -128,50 +133,34 @@ impl Repl {
     }
 
     fn run(&mut self) {
-        let (lines, input) = mpsc::channel();
-        thread::spawn(move || {
-            for line in std::io::stdin().lock().lines() {
-                let Ok(line) = line else { break };
-                if lines.send(line).is_err() {
-                    break;
-                }
-            }
-        });
         let mut eof = false;
         let mut quitting = false;
-        let mut prompted = false;
         loop {
             while let Some(message) = self.conn.try_recv() {
                 self.receive(message);
             }
             if self.conn.closed() {
-                println!("the runtime is gone");
+                self.console.println("the runtime is gone");
+                self.console.close();
                 return;
             }
             if self.pending.is_empty() {
                 if eof || quitting {
                     break;
                 }
-                if !prompted {
-                    print!("(kagari) ");
-                    let _ = std::io::stdout().flush();
-                    prompted = true;
-                }
+                self.console.prompt();
             }
             if eof || quitting {
                 thread::sleep(Duration::from_millis(5));
                 continue;
             }
-            match input.recv_timeout(Duration::from_millis(20)) {
-                Ok(line) => {
-                    prompted = false;
-                    quitting = self.command(&line);
-                }
+            match self.console.line(Duration::from_millis(20)) {
+                Ok(line) => quitting = self.command(&line),
                 Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => eof = true,
             }
-            if !quitting && self.watched() {
-                prompted = false;
+            if !quitting {
+                self.watched();
             }
         }
         let bye = self.conn.request(command::DISCONNECT, Value::Null);
@@ -184,31 +173,34 @@ impl Repl {
                 None => {}
             }
         }
+        self.console.close();
     }
 
     /// Runs a command line; whether to quit.
     fn command(&mut self, line: &str) -> bool {
         match text::parse(line) {
             Ok(Parsed::Nothing) => {}
-            Ok(Parsed::Help) => println!("{}", text::HELP),
+            Ok(Parsed::Help) => self.console.println(text::HELP),
             Ok(Parsed::Quit) => return true,
             Ok(Parsed::Request { command, args }) => self.send(command, args),
             Ok(Parsed::Breakpoints) => {
                 if self.breakpoints.is_empty() {
-                    println!("no breakpoints");
+                    self.console.println("no breakpoints");
                 }
                 for (i, spec) in self.breakpoints.iter().enumerate() {
-                    println!("{i}: {spec}");
+                    self.console.println(&format!("{i}: {spec}"));
                 }
             }
             Ok(Parsed::Break(specs)) => {
                 for spec in specs {
                     match self.resolve(&spec) {
                         Ok(what) => {
-                            println!("breakpoint {}: {spec} ({what})", self.breakpoints.len());
+                            let shown =
+                                format!("breakpoint {}: {spec} ({what})", self.breakpoints.len());
+                            self.console.println(&shown);
                             self.breakpoints.push(spec);
                         }
-                        Err(error) => println!("error: {error}"),
+                        Err(error) => self.console.println(&format!("error: {error}")),
                     }
                 }
                 self.sync_breakpoints();
@@ -216,30 +208,29 @@ impl Repl {
             Ok(Parsed::Delete) => {
                 self.breakpoints.clear();
                 self.sync_breakpoints();
-                println!("no breakpoints");
+                self.console.println("no breakpoints");
             }
             Ok(Parsed::Swap) => self.swap(),
-            Err(error) => println!("error: {error}"),
+            Err(error) => self.console.println(&format!("error: {error}")),
         }
         false
     }
 
     /// `--watch`: at most every [`WATCH_INTERVAL`], looks at the project's files; a change
-    /// rebuilds and swaps as `swap` does. Whether it did.
-    fn watched(&mut self) -> bool {
+    /// rebuilds and swaps as `swap` does.
+    fn watched(&mut self) {
         let Some(watcher) = self.watcher.as_mut() else {
-            return false;
+            return;
         };
         if self.polled.elapsed() < WATCH_INTERVAL {
-            return false;
+            return;
         }
         self.polled = Instant::now();
         if !watcher.changed() {
-            return false;
+            return;
         }
-        println!("source changed: rebuilding");
+        self.console.println("source changed: rebuilding");
         self.swap();
-        true
     }
 
     /// `swap`: rebuilds the debug profile and asks the runtime to swap the new game in; the
@@ -249,12 +240,12 @@ impl Repl {
             self.manifest_path.as_deref(),
             self.target.as_deref(),
             true,
-            &mut |line| println!("{line}"),
+            &mut |line| self.console.println(line),
         );
         let opened = match opened {
             Ok(opened) => opened,
             Err(error) => {
-                println!("error: {error}");
+                self.console.println(&format!("error: {error}"));
                 return;
             }
         };
@@ -328,27 +319,30 @@ impl Repl {
                 ..
             } => match self.pending.remove(&request_seq) {
                 Some(_) if !success => {
-                    println!("error: {}", message.unwrap_or_default());
+                    self.console
+                        .println(&format!("error: {}", message.unwrap_or_default()));
                 }
                 Some(Waiting::Shown(command)) => {
                     let shown = text::format(command, &body, &self.loc);
                     if !shown.is_empty() {
-                        println!("{shown}");
+                        self.console.println(&shown);
                     }
                 }
                 Some(Waiting::Initialize) => {
                     let init: InitializeBody = serde_json::from_value(body).unwrap_or_default();
-                    println!("{}", text::describe(&init));
+                    self.console.println(&text::describe(&init));
                 }
                 Some(Waiting::Silent) => {
                     let verdict: BreakpointsBody = serde_json::from_value(body).unwrap_or_default();
                     if verdict.verified.iter().any(|v| !v) {
-                        println!("warning: the runtime rejected a breakpoint");
+                        self.console
+                            .println("warning: the runtime rejected a breakpoint");
                     }
                 }
                 Some(Waiting::Swap(loc)) => {
                     self.loc = *loc;
-                    println!("{}", text::format(command::SWAP, &body, &self.loc));
+                    let shown = text::format(command::SWAP, &body, &self.loc);
+                    self.console.println(&shown);
                     self.sync_breakpoints();
                 }
                 None => {}
@@ -360,12 +354,12 @@ impl Repl {
                         // The summary is the answer to `swap`.
                         stopped.description = None;
                     }
-                    println!("{}", text::stopped(&stopped));
+                    self.console.println(&text::stopped(&stopped));
                 }
-                event::CONTINUED => println!("running"),
+                event::CONTINUED => self.console.println("running"),
                 event::OUTPUT => {
                     let output: OutputBody = serde_json::from_value(body).unwrap_or_default();
-                    print!("{}", output.text);
+                    self.console.print(output.text);
                 }
                 _ => {}
             },
