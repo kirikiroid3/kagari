@@ -49,7 +49,7 @@ graph lists first (or `--entry`), with the arguments the graph has for it, and t
 | `--target <TARGET>` | The target to debug; by default the first of `build.targets`. |
 | `--entry <PATH>` | The entry scene the query engine starts (query engine only). |
 | `--seed <N>` | The query engine's random seed. Default `1`. |
-| `--window` | Start the game in a window instead (`kagari-desktop-runtime`, found next to `kagari` or on `PATH`). |
+| `--window` | Start the game in a window instead (`kagari-desktop-runtime`, found next to `kagari` or on `PATH`). Its log (its standard error) is printed above the prompt; with commands piped in, on standard error. |
 | `--runtime <PATH>` | The runtime `--window` starts. |
 | `--attach <ADDRESS>` | Attach to a game started with `--debug-port`: `PORT` or `HOST:PORT`. Nothing is built. |
 | `--no-build` | Do not build first; use the files already in the target directory. |
@@ -220,4 +220,5 @@ step into and step out as above. The debug console evaluates the commands of thi
 `kagari/nav` and `kagari/seed`, with structured results. The custom request `kagari/swap` rebuilds
 and hot swaps the game, sets the line breakpoints again and answers with the outcome (`kept`,
 `recalled`, `restarted` or `reset`), the scene called again, the reason, the scenes thrown off and
-the new position. Conditional, function and exception breakpoints are not supported.
+the new position. Conditional, function and exception breakpoints are not supported. A window
+launch sends the game's log (its standard error) to the debug console as `stderr` output.

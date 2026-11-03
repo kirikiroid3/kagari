@@ -137,6 +137,9 @@ impl<'l> Adapter<'l> {
             {
                 self.runtime_message(message);
             }
+            while let Some(line) = self.session.as_ref().and_then(|s| s.attached.log_line()) {
+                game_log(&self.editor, &line);
+            }
             if self.done {
                 break;
             }
@@ -185,6 +188,9 @@ impl<'l> Adapter<'l> {
                 _ => {}
             }
         }
+        while let Some(line) = session.attached.log_line() {
+            game_log(&self.editor, &line);
+        }
         session.attached.kill();
         self.fail_pending("the debug session ended");
     }
@@ -195,6 +201,10 @@ impl<'l> Adapter<'l> {
             self.runtime_message(message);
         }
         if let Some(mut session) = self.session.take() {
+            // What the game said last, a crash for one.
+            for line in session.attached.rest_of_log() {
+                game_log(&self.editor, &line);
+            }
             session.attached.kill();
         }
         self.fail_pending("the game is gone");
@@ -219,5 +229,13 @@ fn output(editor: &Connection, text: impl Into<String>) {
     editor.event(
         "output",
         json!({ "category": "console", "output": text.into() }),
+    );
+}
+
+/// A line of a launched game's log (its standard error) for the editor.
+fn game_log(editor: &Connection, line: &str) {
+    editor.event(
+        "output",
+        json!({ "category": "stderr", "output": format!("{line}\n") }),
     );
 }

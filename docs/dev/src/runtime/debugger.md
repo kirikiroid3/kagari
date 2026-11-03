@@ -62,7 +62,12 @@ flowchart TB
   desktop window, polled once per frame) or **headless** (the query engine, which serves until
   the client disconnects).
 - **Transports**: the headless query engine runs on a thread of the front end with an in-process
-  link; a window is launched with `--debug-stdio`; a running game opens `--debug-port`.
+  link; a window is launched with `--debug-stdio`; a running game opens `--debug-port`. A launched
+  window's standard error (its log) is piped too: `Attached` reads it on a thread of its own, so
+  the game never blocks on a full pipe, and hands it out line by line (`log_line`; `rest_of_log`
+  waits up to half a second for the last lines of a game that went away, a crash for one). The
+  REPL prints the lines above the prompt (on standard error without the line editor); the adapter
+  sends them as `output` events of category `stderr`.
 
 ## Positions and moves
 

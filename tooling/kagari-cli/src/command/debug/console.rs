@@ -109,6 +109,17 @@ impl Console {
         }
     }
 
+    /// Prints a line of a launched game's log: with the editor above the prompt, else on
+    /// standard error, where the game wrote it.
+    pub fn log(&mut self, line: &str) {
+        match &self.editor {
+            Some(editor) => {
+                let _ = editor.out.send(format!("{line}\n"));
+            }
+            None => eprintln!("{line}"),
+        }
+    }
+
     /// Lets go of the terminal before the REPL ends. The editor's raw mode ends only with the
     /// line, so a prompt that is up waits for Enter (or Ctrl-C, Ctrl-D); then what is left to
     /// print is printed.

@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 
 use kagari_debugger::Connection;
 use kagari_debugger::client::text::{self, Parsed};
-use kagari_debugger::client::{Backend, Locator, Watcher};
+use kagari_debugger::client::{Attached, Backend, Locator, Watcher};
 use kagari_debugger::headless::StartOptions;
 use kagari_debugger::protocol::{
     BreakpointsBody, InitializeBody, Message, OutputBody, StoppedBody, command, event,
@@ -78,6 +78,7 @@ pub fn run(options: &Options<'_>) -> Result<ExitCode, Failure> {
         .ok_or_else(|| Failure("no connection".to_owned()))?;
     let mut repl = Repl {
         conn: Connection::new(link),
+        attached,
         console: Console::start(),
         loc: opened.locator(),
         root: opened.source_root.clone(),
@@ -90,7 +91,7 @@ pub fn run(options: &Options<'_>) -> Result<ExitCode, Failure> {
     };
     repl.send(command::INITIALIZE, Value::Null);
     repl.run();
-    attached.kill();
+    repl.attached.kill();
     Ok(ExitCode::SUCCESS)
 }
 
@@ -107,6 +108,8 @@ enum Waiting {
 
 struct Repl {
     conn: Connection,
+    /// A launched game's log comes through it; dropping it ends the game.
+    attached: Attached,
     console: Console,
     loc: Locator,
     root: PathBuf,
@@ -139,7 +142,14 @@ impl Repl {
             while let Some(message) = self.conn.try_recv() {
                 self.receive(message);
             }
+            while let Some(line) = self.attached.log_line() {
+                self.console.log(&line);
+            }
             if self.conn.closed() {
+                // What the game said last, a crash for one.
+                for line in self.attached.rest_of_log() {
+                    self.console.log(&line);
+                }
                 self.console.println("the runtime is gone");
                 self.console.close();
                 return;
@@ -172,6 +182,9 @@ impl Repl {
                 None if self.conn.closed() => break,
                 None => {}
             }
+        }
+        while let Some(line) = self.attached.log_line() {
+            self.console.log(&line);
         }
         self.console.close();
     }
