@@ -611,25 +611,7 @@ fn a_live_runtime_stops_at_breakpoints_and_moves_on_request() {
     );
 
     // The player advances: the story holds at the breakpoint.
-    for now in [10, 20, 30, 40] {
-        game.engine.input(
-            kagari_engine::InputEvent::Key {
-                key: kagari_engine::Key::Space,
-                pressed: true,
-            },
-            &mut game.platform,
-            now,
-        );
-        game.engine.input(
-            kagari_engine::InputEvent::Key {
-                key: kagari_engine::Key::Space,
-                pressed: false,
-            },
-            &mut game.platform,
-            now,
-        );
-        game.engine.update(&mut game.platform, now);
-    }
+    advance(&mut game, &[10, 20, 30, 40]);
     server.poll(&mut game.t());
     let stops = stopped_events(&drain(&client));
     assert_eq!(stops.len(), 1, "{stops:?}");
@@ -662,6 +644,55 @@ fn a_live_runtime_stops_at_breakpoints_and_moves_on_request() {
     server.poll(&mut game.t());
     assert!(response(&drain(&client), bye).0);
     assert!(!server.attached());
+}
+
+/// Presses and releases Space at each of `times`, updating the engine after each.
+fn advance(game: &mut Game, times: &[u64]) {
+    for &now in times {
+        for pressed in [true, false] {
+            game.engine.input(
+                kagari_engine::InputEvent::Key {
+                    key: kagari_engine::Key::Space,
+                    pressed,
+                },
+                &mut game.platform,
+                now,
+            );
+        }
+        game.engine.update(&mut game.platform, now);
+    }
+}
+
+#[test]
+fn a_move_leaves_a_playing_game_to_the_player() {
+    let (mut game, mut server, client) = served(true);
+    server.debugger().start(&mut game.t(), None, 1).unwrap();
+    game.engine.debug_release();
+    let goto = client.request(command::GOTO, json!({ "step": "crate::Start#1" }));
+    server.poll(&mut game.t());
+    let messages = drain(&client);
+    assert!(response(&messages, goto).0, "{messages:?}");
+    assert!(stopped_events(&messages).is_empty(), "{messages:?}");
+    assert!(!game.engine.debug_held());
+    assert_eq!(at(&mut game, server.debugger()), "crate::Start#1");
+    // The player's input moves the story on from the new step.
+    advance(&mut game, &[10, 20, 30, 40]);
+    assert_eq!(at(&mut game, server.debugger()), "crate::Start#2");
+
+    // A held game stays held after a move, and the client hears where.
+    let pause = client.request(command::PAUSE, Value::Null);
+    server.poll(&mut game.t());
+    assert!(response(&drain(&client), pause).0);
+    let goto = client.request(command::GOTO, json!({ "step": "crate::Start#0" }));
+    server.poll(&mut game.t());
+    let messages = drain(&client);
+    assert!(response(&messages, goto).0, "{messages:?}");
+    let stops = stopped_events(&messages);
+    assert_eq!(stops.len(), 1, "{stops:?}");
+    assert_eq!(stops[0]["reason"], "goto");
+    assert!(game.engine.debug_held());
+    advance(&mut game, &[50, 60, 70, 80]);
+    assert_eq!(at(&mut game, server.debugger()), "crate::Start#0");
 }
 
 /// A query engine at the `mood` choice with a breakpoint on `TRUST = gain;`, Meet's first

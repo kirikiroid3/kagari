@@ -88,7 +88,12 @@ a pilot steers on, step by step, with side effects off.
 | `continue`, `next`, `stepIn`, `stepOut` (headless; at a step in a window) | step the live game | below |
 
 A jump or a step installs the result like a load (`NavOp::Restore`): the screen shows the new
-step at once, without the animations in between, and the game is held. `goto` accepts only the
+step at once, without the animations in between, and the engine holds the game. In a window the
+live `Server` then keeps the run state the move found (`Server::after_move`): a game the player was
+playing (not held, no pause pending) is released and plays on from the new step, without a
+`stopped` event; a held game stays held and the client gets `stopped` with reason `goto` (`swap`
+after a hot swap). A pause requested during the move (a `pause`, or a code step inside a `push`
+that reached a step) keeps the hold. Headless, every move ends stopped. `goto` accepts only the
 steps from the step after the last choice (or the start) up to the next choice, the choice
 included; anything else is an error naming the last choice and the next one. `push` accepts an
 arm ID (`crate::Pick::B`), `#index`, or the arm ID's last segments when they name one shown arm
@@ -236,7 +241,8 @@ frame and the frames above it are thrown off and its call runs again from the ca
 or the story restarts from its entry. Afterwards the debugger drops its story-graph state (the
 tracker, the summaries) and the instruction breakpoints (they name code words of old functions),
 moves the step breakpoints by function path, installs the hook again with the new artifact, and
-answers with where the story is; a held game gets a `stopped` event with reason `swap`. Front ends
+answers with where the story is; a held game gets a `stopped` event with reason `swap`, and in a
+window a game the player was playing plays on, as after a move. Front ends
 send their breakpoints again, resolved against the new sources.
 
 Call snapshots exist only when the runtime records them: a window with a debug channel on a debug

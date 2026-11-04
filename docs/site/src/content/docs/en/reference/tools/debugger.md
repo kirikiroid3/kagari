@@ -156,8 +156,10 @@ kagari debug --attach 4711
 While the debugger has the story stopped, the player's story input (advance, choices, auto,
 skip) is ignored; menus, saves and the backlog still work, and a load or a new game ends the stop.
 `continue` gives the story back to the player, and the game stops again at a breakpoint or when
-`pause` is requested. Every move shows the new state at once, without the animations in between;
-the current step's own animations play again.
+`pause` is requested. Every move (`goto`, `push`, `pop`, `seed`, `swap`) shows the new state at
+once, without the animations in between; the current step's own animations play again. A move
+leaves the story as it found it: a stopped story stays stopped at the new step, and a story the
+player was playing plays on from there.
 
 ## Hot swap {#hot-swap}
 
@@ -173,7 +175,8 @@ scene and every scene above it are thrown off, and that scene is **called again*
 with the same arguments: it starts from its first step with the new code. The callers keep their
 position and their locals. Story variables, the values behind `&mut` arguments, the random state,
 the position and the screen go back to what they were when the call was made, so what the thrown
-scenes did is undone. The new step shows at once and the story stops there.
+scenes did is undone. The new step shows at once and the story stops there (in a window the
+player was playing, the player plays on from there instead).
 
 ```text
 (kagari) swap

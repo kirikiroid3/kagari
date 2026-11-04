@@ -1,11 +1,11 @@
 //! The runtime side of the protocol: requests to [`Debugger`] commands, stops to events.
 //!
 //! A **live** server runs inside a runtime the player plays (the desktop window): it is polled
-//! once per frame, `continue` releases the hold and the player plays on, and the engine reports
-//! the stops it makes by itself (step breakpoints, pauses). A **headless** server (the query
-//! engine) serves until the client disconnects, and `continue` drives the story itself.
-//! Either way a stop inside code blocks in the VM's hook and serves the requests that make
-//! sense there ([`serve_code_stop`]).
+//! once per frame, `continue` releases the hold and the player plays on, a move leaves a game the
+//! player was playing to the player, and the engine reports the stops it makes by itself (step
+//! breakpoints, pauses). A **headless** server (the query engine) serves until the client
+//! disconnects, and `continue` drives the story itself. Either way a stop inside code blocks in
+//! the VM's hook and serves the requests that make sense there ([`serve_code_stop`]).
 
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -269,6 +269,7 @@ impl Server {
             }
             command::SCENARIO => respond(&self.conn, json(scenario(t.engine.program()))),
             command::GOTO | command::PUSH | command::POP | command::SEED => {
+                let was_playing = self.playing(t);
                 let result = match command.as_str() {
                     command::GOTO => args::<StepArgs>(arguments).and_then(|a| {
                         let step = a.step.ok_or("`goto` needs a step")?;
@@ -280,27 +281,49 @@ impl Server {
                     _ => args::<SeedArgs>(arguments)
                         .and_then(|a| self.debugger.seed(t, a.seed).and_then(json)),
                 };
+                // Even a `push` that stopped early has moved the story.
                 let moved = result.is_ok() || command == command::PUSH;
                 respond(&self.conn, result);
                 self.sync_hook(t);
-                // A move (even a `push` that stopped early) holds the story where it is now.
-                if moved && t.engine.debug_held() {
-                    let body = self.debugger.stopped(t, "goto", None);
-                    self.send_stopped(body);
+                if moved {
+                    self.after_move(t, was_playing, "goto", None);
                 }
             }
             command::SWAP => {
+                let was_playing = self.playing(t);
                 let result = self.swap(t);
-                let held = result.is_ok() && t.engine.debug_held();
                 let description = result.as_ref().ok().map(SwapBody::summary);
+                let swapped = result.is_ok();
                 respond(&self.conn, result.and_then(json));
                 self.sync_hook(t);
-                if held {
-                    let body = self.debugger.stopped(t, "swap", description);
-                    self.send_stopped(body);
+                if swapped {
+                    self.after_move(t, was_playing, "swap", description);
                 }
             }
             _ => respond(&self.conn, Err(format!("unknown request `{command}`"))),
+        }
+    }
+
+    /// Whether the live game is in the player's hands: not held, and no pause pending.
+    fn playing(&self, t: &Target<'_>) -> bool {
+        self.live && !t.engine.debug_held() && !t.engine.debug_pause_flag().get()
+    }
+
+    /// After a move or a swap, which the engine installs held: a game the player was playing
+    /// plays on from the new position, unless a stop was requested meanwhile (a `pause`, or a
+    /// code step that reached a step); a held game stays held, and the client hears where.
+    fn after_move(
+        &mut self,
+        t: &mut Target<'_>,
+        was_playing: bool,
+        reason: &str,
+        description: Option<String>,
+    ) {
+        if was_playing && !t.engine.debug_pause_flag().get() {
+            t.engine.debug_release();
+        } else if t.engine.debug_held() {
+            let body = self.debugger.stopped(t, reason, description);
+            self.send_stopped(body);
         }
     }
 

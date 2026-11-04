@@ -399,7 +399,9 @@ loop.
   breakpoint (`debug_set_breakpoints`) or a pause (`debug_pause`). While held, `settle` drops the
   player's story input and `driver::tick` does nothing (no auto, no skip); the system UI keeps
   running. The hold names the game's generation, so a load or a new game ends it.
-  `debug_take_stop` reports a stop the live game made by itself; `debug_release` ends the hold.
+  `debug_take_stop` reports a stop the live game made by itself; `debug_release` ends the hold
+  (the debugger's live server calls it after a move of a game the player was playing,
+  [The Debugger](./debugger.md#positions-and-moves)).
 - **The instruction hook** (`set_instr_hook`) is the VM's ([The VM](./vm.md)); the engine only
   passes it through.
 - **Call recording** (`debug_record_calls`): every story fiber the engine starts from then on
