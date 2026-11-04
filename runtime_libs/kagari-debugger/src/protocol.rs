@@ -341,8 +341,13 @@ pub struct NavBody {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum PathItem {
-    /// Select `arm` at the choice `step`.
-    Choice { step: String, arm: String },
+    /// Select `arm` at the choice `step`; `text` is the arm's plain text as the replay that
+    /// follows the path shows it (`None` when no replay reached the choice).
+    Choice {
+        step: String,
+        arm: String,
+        text: Option<String>,
+    },
     /// The scene `scene` must draw `value` (one of `outcomes` values).
     Draw {
         scene: String,

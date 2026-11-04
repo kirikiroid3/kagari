@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use kagari_debug::StoryGraph;
 use kagari_engine::debug::{StepId, Trace};
+use kagari_vm::Program;
 
 use super::pilots::{ObservePilot, RealizePilot};
 use super::{Debugger, Result, Target, parse_step};
@@ -81,16 +82,38 @@ impl Debugger {
             });
         };
         let mut body = reachable(graph, &path);
-        if let Some(mut search) = body.seed.take() {
-            search.limit = seeds.unwrap_or(DEFAULT_SEEDS);
-            self.search_seed(t, &trace, &body.push, target, path.length, &mut search);
-            body.seed = Some(search);
-        }
+        let texts = match body.seed.take() {
+            Some(mut search) => {
+                search.limit = seeds.unwrap_or(DEFAULT_SEEDS);
+                let texts =
+                    self.search_seed(t, &trace, &body.push, target, path.length, &mut search);
+                body.seed = Some(search);
+                texts
+            }
+            None => self.realize(t, &trace, &body.push, target, path.length).1,
+        };
+        label(&mut body, t.engine.program(), texts);
         Ok(body)
     }
 
+    /// Replays `trace` and follows the path's arms: whether `target` is reached, and the step
+    /// and text of each arm selected.
+    fn realize(
+        &self,
+        t: &mut Target<'_>,
+        trace: &Trace,
+        arms: &[String],
+        target: StepId,
+        length: u32,
+    ) -> (bool, Vec<(StepId, String)>) {
+        let mut pilot = RealizePilot::new(arms, target, length.saturating_add(64));
+        let reached = self.probe(t, trace, &mut pilot).is_ok() && pilot.reached;
+        (reached, pilot.texts)
+    }
+
     /// Replays the current trace plus the path's arms with other seeds (the current one first,
-    /// then 0, 1, …) until one reaches `target`, at most `search.limit` tries.
+    /// then 0, 1, …) until one reaches `target`, at most `search.limit` tries. Returns the arm
+    /// texts of the seed found, else of the current seed.
     fn search_seed(
         &self,
         t: &mut Target<'_>,
@@ -99,23 +122,26 @@ impl Debugger {
         target: StepId,
         length: u32,
         search: &mut SeedSearch,
-    ) {
+    ) -> Vec<(StepId, String)> {
         search.current = trace.seed;
         let seeds = std::iter::once(trace.seed)
             .chain((0..u64::MAX).filter(|s| *s != trace.seed))
             .take(search.limit as usize);
+        let mut current = None;
         for seed in seeds {
             search.tried = search.tried.saturating_add(1);
             let attempt = Trace {
                 seed,
                 ..trace.clone()
             };
-            let mut pilot = RealizePilot::new(arms, target, length.saturating_add(64));
-            if self.probe(t, &attempt, &mut pilot).is_ok() && pilot.reached {
+            let (reached, texts) = self.realize(t, &attempt, arms, target, length);
+            if reached {
                 search.found = Some(seed);
-                return;
+                return texts;
             }
+            current.get_or_insert(texts);
         }
+        current.unwrap_or_default()
     }
 
     /// The graph position of `trace`, rebuilt by a replay when the trace changed.
@@ -155,6 +181,7 @@ fn reachable(graph: &StoryGraph, path: &Path) -> NavBody {
                 body.path.push(PathItem::Choice {
                     step: graph.step_id(at.context, at.node).unwrap_or_default(),
                     arm: arm.clone(),
+                    text: None,
                 });
                 body.push.push(arm.clone());
             }
@@ -178,6 +205,21 @@ fn reachable(graph: &StoryGraph, path: &Path) -> NavBody {
     }
     body.seed = (search.draws > 0).then_some(search);
     body
+}
+
+/// Gives the path's choices the arm texts a replay showed, in order, up to the first choice the
+/// replay did not select at.
+fn label(body: &mut NavBody, program: &Program, texts: Vec<(StepId, String)>) {
+    let choices = body.path.iter_mut().filter_map(|item| match item {
+        PathItem::Choice { step, text, .. } => Some((step, text)),
+        PathItem::Draw { .. } => None,
+    });
+    for ((step, text), (at, shown)) in choices.zip(texts) {
+        if *step != program.step_path(at) {
+            break;
+        }
+        *text = Some(shown);
+    }
 }
 
 fn unknown(reason: String) -> NavBody {

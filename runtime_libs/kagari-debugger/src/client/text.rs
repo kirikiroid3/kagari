@@ -2,6 +2,7 @@
 //! `evaluate` sends, and their results as text.
 
 use serde_json::{Value, json};
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use super::locate::Locator;
 use crate::protocol::{
@@ -282,14 +283,23 @@ fn write_var(var: &Var, depth: usize, out: &mut String) {
     }
 }
 
-/// The first few words of a line.
+/// The first few words of a line: at most `LIMIT` terminal columns (a CJK character takes two).
 fn words(text: &str) -> String {
     const LIMIT: usize = 40;
     let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    if flat.chars().count() <= LIMIT {
+    if flat.width() <= LIMIT {
         return flat;
     }
-    let cut: String = flat.chars().take(LIMIT).collect();
+    // One column is left for the `…`.
+    let mut used = 1usize;
+    let mut cut = String::new();
+    for c in flat.chars() {
+        used = used.saturating_add(c.width().unwrap_or(0));
+        if used > LIMIT {
+            break;
+        }
+        cut.push(c);
+    }
     format!("{}…", cut.trim_end())
 }
 
@@ -348,17 +358,58 @@ fn detail(d: &Detail) -> String {
     out.join("\n")
 }
 
+/// Rows as a table: `|cell |cell |`, each column padded to its widest cell (in terminal
+/// columns, so wide characters line up).
+fn table<const N: usize>(header: [&str; N], rows: &[[String; N]]) -> Vec<String> {
+    let mut widths = header.map(UnicodeWidthStr::width);
+    for row in rows {
+        for (width, cell) in widths.iter_mut().zip(row) {
+            *width = (*width).max(cell.width());
+        }
+    }
+    let line = |cells: [&str; N]| {
+        let mut out = String::from("|");
+        for (cell, width) in cells.iter().zip(widths) {
+            out.push_str(cell);
+            out.push_str(&" ".repeat(width.saturating_sub(cell.width()).saturating_add(1)));
+            out.push('|');
+        }
+        out
+    };
+    let mut out = vec![line(header)];
+    out.extend(
+        rows.iter()
+            .map(|row| line(row.each_ref().map(String::as_str))),
+    );
+    out
+}
+
 fn nav(n: &NavBody) -> String {
     let mut out = Vec::new();
     match n.answer.as_str() {
         "reachable" => {
             out.push(format!("reachable: {} steps", n.length));
-            if n.push.is_empty() {
+            let choices: Vec<[String; 4]> = n
+                .path
+                .iter()
+                .filter_map(|item| match item {
+                    PathItem::Choice { step, arm, text } => Some((step, arm, text)),
+                    PathItem::Draw { .. } => None,
+                })
+                .zip(1usize..)
+                .map(|((step, arm, text), i)| {
+                    let text = text.as_deref().map_or_else(|| "?".to_owned(), words);
+                    [i.to_string(), step.clone(), arm.clone(), text]
+                })
+                .collect();
+            if choices.is_empty() {
                 out.push(
                     "  no choice on the way (`goto` it once it is in this segment, or `continue`)"
                         .to_owned(),
                 );
             } else {
+                let rows = table(["#", "After Step", "Choose", "Display"], &choices);
+                out.extend(rows.into_iter().map(|row| format!("  {row}")));
                 out.push(format!("  push {}", n.push.join(" ")));
             }
             for item in &n.path {
@@ -399,4 +450,48 @@ fn nav(n: &NavBody) -> String {
         }
     }
     out.join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
+    use super::*;
+
+    #[test]
+    fn nav_table_aligns_wide_characters_and_cuts_by_columns() {
+        let choice = |arm: &str, text: &str| PathItem::Choice {
+            step: "crate::Start#2".to_owned(),
+            arm: arm.to_owned(),
+            text: Some(text.to_owned()),
+        };
+        let body = NavBody {
+            answer: "reachable".to_owned(),
+            path: vec![
+                choice(
+                    "crate::Reply::Deny",
+                    "「他人を好きになる、なんて、身勝手な欲求を美化しているだけだ」",
+                ),
+                choice("crate::Reply::Agree", "Agree"),
+            ],
+            push: vec![
+                "crate::Reply::Deny".to_owned(),
+                "crate::Reply::Agree".to_owned(),
+            ],
+            length: 4,
+            ..NavBody::default()
+        };
+        let shown = nav(&body);
+        let rows: Vec<&str> = shown.lines().filter(|l| l.starts_with("  |")).collect();
+        assert_eq!(rows.len(), 3, "{shown}");
+        assert!(
+            rows.iter().all(|r| r.width() == rows[0].width()),
+            "rows of different widths:\n{shown}"
+        );
+        // 19 wide characters and the `…`: 39 columns, as the 20th would make 41.
+        assert!(
+            rows[1].contains("|「他人を好きになる、なんて、身勝手な欲… |"),
+            "{shown}"
+        );
+    }
 }

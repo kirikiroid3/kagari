@@ -72,15 +72,20 @@ kagari debug --attach <ADDRESS> [--manifest-path <PATH>] [--target <TARGET>] [--
 
 | 答え | 意味 |
 | ---- | ---- |
-| reachable | 最短経路をたどるための `push` の引数と、経路上で行われる乱数の抽選。 |
+| reachable | 最短経路上の選択肢の表。選択肢のステップ（`After Step`）、選ぶアーム（`Choose`）、そのテキスト（`Display`）を並べます。続けて、それらのアームを選ぶ `push` の引数と、経路上で行われる乱数の抽選を表示します。 |
 | unreachable | 到達する方法はありません。物語グラフが完全な場合にだけ、こう答えます。 |
 | unknown | グラフが不完全（`W5006` の上限か、打ち切った `W5007` の経路を示します）か、現在の状態がグラフにありません（デバッグ用成果物が古い、または上限を超えた先の状態）。 |
 
 **乱数の抽選。** グラフは `rng_choose` が返しうるすべての値をたどりますが、実際のプレイはシードで結果が決まります。経路に抽選が含まれる場合、`nav` は現在の位置までと経路を、別のシードで再生してみます。最初に現在のシード、次に `0`、`1`、`2`、… と、最大 `--seeds` 回（既定は 1000）試します。ステップに届くシードが見つかればそれを提案し（`seed <n>` の後に `push`）、上限までに見つからなければそう伝えます。試すたびにそれまでの物語全体を再生するので、物語が長い場合や抽選が起こりにくい場合は時間がかかります。`nav` は確率（何個のシードに一つが経路どおりの値を引くか）も表示します。シードを変えると現在の位置より前の抽選結果も変わるため、それまでに選んだ選択肢が合わなくなって失敗することもあります。
 
+アームのテキストは、経路をたどる再生から取ります（抽選がある場合は、見つかったシードで再生します）。どのシードでも抽選が経路どおりにならず、再生が届かなかった選択肢には `?` を表示します。
+
 ```text
 (kagari) nav crate::AmusementPark#5
 reachable: 9 steps
+  |# |After Step             |Choose               |Display |
+  |1 |crate::Start#2         |crate::Pick::Bold    |Be bold |
+  |2 |crate::AmusementPark#1 |crate::Ride::Coaster |Coaster |
   push crate::Pick::Bold crate::Ride::Coaster
   draws: crate::AmusementPark draws crate::Coin::Tails (one of 2)
   the current seed already gives a path there: `push` it

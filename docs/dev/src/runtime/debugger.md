@@ -84,7 +84,7 @@ a pilot steers on, step by step, with side effects off.
 | `push <arms>` | step the live game | lines go on; each choice selects the next arm; stop after the last |
 | `pop` | jump to the trace without its last choice | go on to that choice |
 | `seed <n>` | jump to the trace with seed `n` | stay |
-| `nav` | probe the current trace (tracking); probe once per seed tried | follow the path's arms to the target |
+| `nav` | probe the current trace (tracking); probe once to follow the path, or once per seed tried when it passes draws | follow the path's arms to the target, recording each selected arm's text |
 | `continue`, `next`, `stepIn`, `stepOut` (headless; at a step in a window) | step the live game | below |
 
 A jump or a step installs the result like a load (`NavOp::Restore`): the screen shows the new
@@ -134,7 +134,7 @@ the number of steps passed):
 
 | Answer | When |
 | ------ | ---- |
-| reachable | a path exists: its choices as `push` arguments, its draws, its length |
+| reachable | a path exists: its choices (step, arm ID, arm text) and the same arms as `push` arguments, its draws, its length |
 | unreachable | no path, and the graph is complete |
 | unknown | no path in an incomplete graph (the `W5006`/`W5007` reasons are named), or the tracker is lost |
 
@@ -146,6 +146,14 @@ as the product of the outcome counts (one in how many seeds would draw them all,
 were independent and uniform). A seed found is suggested (`seed <n>`, then `push`); none found
 says so with the limit. Changing the seed also changes the draws before the current position, so
 a seed whose replay of the trace diverges counts as a failed try.
+
+**Arm texts.** The story graph keeps arm IDs, not texts (a text may depend on story state), so
+the arm texts of the path come from a replay that follows it: the seed found, or the current seed
+when the path has no draws or no seed reaches the target. Each choice of the path takes the text
+the replay selected there, up to the first choice the replay did not reach (`text` is `None`
+there and after; the text front end shows `?`). The text front end prints the choices as a table
+(`#`, `After Step`, `Choose`, `Display`), padded by terminal width (a CJK character takes two
+columns) so wide characters line up; like an `ls` line, a text is cut at 40 columns.
 
 ## Execution
 
@@ -196,7 +204,7 @@ directory, or `std/…`) and a byte `offset`.
 | `kagari/goto`, `kagari/detail` | `step` | a position; a detail |
 | `kagari/push` | `arms` | `position`, `selected` (choice IDs) |
 | `kagari/pop` | — | a position |
-| `kagari/nav` | `step`, `seeds` | `answer`, `reason`, `path` (choices and draws), `push`, `length`, `seed` (the search) |
+| `kagari/nav` | `step`, `seeds` | `answer`, `reason`, `path` (choices with `step`, `arm`, `text`; draws), `push`, `length`, `seed` (the search) |
 | `kagari/seed` | `seed` | `seed` |
 | `kagari/scenario` | — | `scenes`, sorted by path: `name`, `steps` (distinct step IDs in its code) |
 | `kagari/swap` | — | `outcome` (`kept`, `recalled`, `restarted`, `reset`, `none`), `scene`, `reason`, `thrown`, `position`, `scriptHash` |

@@ -101,7 +101,7 @@ call stack, for one shortest way to any state at the step. It answers:
 
 | Answer | Meaning |
 | ------ | ------- |
-| reachable | The `push` arguments that realize the shortest path, and the random draws it passes. |
+| reachable | The choices on the shortest path, as a table: the choice's step (`After Step`), the arm to select (`Choose`) and its text (`Display`); then the `push` arguments that select those arms, and the random draws the path passes. |
 | unreachable | No way exists. Claimed only when the story graph is complete. |
 | unknown | The graph is incomplete (the `W5006` cap or a `W5007` path given up is named), or the current state is not in the graph (a stale debug artifact, or a state past a cap). |
 
@@ -114,9 +114,15 @@ unlikely draws; `nav` reports the odds (one in how many seeds would draw the pat
 Another seed also changes the draws before the current position, so a seed can fail because the
 choices made so far no longer fit.
 
+The arm texts come from a replay that follows the path (with the seed found, when there are
+draws). A choice that replay did not reach, because no seed realized the draws, shows `?`.
+
 ```text
 (kagari) nav crate::AmusementPark#5
 reachable: 9 steps
+  |# |After Step             |Choose               |Display |
+  |1 |crate::Start#2         |crate::Pick::Bold    |Be bold |
+  |2 |crate::AmusementPark#1 |crate::Ride::Coaster |Coaster |
   push crate::Pick::Bold crate::Ride::Coaster
   draws: crate::AmusementPark draws crate::Coin::Tails (one of 2)
   the current seed already gives a path there: `push` it

@@ -12,6 +12,7 @@ use crate::frames::Artifact;
 use crate::hook::HookState;
 use crate::protocol::{Detail, LsLine};
 use crate::tracker::Tracker;
+use crate::values::plain;
 
 /// Stays at the trace's position.
 pub(super) struct Stay;
@@ -205,6 +206,8 @@ pub(super) struct RealizePilot<'a> {
     target: StepId,
     budget: u32,
     pub reached: bool,
+    /// Per arm selected: the choice's step and the arm's plain text.
+    pub texts: Vec<(StepId, String)>,
 }
 
 impl<'a> RealizePilot<'a> {
@@ -214,6 +217,7 @@ impl<'a> RealizePilot<'a> {
             target,
             budget,
             reached: false,
+            texts: Vec::new(),
         }
     }
 }
@@ -232,7 +236,13 @@ impl Pilot for RealizePilot<'_> {
         if self.push.next == self.push.arms.len() {
             return through_lines(&step.kind);
         }
-        self.push.steer(view)
+        let steer = self.push.steer(view);
+        if let (Steer::Select(index), StepKind::Choice { arms, .. }) = (&steer, &step.kind)
+            && let Some(arm) = arms.get(*index as usize)
+        {
+            self.texts.push((step.step, plain(arm.text)));
+        }
+        steer
     }
 }
 

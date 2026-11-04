@@ -208,8 +208,11 @@ fn the_repl_moves_through_the_story_and_navigates() {
         "the story graph is complete",
         // ls -t 1: the next choice.
         "crate::scenario::Start#2  choice `mood`",
-        // nav: the path, its draw and a seed.
+        // nav: the path's choices with their arm texts, its draw and a seed.
         "reachable:",
+        "  |# |After Step                       |Choose                         |Display |\n  \
+         |1 |crate::scenario::Start#2         |crate::scenario::Pick::Bold    |Be bold |\n  \
+         |2 |crate::scenario::AmusementPark#1 |crate::scenario::Ride::Coaster |Coaster |\n",
         "push crate::scenario::Pick::Bold crate::scenario::Ride::Coaster",
         "draws: crate::scenario::AmusementPark draws",
         // push follows the path; ls shows the target ahead.

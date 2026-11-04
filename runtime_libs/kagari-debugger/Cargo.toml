@@ -8,7 +8,7 @@ edition.workspace = true
 
 [features]
 # What debugger front ends share: reaching a runtime, source locations, the commands as text.
-client = ["dep:kagari-std"]
+client = ["dep:kagari-std", "dep:unicode-width"]
 # The debug adapter (Debug Adapter Protocol over stdio).
 dap = ["client"]
 
@@ -22,6 +22,7 @@ kagari-vm = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+unicode-width = { workspace = true, optional = true }
 
 [dev-dependencies]
 kagari-lang = { workspace = true }
