@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/site/public/logo.svg" alt="Kagari logo" width="128" height="128">
+  <img src="https://raw.githubusercontent.com/kirikiroid3/kagari-doc/main/public/logo.svg" alt="Kagari logo" width="128" height="128">
 </p>
 
 # Kagari Visual Novel Engine
@@ -23,8 +23,10 @@ The documentation site is [kagari.suitsu31.club](https://kagari.suitsu31.club) (
 | Diagnostics | Studios: every compiler diagnostic | [en](https://kagari.suitsu31.club/en/diagnostics/) | [ja](https://kagari.suitsu31.club/diagnostics/) |
 | Kagari Develop Guide | Contributors: design decisions, compiler, formats, runtime | [en](docs/dev/src/introduction.md) | — |
 
-The site's sources are in [`docs/site`](docs/site) (Astro; `pnpm install && pnpm run dev` there). The
-Develop Guide is an mdBook: `mdbook build docs/dev` writes it to `docs/_site/`.
+The site's sources are in the [kagari-doc](https://github.com/kirikiroid3/kagari-doc) repository,
+checked out here as the submodule `docs/site` (`git submodule update --init`; Astro:
+`pnpm install && pnpm run dev` there). The Develop Guide is an mdBook in this repository:
+`mdbook build docs/dev` writes it to `docs/_site/`.
 
 ## Status
 

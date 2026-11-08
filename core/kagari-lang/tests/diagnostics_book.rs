@@ -1,7 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 //! Every diagnostic code has exactly one entry in each language of the Diagnostics section of
-//! the documentation site (`docs/site/src/content/docs/{en,ja}/diagnostics`).
+//! the documentation site (`docs/site/src/content/docs/{en,ja}/diagnostics`, in the `docs/site`
+//! git submodule).
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -23,7 +24,13 @@ fn heading_code(line: &str) -> Option<&str> {
 /// The number of `## E2001 …` headings of each code in the Markdown files of `dir`.
 fn documented_codes(dir: &Path) -> BTreeMap<String, usize> {
     let mut found: BTreeMap<String, usize> = BTreeMap::new();
-    for entry in std::fs::read_dir(dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display())) {
+    let entries = std::fs::read_dir(dir).unwrap_or_else(|e| {
+        panic!(
+            "{}: {e} (is the docs/site submodule checked out? `git submodule update --init`)",
+            dir.display()
+        )
+    });
+    for entry in entries {
         let path = entry.unwrap().path();
         if path.extension().is_none_or(|ext| ext != "md") {
             continue;

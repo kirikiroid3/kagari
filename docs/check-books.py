@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Consistency checks for the documentation (no dependencies; run from anywhere).
 
-The documentation site (`docs/site`, en and ja):
+The documentation site (`docs/site`, the `kagari-doc` git submodule, en and ja):
 - every page has a `title` and is listed in `docsNav` of `theme.config.json`, and every
   `docsNav` entry exists in both languages;
 - relative links and `#anchors` resolve (anchors computed like mdBook, explicit `{#id}` and
@@ -224,6 +224,9 @@ def check_dev():
         path = os.path.join(DEV, rel)
         check_links(f'dev/{rel}', path, read(path))
 
+
+if not os.path.isdir(SITE):
+    sys.exit(f'{SITE} is missing: check out the docs/site submodule (`git submodule update --init`)')
 
 check_site()
 check_mirror()

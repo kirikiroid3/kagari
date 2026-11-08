@@ -53,9 +53,11 @@ mdbook build docs/dev       # into docs/_site/dev/src/ (ignored by git)
 mdbook serve docs/dev       # live reload
 ```
 
-The site is an Astro project in `docs/site` and needs only Node.js and pnpm:
+The site is an Astro project in the `kagari-doc` repository, checked out at `docs/site` as a git
+submodule, and needs only Node.js and pnpm:
 
 ```sh
+git submodule update --init
 cd docs/site && pnpm install && pnpm run dev
 ```
 

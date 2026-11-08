@@ -15,6 +15,8 @@ before changing it.
   CLI, runtime), `std/` (the STD Reference) and `diagnostics/`. The `ja` tree mirrors `en`: same
   files, same headings with shared `{#id}` anchors, byte-identical code blocks; a new page also
   gets a `docsNav` entry in `docs/site/theme.config.json`. Rules: `docs/dev/src/process/docs.md`.
+  `docs/site` is a git submodule (the `kagari-doc` repository): commit site changes there, then
+  commit the updated submodule pointer here.
 - **The code is the truth.** When docs and code disagree, fix the docs (or the code, if the docs
   describe the intended behaviour and the user agrees).
 - Load the matching skill from `.agents/skills/` before working in its area: `kagari-frontend`
@@ -26,6 +28,7 @@ before changing it.
 ## Commands
 
 ```sh
+git submodule update --init             # docs/site; the docs test and check-books.py read it
 cargo test --workspace                   # all tests; no GPU, window, audio or network needed
 cargo clippy --workspace --all-targets   # must stay clean
 cargo fmt --all                          # rustfmt defaults

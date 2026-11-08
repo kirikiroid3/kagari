@@ -3,7 +3,9 @@
 **Where in the code**
 
 - The documentation site (`docs/site`, an Astro project with the [Lotus](https://astro-theme-lotus.prosefly.dev/)
-  theme), published at `https://kagari.suitsu31.club`:
+  theme), published at `https://kagari.suitsu31.club`. Its sources are the separate repository
+  [`kirikiroid3/kagari-doc`](https://github.com/kirikiroid3/kagari-doc), checked out at
+  `docs/site` as a git submodule (see [The site submodule](#the-site-submodule)):
   - Pages: `src/content/docs/{ja,en}/` with four sections, `tutorial/`, `reference/` (the
     Language Reference), `std/` (the STD Reference) and `diagnostics/`. Japanese is the root
     locale (`/reference/…`), English is under `/en/` (`/en/reference/…`).
@@ -15,8 +17,9 @@
     (Lotus override: the header logo links to the current locale's home), `src/styles/site.css`.
   - `grammars/kagari.tmLanguage.json`: the site's copy of the Kagari TextMate grammar (see
     [Code highlighting](#code-highlighting)).
-  - Hosting: Vercel, with Root Directory `docs/site` and `docs/site/vercel.json` (see
-    [Building and checking](#building-and-checking)).
+  - Hosting: Vercel, building the `kagari-doc` repository from its root with its `vercel.json`
+    (see [Building and checking](#building-and-checking)). `theme.config.json` points the
+    "Edit this page" links at `kagari-doc`.
 - The Develop Guide (`docs/dev`): a standalone mdBook (`book.toml` + `src/SUMMARY.md`), built to
   `docs/_site/` (ignored by git) and not published with the site.
 - Agent skills: `.agents/skills/<name>/SKILL.md`; the documentation skill is `kagari-docs`.
@@ -31,12 +34,31 @@
 - A change a studio can observe (syntax, a diagnostic, a std item, an attribute, a CLI flag, a
   manifest key, a runtime option, headless commands, an asset format) updates the **Language
   Reference**, the **STD Reference** or **Diagnostics** on the site in **English and Japanese** in
-  the same commit.
+  the same change: a `kagari-doc` commit plus the commit here that bumps the submodule pointer
+  ([The site submodule](#the-site-submodule)).
 - A change to how Kagari works inside (compiler, IRs, formats, VM, engine, tooling, process)
   updates the **Develop Guide** in the same commit.
 - A design decision, or a change to one, updates
   [Design Decisions](../foundations/decisions.md) (status included). A question that gets answered
   leaves [Open Questions](./open-questions.md).
+
+### The site submodule
+
+`docs/site` is a git submodule (`.gitmodules`, URL `../kagari-doc.git`, relative to this
+repository's remote). The superproject records one commit of `kagari-doc`; a fresh clone needs
+`git submodule update --init` (or `git clone --recurse-submodules`) before
+`docs/check-books.py`, the `diagnostics_book` test or the site build can read the pages.
+
+"The same change" spans both repositories when it touches the site:
+
+1. Edit the pages in `docs/site`, commit there on `main` and push `kagari-doc` (Vercel deploys
+   from it).
+2. Commit the code, the Develop Guide and the new submodule pointer (`git add docs/site`) in this
+   repository. The pointer must name a pushed `kagari-doc` commit, or other clones cannot check
+   it out.
+
+A docs-only fix to the site needs no commit here until the next code change that depends on it;
+bump the pointer then, so that the `diagnostics_book` test sees the matching pages.
 
 ## Which part holds what
 
@@ -302,7 +324,7 @@ them. A change to a chapter that a skill summarizes updates the skill too.
 
 The site needs Node.js 22.23.4 or later (Astro's minimum; `engines` in `docs/site/package.json`)
 and pnpm, nothing else: no Rust toolchain, no C compiler. Everything the build reads is inside
-`docs/site`.
+`docs/site` (the submodule; check it out first with `git submodule update --init`).
 
 ```sh
 cd docs/site
@@ -337,15 +359,16 @@ diagram exists and has its mermaid-ish comment. In the Develop Guide it checks `
 relative links and diagrams the same way, and that every link to `https://kagari.suitsu31.club`
 names an existing page and anchor. It exits with status 1 and lists the problems otherwise.
 
-**Deployment.** The Vercel project has Root Directory `docs/site` and the Astro framework
-preset; `docs/site/vercel.json` pins the commands (`pnpm install --frozen-lockfile`,
+**Deployment.** The Vercel project builds the `kagari-doc` repository (Root Directory: its root)
+with the Astro framework preset; `vercel.json` pins the commands (`pnpm install --frozen-lockfile`,
 `pnpm run build`, output `dist`). Vercel picks the pnpm version from `pnpm-lock.yaml`
-(`lockfileVersion: '9.0'`, pnpm 10). Its `ignoreCommand` skips a deployment when nothing under
-`docs/site` changed since the last successful deployment of the branch
+(`lockfileVersion: '9.0'`, pnpm 10). Its `ignoreCommand` skips a deployment when nothing in
+`kagari-doc` changed since the last successful deployment of the branch
 (`git diff --quiet "$VERCEL_GIT_PREVIOUS_SHA" HEAD -- .`, run in the root directory). Any other
 outcome exits 1 and builds: the first deployment of a branch, and a previous commit outside
 Vercel's shallow clone (depth 10; `git diff` would fail with exit 128, which Vercel treats as a
-failed deployment, not as "build"). Because only `docs/site` is diffed, the site imports nothing
+failed deployment, not as "build"). Commits to this repository, including submodule pointer
+bumps, never deploy the site. Because Vercel sees only `kagari-doc`, the site imports nothing
 from outside it. The Node.js version in the project
 settings must satisfy `engines`. The domain is `kagari.suitsu31.club` (`site` in
 `astro.config.ts`, used for canonical URLs).

@@ -17,7 +17,8 @@ Depth: `docs/dev/src/process/docs.md` (the full policy). Read it before a larger
 | Diagnostics | `docs/site/src/content/docs/{ja,en}/diagnostics` | ja + en | studios |
 | Kagari Develop Guide | `docs/dev/src` (mdBook) | en | maintainers |
 
-The site (`docs/site`) is Astro with the Lotus theme, published at `https://kagari.suitsu31.club`
+The site (`docs/site`, a git submodule: the repository `kirikiroid3/kagari-doc`) is Astro with
+the Lotus theme, published at `https://kagari.suitsu31.club`
 (ja at `/`, en at `/en/`). Pages are plain `.md` with a frontmatter `title` and no `#` heading.
 `docsNav` in `docs/site/theme.config.json` lists every page in sidebar order (entries are paths
 without locale and `.md`; `x/index.md` is `x`); add new pages there or `check-books.py` fails.
@@ -26,8 +27,10 @@ mdBook: `docs/dev/src/SUMMARY.md` lists every page.
 
 ## Always
 
-- Same change, same commit: code + Develop Guide chapter + (if a studio can observe it) the site
-  page in **en and ja**.
+- Same change: code + Develop Guide chapter + (if a studio can observe it) the site page in
+  **en and ja**. Site edits are commits in the `docs/site` submodule (on its `main`, pushed
+  first); the main-repository commit carries the code, the Develop Guide and the new submodule
+  pointer.
 - The code is the truth. Verify every name, signature, flag, default and diagnostic code against
   the source before writing it: std in `core/kagari-std/kis/std/**/*.kis`, diagnostic codes in
   `core/kagari-lang/src/diagnostic.rs`, CLI in `tooling/kagari-cli/src/cli.rs`, manifest in
@@ -124,8 +127,8 @@ mdbook build docs/dev                               # runs mdbook-kagari via car
 Tag every Kagari block `kis` or `kix`: the site highlights them with its copy of the TextMate
 grammar, `docs/site/grammars/kagari.tmLanguage.json` (copied from `tooling/textmate-kagari` when
 the site starts documenting new syntax; it may lag), the Develop Guide with `mdbook-kagari`.
-Everything the site builds from stays inside `docs/site`: Vercel builds from that root and skips
-deployments without changes there. After changing
+Everything the site builds from stays inside `docs/site`: Vercel builds the `kagari-doc`
+repository from its root and skips deployments without changes there. After changing
 `docs/site/astro.config.ts`, `docs/site/src/markdown.ts` or the grammar, delete
 `docs/site/node_modules/.astro` before building (Astro caches rendered pages). Details:
 `docs/dev/src/process/docs.md#building-and-checking` and `#code-highlighting`.
