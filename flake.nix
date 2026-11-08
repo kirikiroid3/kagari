@@ -19,7 +19,7 @@
       # The repository's Cargo sources, so that changes elsewhere (docs, CI) do not rebuild.
       localSource = lib.fileset.toSource {
         root = ./.;
-        fileset = lib.fileset.unions [ ./Cargo.toml ./Cargo.lock ./core ./runtime ./runtime_libs ./tooling ];
+        fileset = lib.fileset.unions [ ./Cargo.toml ./Cargo.lock ./.cargo ./core ./runtime ./runtime_libs ./tooling ];
       };
       workspaceVersion = (lib.importTOML ./Cargo.toml).workspace.package.version;
 

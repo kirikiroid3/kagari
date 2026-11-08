@@ -30,27 +30,31 @@ version = "0.3.1"
 authors = ["Nikaidou Haruki"]
 license = "Apache-2.0"
 edition = "2024"
+# Published only to the private registry (see docs/dev/src/process/releases.md#crates).
+publish = ["Suitsu31"]
 
 [workspace.dependencies]
-kagari-archive = { path = "core/kagari-archive" }
-kagari-num = { path = "core/kagari-num" }
-kagari-debug = { path = "core/kagari-debug" }
-kagari-bytecode = { path = "core/kagari-bytecode" }
-kagari-lang = { path = "core/kagari-lang" }
-kagari-syntax = { path = "core/kagari-syntax" }
-kagari-std = { path = "core/kagari-std" }
-kagari-shader = { path = "core/kagari-shader" }
-kagari-fmt = { path = "tooling/kagari-fmt" }
-kagari-project = { path = "tooling/kagari-project" }
-kagari-lsp = { path = "tooling/kagari-lsp" }
-kagari-vm = { path = "runtime_libs/kagari-vm" }
-kagari-text = { path = "runtime_libs/kagari-text" }
-kagari-compat = { path = "runtime_libs/kagari-compat" }
-kagari-engine = { path = "runtime_libs/kagari-engine" }
-kagari-debugger = { path = "runtime_libs/kagari-debugger" }
-kagari-render = { path = "runtime_libs/kagari-render" }
-kagari-video = { path = "runtime_libs/kagari-video" }
-kagari-desktop-runtime = { path = "runtime/kagari-desktop-runtime" }
+# `version` must equal `[workspace.package] version`; `registry` keeps the published
+# dependencies on Suitsu31 (a path dependency without it would point at crates.io).
+kagari-archive = { path = "core/kagari-archive", version = "0.3.1", registry = "Suitsu31" }
+kagari-num = { path = "core/kagari-num", version = "0.3.1", registry = "Suitsu31" }
+kagari-debug = { path = "core/kagari-debug", version = "0.3.1", registry = "Suitsu31" }
+kagari-bytecode = { path = "core/kagari-bytecode", version = "0.3.1", registry = "Suitsu31" }
+kagari-lang = { path = "core/kagari-lang", version = "0.3.1", registry = "Suitsu31" }
+kagari-syntax = { path = "core/kagari-syntax", version = "0.3.1", registry = "Suitsu31" }
+kagari-std = { path = "core/kagari-std", version = "0.3.1", registry = "Suitsu31" }
+kagari-shader = { path = "core/kagari-shader", version = "0.3.1", registry = "Suitsu31" }
+kagari-fmt = { path = "tooling/kagari-fmt", version = "0.3.1", registry = "Suitsu31" }
+kagari-project = { path = "tooling/kagari-project", version = "0.3.1", registry = "Suitsu31" }
+kagari-lsp = { path = "tooling/kagari-lsp", version = "0.3.1", registry = "Suitsu31" }
+kagari-vm = { path = "runtime_libs/kagari-vm", version = "0.3.1", registry = "Suitsu31" }
+kagari-text = { path = "runtime_libs/kagari-text", version = "0.3.1", registry = "Suitsu31" }
+kagari-compat = { path = "runtime_libs/kagari-compat", version = "0.3.1", registry = "Suitsu31" }
+kagari-engine = { path = "runtime_libs/kagari-engine", version = "0.3.1", registry = "Suitsu31" }
+kagari-debugger = { path = "runtime_libs/kagari-debugger", version = "0.3.1", registry = "Suitsu31" }
+kagari-render = { path = "runtime_libs/kagari-render", version = "0.3.1", registry = "Suitsu31" }
+kagari-video = { path = "runtime_libs/kagari-video", version = "0.3.1", registry = "Suitsu31" }
+kagari-desktop-runtime = { path = "runtime/kagari-desktop-runtime", version = "0.3.1", registry = "Suitsu31" }
 rowan = "0.17"
 salsa = "0.28"
 logos = "0.16"

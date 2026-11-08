@@ -2,7 +2,10 @@
 
 **Where in the code**
 
-- Version: `[workspace.package] version` in `Cargo.toml`; every crate uses `version.workspace = true`.
+- Version: `[workspace.package] version` in `Cargo.toml`; every crate uses `version.workspace = true`,
+  and every workspace crate in `[workspace.dependencies]` repeats it in `version`.
+- Crate registry: `[registries.Suitsu31]` in `.cargo/config.toml`, `publish` in
+  `[workspace.package]` ([Crates](#crates)).
 - CI: `.github/workflows/release.yml`.
 - Linux and macOS installer: `installer.sh` (uploaded to the bucket root).
 - Windows installer: `packaging/windows/kagari.iss` (Inno Setup).
@@ -227,7 +230,7 @@ the project's.
 
 ## Nix
 
-`packages.unstable` builds the flake's own source (only the Cargo sources, through
+`packages.unstable` builds the flake's own source (only the Cargo sources and `.cargo/`, through
 `lib.fileset`), version `<workspace>-unstable-<date>`. `packages.stable` exists once
 `nix/stable.json` does and builds the tagged commit it names, fetched with `fetchTree` (pinned by
 `rev`, so pure evaluation accepts it). `packages.default` is `stable` when present, else `unstable`.
@@ -235,13 +238,45 @@ Both use nixpkgs' `rustPlatform` (its rustc must be at least the pinned toolchai
 and add the libraries the runtime loads with `dlopen` (Wayland, xkbcommon, Vulkan, GL, X11) to its
 `RUNPATH` after fixup.
 
+## Crates {#crates}
+
+The workspace crates are published to a private [Kellnr](https://kellnr.io) registry at
+`https://crates.suitsu31.club`, registry name `Suitsu31`, sparse index
+`sparse+https://crates.suitsu31.club/api/v1/crates/`. It requires authentication for every
+request, including index reads, so a project that depends on these crates also needs a token.
+
+- `[workspace.package] publish = ["Suitsu31"]`, inherited by every crate with
+  `publish.workspace = true`: `cargo publish` defaults to Suitsu31 and refuses crates.io.
+  `mdbook-kagari` keeps `publish = false`.
+- Each workspace crate in `[workspace.dependencies]` has `path`, `version` and
+  `registry = "Suitsu31"`. Builds use the path; the published manifest keeps the version and the
+  registry. Without `registry`, a published dependency would point at crates.io, where another
+  crate may own the name.
+- Because the manifests name the registry, every build needs it defined, even though nothing is
+  fetched from it: `.cargo/config.toml` defines it without credentials, for CI, Nix and fresh
+  clones. Developers who consume the crates elsewhere define the same table in
+  `~/.cargo/config.toml`.
+- Credentials: `cargo login --registry Suitsu31` with a token created in the Kellnr web UI
+  (stored in `~/.cargo/credentials.toml`), or `CARGO_REGISTRIES_SUITSU31_TOKEN` in CI.
+
+Another project depends on a crate with
+`kagari-lang = { version = "0.3", registry = "Suitsu31" }`.
+
+To publish, after the version bump below: `cargo publish --workspace` uploads every publishable
+crate in dependency order (cargo verifies each one by building it from its packaged sources, so
+the dev shell's libraries are needed). A version can be yanked
+(`cargo yank --registry Suitsu31 <crate>@<version>`) but never re-uploaded. Dry run without
+uploading: `cargo publish --workspace --dry-run`.
+
 ## Making a release
 
-1. Set `[workspace.package] version` in `Cargo.toml` and run `cargo check` so `Cargo.lock`
-   follows; commit.
+1. Set `[workspace.package] version` in `Cargo.toml`, set the same `version` on every workspace
+   crate in `[workspace.dependencies]` (a mismatched minor version fails the build), and run
+   `cargo check` so `Cargo.lock` follows; commit.
 2. Tag that commit `v<version>` and push the tag.
 3. Check the workflow run: both artifacts, the `latest` pointers and the `nix/stable.json` commit
    on `main`.
+4. Publish the crates: `cargo publish --workspace` ([Crates](#crates)).
 
 **Invariants**
 

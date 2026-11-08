@@ -1,0 +1,6 @@
+# The private registry the workspace crates are published to (Kellnr). The workspace's own
+# dependencies name it (`registry = "Suitsu31"` in Cargo.toml), so every build needs it defined,
+# even though they resolve to paths. No credentials here: `cargo login --registry Suitsu31`.
+[registries.Suitsu31]
+index = "sparse+https://crates.suitsu31.club/api/v1/crates/"
+credential-provider = ["cargo:token"]

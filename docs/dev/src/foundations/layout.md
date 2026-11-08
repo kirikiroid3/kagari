@@ -4,6 +4,8 @@
 
 - `Cargo.toml`: the workspace (members, shared package fields, every dependency version).
 - `rust-toolchain.toml`, `flake.nix`, `.envrc`: toolchain and dev shell (see [Testing](../process/testing.md)).
+- `.cargo/config.toml`: the `Suitsu31` crate registry the workspace publishes to (see
+  [Releases](../process/releases.md#crates)).
 - `.gitignore`, `.gitattributes`, `docs/.gitignore`: what is generated or local.
 
 The repository is one Cargo workspace (resolver 3, edition 2024, version 0.3.1, Apache-2.0) plus
