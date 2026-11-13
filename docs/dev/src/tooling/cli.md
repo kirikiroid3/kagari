@@ -197,7 +197,7 @@ kagari build [--manifest-path PATH] [--target TARGET]... [--profile debug|releas
    Any such line → exit 1, and the output directory is neither created nor cleaned. The format
    tables per profile live in `runtime_libs/kagari-compat`; the user-facing list is in the
    Reference's [Runtime profiles](https://kagari.suitsu31.club/en/reference/tools/projects/#runtime-profiles).
-   `native_v0` accepts shaders whose content sniffs as UTF-8 text (`AssetFormat::Wgsl`).
+   Both profiles accept shaders whose content sniffs as UTF-8 text (`AssetFormat::Wgsl`).
 4. **Shader check** (`build/shaders.rs`): `shader_roles` is parallel to `asset_files`; for each
    asset with `Some(role)`, read the whole source (disk, or `kagari_std::file` for
    `FilePath::Std`) and run `kagari_shader::validate(role, &src)` (feature `validate`, naga). Each

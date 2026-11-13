@@ -57,7 +57,7 @@ fn unknown_runtime_profiles_are_rejected() {
     let text = format!("{MINIMAL}\n[build]\nruntime-compatibility = [\"web_v0\"]\n");
     assert_eq!(
         parse_manifest(&text).unwrap_err(),
-        "unknown runtime profile `web_v0`; supported runtime profiles: native_v0"
+        "unknown runtime profile `web_v0`; supported runtime profiles: native_v0, native_unstable"
     );
 }
 

@@ -1,11 +1,11 @@
 # The Desktop Runtime
 
 `kagari-desktop-runtime` is the binary that runs the output of `kagari build` (`game.kagari` and
-the `.kiarchive` files) on Linux, macOS and Windows. It implements the runtime profile
-`native_v0`. It is a thin shell around the engine: it implements `Platform`, feeds input and
-time, draws `Frame`s with `kagari-render`, and plays `AudioCommand`s with kira. With `--headless`
-the same engine runs without a window, driven by a script, writing PNG captures; this is the
-project's end-to-end test harness.
+the `.kiarchive` files) on Linux, macOS and Windows. It implements the runtime profiles
+`native_v0` (frozen) and `native_unstable`. It is a thin shell around the engine: it implements
+`Platform`, feeds input and time, draws `Frame`s with `kagari-render`, and plays `AudioCommand`s
+with kira. With `--headless` the same engine runs without a window, driven by a script, writing
+PNG captures; this is the project's end-to-end test harness.
 
 The user-facing documentation is the Reference: [The Runtime](https://kagari.suitsu31.club/en/reference/tools/runtime/)
 and [Headless Mode](https://kagari.suitsu31.club/en/reference/tools/headless/).

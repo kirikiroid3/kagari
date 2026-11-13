@@ -129,41 +129,48 @@ pub fn describe(format: AssetFormat) -> &'static str {
 /// Whether `profile` supports assets of `kind` at all.
 pub fn supports_kind(profile: RuntimeProfile, kind: AssetKind) -> bool {
     match (profile, kind) {
-        (RuntimeProfile::NativeV0, _) => true,
+        (RuntimeProfile::NativeV0 | RuntimeProfile::NativeUnstable, _) => true,
     }
 }
 
 /// Whether `profile` decodes an asset of `kind` stored as `format`.
 pub fn supports(profile: RuntimeProfile, kind: AssetKind, format: AssetFormat) -> bool {
-    use AssetFormat as F;
     match profile {
-        RuntimeProfile::NativeV0 => match kind {
-            AssetKind::Image => matches!(
-                format,
-                F::Png
-                    | F::JpegBaseline
-                    | F::JpegProgressive
-                    | F::WebpLossy
-                    | F::WebpLossless
-                    | F::WebpExtended
-                    | F::Bmp
-                    | F::Jxl
-            ),
-            AssetKind::Audio | AssetKind::Voice => matches!(
-                format,
-                F::OggVorbis
-                    | F::OggFlac
-                    | F::Flac
-                    | F::WavPcm
-                    | F::WavFloat
-                    | F::Mp3
-                    | F::AdtsAac
-                    | F::Mp4Aac
-                    | F::Mp4Alac
-            ),
-            AssetKind::Font => matches!(format, F::TrueType | F::OpenTypeCff | F::FontCollection),
-            AssetKind::Shader => matches!(format, F::Wgsl),
-            AssetKind::Video => matches!(format, F::WebmVp9 | F::WebmAv1 | F::Mp4H264),
-        },
+        RuntimeProfile::NativeV0 => native_v0(kind, format),
+        // So far exactly `native_v0`; formats added after the freeze go here.
+        RuntimeProfile::NativeUnstable => native_v0(kind, format),
+    }
+}
+
+/// The formats of `native_v0`. Frozen: never add or remove a format here.
+fn native_v0(kind: AssetKind, format: AssetFormat) -> bool {
+    use AssetFormat as F;
+    match kind {
+        AssetKind::Image => matches!(
+            format,
+            F::Png
+                | F::JpegBaseline
+                | F::JpegProgressive
+                | F::WebpLossy
+                | F::WebpLossless
+                | F::WebpExtended
+                | F::Bmp
+                | F::Jxl
+        ),
+        AssetKind::Audio | AssetKind::Voice => matches!(
+            format,
+            F::OggVorbis
+                | F::OggFlac
+                | F::Flac
+                | F::WavPcm
+                | F::WavFloat
+                | F::Mp3
+                | F::AdtsAac
+                | F::Mp4Aac
+                | F::Mp4Alac
+        ),
+        AssetKind::Font => matches!(format, F::TrueType | F::OpenTypeCff | F::FontCollection),
+        AssetKind::Shader => matches!(format, F::Wgsl),
+        AssetKind::Video => matches!(format, F::WebmVp9 | F::WebmAv1 | F::Mp4H264),
     }
 }

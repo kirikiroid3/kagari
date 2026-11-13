@@ -9,6 +9,7 @@
 - Host ABI: `core/kagari-std/kis/std/**/*.kis` (`#[builtin]` items), `runtime_libs/kagari-engine/src/host`.
 - Trust boundary: `core/kagari-bytecode/src/verify.rs`, `runtime_libs/kagari-vm/src/{program.rs,vm.rs,trap.rs}`.
 - Saves: `runtime_libs/kagari-engine/src/saves`.
+- Runtime profiles: `runtime_libs/kagari-compat/src/{profile.rs,format.rs}`.
 
 This chapter records the decisions that shape Kagari, each as a short record: the **Decision**,
 **Why**, and the **Consequences** including the alternatives that were rejected. Each record has a
@@ -405,6 +406,28 @@ of an extension is rejected by an engine that has a different one.
 - The bytecode reserves the Features section for required engine extensions. The compiler emits
   none, and the VM rejects any module with a required feature
   (`LoadError::RequiredFeature`).
+
+### `native_v0` is frozen; new formats go to `native_unstable` {#runtime-profiles}
+
+*Status: Implemented.*
+
+**Decision.** The runtime profile `native_v0` is frozen: the asset formats and std features it
+covers never change. Everything new goes to the profile `native_unstable`, which started as an
+exact copy of `native_v0`. The default of `build.runtime-compatibility` stays `["native_v0"]`.
+
+**Why.** A profile is a promise that a runtime decodes what `kagari build` accepted. Adding a
+format to `native_v0` would let a game build for `native_v0` and then fail on a runtime released
+before the addition. A separate profile for work in progress keeps that promise and still lets a
+project opt into new formats early.
+
+**Consequences.**
+
+- `kagari-compat`'s `native_v0` table is never edited; a new decoder adds its formats to the
+  `native_unstable` arm of `supports` only.
+- The desktop runtime implements both profiles and must keep decoding every `native_v0` format.
+- A game that lists `native_unstable` may need a runtime at least as new as the toolchain that
+  built it, and what the profile accepts may change between releases.
+- See [Runtime profiles and `kagari-compat`](../runtime/engine.md#runtime-profiles-and-kagari-compat).
 
 ## Compiler architecture
 

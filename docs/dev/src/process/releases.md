@@ -103,7 +103,7 @@ linked dynamically, so releases ship its shared libraries next to the runtime.
 
 The workflow caches each platform's prefix under a key hashed from `build.sh`, so editing the
 script rebuilds FFmpeg. The decoders and demuxers must cover every video format
-`kagari-compat::supports` accepts for `native_v0`.
+`kagari-compat::supports` accepts for any profile (`native_v0` and `native_unstable`).
 
 ## The bucket
 

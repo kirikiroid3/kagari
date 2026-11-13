@@ -12,7 +12,7 @@ description: Load when changing the Kagari engine, text layout, renderer, runtim
 | `runtime_libs/kagari-engine` | host imports, mode stack, reactive UI, story driver, screen and timeline, audio model, input, stores, saves; `debug.rs` (debugger access) |
 | `runtime_libs/kagari-text` | fonts, shaping, line breaking, ruby, rasterization |
 | `runtime_libs/kagari-render` | the wgpu compositor for `Frame` |
-| `runtime_libs/kagari-compat` | runtime profiles (`native_v0`) and asset sniffing, used by `kagari build` |
+| `runtime_libs/kagari-compat` | runtime profiles (`native_v0` frozen, `native_unstable`) and asset sniffing, used by `kagari build` |
 | `runtime_libs/kagari-video` | FFmpeg (`ffmpeg-next`) movie probing, video frames (hardware with software fallback) and movie audio; depends on no Kagari crate |
 | `runtime_libs/kagari-debugger` | query engine (`session/`), debug protocol server, instruction hook, headless platform; features `client` (front-end helpers) and `dap` (the debug adapter) |
 | `runtime/kagari-desktop-runtime` | winit/wgpu/kira/gilrs shell, `Platform`, movie playback (`movies.rs`), headless mode |
@@ -53,6 +53,9 @@ Develop Guide (`docs/dev/src/`):
 - **Navigation and story input are deferred** (`pending_nav`, `pending_input`) and applied only by
   `settle`.
 - `kagari_text::units` defines reveal units for both layout and reveal.
+- **`native_v0` is frozen.** Never change its table (`kagari-compat` `format.rs`, `native_v0`);
+  new formats and features go to `native_unstable` only, and the runtime keeps decoding every
+  `native_v0` format.
 - `kagari-compat::supports` must match the decoder features in the workspace `Cargo.toml`
   (`image`: png/jpeg/webp/bmp; `jxl-oxide` in the engine; `kira`:
   ogg/vorbis/flac/wav/pcm/mp3/aac/isomp4/alac). The desktop runtime's

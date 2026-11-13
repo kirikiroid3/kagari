@@ -36,7 +36,7 @@ between std declarations and these imports is in [Builtins and the Host ABI](../
 
 Related crates: `runtime_libs/kagari-vm` ([The VM](./vm.md)), `runtime_libs/kagari-text` and
 `runtime_libs/kagari-render` ([Text and Rendering](./text-render.md)),
-`runtime_libs/kagari-compat` ([below](#profile-native_v0-and-kagari-compat)).
+`runtime_libs/kagari-compat` ([below](#runtime-profiles-and-kagari-compat)).
 
 ## Structure
 
@@ -695,18 +695,24 @@ not a supported image, traps there rather than mid-animation; pixel data that fa
 upload is logged once and the image is not drawn (`kagari build` rejects assets a listed profile
 cannot decode).
 
-## Profile `native_v0` and `kagari-compat`
+## Runtime profiles and `kagari-compat`
 
 A runtime profile names the set of decoders a runtime provides. `kagari-compat` defines the
-profiles (`RuntimeProfile`, currently only `NativeV0` = `native_v0`), content sniffing of asset
-bytes (`sniff`, rule order matters: the first matching rule wins, every read is bounds-checked),
-and the table of which formats a profile decodes (`supports`, `supports_kind`). Its only users are
-`kagari-project` (parsing `build.runtime-compatibility`) and `kagari build` (rejecting assets a
-listed profile cannot decode; [Projects and the CLI](../tooling/cli.md)). The runtime itself does
-not consult it.
+profiles (`RuntimeProfile`: `NativeV0` = `native_v0`, `NativeUnstable` = `native_unstable`),
+content sniffing of asset bytes (`sniff`, rule order matters: the first matching rule wins, every
+read is bounds-checked), and the table of which formats a profile decodes (`supports`,
+`supports_kind`). Its only users are `kagari-project` (parsing `build.runtime-compatibility`) and
+`kagari build` (rejecting assets a listed profile cannot decode;
+[Projects and the CLI](../tooling/cli.md)). The runtime itself does not consult it.
 
-| Kind | `native_v0` decodes | Implemented by |
-| ---- | ------------------- | -------------- |
+`native_v0` is frozen ([decision](../foundations/decisions.md#runtime-profiles)): its table
+(`format.rs`, `native_v0`) never gains or loses a format, and the desktop runtime keeps decoding
+everything it lists. New formats and features go to `native_unstable` only. Today
+`native_unstable` is exactly `native_v0` (`supports` delegates to `native_v0`); the first
+addition gives it its own arm. The table below is therefore both profiles.
+
+| Kind | Decodes | Implemented by |
+| ---- | ------- | -------------- |
 | Image | PNG, baseline and progressive JPEG, lossy, lossless and extended WebP, BMP, still RGB or greyscale JPEG XL | `image` with features `png`, `jpeg`, `webp`, `bmp`; `jxl-oxide` with feature `image`, no CMS (engine) |
 | Audio, voice | Ogg Vorbis, Ogg FLAC, FLAC, WAV (PCM, IEEE float), MP3, mono/stereo AAC-LC (ADTS, MP4), mono/stereo ALAC (MP4) | `kira` with features `ogg`, `vorbis`, `flac`, `wav`, `pcm`, `mp3`, `aac`, `isomp4`, `alac` (desktop) |
 | Font | TrueType, OpenType (CFF), collections (face 0) | `skrifa` (`kagari-text`) |

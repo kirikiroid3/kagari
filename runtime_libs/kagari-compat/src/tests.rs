@@ -385,18 +385,18 @@ fn video_encoder_output() {
             bytes.to_vec()
         };
         assert_eq!(sniff(AssetKind::Video, &head), expected);
-        assert!(supports(
-            RuntimeProfile::NativeV0,
-            AssetKind::Video,
-            expected
-        ));
+        for &profile in RuntimeProfile::ALL {
+            assert!(supports(profile, AssetKind::Video, expected));
+        }
     }
     let vp8 = sniff(
         AssetKind::Video,
         include_bytes!("../tests/fixtures/vp8.webm"),
     );
     assert_eq!(vp8, AssetFormat::WebmOther);
-    assert!(!supports(RuntimeProfile::NativeV0, AssetKind::Video, vp8));
+    for &profile in RuntimeProfile::ALL {
+        assert!(!supports(profile, AssetKind::Video, vp8));
+    }
     // Only video assets read EBML.
     assert_eq!(
         sniff(
@@ -519,11 +519,9 @@ fn encoder_output_is_supported() {
             bytes.to_vec()
         };
         assert_eq!(sniff(AssetKind::Voice, &head), expected);
-        assert!(supports(
-            RuntimeProfile::NativeV0,
-            AssetKind::Voice,
-            expected
-        ));
+        for &profile in RuntimeProfile::ALL {
+            assert!(supports(profile, AssetKind::Voice, expected));
+        }
     }
 }
 

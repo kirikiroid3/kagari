@@ -187,9 +187,9 @@ from `PATH` or from the `lsp.kagari.binary.path` setting.
 
 ## `runtime_libs/`
 
-**`kagari-compat`** — Runtime profiles (today only `native_v0`) and the asset formats each can
-decode. `sniff` identifies an asset by content, not by extension; `kagari build` rejects assets a
-listed profile cannot decode.
+**`kagari-compat`** — Runtime profiles (`native_v0`, frozen, and `native_unstable`) and the asset
+formats each can decode. `sniff` identifies an asset by content, not by extension; `kagari build`
+rejects assets a listed profile cannot decode.
 
 **`kagari-video`** — Movie decoding through FFmpeg (`ffmpeg-next`): probing, video frames as
 sRGB RGBA with hardware decoding and a software fallback, and movie audio. It depends on no
@@ -225,9 +225,10 @@ the compiler. See [The Debugger](../runtime/debugger.md).
 
 ## `runtime/`
 
-**`kagari-desktop-runtime`** — The desktop binary (profile `native_v0`): a `winit` + `wgpu` window,
-`kira` audio, `gilrs` gamepads, file-backed stores in the platform data directory, and a headless
-mode driven by an input script. See [The Desktop Runtime](../runtime/desktop.md).
+**`kagari-desktop-runtime`** — The desktop binary (profiles `native_v0` and `native_unstable`): a
+`winit` + `wgpu` window, `kira` audio, `gilrs` gamepads, file-backed stores in the platform data
+directory, and a headless mode driven by an input script. See
+[The Desktop Runtime](../runtime/desktop.md).
 
 ## Other directories
 

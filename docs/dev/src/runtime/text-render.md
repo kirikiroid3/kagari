@@ -375,7 +375,7 @@ output happens only at the end:
   `pipelines.rs` and `kagari-render`'s layout tests (`uniforms_start_with_the_user_frame`,
   `motion_uniform_matches_the_prelude`) together.
 - A new drawable (shaders, filters, another kind of content): the compositor, the profile table in
-  `kagari-compat` (a new profile if `native_v0`'s promise changes), and the STD appendix
+  `kagari-compat` (`native_unstable` only; `native_v0` is frozen), and the STD appendix
   [Runtime Profiles](https://kagari.suitsu31.club/en/std/appendix/profiles/). Movies follow the
   `Node::Video` / `VideoRequest` path: a change to video drawing touches the engine (`frame.rs`,
   `screen/draw.rs`), the renderer (`textures.rs`, `plan.rs`, `encode.rs`) and the platform

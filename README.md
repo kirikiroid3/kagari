@@ -36,7 +36,7 @@ checked out here as the submodule `docs/site` (`git submodule update --init`; As
 | Bytecode (`kagari-bytecode`) and archives (`kagari-archive`) | ✅ |
 | Standard library (`kagari-std` declarations, implemented by the engine) | ✅ except video playback and studio shaders |
 | Tooling: `kagari` CLI, formatter, language server, tree-sitter grammar, Zed extension | ✅ |
-| Desktop runtime, profile `native_v0` (the whole std except video and shaders) | ✅ |
+| Desktop runtime, profiles `native_v0` (frozen) and `native_unstable` (the whole std except video and shaders) | ✅ |
 
 ## Installing
 
