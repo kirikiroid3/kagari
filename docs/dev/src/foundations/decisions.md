@@ -78,8 +78,9 @@ once per call site.
   have only bounded loops (`E3004`, `E3006`), so each call is one transition inside a scene.
 - Every loop and call cycle of a scene must pass through a step (`E5001`, `E5002`).
 - The analysis is explicit-state (proposal phase 2) with a state cap (`state_cap`, default
-  200 000; `W5006` past it). Symbolic reachability with decision diagrams is planned; see
-  [Open Questions](../process/open-questions.md).
+  200 000; `W5006` past it). It shares states instead of storing each in full, and it stays
+  explicit: a symbolic back end was rejected (see
+  [The story analysis shares states, it never merges them](#state-sharing)).
 - The run-time call stack is capped by `recursion_depth` (default 2048), written into the
   bytecode as `max_call_depth`. The proposal's alternative, capping recursion at compile time to
   get a finite automaton, was rejected.
@@ -527,6 +528,42 @@ tree database; a new container would duplicate it.
 - `kagari check` writes into the output directory; `kagari clean` removes what the CLI writes.
 - The files are large for large stories (about 140 MiB at 200 000 states); the format favours
   readability (named fields) over size.
+
+### The story analysis shares states, it never merges them {#state-sharing}
+
+*Status: Implemented.*
+
+**Decision.** The exploration stays explicit and exact. It stores a state as a node in a context
+that holds only a part of the state, and the call nodes that lead to the context hold the rest: a
+scene is explored once per valuation of the story variables it can access (its *footprint*), and
+a run of steps inside a scene that writes no story variable (a *region*) once per valuation of
+what it reads. Two states that the exploration without sharing tells apart stay apart
+([Story and System Analysis](../compiler/analysis.md#sharing-states)).
+
+**Why.** The exploration stored one node per line and per valuation of the story variables:
+`2^k (L + 2) - 1` nodes for `k` yes/no flags that stay live across `L` lines, so eleven flags
+and a hundred lines were past the default state cap, and a story with three counters, thirty
+choices and a hundred lines between two choices had 550 956 states. Most of those states differ
+only in variables the code around them never touches. Sharing them keeps every result (the
+diagnostics, the graph the debugger tracks and navigates) and brings the two stories to 10 000
+and 15 000 nodes.
+
+**Consequences.**
+
+- The state cap counts nodes as before; the same story now has fewer.
+- The persisted graph has contexts for regions and exits that leave a region; a reader that
+  follows entries, successors and exits needs no change
+  ([`.kagari-cache` Files](../formats/cache.md#story)).
+- Rejected: dropping story variables that no later code reads from the state. It merges states,
+  and `W5004` treats a story variable as the author's statement that two paths differ: the fix
+  the Reference gives for `W5004` ("promote the dependency into a story variable") would be
+  reported one step later. Whether a dead story variable should separate states is an
+  [open question](../process/open-questions.md).
+- Rejected: a SAT or decision-diagram back end. It needs a second semantics of MIR beside the
+  executor, and gives no graph for the screens, the tracker or `nav`.
+- Rejected: partial-order reduction, and the DAG of choice histories as the state space. The
+  tracker needs a node for every state the player can be in, and a path of the choice DAG need
+  not be a run of the story.
 
 ## Distribution
 

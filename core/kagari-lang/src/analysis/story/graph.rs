@@ -21,7 +21,7 @@ use crate::resolve::body_resolution;
 use crate::signatures::{ProgramSignatures, program_signatures};
 use crate::ty::{FnDefId, FnRef};
 
-use super::explore::{Context, Explored, Node, NodeKind, Target};
+use super::explore::{Context, ExitData, Explored, Node, NodeKind, Target, ValueId};
 use super::keyframes::is_keyframe;
 use super::liveness::scene_kept;
 
@@ -103,7 +103,12 @@ pub(super) fn convert(
             .globals
             .items()
             .iter()
-            .map(|globals| globals.iter().map(|id| id.0).collect())
+            .map(|globals| {
+                globals
+                    .iter()
+                    .map(|id| (*id != ValueId::ABSENT).then_some(id.0))
+                    .collect()
+            })
             .collect(),
         scenes: scenes
             .iter()
@@ -185,15 +190,22 @@ impl Converter<'_> {
             path: self.fn_path(&context.fn_ref),
             args: context.args.iter().map(|id| id.0).collect(),
             globals: context.globals.0,
+            region: context.region.map(|region| block_index(region.header)),
             entry: target(context.entry),
             nodes,
             exits: context
                 .exits
                 .iter()
-                .map(|exit| kd::Exit {
-                    ret: exit.ret.0,
-                    globals: exit.globals.0,
-                    outs: exit.outs.iter().map(|id| id.0).collect(),
+                .map(|exit| match exit {
+                    ExitData::Return { ret, globals, outs } => kd::Exit::Return {
+                        ret: ret.0,
+                        globals: globals.0,
+                        outs: outs.iter().map(|id| id.0).collect(),
+                    },
+                    ExitData::Leave { block, frame } => kd::Exit::Leave {
+                        block: block_index(*block),
+                        frame: frame.0,
+                    },
                 })
                 .collect(),
             callers: context

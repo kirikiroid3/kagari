@@ -522,7 +522,7 @@ impl Summarizer<'_> {
     }
 }
 
-fn contains_mut_ref(ty: &Ty) -> bool {
+pub(super) fn contains_mut_ref(ty: &Ty) -> bool {
     let mut found = false;
     ty.walk(&mut |node| {
         found |=

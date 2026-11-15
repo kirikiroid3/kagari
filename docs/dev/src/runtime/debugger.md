@@ -117,11 +117,14 @@ Files](../formats/cache.md#story)). `Tracker` walks the graph in lockstep with a
 entry and arguments pick the root context; from a step node, a line goes to its successor and a
 choice to its arm's target; a scene call enters its callee's context; a draw takes the value the
 fiber drew (`StoryFiber::draws`, the RAND results of the resume); an exit returns to the caller's
-call node, whose successor for that exit is known. The walk is deterministic, so the tracker
-holds one node and the real call stack above it (the callers' call nodes). The node the walk
-reaches must be the step the story reached, or the tracker is **lost**: the graph does not
-describe this state (a stale artifact, or a state past a cap or a given-up path). The tracker of
-a trace is cached until the trace changes.
+call node, whose successor for that exit is known. A call node enters a called scene or a
+*region* of the same scene (a run of steps the analysis explores once for the part of the state
+it reads; see [Story and System Analysis](../compiler/analysis.md#sharing-states)); the walk
+treats both alike. The walk is deterministic, so the tracker holds one node and the real call
+stack above it (the callers' call nodes, which can be more than the scenes on the VM's stack).
+The node the walk reaches must be the step the story reached, or the tracker is **lost**: the
+graph does not describe this state (a stale artifact, or a state past a cap or a given-up path).
+The tracker of a trace is cached until the trace changes.
 
 ## `nav`
 

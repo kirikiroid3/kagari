@@ -57,7 +57,7 @@ debugger must reject a debug artifact whose script hash is not that of the bytec
 | Field | Type | Kinds | Meaning |
 | ----- | ---- | ----- | ------- |
 | `kind` | String | both | `analysis` or `debug`; another value is `Error::Kind` |
-| `schema` | I64 | both | `SCHEMA` (3); another value is `Error::Schema` |
+| `schema` | I64 | both | `SCHEMA` (4); another value is `Error::Schema` |
 | `toolchain` | String | both | The `kagari-lang` version that wrote the file |
 | `fingerprint` | String | both | The source fingerprint |
 | `diagnostics` | Array of tables | `analysis` | The stage-5 diagnostics, resolved (below) |
@@ -91,24 +91,40 @@ given arguments and story variables), its states; a scene call leads into the ca
 resumes once per exit of it. Values, frames and story-variable sets are stored once and referred
 to by index.
 
+States are shared, never merged (see [Sharing states](../compiler/analysis.md#sharing-states)). A
+scene's context holds only the story variables the scene can access. A *region* (a run of steps
+inside a scene that depends on a part of the state only) is a context of its own: a call node at
+the region's first step enters it, and it ends in `leave` exits instead of returning. What a
+context does not hold (a story variable, a kept local) is Null in its `globals` and `frames`, and
+has the value it has at the call node that entered the context. A reader that follows `entry`,
+`next` and the exits of call nodes (`StoryGraph::reached`, the debugger's tracker) needs to know
+none of this.
+
 | Field | Type | Meaning |
 | ----- | ---- | ------- |
 | `complete` | Bool | Every reachable state was visited |
 | `incomplete` | Array of `{code, message}` | Why not: `W5006` (a cap) or `W5007` (a path given up) |
 | `vars` | Array of String | The story variables (`static mut`) by path |
 | `values` | Array of values | Every value, stored once |
-| `frames` | Array of arrays of (I64 or Null) | Kept locals: a value index per local of `Point::locals`, Null when uninitialized |
-| `globals` | Array of arrays of I64 | Story-variable values, in the order of `vars` |
+| `frames` | Array of arrays of (I64 or Null) | Kept locals: a value index per local of `Point::locals`; Null when uninitialized, and in a region context when the context does not hold the local |
+| `globals` | Array of arrays of (I64 or Null) | Story-variable values, in the order of `vars`; Null for a variable the context does not hold |
 | `scenes` | Array of `{path, points}` | Per scene its item path and `points`: `{block, locals}` per suspension block some node is at, ascending by block; `locals` are the names of the kept locals in frame order (`""` for a temporary) |
 | `contexts` | Array of tables | Below |
 | `roots` | Array of I64 | The contexts of the entry scenes, one per argument value |
 | `keyframes` | Array of I64 | The value indices of the render functions nodes refer to (`render`) that are keyframe renders (their output does not depend on the input screen), ascending and unique; any other render a node refers to is a delta render |
 
 Context: `scene` (index into `scenes`), `path` (the instance path as the bytecode names the
-function, generic arguments included), `args` (value indices), `globals` (at entry), `entry`
-(target), `nodes`, `exits` (`{ret, globals, outs}`: returned value, story variables at return,
-final values of the `&mut` parameters), `callers` (`[context, node]` pairs of the call nodes that
-enter it).
+function, generic arguments included), `args` (value indices; none for a region), `globals` (at
+entry), `region` (the header block of the region the context explores, a `block` of the scene's
+`points`; Null for a scene), `entry` (target), `nodes`, `exits`, `callers` (`[context, node]`
+pairs of the call nodes that enter it).
+
+Exit, by `kind` (another value is `Error::Malformed("exits")`):
+
+| `kind` | Fields | Meaning |
+| ------ | ------ | ------- |
+| `return` | `ret`, `globals`, `outs` | The scene returns: the returned value, the story variables at return, the final values of the `&mut` parameters |
+| `leave` | `block`, `frame` | A region is left at the suspension block `block` outside it; `frame` holds the kept locals of `block` the region context holds |
 
 Node: `kind`, `block`, `frame`, `globals`, `next` (an array of targets), and per kind:
 
@@ -186,7 +202,8 @@ for step in story.reached_steps() {
 `StoryGraph::reached` walks from the roots: within a context along the targets of each node, into
 the callee's context at a call (before the caller resumes), visiting each context and node once.
 `locals(context, node)` pairs the kept-local names of the node's point with its frame, and
-`vars(context, node)` the story-variable paths with its values.
+`vars(context, node)` the story-variable paths with its values (`None` for a variable the node's
+context does not hold).
 
 ## Invariants
 

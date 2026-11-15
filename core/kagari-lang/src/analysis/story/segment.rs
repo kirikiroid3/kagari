@@ -7,9 +7,12 @@
 //! back through the places its arguments borrowed.
 //!
 //! Story variables are thawed when the segment first reaches them; only those are frozen
-//! again at the stop ([`Snapshot::globals`]).
+//! again at the stop ([`Snapshot::globals`]). Likewise only the locals the segment may touch
+//! ([`Bounds::touched`]) get a heap cell, and the machine's vectors are reused from one
+//! segment to the next ([`Scratch`]): a segment costs what it touches, not the size of its
+//! scene.
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::db::Db;
 use crate::eval::ConstValue;
@@ -47,6 +50,9 @@ pub(super) enum Stop {
         value: ConstValue,
         outs: Vec<ConstValue>,
     },
+    /// The segment reached the suspension ending `block`, which lies outside the region it
+    /// explores ([`Bounds::region`]): the context that entered the region goes on there.
+    Leave { block: BasicBlock },
     /// A const-evaluation error in story code, at the expression `at` of the scene (at
     /// the error's own location when `None`).
     Fault {
@@ -88,6 +94,12 @@ pub(super) enum Resume<'a> {
         value: &'a ConstValue,
         outs: &'a [ConstValue],
     },
+    /// At the suspension ending `block`, whose kept locals hold `frame`: no statement runs,
+    /// the segment only evaluates the suspension.
+    At {
+        block: BasicBlock,
+        frame: &'a [Option<&'a ConstValue>],
+    },
 }
 
 /// The program-wide inputs of a segment.
@@ -100,6 +112,31 @@ pub(super) struct Inputs<'a, 'db> {
     pub slots: &'a FxHashMap<ItemId, usize>,
 }
 
+/// The vectors of a segment's machine, kept from one segment to the next.
+#[derive(Default)]
+pub(super) struct Scratch {
+    /// The heap cell of every local of the scene that ran last; all `usize::MAX` between
+    /// segments.
+    cells: Vec<usize>,
+    /// Empty between segments.
+    heap: Vec<Value>,
+}
+
+/// What a segment may touch (see `SceneShape`).
+pub(super) struct Bounds<'a> {
+    /// The locals that get a cell. Reaching another local aborts the segment.
+    pub touched: &'a [Local],
+    /// The parameters passed by reference: kept as the value they point to.
+    pub by_ref: &'a [Local],
+    /// The blocks of the region the segment explores; a suspension outside it is left to
+    /// the context that entered the region.
+    pub region: Option<&'a FxHashSet<BasicBlock>>,
+}
+
+fn local_index(local: Local) -> usize {
+    local.into_raw().into_u32() as usize
+}
+
 /// Runs `scene` from `resume` with the story variables `globals`.
 pub(super) fn run<'a, 'db: 'a>(
     inputs: Inputs<'a, 'db>,
@@ -107,15 +144,22 @@ pub(super) fn run<'a, 'db: 'a>(
     env: GenericEnv,
     resume: Resume<'_>,
     globals: &'a dyn StoryValues,
+    bounds: Bounds<'_>,
+    scratch: &mut Scratch,
 ) -> (Stop, Snapshot) {
     let mut machine: Machine<'a> = Machine::new(inputs.db, inputs.program, inputs.std);
     machine.story = Some(StoryVars::new(inputs.slots, globals));
+    machine.heap = std::mem::take(&mut scratch.heap);
     let body = scene.body;
-    let cells = body
-        .locals
-        .iter()
-        .map(|_| machine.alloc(Value::Uninit))
-        .collect();
+    let mut cells = std::mem::take(&mut scratch.cells);
+    if cells.len() < body.locals.len() {
+        cells.resize(body.locals.len(), usize::MAX);
+    }
+    for local in bounds.touched {
+        if let Some(slot) = cells.get_mut(local_index(*local)) {
+            *slot = machine.alloc(Value::Uninit);
+        }
+    }
     let mut segment = Segment {
         machine,
         frame: Frame {
@@ -126,48 +170,50 @@ pub(super) fn run<'a, 'db: 'a>(
             stmt: 0,
         },
         scene,
-        by_ref: ref_params(body).map(|(local, _)| local).collect(),
+        by_ref: bounds.by_ref,
+        region: bounds.region,
+        at: false,
         last: None,
     };
     let stop = match segment.start(resume) {
         Ok(()) => segment.run(),
         Err(stop) => stop,
     };
-    segment.snapshot(stop)
+    segment.finish(stop, &bounds, scratch)
 }
 
-struct Segment<'db> {
+struct Segment<'s, 'db> {
     machine: Machine<'db>,
     frame: Frame<'db>,
     scene: SceneBody<'db>,
     /// The parameters passed by reference: kept as the value they point to.
-    by_ref: Vec<Local>,
+    by_ref: &'s [Local],
+    /// The blocks of the region the segment explores.
+    region: Option<&'s FxHashSet<BasicBlock>>,
+    /// The segment started at its suspension ([`Resume::At`]): the statements before it did
+    /// not run, so the temporaries they define (the references a scene call passes) are
+    /// not there.
+    at: bool,
     last: Option<ExprId>,
 }
 
-impl<'db> Segment<'db> {
+impl<'db> Segment<'_, 'db> {
     fn cell(&self, local: Local) -> Option<usize> {
-        self.frame
-            .cells
-            .get(local.into_raw().into_u32() as usize)
-            .copied()
+        self.frame.cells.get(local_index(local)).copied()
     }
 
-    /// Stores a kept value into `local`; a reference parameter gets a fresh cell for the
-    /// value and a reference to it.
-    fn load(&mut self, local: Local, value: &ConstValue) {
-        let value = self.machine.thaw(value);
-        let mut cell = self.machine.alloc(value);
+    /// Stores a kept value into the cell of `local`; a reference parameter gets a fresh
+    /// cell for the value and holds a reference to it. A local the segment may not touch
+    /// has no cell: the segment aborts.
+    fn load(&mut self, local: Local, value: &ConstValue) -> Result<(), Stop> {
+        let mut value = self.machine.thaw(value);
         if self.by_ref.contains(&local) {
-            cell = self.machine.alloc(Value::Ref(Box::new(Place::cell(cell))));
+            let pointee = self.machine.alloc(value);
+            value = Value::Ref(Box::new(Place::cell(pointee)));
         }
-        if let Some(slot) = self
-            .frame
-            .cells
-            .get_mut(local.into_raw().into_u32() as usize)
-        {
-            *slot = cell;
-        }
+        let cell = self.cell(local).ok_or(Stop::Abort)?;
+        *self.machine.heap.get_mut(cell).ok_or(Stop::Abort)? = value;
+        Ok(())
     }
 
     /// The frozen value of `local`, through the reference of a reference parameter;
@@ -186,13 +232,36 @@ impl<'db> Segment<'db> {
         self.machine.freeze(&value).map(Some).map_err(|_| ())
     }
 
+    /// Stores the kept locals `frame` of the suspension ending `block`.
+    fn load_frame(&mut self, block: BasicBlock, frame: &[Option<&ConstValue>]) -> Result<(), Stop> {
+        let kept = self.scene.kept.get(&block).ok_or(Stop::Abort)?;
+        for (local, value) in kept.iter().zip(frame) {
+            if let Some(value) = value {
+                self.load(local, value)?;
+            }
+        }
+        Ok(())
+    }
+
     fn start(&mut self, resume: Resume<'_>) -> Result<(), Stop> {
         let body = self.scene.body;
         match resume {
             Resume::Entry(args) => {
                 for (local, arg) in body.args().zip(args) {
-                    self.load(local, arg);
+                    self.load(local, arg)?;
                 }
+                Ok(())
+            }
+            Resume::At { block, frame } => {
+                self.load_frame(block, frame)?;
+                let data = body.block(block).ok_or(Stop::Abort)?;
+                if !data.term.is_suspension() {
+                    return Err(Stop::Abort);
+                }
+                self.last = data.term_src;
+                self.at = true;
+                self.frame.block = block;
+                self.frame.stmt = data.stmts.len();
                 Ok(())
             }
             Resume::After {
@@ -201,12 +270,7 @@ impl<'db> Segment<'db> {
                 value,
                 outs,
             } => {
-                let kept = self.scene.kept.get(&block).ok_or(Stop::Abort)?;
-                for (local, value) in kept.iter().zip(frame) {
-                    if let Some(value) = value {
-                        self.load(local, value);
-                    }
-                }
+                self.load_frame(block, frame)?;
                 let data = body.block(block).ok_or(Stop::Abort)?;
                 self.last = data.term_src;
                 let (dest, next) = match &data.term {
@@ -263,6 +327,17 @@ impl<'db> Segment<'db> {
             Ok(false) => return Stop::Abort,
             Err(error) => return fault(error, self.last),
         }
+        let block = self.frame.block;
+        if let Some(region) = self.region
+            && !region.contains(&block)
+            && self
+                .scene
+                .body
+                .block(block)
+                .is_some_and(|data| data.term.is_suspension())
+        {
+            return Stop::Leave { block };
+        }
         match self.suspend() {
             Ok(stop) | Err(stop) => stop,
         }
@@ -304,16 +379,35 @@ impl<'db> Segment<'db> {
                 };
                 let mut values = Vec::with_capacity(args.len());
                 for arg in args {
-                    let mut value = self
-                        .machine
-                        .scene_operand(&self.frame, arg, src)
-                        .map_err(|error| fault(error, src))?;
-                    if ref_arg(body, arg).is_some() {
-                        value = self
+                    let value = match ref_arg(body, arg) {
+                        // The reference is copied in as the value it points to. A segment
+                        // that started here has no reference: the value is read from the
+                        // place it borrows, which the frame keeps (`scene_kept`) and which
+                        // the `outs` are written back to.
+                        Some(target) if self.at => {
+                            let place = self
+                                .machine
+                                .scene_place(&self.frame, &target.place, src)
+                                .map_err(|error| fault(error, src))?;
+                            self.machine
+                                .read_place(&place)
+                                .and_then(|value| self.machine.deref_value(value))
+                                .map_err(|kind| fault(EvalError { kind, at: None }, src))?
+                        }
+                        Some(_) => {
+                            let value = self
+                                .machine
+                                .scene_operand(&self.frame, arg, src)
+                                .map_err(|error| fault(error, src))?;
+                            self.machine
+                                .deref_value(value)
+                                .map_err(|kind| fault(EvalError { kind, at: None }, src))?
+                        }
+                        None => self
                             .machine
-                            .deref_value(value)
-                            .map_err(|kind| fault(EvalError { kind, at: None }, src))?;
-                    }
+                            .scene_operand(&self.frame, arg, src)
+                            .map_err(|error| fault(error, src))?,
+                    };
                     values.push(self.freeze(&value)?);
                 }
                 Ok(Stop::Call {
@@ -343,12 +437,19 @@ impl<'db> Segment<'db> {
 
     /// The state at `stop`: the locals kept at a suspension, and the story variables the
     /// segment accessed. A value the analysis cannot store turns the stop into an abort.
-    fn snapshot(mut self, stop: Stop) -> (Stop, Snapshot) {
+    /// The machine's vectors go back to `scratch`, emptied.
+    fn finish(
+        mut self,
+        stop: Stop,
+        bounds: &Bounds<'_>,
+        scratch: &mut Scratch,
+    ) -> (Stop, Snapshot) {
         let block = match &stop {
-            Stop::Step { block, .. } | Stop::Rng { block, .. } | Stop::Call { block, .. } => {
-                Some(*block)
-            }
-            _ => None,
+            Stop::Step { block, .. }
+            | Stop::Rng { block, .. }
+            | Stop::Call { block, .. }
+            | Stop::Leave { block } => Some(*block),
+            Stop::Return { .. } | Stop::Fault { .. } | Stop::Abort => None,
         };
         let mut failed = false;
         let mut frame = Vec::new();
@@ -392,6 +493,16 @@ impl<'db> Segment<'db> {
             globals,
             last: self.last,
         };
+        let mut cells = self.frame.cells;
+        for local in bounds.touched {
+            if let Some(slot) = cells.get_mut(local_index(*local)) {
+                *slot = usize::MAX;
+            }
+        }
+        let mut heap = self.machine.heap;
+        heap.clear();
+        scratch.cells = cells;
+        scratch.heap = heap;
         (stop, snapshot)
     }
 }

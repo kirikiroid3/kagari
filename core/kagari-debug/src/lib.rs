@@ -48,7 +48,7 @@ pub const ANALYSIS_FILE: &str = "analysis.kagari-cache";
 /// The debug artifact next to `game.kagari` in a target directory.
 pub const DEBUG_FILE: &str = "game.kagari-cache";
 /// The schema version of the content; a reader rejects any other.
-pub const SCHEMA: i64 = 3;
+pub const SCHEMA: i64 = 4;
 
 /// Why a cache file cannot be read or written.
 #[derive(Clone, Debug, PartialEq, Eq)]

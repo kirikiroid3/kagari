@@ -8,6 +8,11 @@
 //! recursive state machines are explored: a scene called from many places with the same
 //! entry state is explored once.
 //!
+//! States are shared, never merged (`SceneShape`). A scene's context holds only the story
+//! variables the scene can access (its footprint): the others are [`ValueId::ABSENT`] in
+//! it, and keep the values they have at the call node, which the caller puts back around
+//! the callee's on return. So a scene is explored once per valuation of what it can see.
+//!
 //! Values are stored once ([`ValueInterner`]); frames, story variables and contexts refer
 //! to them by [`ValueId`]. A segment reads the story variables it uses straight from the
 //! interned state and reports only those back, which are `set` into a copy of the state's
@@ -18,7 +23,7 @@ mod report;
 
 pub(super) use model::{
     Context, CtxId, ExitData, ExitId, Explored, Frame, FrameId, Globals, GlobalsId, Interner, Node,
-    NodeId, NodeKind, Target, ValueId, ValueInterner,
+    NodeId, NodeKind, RegionRef, Target, ValueId, ValueInterner,
 };
 
 use rustc_hash::FxHashMap;
@@ -39,7 +44,8 @@ use crate::signatures::{FnSig, ProgramSignatures};
 use crate::ty::{FnDefId, FnRef, GenericArgs};
 
 use super::Scenes;
-use super::segment::{Inputs, Resume, Snapshot, Stop, run};
+use super::segment::{Bounds, Inputs, Resume, Scratch, Snapshot, Stop, run};
+use super::shape::{SceneShape, SlotSet};
 use report::{assets, functions, name_diagnostic};
 
 enum Task {
@@ -66,13 +72,29 @@ pub(super) struct StoryCx<'db> {
     pub sigs: &'db ProgramSignatures,
 }
 
+/// What a context is explored once for.
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct CtxKey {
+    fn_ref: FnRef,
+    args: Box<[ValueId]>,
+    region: Option<RegionRef>,
+    /// The story variables the context holds, at entry.
+    globals: GlobalsId,
+}
+
 struct Explorer<'a, 'db> {
     cx: StoryCx<'db>,
     scenes: &'a Scenes<'db>,
+    /// The shape of every scene, by `Scenes::list` index.
+    shapes: &'a [SceneShape],
+    /// The machine vectors the segments reuse.
+    scratch: Scratch,
     out: Explored,
     /// The position of each story variable in [`Explored::vars`].
     slots: FxHashMap<ItemId, usize>,
-    ctx_index: FxHashMap<(FnRef, Box<[ValueId]>, GlobalsId), CtxId>,
+    /// The story variables with none held.
+    absent: GlobalsId,
+    ctx_index: FxHashMap<CtxKey, CtxId>,
     tasks: Vec<Task>,
     states: usize,
     /// Choices reached with every arm hidden: scene, step, story variables of a witness.
@@ -92,12 +114,19 @@ enum Start {
         value: ConstValue,
         outs: Vec<ConstValue>,
     },
+    /// At the suspension ending `block`, with its kept locals: the header of a region, or
+    /// where a region was left.
+    At {
+        block: BasicBlock,
+        frame: FrameId,
+    },
 }
 
 /// Explores the story from every entry scene; `None` when there is nothing to explore.
 pub(super) fn explore(
     cx: StoryCx<'_>,
     scenes: &Scenes<'_>,
+    shapes: &[SceneShape],
     vars: &[ItemId],
     diagnostics: &mut Vec<Diag>,
 ) -> Option<Explored> {
@@ -132,15 +161,22 @@ pub(super) fn explore(
         initial.push_back(out.values.intern(value.value.clone()));
     }
     let globals = GlobalsId(out.globals.intern(initial));
+    let absent = GlobalsId(
+        out.globals
+            .intern(vars.iter().map(|_| ValueId::ABSENT).collect()),
+    );
     let mut explorer = Explorer {
         cx,
         scenes,
+        shapes,
+        scratch: Scratch::default(),
         slots: vars
             .iter()
             .enumerate()
             .map(|(slot, var)| (*var, slot))
             .collect(),
         out,
+        absent,
         ctx_index: FxHashMap::default(),
         tasks: Vec::new(),
         states: 0,
@@ -193,7 +229,7 @@ pub(super) fn explore(
     }
     for (scene, fn_ref, args) in roots {
         let args = explorer.intern_values(args);
-        let root = explorer.context(scene, fn_ref, args, globals);
+        let root = explorer.scene_context(scene, fn_ref, args, globals);
         explorer.out.roots.push(root);
     }
     explorer.run(diagnostics, &entries);
@@ -244,24 +280,30 @@ impl Explorer<'_, '_> {
         self.out.contexts.get_mut(id.idx())
     }
 
-    /// The context of `scene` entered with `args` and `globals`, explored once.
+    /// The context with these key parts, explored once.
     fn context(
         &mut self,
         scene: usize,
         fn_ref: FnRef,
         args: Box<[ValueId]>,
+        region: Option<RegionRef>,
         globals: GlobalsId,
     ) -> CtxId {
-        let key = (fn_ref, args, globals);
+        let key = CtxKey {
+            fn_ref,
+            args,
+            region,
+            globals,
+        };
         if let Some(id) = self.ctx_index.get(&key) {
             return *id;
         }
         let id = CtxId::from_usize(self.out.contexts.len());
-        let (fn_ref, args, globals) = key.clone();
         self.out.contexts.push(Context {
             scene,
-            fn_ref,
-            args,
+            fn_ref: key.fn_ref.clone(),
+            args: key.args.clone(),
+            region,
             globals,
             entry: Target::Dead,
             nodes: Vec::new(),
@@ -273,6 +315,69 @@ impl Explorer<'_, '_> {
         self.ctx_index.insert(key, id);
         self.tasks.push(Task::Start(id));
         id
+    }
+
+    /// The context of `scene` entered with `args` and, of the story variables `globals`,
+    /// those the scene can access.
+    fn scene_context(
+        &mut self,
+        scene: usize,
+        fn_ref: FnRef,
+        args: Box<[ValueId]>,
+        globals: GlobalsId,
+    ) -> CtxId {
+        let shapes = self.shapes;
+        let globals = match shapes.get(scene).and_then(|shape| shape.footprint.as_ref()) {
+            Some(footprint) => self.project(globals, footprint),
+            None => globals,
+        };
+        self.context(scene, fn_ref, args, None, globals)
+    }
+
+    /// `globals` with the story variables outside `keep` absent.
+    fn project(&mut self, globals: GlobalsId, keep: &SlotSet) -> GlobalsId {
+        if keep.is_empty() {
+            return self.absent;
+        }
+        let Some(values) = self.out.globals.get(globals.0) else {
+            return globals;
+        };
+        let projected: Globals = values
+            .iter()
+            .enumerate()
+            .map(|(slot, value)| {
+                if keep.contains(slot) {
+                    *value
+                } else {
+                    ValueId::ABSENT
+                }
+            })
+            .collect();
+        if projected == *values {
+            return globals;
+        }
+        GlobalsId(self.out.globals.intern(projected))
+    }
+
+    /// `base` with the story variables `over` holds set to their values in `over`.
+    fn overlay(&mut self, base: GlobalsId, over: GlobalsId) -> GlobalsId {
+        let (Some(values), Some(over)) =
+            (self.out.globals.get(base.0), self.out.globals.get(over.0))
+        else {
+            return base;
+        };
+        let mut merged = values.clone();
+        let mut changed = false;
+        for (slot, value) in over.iter().enumerate() {
+            if *value != ValueId::ABSENT && merged.get(slot) != Some(value) {
+                merged.set(slot, *value);
+                changed = true;
+            }
+        }
+        if !changed {
+            return base;
+        }
+        GlobalsId(self.out.globals.intern(merged))
     }
 
     fn run(&mut self, diagnostics: &mut Vec<Diag>, entries: &[usize]) {
@@ -298,10 +403,21 @@ impl Explorer<'_, '_> {
             }
             match task {
                 Task::Start(id) => {
-                    let Some(globals) = self.out.context(id).map(|context| context.globals) else {
+                    let Some((region, globals)) = self
+                        .out
+                        .context(id)
+                        .map(|context| (context.region, context.globals))
+                    else {
                         continue;
                     };
-                    let target = self.resume(id, Start::Entry, globals);
+                    let start = match region {
+                        Some(region) => Start::At {
+                            block: region.header,
+                            frame: region.frame,
+                        },
+                        None => Start::Entry,
+                    };
+                    let target = self.resume(id, start, globals);
                     if let Some(context) = self.ctx_mut(id) {
                         context.entry = target;
                     }
@@ -333,27 +449,56 @@ impl Explorer<'_, '_> {
                     }
                 }
                 Task::Return { ctx, node, exit } => {
-                    let Some((block, frame, _)) = self.node_state(ctx, node) else {
+                    let Some((block, frame, globals)) = self.node_state(ctx, node) else {
                         continue;
                     };
                     let Some(callee) = self.callee(ctx, node) else {
                         continue;
                     };
-                    let Some((ret, globals, outs)) = self
-                        .out
-                        .context(callee)
-                        .and_then(|callee| callee.exits.get(exit.idx()))
-                        .map(|data| (data.ret, data.globals, data.outs.clone()))
-                    else {
+                    let Some((entry, data)) = self.out.context(callee).and_then(|callee| {
+                        Some((callee.globals, callee.exits.get(exit.idx())?.clone()))
+                    }) else {
                         continue;
                     };
-                    let start = Start::After {
-                        block,
-                        frame,
-                        value: self.value(ret),
-                        outs: self.values(&outs),
+                    let target = match data {
+                        ExitData::Return {
+                            ret,
+                            globals: returned,
+                            outs,
+                        } => {
+                            // The callee holds the story variables it can access; the others
+                            // still have the values they have at the call.
+                            let globals = if returned == entry {
+                                globals
+                            } else {
+                                self.overlay(globals, returned)
+                            };
+                            let start = Start::After {
+                                block,
+                                frame,
+                                value: self.value(ret),
+                                outs: self.values(&outs),
+                            };
+                            self.resume(ctx, start, globals)
+                        }
+                        // The region changed no story variable: the caller goes on where
+                        // the region stopped, with its own state around the region's.
+                        ExitData::Leave {
+                            block: to,
+                            frame: held,
+                        } => match self.rejoin(ctx, block, frame, to, held) {
+                            Some(frame) => {
+                                self.resume(ctx, Start::At { block: to, frame }, globals)
+                            }
+                            None => {
+                                let at = self.term_src(ctx, to);
+                                if let Some(scene) = self.out.context(ctx).map(|c| c.scene) {
+                                    self.give_up(scene, at);
+                                }
+                                Target::Dead
+                            }
+                        },
                     };
-                    let target = self.resume(ctx, start, globals);
                     if let Some(Node {
                         kind: NodeKind::Call { succ, .. },
                         ..
@@ -404,7 +549,10 @@ impl Explorer<'_, '_> {
         let Some(context) = self.out.context(ctx) else {
             return Target::Dead;
         };
-        let Some(data) = self.scenes.list.get(context.scene) else {
+        let (Some(data), Some(shape)) = (
+            self.scenes.list.get(context.scene),
+            self.shapes.get(context.scene),
+        ) else {
             return Target::Dead;
         };
         let Some(vars) = self.out.globals.get(globals.0) else {
@@ -421,58 +569,157 @@ impl Explorer<'_, '_> {
             std: self.cx.std,
             slots: &self.slots,
         };
-        let (stop, snapshot) = match &start {
-            Start::Entry => {
-                let args = self.values(&context.args);
-                run(inputs, data.body(), env, Resume::Entry(&args), &vars)
+        let (at, frame) = match &start {
+            Start::Entry => (None, None),
+            Start::After { block, frame, .. } | Start::At { block, frame } => {
+                (Some(*block), Some(*frame))
             }
-            Start::After {
-                block,
-                frame,
-                value,
-                outs,
-            } => {
+        };
+        let bounds = Bounds {
+            touched: shape.touched(at),
+            by_ref: &shape.by_ref,
+            region: context
+                .region
+                .and_then(|region| shape.regions.get(region.region as usize))
+                .map(|region| &region.blocks),
+        };
+        let frame: Vec<Option<&ConstValue>> = match frame {
+            Some(frame) => {
                 let Some(frame) = self.out.frames.get(frame.0) else {
                     return Target::Dead;
                 };
-                let frame: Vec<Option<&ConstValue>> = frame
+                frame
                     .iter()
                     .map(|id| id.and_then(|id| self.out.values.get(id)))
-                    .collect();
-                let resume = Resume::After {
-                    block: *block,
-                    frame: &frame,
-                    value,
-                    outs,
-                };
-                run(inputs, data.body(), env, resume, &vars)
+                    .collect()
             }
+            None => Vec::new(),
         };
+        let args;
+        let resume = match &start {
+            Start::Entry => {
+                args = self.values(&context.args);
+                Resume::Entry(&args)
+            }
+            Start::After {
+                block, value, outs, ..
+            } => Resume::After {
+                block: *block,
+                frame: &frame,
+                value,
+                outs,
+            },
+            Start::At { block, .. } => Resume::At {
+                block: *block,
+                frame: &frame,
+            },
+        };
+        let (stop, snapshot) = run(
+            inputs,
+            data.body(),
+            env,
+            resume,
+            &vars,
+            bounds,
+            &mut self.scratch,
+        );
         self.settle(ctx, stop, snapshot, globals)
     }
 
-    /// Interns the frame and story variables of a snapshot taken from a segment that started
-    /// with the story variables `globals`; returns the node of that state if it exists.
+    fn intern_frame(&mut self, frame: Vec<Option<ConstValue>>) -> FrameId {
+        let frame: Frame = frame
+            .into_iter()
+            .map(|value| value.map(|value| self.out.values.intern(value)))
+            .collect();
+        FrameId(self.out.frames.intern(frame))
+    }
+
+    /// Interns the frame of a snapshot; returns the node of the state it makes with `block`
+    /// and the story variables `globals`, if it exists.
     fn state(
         &mut self,
         ctx: CtxId,
         block: BasicBlock,
-        snapshot: Snapshot,
+        frame: Vec<Option<ConstValue>>,
         globals: GlobalsId,
-    ) -> (FrameId, GlobalsId, Option<NodeId>) {
-        let frame: Frame = snapshot
-            .frame
-            .into_iter()
-            .map(|value| value.map(|value| self.out.values.intern(value)))
-            .collect();
-        let frame = FrameId(self.out.frames.intern(frame));
-        let globals = self.update_globals(globals, snapshot.globals);
+    ) -> (FrameId, Option<NodeId>) {
+        let frame = self.intern_frame(frame);
         let node = self
             .out
             .context(ctx)
             .and_then(|context| context.node_index.get(&(block, frame, globals)))
             .copied();
-        (frame, globals, node)
+        (frame, node)
+    }
+
+    /// When a region starts at `block` for `ctx`: the call node of `ctx`, with the state
+    /// `frame` and `globals`, that enters the region's context for the part of that state
+    /// the region reads. The region's context creates the node of the suspension itself.
+    fn enter_region(
+        &mut self,
+        ctx: CtxId,
+        block: BasicBlock,
+        frame: FrameId,
+        globals: GlobalsId,
+    ) -> Option<Target> {
+        let shapes = self.shapes;
+        let context = self.out.context(ctx)?;
+        let shape = shapes.get(context.scene)?;
+        let index = shape.region_at(context.region.map(|region| region.region), block)?;
+        let region = shape.regions.get(index as usize)?;
+        let (scene, fn_ref) = (context.scene, context.fn_ref.clone());
+        let key: Frame = self
+            .out
+            .frames
+            .get(frame.0)?
+            .iter()
+            .zip(region.key_locals.iter())
+            .map(|(value, read)| value.filter(|_| *read))
+            .collect();
+        let key = RegionRef {
+            region: index,
+            header: region.header,
+            frame: FrameId(self.out.frames.intern(key)),
+        };
+        let held = self.project(globals, &region.key_vars);
+        let callee = self.context(scene, fn_ref, Box::default(), Some(key), held);
+        Some(self.call(ctx, block, frame, globals, callee))
+    }
+
+    /// The kept locals of `to`, where a region entered at the call node of `ctx` at `block`
+    /// with the kept locals `frame` was left holding `held`: what the region holds, around
+    /// it what the call node holds.
+    fn rejoin(
+        &mut self,
+        ctx: CtxId,
+        block: BasicBlock,
+        frame: FrameId,
+        to: BasicBlock,
+        held: FrameId,
+    ) -> Option<FrameId> {
+        let scene = self.scenes.list.get(self.out.context(ctx)?.scene)?;
+        let raw = |local: crate::mir::Local| local.into_raw().into_u32();
+        let mut own = scene
+            .kept
+            .get(&block)?
+            .iter()
+            .zip(self.out.frames.get(frame.0)?.iter())
+            .peekable();
+        let joined: Frame = scene
+            .kept
+            .get(&to)?
+            .iter()
+            .zip(self.out.frames.get(held.0)?.iter())
+            .map(|(local, value)| {
+                while own.next_if(|(kept, _)| raw(*kept) < raw(local)).is_some() {}
+                let outer = own
+                    .peek()
+                    .filter(|(kept, _)| *kept == local)
+                    .and_then(|(_, value)| **value);
+                value.or(outer)
+            })
+            .collect();
+        Some(FrameId(self.out.frames.intern(joined)))
     }
 
     /// The story variables `base` with the accessed ones set to their new values.
@@ -497,13 +744,30 @@ impl Explorer<'_, '_> {
     }
 
     fn settle(&mut self, ctx: CtxId, stop: Stop, snapshot: Snapshot, start: GlobalsId) -> Target {
-        let Some(scene_index) = self.out.context(ctx).map(|context| context.scene) else {
+        let Some((scene_index, region)) = self
+            .out
+            .context(ctx)
+            .map(|context| (context.scene, context.region))
+        else {
             return Target::Dead;
         };
         let last = snapshot.last;
+        // The story variables after the segment.
+        let globals = match stop {
+            Stop::Fault { .. } | Stop::Abort => start,
+            _ => self.update_globals(start, snapshot.globals),
+        };
+        // The segments of a region write no story variable, call no scene and never return:
+        // a region whose segment does is not what its shape says.
+        if region.is_some()
+            && (globals != start || matches!(stop, Stop::Return { .. } | Stop::Call { .. }))
+        {
+            self.give_up(scene_index, last);
+            return Target::Dead;
+        }
         match stop {
             Stop::Step { block, record } => {
-                let (frame, globals, node) = self.state(ctx, block, snapshot, start);
+                let (frame, node) = self.state(ctx, block, snapshot.frame, globals);
                 if let Some(node) = node {
                     return Target::Node(node);
                 }
@@ -515,7 +779,12 @@ impl Explorer<'_, '_> {
                     return Target::Dead;
                 };
                 if outcomes.is_empty() {
+                    // Before a region is entered: its context need not hold the story
+                    // variables the arms' conditions read.
                     self.stuck.entry((scene_index, expr)).or_insert(globals);
+                }
+                if let Some(target) = self.enter_region(ctx, block, frame, globals) {
+                    return target;
                 }
                 let choice = matches!(&record, ConstValue::Adt { item, .. } if *item == self.cx.std.choice.item);
                 let outcomes: Box<[(u32, ValueId)]> = outcomes
@@ -549,9 +818,12 @@ impl Explorer<'_, '_> {
                 Target::Node(id)
             }
             Stop::Rng { block, ty } => {
-                let (frame, globals, node) = self.state(ctx, block, snapshot, start);
+                let (frame, node) = self.state(ctx, block, snapshot.frame, globals);
                 if let Some(node) = node {
                     return Target::Node(node);
+                }
+                if let Some(target) = self.enter_region(ctx, block, frame, globals) {
+                    return target;
                 }
                 if !self.is_term(ctx, block, |term| matches!(term, Terminator::Rng { .. })) {
                     return Target::Dead;
@@ -591,7 +863,7 @@ impl Explorer<'_, '_> {
                 callee,
                 args,
             } => {
-                let (frame, globals, node) = self.state(ctx, block, snapshot, start);
+                let (frame, node) = self.state(ctx, block, snapshot.frame, globals);
                 if let Some(node) = node {
                     return Target::Node(node);
                 }
@@ -604,59 +876,20 @@ impl Explorer<'_, '_> {
                     return Target::Dead;
                 };
                 let args = self.intern_values(args);
-                let callee_ctx = self.context(scene, callee, args, globals);
-                let id = self.add_node(
-                    ctx,
-                    Node {
-                        block,
-                        frame,
-                        globals,
-                        kind: NodeKind::Call {
-                            callee: callee_ctx,
-                            succ: Vec::new(),
-                        },
-                    },
-                );
-                let exits = match self.ctx_mut(callee_ctx) {
-                    Some(callee) => {
-                        callee.callers.push((ctx, id));
-                        callee.exits.len()
-                    }
-                    None => 0,
-                };
-                for exit in 0..exits {
-                    self.tasks.push(Task::Return {
-                        ctx,
-                        node: id,
-                        exit: ExitId::from_usize(exit),
-                    });
-                }
-                Target::Node(id)
+                let callee = self.scene_context(scene, callee, args, globals);
+                self.call(ctx, block, frame, globals, callee)
             }
             Stop::Return { value, outs } => {
-                let globals = self.update_globals(start, snapshot.globals);
-                let data = ExitData {
+                let data = ExitData::Return {
                     ret: self.out.values.intern(value),
                     globals,
                     outs: self.intern_values(outs),
                 };
-                let Some(context) = self.out.contexts.get_mut(ctx.idx()) else {
-                    return Target::Dead;
-                };
-                if let Some(exit) = context.exit_index.get(&data) {
-                    return Target::Exit(*exit);
-                }
-                let exit = ExitId::from_usize(context.exits.len());
-                context.exits.push(data.clone());
-                context.exit_index.insert(data, exit);
-                for &(caller, node) in &context.callers {
-                    self.tasks.push(Task::Return {
-                        ctx: caller,
-                        node,
-                        exit,
-                    });
-                }
-                Target::Exit(exit)
+                self.exit(ctx, data)
+            }
+            Stop::Leave { block } => {
+                let frame = self.intern_frame(snapshot.frame);
+                self.exit(ctx, ExitData::Leave { block, frame })
             }
             Stop::Fault { error, at } => {
                 if let Some(scene) = self.scenes.list.get(scene_index)
@@ -671,6 +904,67 @@ impl Explorer<'_, '_> {
                 Target::Dead
             }
         }
+    }
+
+    /// A call node of `ctx` at `block` that enters `callee`; it resumes once per exit of
+    /// the callee, those it already has included.
+    fn call(
+        &mut self,
+        ctx: CtxId,
+        block: BasicBlock,
+        frame: FrameId,
+        globals: GlobalsId,
+        callee: CtxId,
+    ) -> Target {
+        let id = self.add_node(
+            ctx,
+            Node {
+                block,
+                frame,
+                globals,
+                kind: NodeKind::Call {
+                    callee,
+                    succ: Vec::new(),
+                },
+            },
+        );
+        let exits = match self.ctx_mut(callee) {
+            Some(callee) => {
+                callee.callers.push((ctx, id));
+                callee.exits.len()
+            }
+            None => 0,
+        };
+        for exit in 0..exits {
+            self.tasks.push(Task::Return {
+                ctx,
+                node: id,
+                exit: ExitId::from_usize(exit),
+            });
+        }
+        Target::Node(id)
+    }
+
+    /// The exit `data` of `ctx`, added once; a new exit resumes every caller the context
+    /// has so far.
+    fn exit(&mut self, ctx: CtxId, data: ExitData) -> Target {
+        let Some(context) = self.out.contexts.get_mut(ctx.idx()) else {
+            return Target::Dead;
+        };
+        if let Some(exit) = context.exit_index.get(&data) {
+            return Target::Exit(*exit);
+        }
+        let exit = ExitId::from_usize(context.exits.len());
+        context.exits.push(data.clone());
+        context.exit_index.insert(data, exit);
+        for &(caller, node) in &context.callers {
+            self.tasks.push(Task::Return {
+                ctx: caller,
+                node,
+                exit,
+            });
+        }
+        Target::Exit(exit)
     }
 
     fn add_node(&mut self, ctx: CtxId, node: Node) -> NodeId {

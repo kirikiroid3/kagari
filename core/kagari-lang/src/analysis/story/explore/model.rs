@@ -56,6 +56,12 @@ index!(
     GlobalsId
 );
 
+impl ValueId {
+    /// In a [`Globals`]: a story variable the context does not hold. It has the value it
+    /// has at the call node that entered the context; a segment that reaches it aborts.
+    pub const ABSENT: ValueId = ValueId(u32::MAX);
+}
+
 /// Values stored once and referred to by index.
 pub(in crate::analysis::story) struct Interner<T> {
     items: Vec<T>,
@@ -119,7 +125,8 @@ impl ValueInterner {
 
 /// The kept locals of a block, in ascending order; `None` for an uninitialized local.
 pub(in crate::analysis::story) type Frame = Box<[Option<ValueId>]>;
-/// The story variables, by position in [`Explored::vars`].
+/// The story variables, by position in [`Explored::vars`]; [`ValueId::ABSENT`] for a
+/// variable the context does not hold.
 pub(in crate::analysis::story) type Globals = imbl::Vector<ValueId>;
 
 /// Where a resumption leads.
@@ -164,18 +171,41 @@ pub(in crate::analysis::story) struct Node {
     pub kind: NodeKind,
 }
 
+/// A way a context ends.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub(in crate::analysis::story) struct ExitData {
-    pub ret: ValueId,
-    pub globals: GlobalsId,
-    pub outs: Box<[ValueId]>,
+pub(in crate::analysis::story) enum ExitData {
+    /// The scene returns `ret` with the story variables `globals` (those the context holds)
+    /// and the final values `outs` of its `&mut` parameters.
+    Return {
+        ret: ValueId,
+        globals: GlobalsId,
+        outs: Box<[ValueId]>,
+    },
+    /// A region reached the suspension block `block` outside it; `frame` holds the kept
+    /// locals of `block` the region context holds (`None` for the others).
+    Leave { block: BasicBlock, frame: FrameId },
 }
 
+/// The region a context explores: its index in `SceneShape::regions`, its header and the
+/// kept locals of the header the region reads (its key frame; `None` for the others).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(in crate::analysis::story) struct RegionRef {
+    pub region: u32,
+    pub header: BasicBlock,
+    pub frame: FrameId,
+}
+
+/// A scene entered with arguments and the story variables it can access, or a region of a
+/// scene entered with what it reads.
 pub(in crate::analysis::story) struct Context {
     /// Index into `Scenes::list`.
     pub scene: usize,
     pub fn_ref: FnRef,
+    /// The arguments of a scene; none for a region.
     pub args: Box<[ValueId]>,
+    /// `None` for a scene.
+    pub region: Option<RegionRef>,
+    /// The story variables at entry: those the context holds.
     pub globals: GlobalsId,
     pub entry: Target,
     pub nodes: Vec<Node>,

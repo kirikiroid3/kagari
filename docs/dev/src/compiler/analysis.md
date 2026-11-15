@@ -18,12 +18,13 @@ where they report.
 | `core/kagari-lang/src/analysis/story/termination.rs` | Stepless loops (`E5001`) and stepless call cycles (`E5002`) |
 | `core/kagari-lang/src/analysis/story/liveness.rs` | `scene_kept` (salsa, per scene): the locals each suspension keeps |
 | `core/kagari-lang/src/analysis/story/segment.rs` | Running a scene from one suspension to the next in the MIR executor |
+| `core/kagari-lang/src/analysis/story/shape.rs` | `shapes`: per scene, the locals each segment may touch, the story variables it can access (its footprint) and its regions |
 | `core/kagari-lang/src/analysis/story/explore/mod.rs` | The exploration: contexts, worklist, stuck choices, caps |
 | `core/kagari-lang/src/analysis/story/explore/model.rs` | The explored state space (`Explored`, `Context`, `Node`, interners) |
 | `core/kagari-lang/src/analysis/story/explore/report.rs` | `W5006`–`W5009` and `E5003` reporting, witnesses |
 | `core/kagari-lang/src/analysis/story/screens.rs` | Screens per step: render errors, bounded screens (`E5005`), consistency (`W5004`) |
 | `core/kagari-lang/src/analysis/story/keyframes.rs` | Opt-in keyframe placement check (`W5011`) |
-| `core/kagari-lang/src/analysis/story/tests.rs` | Unit tests of the keyframe check |
+| `core/kagari-lang/src/analysis/story/tests.rs` | Unit tests: the keyframe check, scene shapes, and the exploration with sharing against the one without |
 | `core/kagari-lang/src/analysis/influence.rs` | Unused story variables (`W5010`): dependence graph over all `pushdown fn` |
 | `core/kagari-lang/src/analysis/system/mod.rs` | The mode graph and its checks (`W6001`–`W6004`) |
 | `core/kagari-lang/src/analysis/system/code.rs` | The code of each mode: transitive closure of per-item summaries |
@@ -52,11 +53,13 @@ diagnostics.extend(system::check(db, program));
    story variable (`static mut`), in load order.
 2. **Termination.** On any `E5001`/`E5002`, stop: running a story with a stepless loop could never
    reach the next step.
-3. **Exploration** from every game entry scene. Without one, stop.
-4. **Screens** over the explored states (also when the exploration was incomplete: a difference
+3. **Shapes** (`shape::shapes`): what each segment of each scene may touch, and which states can
+   be shared ([Sharing states](#sharing-states)).
+4. **Exploration** from every game entry scene. Without one, stop.
+5. **Screens** over the explored states (also when the exploration was incomplete: a difference
    found on reachable states is real).
-5. **Reachability** (`W5008`, `W5009`), only when the exploration was complete.
-6. **Keyframe placement** (`W5011`), only when `CompileOptions::keyframe_check` is on.
+6. **Reachability** (`W5008`, `W5009`), only when the exploration was complete.
+7. **Keyframe placement** (`W5011`), only when `CompileOptions::keyframe_check` is on.
 
 It returns the diagnostics together with the `Explored` graph and the item of every scene. The
 query is `no_eq`: the graph is large, has no cheap equality, and every change that reaches it
@@ -139,19 +142,86 @@ flowchart LR
 Everything is interned (`model.rs`): each `ConstValue` once in a `ValueInterner` (`ValueId`),
 each frame once (`FrameId`: the kept locals of a block in ascending order, `None` for an
 uninitialized local), each assignment of story variables once (`GlobalsId`: an `imbl::Vector` of
-`ValueId`s by variable position, so an update shares structure with its predecessor).
+`ValueId`s by variable position, so an update shares structure with its predecessor). A story
+variable a context does not hold is `ValueId::ABSENT` in it.
 
 | Concept | Key | Contents |
 | ------- | --- | -------- |
-| Context (`CtxId`) | `(FnRef, args: [ValueId], GlobalsId)` | A scene entered with argument values and story variables; its entry target, nodes, exits and callers |
+| Context (`CtxId`) | `CtxKey { fn_ref, args, region, globals }` | A scene entered with argument values and the story variables it can access, or a region of a scene (`RegionRef`: the region, its header and its key frame) entered with the story variables it reads; its entry target, nodes, exits and callers |
 | Node (`NodeId`, per context) | `(BasicBlock, FrameId, GlobalsId)` | A suspension state: `Step { expr, render, choice, outcomes, succ }` (`outcomes`: per successor, the arm's position in the choice's arm list and the resume value; `(0, ())` for a `Say`), `Call { callee: CtxId, succ: [(ExitId, Target)] }` or `Rng { draws, succ }` (`draws`: the drawn value per successor) |
-| Exit (`ExitId`, per context) | `ExitData { ret, globals, outs }` | A way the context returns: value, story variables, final values of `&mut` parameters |
+| Exit (`ExitId`, per context) | `ExitData` | `Return { ret, globals, outs }`: a way a scene returns (value, the story variables the context holds, final values of `&mut` parameters). `Leave { block, frame }`: a region reached the suspension `block` outside it, holding the kept locals `frame` |
 | `Target` | — | Where a resumption leads: `Node(id)`, `Exit(id)`, or `Dead` (an error, or a path the analysis gave up) |
 
 A **state** is therefore a position (the suspension block), the kept locals of the scene's frame,
 and the values of the story variables, inside a context that fixes the arguments. The call stack
 is not part of a state: a call node refers to the callee's context, and the caller resumes once
 per exit of it.
+
+### Sharing states
+
+A story with `k` independent flags that stay live across `L` lines has `2^k` states per line.
+The exploration stores a line once and a valuation once instead, by *sharing* states. It never
+*merges* two states: a state of the exploration without sharing is still told apart from every
+other, by its node together with the call nodes on the stack. So every diagnostic, `W5004`
+included (see [Screens](#screens)), and every walk of the persisted graph is what it is without
+sharing. `tests.rs` compares the two explorations (`Sharing::On` against `Sharing::Off`).
+
+`shape::shapes` computes what sharing needs, per scene, from MIR alone. A *segment* is the code
+from one suspension (or from the scene's entry) to the suspensions and returns it can reach
+next; those suspensions are its *stops*.
+
+- **Access.** One visitor (`Places`) lists what every block reads and writes: story variables
+  and locals. A written story variable counts as read too (the machine thaws it first), and a
+  read local whose type contains `&mut` counts as written. Per `pushdown fn`, a least fixpoint
+  over direct calls and named scene calls gives the story variables it can access. A call
+  through a pointer or a closure makes a function *opaque*, and so does any closure of it that
+  mentions a story variable.
+- **Touched locals** of a segment: every local its blocks mention, the kept locals of its start
+  and of its stops, the return place and the arguments. Only these get a heap cell (see
+  [Segments](#segments)).
+- **Footprint** of a scene: the story variables it can access, whatever it calls included; every
+  story variable when the scene is opaque.
+- **Regions.** A region is a set of suspension blocks of one scene with a *header*, such that:
+  every segment that stops at a block of it other than the header starts in it (single entry);
+  its segments resume a step or a draw, cannot return, are not opaque and write no story
+  variable (`quiet`); they write no local the header keeps; and every block of it keeps what the
+  header keeps. So every state inside a region is the state the region was entered with, plus
+  locals the region defined itself. The region's *key* is what its segments read of the entering
+  state: `key_vars` (story variables) and `key_locals` (kept locals of the header).
+
+`Former::form` partitions candidate blocks in rounds. The headers `H` start empty; `P`, the
+blocks of no region, starts with the candidates that are not members (`quiet`). A round labels
+every other candidate with where it is reached from: `Many` from outside the candidates or from
+a block of `P`, `One(h)` from a header `h`. A block labelled `One(h)` that `h` *admits* (it
+keeps what `h` keeps, and its segment writes none of that) passes `One(h)` on to its stops; two
+different labels join to `Many`. A candidate that ends the round with `Many`, or with `One(h)`
+without being admitted, starts over: it joins `H` when its own segment writes no local it keeps
+(`eligible`), else `P`. The rounds end when nothing starts over; a header that some block is
+labelled with is a region.
+
+Level 1 runs `form` over all suspension blocks of a scene. Level 2 runs it inside every level-1
+region whose key has story variables, with the stricter member test `pure` (neither the
+suspension nor its segment reads a story variable). So in a run of lines of which only the last
+segment reads the story variables (an `if` after the last line), all lines but the last are
+stored once for all valuations.
+
+The exploration uses a shape in three places:
+
+| What | Where | Effect |
+| ---- | ----- | ------ |
+| Scene contexts | `scene_context` | A scene's context is keyed by the caller's story variables restricted to the footprint (`project`). The call node keeps the caller's state; on return the callee's story variables are laid over it (`overlay`) |
+| Region contexts | `enter_region`, from `settle` | A step or draw at a header is a call node of the region's context, which is keyed by the key frame and the key story variables. The region's context starts at the header (`Start::At`) and adds the header's own node |
+| Leaving a region | `Stop::Leave`, `ExitData::Leave`, `rejoin` | A segment of a region's context that reaches a suspension outside the region stops without evaluating it. The caller rebuilds the kept locals of that block (what the region holds, around it what the call node holds) and goes on there (`Start::At`) with its own story variables |
+
+The access sets are not trusted. A segment that reaches a local without a cell or an absent
+story variable aborts, and a region's context whose segment changes a story variable, calls a
+scene or returns is given up (`W5007`): a set that is too small costs completeness, never a
+wrong state.
+
+On the flags family of the tests (`k` yes/no choices that each may set a flag, `L` lines that
+read no flag, an ending that reads all) the exploration has `5 * 2^k + L - 2` nodes instead of
+`2^k (L + 2) - 1`: `2^k - 1` choice nodes, `2^k` calls of the region of the lines, `2^k`
+contexts of that region with two nodes each, `L - 1` lines once, `2^k` endings.
 
 ### Algorithm
 
@@ -161,22 +231,23 @@ the story variables' initial values (`static_value`). A LIFO worklist of tasks d
 
 | Task | Does |
 | ---- | ---- |
-| `Start(ctx)` | Runs the context's scene from its entry |
+| `Start(ctx)` | Runs a scene's context from the scene's entry, a region's context from its header |
 | `Step { ctx, node, outcome, value }` | Resumes after a step or draw node with one outcome value |
-| `Return { ctx, node, exit }` | Resumes after a call node with one exit of the callee |
+| `Return { ctx, node, exit }` | Resumes a call node with one exit of the callee: after the call for a `Return`, at the block the region left at for a `Leave` |
 
 Each task runs one **segment** (`segment::run`) and *settles* where it stopped:
 
 - **`Step`**: the record is frozen. A `Say` has one outcome, `()`; a `Choice` one per arm whose
   `shown` field is `true`. A new node is added and a `Step` task queued per outcome. No outcome is
-  a **stuck choice**: the first state found is kept as a witness for `E5003`.
+  a **stuck choice**: the first state found is kept as a witness for `E5003`. At the header of a
+  region the node added is a call node of the region's context instead.
 - **`Rng`**: one outcome per value of the drawn type; more than `TABLE_DOMAIN_CAP` values is
-  `W5006` at the draw, and the path ends.
+  `W5006` at the draw, and the path ends. A header is handled as for `Step`.
 - **`SceneCall`**: the callee value is resolved to a scene, its arguments frozen, and the callee's
   context found or created (which queues its `Start`). The caller registers in the callee's
-  `callers`, and a `Return` task is queued for every exit the callee already has.
-- **`Return`**: the exit is interned in the context; a new exit queues a `Return` task for every
-  caller registered so far.
+  `callers`, and a `Return` task is queued for every exit the callee already has (`call`).
+- **`Return`**, **`Leave`**: the exit is interned in the context; a new exit queues a `Return`
+  task for every caller registered so far (`exit`).
 - **Fault**: an evaluation error in story code (index out of range, overflow, budget) is
   reported at the scene expression that was running, with a related note at the failing site, and
   the path ends.
@@ -184,24 +255,37 @@ Each task runs one **segment** (`segment::run`) and *settles* where it stopped:
 
 A state that already exists as a node of the context returns its `Target` instead of a new node:
 this is the deduplication that makes the search finite. Calls with the same callee, arguments and
-story variables share one context, so a scene called from many places in the same state is
-explored once.
+story variables of the callee's footprint share one context, so a scene called from many places
+in the same state, as far as it can see it, is explored once.
 
 ### Segments
 
-`segment::run` builds a fresh `Machine` in story mode for every segment. It loads the kept locals
-of the resumed suspension (thawing their values; a reference parameter gets a fresh cell and a
-reference to it), writes the suspension's result into its `dest`, writes the callee's `outs` back
-through the places the `&mut` arguments borrowed, and runs `Machine::run_scene` until the scene
-reaches a suspension, `Return` or `Unreachable`. Calls of instant procedures and `const fn` run
-inside the segment. Story variables are thawed from the state the first time the segment touches
-them, and only those are frozen back (`Snapshot::globals`) and set into a copy of the state's
-`Globals`.
+`segment::run` builds a `Machine` in story mode for every segment, on the vectors of the segment
+before it (`Scratch`: the heap and the frame's cell table are emptied, not freed). Only the
+locals the segment may touch (`SceneShape::touched`) get a heap cell. Every other local has the
+cell `usize::MAX`, which no heap has, so reaching it aborts the segment. A segment therefore
+costs what it touches, not the number of locals of its scene.
+
+The segment loads the kept locals of the resumed suspension (thawing their values; a reference
+parameter holds a reference to a fresh cell with the value), writes the suspension's result into
+its `dest`, writes the callee's `outs` back through the places the `&mut` arguments borrowed, and
+runs `Machine::run_scene` until the scene reaches a suspension, `Return` or `Unreachable`. Calls
+of instant procedures and `const fn` run inside the segment. Story variables are thawed from the
+state the first time the segment touches them, and only those are frozen back
+(`Snapshot::globals`) and set into a copy of the state's `Globals`.
+
+A segment can also start *at* a suspension (`Resume::At`: the header of a region, or the block a
+region left at). It loads the kept locals of that block, runs no statement and evaluates the
+suspension. The references a scene call passes are temporaries of the statements before the call
+and are not kept, so such a segment reads a reference argument from the place it borrows, which
+is kept (`scene_kept`) and is where the `outs` are written back to.
 
 At the stop, the kept locals are frozen. A value that cannot be frozen (a capturing closure or a
-reference held across a step) turns the stop into an abort. `SEGMENT_FUEL` (1 000 000 blocks per
-segment) guards against bugs only: termination guarantees that every loop passes a step, and the
-machine's step budget fires first (`E4003`, reported as a fault in story code).
+reference held across a step) turns the stop into an abort. In a region's context
+(`Bounds::region`), a suspension outside the region is the stop `Leave` and is not evaluated.
+`SEGMENT_FUEL` (1 000 000 blocks per segment) guards against bugs only: termination guarantees
+that every loop passes a step, and the machine's step budget fires first (`E4003`, reported as a
+fault in story code).
 
 ### Caps and completeness
 
@@ -212,14 +296,17 @@ machine's step budget fires first (`E4003`, reported as a fault in story code).
 | Draw values | 65 536 | `W5006` at the draw |
 | Unfollowable path | — | `W5007` where it stopped |
 
-The state count is the number of nodes over all contexts, checked whenever a task is taken.
+The state count is the number of nodes over all contexts (the call nodes that enter regions
+included), checked whenever a task is taken.
 Every one of these sets `Explored::complete = false`, which suppresses the claims that need every
 state: unreachable scenes and steps. Stuck choices, faults, render errors and screen diagnostics
 found on the states that were reached are still reported.
 
 Cost: each node runs at most one segment per outcome, and each call node one segment per callee
 exit. The state space is the product of reachable program points, kept-local values and story
-variable values, so it grows with the size of the story variables' types; `state_cap` bounds the
+variable values, as far as contexts do not share it: a scene costs its states once per valuation
+of its footprint, a region once per valuation of its key. It still grows with the size of the
+types of the story variables that the code between two suspensions reads; `state_cap` bounds the
 work.
 
 ### Reachability
@@ -276,6 +363,11 @@ deduplicated per *merge*: a step whose only differing producer is an already rep
 skipped, steps with the same set of producers are reported once, at the first in source order,
 with up to two producer render sites as related notes. This is the presentation-ambiguity lint of
 the proposal.
+
+A region's context is a context here like a scene's, and entering it is a call node. The
+arrivals compared at a step inside a region are therefore those of one entering state, which are
+the arrivals at that step's state without sharing: a region is single-entry, and the state it is
+entered with stays readable from every state inside it.
 
 ## Keyframe placement (`W5011`)
 
@@ -351,6 +443,9 @@ link the compiler:
 | `NodeKind::Step` | `Say { step, render, next }` or `Choice { step, render, arms }`; `step` is the ordinal of the block's `Terminator::Step`; a shown arm is named by its **arm ID**, as `saves::trace::arm_id` in the engine names it: `{type path}::{variant}` for an ADT value, else `#{position in the arm list}` |
 | `NodeKind::Call` | `Call { callee, exits: [(exit, target)] }` |
 | `NodeKind::Rng` | `Draw { draws: [(value, target)] }` |
+| `Context::region` (`RegionRef::header`) | `Context::region`: the block of the region's header; `None` for a scene |
+| `ExitData::Return`, `ExitData::Leave` | `Exit::Return { ret, globals, outs }`, `Exit::Leave { block, frame }` |
+| `ValueId::ABSENT` in a `Globals` | `None` in `StoryGraph::globals`: the context does not hold the story variable |
 | the kept locals of a block (`scene_kept`) | `Scene::points`: per block some node is at, the binding names of its kept locals in frame order (`""` for a temporary) |
 | `Explored::vars` | `StoryGraph::vars`: story-variable paths |
 | `Explored::complete` and the `W5006`/`W5007` diagnostics | `complete`, `incomplete: [{code, message}]` |
@@ -404,9 +499,15 @@ source fingerprint.
 
 - Stage 5 never runs on a program with errors from stages 1–4, and the story exploration never
   runs on a program with termination errors.
-- A story state is exactly (block, kept locals, story variables) within a context (scene,
-  arguments, story variables at entry). Adding anything else to it breaks deduplication; leaving
-  out something live makes the analysis unsound.
+- A story state is (block, kept locals, story variables). A node stores the part of it that its
+  context holds, within a context (a scene with its arguments or a region with its key frame,
+  and the story variables it is entered with); the call nodes that lead to the context hold the
+  rest. Adding anything else to a state breaks deduplication; leaving out something live makes
+  the analysis unsound.
+- Sharing never merges states. Dropping a part that no call node holds, such as a story variable
+  that nothing reads any more, would merge states and change what `W5004` compares.
+- The access sets of `shape.rs` over-approximate, and where one is too small the segment aborts
+  (`W5007`). An absent story variable or a local without a cell never gets a default value.
 - "Unreachable" is claimed only when `Explored::complete` holds.
 - The analysis is deterministic: LIFO worklist, interning in discovery order, and diagnostics
   sorted by `pipeline::check`. The same program gives the same diagnostics.
@@ -427,11 +528,16 @@ source fingerprint.
   must respect `Explored::complete`. Add a `DiagnosticCode` (`E5xxx`/`W5xxx`), a fixture under
   `tests/game_source/analysis/`, and one entry per language in the Reference's diagnostics
   appendix.
-- **A new suspension or call form.** Update `liveness.rs` (what the state keeps), `segment.rs`
-  (resume and stop), `termination.rs`, `explore/mod.rs` (`settle`), `screens.rs`,
-  `keyframes.rs` and `graph.rs` (node kinds), and `kagari_debug::NodeKind` with its schema.
-- **A change to what a state contains** changes the number of states of every story: check the
-  analysis snapshots and the `state_cap` default.
+- **A new suspension or call form.** Update `liveness.rs` (what the state keeps), `shape.rs`
+  (segments, `quiet`), `segment.rs` (resume and stop), `termination.rs`, `explore/mod.rs`
+  (`settle`), `screens.rs`, `keyframes.rs` and `graph.rs` (node kinds), and
+  `kagari_debug::NodeKind` with its schema.
+- **A new MIR statement, rvalue, place base or projection.** `shape.rs` lists what code reads
+  and writes (`Places`); its matches are exhaustive so that a new form does not compile until it
+  is handled.
+- **A change to what a state contains, or to what is shared** changes the number of states of
+  every story: check the analysis snapshots, `sharing_keeps_every_result` and
+  `shared_lines_do_not_multiply_states` in `tests.rs`, and the `state_cap` default.
 - **Anything that changes the analysis's results for the same sources** (a new check, a changed
   message, a different exploration): bump `FINGERPRINT_SALT` in `cache.rs`, or caches written by
   the same toolchain version are reused with the old results. A new input the analysis reads goes

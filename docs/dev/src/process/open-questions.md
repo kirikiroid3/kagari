@@ -63,13 +63,20 @@ is that acceptable in practice?
 - **Meta layer scope.** The story reads meta only through entry arguments and writes it with
   `Meta::write`. Is that enough for titles that make the meta layer part of the story?
 - **Combinatorial choices.** The proposal's shuffle operator (`each_once` with declared
-  dependencies) for "talk to each guest once, in any order", and partial-order reduction in the
-  analysis. Not designed in the language yet.
+  dependencies) for "talk to each guest once, in any order". Not designed in the language yet.
+  Partial-order reduction in the analysis was rejected
+  ([Design Decisions](../foundations/decisions.md#state-sharing)).
 - **Contracts.** Assertions on steps and scenes ("this scene requires `MET_B`") checked with
   counterexamples. Not designed.
-- **Symbolic analysis.** The analysis is explicit-state with a state cap (`W5006`). Symbolic
-  reachability with decision diagrams, per-line reachability conditions and witness generation
-  (jumping to a line under a condition) are not started.
+- **Reachability conditions.** Per-line reachability conditions and witness generation (jumping
+  to a line under a condition) are not started. The analysis stays explicit-state with a state
+  cap (`W5006`); a symbolic back end was rejected
+  ([Design Decisions](../foundations/decisions.md#state-sharing)).
+- **Dead story variables.** Should a story variable that no later code reads still separate two
+  story states? Today it does: `W5004` is silent for two arrivals that differ only in such a
+  variable, and the exploration keeps both
+  ([Design Decisions](../foundations/decisions.md#state-sharing)). Merging them would shrink
+  the state space further and report the difference one step later.
 
 ## Runtime
 

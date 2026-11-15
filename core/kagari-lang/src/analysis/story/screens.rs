@@ -72,12 +72,15 @@ struct Screens<'a, 'db> {
     diagnostics: Vec<Diag>,
 }
 
+/// Reports the render errors, the unbounded screens and the inconsistent screens of the
+/// explored states. Returns every step whose shown screen depends on the path (its scene
+/// and `push_step` call), in that order: the reports keep one step per merge.
 pub(super) fn check(
     cx: StoryCx<'_>,
     scenes: &Scenes<'_>,
     explored: &Explored,
     out: &mut Vec<Diag>,
-) {
+) -> Vec<(usize, ExprId)> {
     let mut screens = Interner::new();
     let start = screens.intern(Screen::empty(cx.std).logical);
     let mut state = Screens {
@@ -108,8 +111,9 @@ pub(super) fn check(
     }
     // A screen difference found on reachable states is real even when the exploration
     // stopped early.
-    state.consistency();
+    let inconsistent = state.consistency();
     out.append(&mut state.diagnostics);
+    inconsistent
 }
 
 impl Screens<'_, '_> {
@@ -442,8 +446,9 @@ impl Screens<'_, '_> {
 
     /// Steps whose shown screen depends on the path, per group of instances entered from
     /// equal call stacks (up to screens). A group carries the producer of each screen it is
-    /// entered with on the walked call path, so producers name steps on that path.
-    fn consistency(&mut self) {
+    /// entered with on the walked call path, so producers name steps on that path. Returns
+    /// every such step, by scene and expression.
+    fn consistency(&mut self) -> Vec<StepRef> {
         let mut seen: FxHashSet<(CtxId, Vec<ScreenId>)> = FxHashSet::default();
         let mut stack: Vec<(CtxId, Vec<(ScreenId, Producer)>)> = Vec::new();
         for root in &self.explored.roots {
@@ -523,6 +528,8 @@ impl Screens<'_, '_> {
                 }
             }
         }
+        let mut inconsistent = order.clone();
+        inconsistent.sort_by_key(|(scene, expr)| (*scene, expr.into_raw().into_u32()));
         // One report per merge: steps whose screens differ through the same renders are
         // reported at the first in source order.
         order.sort_by_key(|step| {
@@ -580,5 +587,6 @@ impl Screens<'_, '_> {
             }
             self.diagnostics.push(diagnostic);
         }
+        inconsistent
     }
 }

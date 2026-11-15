@@ -12,8 +12,10 @@ description: Load when changing THIR, MIR, const evaluation, story/system analys
 - `core/kagari-lang/src/eval/` — stage 4: `const_eval`, per-item queries, MIR executor
   (`eval/machine`), tabulation, renders/keyframes, compile-time `Screen` model.
 - `core/kagari-lang/src/analysis/` — stage 5: termination, story exploration, screens,
-  keyframes, influence (`W5010`), system mode graph (`E6xxx`). `analysis/story/graph.rs`
-  converts the explored state space (`Explored`) into the persisted `kagari_debug::StoryGraph`.
+  keyframes, influence (`W5010`), system mode graph (`E6xxx`). `analysis/story/shape.rs` computes
+  what the exploration shares states by (touched locals, footprints, regions);
+  `analysis/story/graph.rs` converts the explored state space (`Explored`) into the persisted
+  `kagari_debug::StoryGraph`.
 - `core/kagari-lang/src/cache.rs` — reuse of stage 5 across runs: `source_fingerprint` (sources
   incl. std, compile options, asset/font dirs, toolchain version, `FINGERPRINT_SALT`),
   `offer_analysis_cache`, `analysis_cache_use`; the CLI stores it as `analysis.kagari-cache`.
@@ -27,7 +29,8 @@ Develop Guide (`docs/dev/src/`):
 
 - `compiler/mir.md` — THIR, MIR shape, suspensions, decision trees, builder, validation.
 - `compiler/eval.md` — machine, constants, promotion, tabulation, renders, `E4xxx`, limits.
-- `compiler/analysis.md` — termination, kept locals, exploration state, screens, influence, system.
+- `compiler/analysis.md` — termination, kept locals, exploration state, sharing states, screens,
+  influence, system.
 - `compiler/emit.md` — instances, regalloc, constants, builtins → intrinsics/imports, terminators.
 - `compiler/pipeline.md` and `compiler/diagnostics.md` for salsa queries and `Diag`/`Anchor`.
 - `formats/kagari.md` when touching emitted instructions or tables.
@@ -38,7 +41,8 @@ Develop Guide (`docs/dev/src/`):
 - **One semantics.** MIR is the only semantic model: the const evaluator, the story exploration and
   codegen all consume it. Never special-case a construct in one consumer only; a MIR change must be
   handled in `eval/machine/exec.rs`, `emit/codegen`, `mir/liveness.rs`, `mir/validate.rs`,
-  `mir/pretty.rs`, `analysis/influence.rs`, `analysis/system/summary.rs`, `typeck/kinds/instant.rs`.
+  `mir/pretty.rs`, `analysis/influence.rs`, `analysis/story/shape.rs`,
+  `analysis/system/summary.rs`, `typeck/kinds/instant.rs`.
 - **Suspensions** (`Step`, `Rng`, `SceneCall`) are terminators, legal only in `BodyKind::Scene`.
 - **Determinism.** No floats, no host I/O, no iteration over hash maps whose insertion order is not
   deterministic. Same program ⇒ same diagnostics and same bytes (the engine's script hash is the
@@ -48,7 +52,15 @@ Develop Guide (`docs/dev/src/`):
   `SCREEN_CAP` (64). Exceeding a bound is a diagnostic (`E4003`, `E4004`, `W5006`, `E5005`), never
   a hang.
 - **Soundness of claims.** "Unreachable" (`W5008`/`W5009`) only when `Explored::complete`. A story
-  state is exactly (block, kept locals, story variables) within a context (scene, args, globals).
+  state is (block, kept locals, story variables); a node stores the part of it that its context
+  holds (a scene with its args or a region with its key frame, and the story variables it is
+  entered with).
+- **Sharing, never merging.** The call nodes that lead to a context hold the rest of the state: a
+  scene's context holds the story variables of its footprint, a region's its key. Two states of
+  the exploration without sharing never become one (`W5004` depends on it). The sets of
+  `shape.rs` over-approximate: where one is too small a segment must abort (`W5007`), never read
+  a default value. `sharing_keeps_every_result` (`analysis/story/tests.rs`) compares
+  `Sharing::On` with `Sharing::Off`.
 - **Diagnostics.** Raise errors as `Fault`/`Diag` with an `Anchor` (never text ranges); report only
   for game-crate items; stage 5 runs only without errors from stages 1–4.
 - **Analysis cache.** Stage-5 diagnostics are reused whenever the fingerprint matches. A change

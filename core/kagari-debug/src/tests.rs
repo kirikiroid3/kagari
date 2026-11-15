@@ -59,14 +59,15 @@ fn every_value() -> Vec<Value> {
     ]
 }
 
-/// Two entry contexts calling a shared scene; one unreached context and node.
+/// Two entry contexts calling a shared scene; one unreached node, and one unreached context
+/// of a region, which holds no story variable and leaves instead of returning.
 ///
 /// ```text
 /// ctx 0 crate::start:   n0 say#0 → n1 call ctx 2 ─exit 0→ n2 choice#1 ─A→ n3 draw ─1→ exit 0
 ///                                                          └─#1→ dead      └─2→ n0
 /// ctx 1 crate::other:   n0 say#0 → exit 0
 /// ctx 2 crate::shared:  n0 say#0 → exit 0;  n1 say#1 (no path reaches it)
-/// ctx 3 crate::unused:  never called
+/// ctx 3 crate::unused:  the region at block 1, never entered: n0 say#0 → exit 0 (leave)
 /// ```
 fn sample_graph() -> StoryGraph {
     let say = |step, next| NodeKind::Say {
@@ -85,9 +86,10 @@ fn sample_graph() -> StoryGraph {
         path: path.to_owned(),
         args: Vec::new(),
         globals: 0,
+        region: None,
         entry: Target::Node(0),
         nodes,
-        exits: vec![Exit {
+        exits: vec![Exit::Return {
             ret: 0,
             globals: 0,
             outs: vec![1],
@@ -131,6 +133,11 @@ fn sample_graph() -> StoryGraph {
         context: 0,
         node: 1,
     }];
+    let mut unused = context(1, "crate::unused", vec![node(say(0, Target::Exit(0)))]);
+    unused.region = Some(1);
+    unused.globals = 1;
+    unused.nodes[0].globals = 1;
+    unused.exits = vec![Exit::Leave { block: 1, frame: 0 }];
     StoryGraph {
         complete: false,
         incomplete: vec![Incomplete {
@@ -140,7 +147,7 @@ fn sample_graph() -> StoryGraph {
         vars: vec!["crate::AFFECTION".to_owned()],
         values,
         frames: vec![vec![Some(2), None]],
-        globals: vec![vec![2]],
+        globals: vec![vec![Some(2)], vec![None]],
         scenes: vec![
             Scene {
                 path: "crate::start".to_owned(),
@@ -158,7 +165,7 @@ fn sample_graph() -> StoryGraph {
             start,
             context(0, "crate::other", vec![node(say(0, Target::Exit(0)))]),
             shared,
-            context(1, "crate::unused", vec![node(say(0, Target::Exit(0)))]),
+            unused,
         ],
         roots: vec![0, 1],
         // `crate::render_room`; the closure (14) is a delta render.
@@ -296,6 +303,11 @@ fn walks_from_the_roots() {
         graph.vars(0, 0),
         vec![("crate::AFFECTION", Some(&Value::Int(-(1_i128 << 100))))]
     );
+    assert_eq!(
+        graph.vars(3, 0),
+        vec![("crate::AFFECTION", None)],
+        "a region context holds only the story variables of its key"
+    );
     assert!(graph.is_keyframe(13));
     assert!(!graph.is_keyframe(14));
 }
@@ -377,5 +389,24 @@ fn rejects_malformed_nodes() {
     assert_eq!(
         AnalysisCache::from_bytes(save.into_bytes()),
         Err(Error::Malformed("keyframes"))
+    );
+
+    let mut save = Save::from_bytes(sample_cache().to_bytes().unwrap()).unwrap();
+    {
+        let mut root = save.root_mut();
+        let mut story = root.table("story").unwrap();
+        let mut contexts = story.array("contexts").unwrap();
+        let mut context = contexts.table_at(0).unwrap();
+        let mut exits = context.array("exits").unwrap();
+        // An exit returns or leaves.
+        exits
+            .table_at(0)
+            .unwrap()
+            .set("kind", Scalar::String("jump"))
+            .unwrap();
+    }
+    assert_eq!(
+        AnalysisCache::from_bytes(save.into_bytes()),
+        Err(Error::Malformed("exits"))
     );
 }

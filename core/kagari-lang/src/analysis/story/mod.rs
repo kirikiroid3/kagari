@@ -19,6 +19,7 @@ mod keyframes;
 mod liveness;
 mod screens;
 mod segment;
+mod shape;
 mod termination;
 #[cfg(test)]
 mod tests;
@@ -35,11 +36,12 @@ use crate::item_tree::ItemIndex;
 use crate::item_tree::{FnKind, ItemId, ItemKind, item_tree};
 use crate::mir::{BasicBlock, ItemMir, LocalSet, StepId, Terminator, item_mir};
 use crate::paths;
-use crate::signatures::program_signatures;
+use crate::signatures::{ProgramSignatures, program_signatures};
 
 use explore::{Explored, StoryCx};
 use liveness::scene_kept;
 use segment::SceneBody;
+use shape::Sharing;
 
 /// The most distinct screens that may reach one step (*tentative*: the cap is an open
 /// question). A render that makes a step's set grow past it is `E5005`.
@@ -148,32 +150,19 @@ impl std::fmt::Debug for StoryAnalysis {
     }
 }
 
-/// Runs the story analysis. Not compared for backdating: the explored states are large and
-/// every source change that reaches them changes the diagnostics too.
-#[salsa::tracked(returns(ref), no_eq)]
-pub(crate) fn story_analysis(db: &dyn Db, program: Program) -> StoryAnalysis {
-    let mut result = StoryAnalysis {
-        diagnostics: Vec::new(),
-        scenes: Vec::new(),
-        explored: None,
-    };
-    let Some(std) = std_table(db, program).as_ref() else {
-        return result;
-    };
-    let sigs = program_signatures(db, program);
-    let cx = StoryCx {
-        db,
-        program,
-        std,
-        sigs,
-    };
-    let maps = def_maps(db, program);
+/// Every scene (a `#[scene] pushdown fn` with a body, with its MIR and kept locals) and
+/// every story variable (`static mut`) of the program, in load order.
+fn collect<'db>(
+    db: &'db dyn Db,
+    program: Program,
+    sigs: &'db ProgramSignatures,
+) -> (Scenes<'db>, Vec<ItemId>) {
     let mut scenes = Scenes {
         list: Vec::new(),
         index: FxHashMap::default(),
     };
     let mut vars = Vec::new();
-    for &(file, krate) in &maps.files {
+    for &(file, krate) in &def_maps(db, program).files {
         let tree = item_tree(db, file);
         for (index, data) in tree.items.iter().enumerate() {
             let Some(index) = ItemIndex::from_usize(index) else {
@@ -205,15 +194,40 @@ pub(crate) fn story_analysis(db: &dyn Db, program: Program) -> StoryAnalysis {
             }
         }
     }
+    (scenes, vars)
+}
+
+/// Runs the story analysis. Not compared for backdating: the explored states are large and
+/// every source change that reaches them changes the diagnostics too.
+#[salsa::tracked(returns(ref), no_eq)]
+pub(crate) fn story_analysis(db: &dyn Db, program: Program) -> StoryAnalysis {
+    let mut result = StoryAnalysis {
+        diagnostics: Vec::new(),
+        scenes: Vec::new(),
+        explored: None,
+    };
+    let Some(std) = std_table(db, program).as_ref() else {
+        return result;
+    };
+    let sigs = program_signatures(db, program);
+    let cx = StoryCx {
+        db,
+        program,
+        std,
+        sigs,
+    };
+    let (scenes, vars) = collect(db, program, sigs);
     result.scenes = scenes.list.iter().map(|scene| scene.item).collect();
     let out = &mut result.diagnostics;
     if !termination::check(db, program, &scenes, sigs, out) {
         // The other analyses run the story, which must reach its steps.
         return result;
     }
-    let explored = explore::explore(cx, &scenes, &vars, out);
+    let shapes = shape::shapes(cx, &scenes, &vars, Sharing::On);
+    let explored = explore::explore(cx, &scenes, &shapes, &vars, out);
     if let Some(explored) = &explored {
-        screens::check(cx, &scenes, explored, out);
+        // The steps it returns are in the diagnostics it adds.
+        let _ = screens::check(cx, &scenes, explored, out);
         explored.report_reachability(db, program, &scenes, out);
         if program.options(db).keyframe_check {
             out.extend(keyframes::check(db, program, explored, &scenes));

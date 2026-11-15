@@ -96,8 +96,8 @@ editor could round-trip it. The story is now code:
 | 0 | Parser for `.kis` and `.kix`; type and kind checker; narrative IR (an RSM) and interpreter; trace saves with snapshot cache | Done, except the snapshot cache. The narrative IR is MIR; the interpreter is the VM's story fiber |
 | 1 | Const evaluation of renders over the ECS screen; keyframe detection; choice-point snapshots with the screen; hot-reload preview | Const evaluation and keyframe detection done. No snapshots, no preview |
 | 2 | Explicit-state analyzer for small scripts; unreachable, ambiguity, liveness lints | Done (`W5004`, `W5008`–`W5010`), with a state cap (`W5006`) |
-| 3 | Symbolic reachability (MDDs); per-line reachability conditions; witness jump; contracts with counterexamples | Not started |
-| 4 | Incremental query engine for live analysis; `each_once` with declared dependencies; partial-order reduction | The compiler is an incremental salsa database with per-item queries, used by the language server. `each_once` and partial-order reduction not started |
+| 3 | Symbolic reachability (MDDs); per-line reachability conditions; witness jump; contracts with counterexamples | Not started. Symbolic reachability was rejected: the analysis stays explicit and shares states ([Design Decisions](./decisions.md#state-sharing)) |
+| 4 | Incremental query engine for live analysis; `each_once` with declared dependencies; partial-order reduction | The compiler is an incremental salsa database with per-item queries, used by the language server. `each_once` not started; partial-order reduction rejected ([Design Decisions](./decisions.md#state-sharing)) |
 
 The remaining items are tracked in [Open Questions](../process/open-questions.md).
 

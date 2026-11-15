@@ -5,6 +5,12 @@
 //! story variables). A context's nodes are its suspension points; a scene call node leads to
 //! the callee's context and resumes once per exit of it. Values, frames (the kept locals of a
 //! node) and story-variable sets are stored once and referred to by index.
+//!
+//! States are shared, never merged. A scene's context holds only the story variables the
+//! scene can access; a run of steps inside a scene that depends on a part of the state only
+//! (a *region*) is a context of its own, entered by a call node at its first step and left
+//! through an [`Exit::Leave`]. What a context does not hold (a story variable, a kept local)
+//! has the value it has at the call node that entered the context.
 
 use std::collections::{BTreeSet, HashSet};
 
@@ -30,10 +36,12 @@ pub struct StoryGraph {
     /// Every value, stored once.
     pub values: Vec<Value>,
     /// Kept locals of a node, in the order of [`Point::locals`]; `None` for an uninitialized
-    /// local. Entries are indices into `values`.
+    /// local, and in a region context for a local the context does not hold. Entries are
+    /// indices into `values`.
     pub frames: Vec<Vec<Option<u32>>>,
-    /// Values of the story variables, in the order of `vars`.
-    pub globals: Vec<Vec<u32>>,
+    /// Values of the story variables, in the order of `vars`; `None` for a variable the
+    /// context does not hold: it has the value it has in the calling context.
+    pub globals: Vec<Vec<Option<u32>>>,
     pub scenes: Vec<Scene>,
     pub contexts: Vec<Context>,
     /// The contexts of the entry scenes, one per argument value.
@@ -69,7 +77,8 @@ pub struct Point {
     pub locals: Vec<String>,
 }
 
-/// A scene entered with given arguments and story variables.
+/// A scene entered with given arguments and story variables, or a region of a scene entered
+/// with the part of the state it depends on.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Context {
     /// Index into [`StoryGraph::scenes`].
@@ -81,6 +90,9 @@ pub struct Context {
     pub args: Vec<u32>,
     /// The story variables at entry: index into [`StoryGraph::globals`].
     pub globals: u32,
+    /// The header block of the region the context explores (a [`Point::block`] of the
+    /// scene); `None` for a scene.
+    pub region: Option<u32>,
     /// Where the scene goes first.
     pub entry: Target,
     pub nodes: Vec<Node>,
@@ -96,15 +108,21 @@ pub struct Caller {
     pub node: u32,
 }
 
-/// A way a context returns.
+/// A way a context ends.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Exit {
-    /// The returned value.
-    pub ret: u32,
-    /// The story variables at return.
-    pub globals: u32,
-    /// The final values of the `&mut` parameters, in order.
-    pub outs: Vec<u32>,
+pub enum Exit {
+    /// The scene returns.
+    Return {
+        /// The returned value.
+        ret: u32,
+        /// The story variables at return.
+        globals: u32,
+        /// The final values of the `&mut` parameters, in order.
+        outs: Vec<u32>,
+    },
+    /// A region left at the suspension point `block` outside it; `frame` holds the locals
+    /// the region context holds there.
+    Leave { block: u32, frame: u32 },
 }
 
 /// A story state: a suspension point with the kept locals and the story variables.
@@ -232,7 +250,8 @@ impl StoryGraph {
             .collect()
     }
 
-    /// The story variables of a node by path, with their values.
+    /// The story variables of a node by path, with their values; `None` for a variable the
+    /// node's context does not hold.
     pub fn vars(&self, context: u32, node: u32) -> Vec<(&str, Option<&Value>)> {
         let globals = self
             .node(context, node)
@@ -241,7 +260,7 @@ impl StoryGraph {
         self.vars
             .iter()
             .zip(globals)
-            .map(|(path, id)| (path.as_str(), self.value(*id)))
+            .map(|(path, id)| (path.as_str(), id.and_then(|id| self.value(id))))
             .collect()
     }
 
@@ -323,7 +342,7 @@ impl StoryGraph {
             for globals in &self.globals {
                 let mut g = a.push_array()?;
                 for value in globals {
-                    g.push(id(*value))?;
+                    g.push(opt_id(*value))?;
                 }
             }
         }
@@ -375,7 +394,10 @@ impl StoryGraph {
             globals: list(t, "globals", |v| {
                 as_array(v, "globals")?
                     .iter()
-                    .map(|value| as_u32(value, "globals"))
+                    .map(|value| match value {
+                        ValueRef::Null => Ok(None),
+                        other => as_u32(other, "globals").map(Some),
+                    })
                     .collect()
             })?,
             scenes: list(t, "scenes", |v| {
@@ -410,6 +432,7 @@ impl Context {
         c.set("path", Scalar::String(&self.path))?;
         put_ids(c, "args", &self.args)?;
         c.set("globals", id(self.globals))?;
+        c.set("region", opt_id(self.region))?;
         c.set("entry", target(self.entry))?;
         {
             let mut nodes = c.array("nodes")?;
@@ -422,9 +445,19 @@ impl Context {
             let mut exits = c.array("exits")?;
             for exit in &self.exits {
                 let mut e = exits.push_table()?;
-                e.set("ret", id(exit.ret))?;
-                e.set("globals", id(exit.globals))?;
-                put_ids(&mut e, "outs", &exit.outs)?;
+                match exit {
+                    Exit::Return { ret, globals, outs } => {
+                        e.set("kind", Scalar::String("return"))?;
+                        e.set("ret", id(*ret))?;
+                        e.set("globals", id(*globals))?;
+                        put_ids(&mut e, "outs", outs)?;
+                    }
+                    Exit::Leave { block, frame } => {
+                        e.set("kind", Scalar::String("leave"))?;
+                        e.set("block", id(*block))?;
+                        e.set("frame", id(*frame))?;
+                    }
+                }
             }
         }
         let mut callers = c.array("callers")?;
@@ -442,15 +475,23 @@ impl Context {
             path: str_field(c, "path")?.to_owned(),
             args: ids(c, "args")?,
             globals: u32_field(c, "globals")?,
+            region: opt_u32_field(c, "region")?,
             entry: read_target(field(c, "entry")?)?,
             nodes: list(c, "nodes", |v| Node::read(as_table(v, "nodes")?))?,
             exits: list(c, "exits", |v| {
                 let e = as_table(v, "exits")?;
-                Ok(Exit {
-                    ret: u32_field(e, "ret")?,
-                    globals: u32_field(e, "globals")?,
-                    outs: ids(e, "outs")?,
-                })
+                match str_field(e, "kind")? {
+                    "return" => Ok(Exit::Return {
+                        ret: u32_field(e, "ret")?,
+                        globals: u32_field(e, "globals")?,
+                        outs: ids(e, "outs")?,
+                    }),
+                    "leave" => Ok(Exit::Leave {
+                        block: u32_field(e, "block")?,
+                        frame: u32_field(e, "frame")?,
+                    }),
+                    _ => Err(Error::Malformed("exits")),
+                }
             })?,
             callers: list(c, "callers", |v| {
                 let pair = as_array(v, "callers")?;

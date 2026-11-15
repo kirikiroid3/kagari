@@ -495,19 +495,81 @@ impl LocalSet {
     /// The locals in ascending order.
     pub fn iter(&self) -> impl Iterator<Item = Local> + '_ {
         self.0.iter().enumerate().flat_map(|(word, bits)| {
-            (0..64u32)
-                .filter(move |bit| bits & (1u64 << bit) != 0)
-                .filter_map(move |bit| {
-                    let index = u32::try_from(word)
-                        .ok()?
-                        .checked_mul(64)?
-                        .checked_add(bit)?;
-                    Some(Local::from_raw(la_arena::RawIdx::from_u32(index)))
-                })
+            let base = u32::try_from(word)
+                .ok()
+                .and_then(|word| word.checked_mul(64));
+            // Each round clears the lowest set bit, so only set bits are visited.
+            std::iter::successors((*bits != 0).then_some(*bits), |bits| {
+                let rest = bits & bits.wrapping_sub(1);
+                (rest != 0).then_some(rest)
+            })
+            .filter_map(move |bits| {
+                let index = base?.checked_add(bits.trailing_zeros())?;
+                Some(Local::from_raw(la_arena::RawIdx::from_u32(index)))
+            })
         })
     }
 
     pub fn is_empty(&self) -> bool {
         self.0.iter().all(|bits| *bits == 0)
+    }
+
+    /// Whether every local of `self` is in `other`.
+    pub fn is_subset(&self, other: &LocalSet) -> bool {
+        self.0
+            .iter()
+            .enumerate()
+            .all(|(word, bits)| bits & !other.0.get(word).copied().unwrap_or(0) == 0)
+    }
+
+    /// Whether some local is in both sets.
+    pub fn intersects(&self, other: &LocalSet) -> bool {
+        self.0.iter().zip(&other.0).any(|(a, b)| a & b != 0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Local, LocalSet};
+
+    fn local(index: u32) -> Local {
+        Local::from_raw(la_arena::RawIdx::from_u32(index))
+    }
+
+    fn set(indices: &[u32]) -> LocalSet {
+        let mut set = LocalSet::default();
+        for index in indices {
+            set.insert(local(*index));
+        }
+        set
+    }
+
+    #[test]
+    fn local_sets_iterate_and_compare_across_words() {
+        let indices = [0, 1, 63, 64, 129, 191, 300];
+        let sparse = set(&indices);
+        let found: Vec<u32> = sparse
+            .iter()
+            .map(|local| local.into_raw().into_u32())
+            .collect();
+        assert_eq!(found, indices);
+        assert_eq!(LocalSet::default().iter().count(), 0);
+
+        // A set with fewer words: the words it lacks count as empty.
+        let small = set(&[1, 63]);
+        assert!(small.is_subset(&sparse));
+        assert!(!sparse.is_subset(&small));
+        assert!(LocalSet::default().is_subset(&small));
+        assert!(!set(&[2]).is_subset(&sparse));
+        // A removed local leaves zero words behind.
+        let mut emptied = set(&[300]);
+        emptied.remove(local(300));
+        assert!(emptied.is_subset(&small));
+
+        assert!(small.intersects(&sparse));
+        assert!(sparse.intersects(&set(&[300])));
+        assert!(!sparse.intersects(&set(&[2, 65, 128])));
+        assert!(!sparse.intersects(&LocalSet::default()));
+        assert!(!set(&[300]).intersects(&small));
     }
 }

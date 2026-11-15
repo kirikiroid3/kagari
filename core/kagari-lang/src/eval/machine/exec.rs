@@ -26,7 +26,8 @@ type Res<T> = Result<T, EvalError>;
 pub(crate) struct Frame<'db> {
     pub body: &'db Body,
     pub env: GenericEnv,
-    /// The heap cell of every local of `body`.
+    /// The heap cell of every local of `body`; `usize::MAX`, which no heap has, for a local
+    /// a story segment may not touch (`analysis/story/segment.rs`): reaching it aborts.
     pub cells: Vec<usize>,
     pub block: BasicBlock,
     pub stmt: usize,
