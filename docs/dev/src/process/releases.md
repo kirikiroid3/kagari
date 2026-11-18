@@ -260,7 +260,7 @@ request, including index reads, so a project that depends on these crates also n
   (stored in `~/.cargo/credentials.toml`), or `CARGO_REGISTRIES_SUITSU31_TOKEN` in CI.
 
 Another project depends on a crate with
-`kagari-lang = { version = "0.3", registry = "Suitsu31" }`.
+`kagari-lang = { version = "0.4", registry = "Suitsu31" }`.
 
 To publish, after the version bump below: `cargo publish --workspace` uploads every publishable
 crate in dependency order (cargo verifies each one by building it from its packaged sources, so

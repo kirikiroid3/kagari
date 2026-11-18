@@ -8,7 +8,7 @@
   [Releases](../process/releases.md#crates)).
 - `.gitignore`, `.gitattributes`, `docs/.gitignore`: what is generated or local.
 
-The repository is one Cargo workspace (resolver 3, edition 2024, version 0.3.1, Apache-2.0) plus
+The repository is one Cargo workspace (resolver 3, edition 2024, version 0.4.0, Apache-2.0) plus
 two editor packages that are not workspace members. Crates live in four directories:
 
 | Directory | Holds |
