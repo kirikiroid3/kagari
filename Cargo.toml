@@ -54,7 +54,6 @@ kagari-engine = { path = "runtime_libs/kagari-engine", version = "0.3.1", regist
 kagari-debugger = { path = "runtime_libs/kagari-debugger", version = "0.3.1", registry = "Suitsu31" }
 kagari-render = { path = "runtime_libs/kagari-render", version = "0.3.1", registry = "Suitsu31" }
 kagari-video = { path = "runtime_libs/kagari-video", version = "0.3.1", registry = "Suitsu31" }
-kagari-desktop-runtime = { path = "runtime/kagari-desktop-runtime", version = "0.3.1", registry = "Suitsu31" }
 rowan = "0.17"
 salsa = "0.28"
 logos = "0.16"

@@ -9,8 +9,9 @@
 
 ## Toolchain and dev shell
 
-`rust-toolchain.toml` pins Rust **1.99**; rustup installs it on first use. Nothing else in the
-repository needs a specific Rust version.
+`rust-toolchain.toml` pins Rust **1.100** with the `wasm32-wasip2` target (for the Zed extension,
+which builds under the same pin); rustup installs both on first use, and adds the target to an
+already installed 1.100. Nothing else in the repository needs a specific Rust version.
 
 The desktop runtime links system libraries: ALSA (through `cpal`, used by `kira`), libudev
 (through `gilrs`) and FFmpeg (through `ffmpeg-next` in `kagari-video`, whose bindgen needs

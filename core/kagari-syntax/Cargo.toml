@@ -9,7 +9,6 @@ publish.workspace = true
 [dependencies]
 rowan = { workspace = true }
 logos = { workspace = true }
-unicode-ident = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

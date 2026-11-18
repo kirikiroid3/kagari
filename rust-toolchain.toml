@@ -1,2 +1,4 @@
 [toolchain]
-channel = "1.99"
+channel = "1.100"
+# The Zed extension (tooling/zed-kagari) builds to wasm32-wasip2 under this pin.
+targets = ["wasm32-wasip2"]
