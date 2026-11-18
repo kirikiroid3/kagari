@@ -418,6 +418,10 @@ impl InferCtx<'_> {
     pub(crate) fn infer_field(&mut self, expr: ExprId, base: ExprId, name: &FieldName) -> Ty {
         let range = self.expr_anchor(expr);
         let base_ty = self.infer_expr(base, Expect::None);
+        if matches!(name, FieldName::Missing) {
+            // The parser reported the missing name.
+            return Ty::error();
+        }
         let (resolved, derefs) = self.autoderef(&base_ty);
         let found: Option<(u32, Ty)> = match (resolved.kind(), name) {
             (TyKind::Error, _) => return Ty::error(),
@@ -446,6 +450,7 @@ impl InferCtx<'_> {
                         let index = *index as usize;
                         (variant.fields.get(index)?.name.is_none()).then_some(index)?
                     }
+                    FieldName::Missing => return None,
                 };
                 let field = variant.fields.get(index)?;
                 let ty = subst_ty(
@@ -469,6 +474,7 @@ impl InferCtx<'_> {
                 let field = match name {
                     FieldName::Named(name) => name.to_string(),
                     FieldName::Index(index) => index.to_string(),
+                    FieldName::Missing => return Ty::error(),
                 };
                 let message = format!("no field `{field}` on type `{}`", self.show(&resolved));
                 self.diag(range, DiagnosticCode::TypeUnknownField, message);

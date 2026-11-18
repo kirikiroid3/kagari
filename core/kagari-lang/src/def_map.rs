@@ -219,6 +219,9 @@ pub enum Resolution {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PathResolution {
     pub resolved: Option<Resolution>,
+    /// What each segment before the last resolved to: `prefixes[i]` for `segments[i]`. Empty
+    /// for lang paths; shorter than the prefix when resolution stopped early.
+    pub prefixes: Vec<Resolution>,
     pub failed_segment: Option<usize>,
     pub diagnostics: Vec<Diag>,
 }
@@ -1211,7 +1214,7 @@ pub fn resolve_module_path(
                 Some(segment) => at(segment),
                 None => Anchor::Text(file, TextRange::default()),
             };
-            let inner = resolve_rest(
+            let mut inner = resolve_rest(
                 maps,
                 db,
                 from,
@@ -1221,6 +1224,8 @@ pub fn resolve_module_path(
                 ns,
                 &lang_at,
             );
+            // The std path is not written in the source, so its prefixes name nothing there.
+            inner.prefixes = Vec::new();
             if inner.resolved.is_none() {
                 result.diagnostics.push(Diag::new(
                     Anchor::Text(file, TextRange::default()),
@@ -1264,6 +1269,7 @@ pub fn resolve_module_path(
     };
     let rest = resolve_rest(maps, db, from, base, path, start, ns, at);
     result.resolved = rest.resolved;
+    result.prefixes = rest.prefixes;
     result.failed_segment = rest.failed_segment;
     result.diagnostics.extend(rest.diagnostics);
     result
@@ -1356,6 +1362,9 @@ pub fn resolve_rest(
     let last = path.segments.len().saturating_sub(1);
     let mut current = base;
     for (index, segment) in path.segments.iter().enumerate().skip(start) {
+        if index > 0 {
+            result.prefixes.push(current.clone());
+        }
         let seg_ns = if index == last { ns } else { Namespace::Types };
         let name = &segment.name;
         let anchor = at(u32::try_from(index).unwrap_or(u32::MAX));

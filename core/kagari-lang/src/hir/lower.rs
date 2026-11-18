@@ -837,7 +837,10 @@ impl Lowerer<'_> {
                         base,
                         name: FieldName::Index(index),
                     },
-                    None => Expr::Missing,
+                    None => Expr::Field {
+                        base,
+                        name: FieldName::Missing,
+                    },
                 }
             }
             ast::Expr::IndexExpr(it) => Expr::Index {

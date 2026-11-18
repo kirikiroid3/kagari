@@ -86,7 +86,10 @@ path, generic parameter names), so semantic queries are unaffected by edits that
 Properties of HIR that later stages rely on:
 
 - **Errors become `Missing`.** A malformed or absent expression, pattern or type is
-  `Expr::Missing`, `Pat::Missing` or `TypeRef::Missing`, never a panic or a skipped node.
+  `Expr::Missing`, `Pat::Missing` or `TypeRef::Missing`, never a panic or a skipped node. A field
+  access without a name (`value.` while typing) keeps its base: `Expr::Field { name:
+  FieldName::Missing }`, which inference types as an error after checking the base, so editors can
+  complete after the dot.
 - **Paths are unresolved.** `Path { kind, segments }` with `PathKind::Plain`, `Crate`,
   `SelfModule`, `Super(n)` or `Lang(LangItem)`; segments carry optional generic arguments.
 - **Forms are gone.** `s!`, `choice!`, `t!` and UI forms are calls and records with `Lang` paths.
@@ -177,9 +180,13 @@ go into `inherent[key][name]`; trait impls into `trait_impls[key]` and `impl_tra
 
 `signature_resolution(program, item)` and `body_resolution(program, item)` walk one HIR store with
 a `Resolver` and produce a `StoreResolution`: `Resolution` per path expression, record path,
-pattern path, type reference, const generic argument and range-pattern bound. The body result also
-has `locals` (an arena of `Local { name, pat, mutable }`; `self` is a local with `pat: None`),
-`bindings` (pattern → local) and `loop_targets` (`break`/`continue` → loop).
+pattern path, type reference, const generic argument and range-pattern bound, plus `prefixes`:
+what each earlier segment of those paths resolved to, keyed by `(owning NodeId, segment index)`
+(filled from `PathResolution::prefixes`, which `resolve_rest` records segment by segment; empty
+for `Lang` paths). Later stages ignore `prefixes`; the IDE uses them to navigate and rename path
+segments. The body result also has `locals` (an arena of `Local { name, pat, mutable }`; `self`
+is a local with `pat: None`), `bindings` (pattern → local) and `loop_targets` (`break`/`continue`
+→ loop).
 
 `Resolution` is one of `Local`, `Def(Module | Item | Variant)`, `Prim`, `GenericParam { owner,
 index }`, `SelfType(impl or trait)`, `Assoc(item)`, `Deferred { base, rest }` or `Error`.

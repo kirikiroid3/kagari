@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use kagari_lang::FilePath;
-use kagari_lang::ide::{FileSymbol, SymbolKind};
+use kagari_lang::ide::{CompletionKind, FileSymbol, SymbolKind};
 use kagari_syntax::SourceKind;
 use lsp_types::{DocumentSymbol, Uri};
 
@@ -49,6 +49,25 @@ pub fn symbol_kind(kind: SymbolKind) -> lsp_types::SymbolKind {
         SymbolKind::Static => lsp_types::SymbolKind::VARIABLE,
         SymbolKind::Trait => lsp_types::SymbolKind::INTERFACE,
         SymbolKind::Impl => lsp_types::SymbolKind::OBJECT,
+    }
+}
+
+pub fn completion_kind(kind: CompletionKind) -> lsp_types::CompletionItemKind {
+    match kind {
+        CompletionKind::Module => lsp_types::CompletionItemKind::MODULE,
+        CompletionKind::Function => lsp_types::CompletionItemKind::FUNCTION,
+        CompletionKind::Method => lsp_types::CompletionItemKind::METHOD,
+        CompletionKind::Struct => lsp_types::CompletionItemKind::STRUCT,
+        CompletionKind::Enum => lsp_types::CompletionItemKind::ENUM,
+        CompletionKind::Variant => lsp_types::CompletionItemKind::ENUM_MEMBER,
+        CompletionKind::TypeAlias | CompletionKind::TypeParam => {
+            lsp_types::CompletionItemKind::TYPE_PARAMETER
+        }
+        CompletionKind::Const => lsp_types::CompletionItemKind::CONSTANT,
+        CompletionKind::Static | CompletionKind::Local => lsp_types::CompletionItemKind::VARIABLE,
+        CompletionKind::Trait => lsp_types::CompletionItemKind::INTERFACE,
+        CompletionKind::Field => lsp_types::CompletionItemKind::FIELD,
+        CompletionKind::Primitive => lsp_types::CompletionItemKind::KEYWORD,
     }
 }
 

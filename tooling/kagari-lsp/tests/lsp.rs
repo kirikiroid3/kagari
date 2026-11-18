@@ -15,16 +15,18 @@ use lsp_types::notification::{
     PublishDiagnostics,
 };
 use lsp_types::request::{
-    DocumentSymbolRequest, Formatting, GotoDefinition, HoverRequest, Initialize, Request as _,
-    Shutdown,
+    Completion, DocumentSymbolRequest, Formatting, GotoDefinition, HoverRequest, Initialize,
+    PrepareRenameRequest, Rename, Request as _, Shutdown,
 };
 use lsp_types::{
-    ClientCapabilities, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentFormattingParams, DocumentSymbol, DocumentSymbolParams, FormattingOptions,
-    GotoDefinitionParams, Hover, HoverContents, HoverParams, InitializeParams, InitializedParams,
-    Location, NumberOrString, Position, PublishDiagnosticsParams, SymbolKind,
+    ClientCapabilities, CompletionItem, CompletionItemKind, CompletionParams, CompletionTextEdit,
+    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFormattingParams,
+    DocumentSymbol, DocumentSymbolParams, FormattingOptions, GotoDefinitionParams, Hover,
+    HoverContents, HoverParams, InitializeParams, InitializedParams, Location, NumberOrString,
+    Position, PrepareRenameResponse, PublishDiagnosticsParams, RenameParams, SymbolKind,
     TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
-    TextDocumentPositionParams, TextEdit, Uri, VersionedTextDocumentIdentifier, WorkspaceFolder,
+    TextDocumentPositionParams, TextEdit, Uri, VersionedTextDocumentIdentifier, WorkspaceEdit,
+    WorkspaceFolder,
 };
 use serde_json::Value;
 
@@ -301,7 +303,7 @@ fn server_end_to_end() {
     let location: Location = serde_json::from_value(client.request(
         GotoDefinition::METHOD,
         GotoDefinitionParams {
-            text_document_position_params: call,
+            text_document_position_params: call.clone(),
             work_done_progress_params: Default::default(),
             partial_result_params: Default::default(),
         },
@@ -339,7 +341,71 @@ fn server_end_to_end() {
         );
     }
 
-    // 6. Formatting rewrites misformatted code.
+    // 6. Completion in `default_bindings` offers the functions in scope, replacing the word.
+    let mut word = client.position_params(&text, "default_bindings()");
+    word.position.character += 3;
+    let items: Vec<CompletionItem> = serde_json::from_value(client.request(
+        Completion::METHOD,
+        CompletionParams {
+            text_document_position: word.clone(),
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+            context: None,
+        },
+    ))
+    .unwrap();
+    let helper = items
+        .iter()
+        .find(|item| item.label == "helper")
+        .unwrap_or_else(|| panic!("no `helper` in {items:#?}"));
+    assert_eq!(helper.kind, Some(CompletionItemKind::FUNCTION));
+    assert_eq!(helper.detail.as_deref(), Some("fn helper() -> u32"));
+    let Some(CompletionTextEdit::Edit(edit)) = &helper.text_edit else {
+        panic!("{helper:#?}")
+    };
+    let start = position_of(&text, "default_bindings()");
+    assert_eq!(edit.range.start, start);
+    assert_eq!(edit.range.end.character, start.character + 16);
+
+    // 7. Renaming `helper` at its call renames the call and the definition.
+    let range: PrepareRenameResponse =
+        serde_json::from_value(client.request(PrepareRenameRequest::METHOD, call.clone())).unwrap();
+    assert_eq!(
+        range,
+        PrepareRenameResponse::Range(lsp_types::Range {
+            start: call.position,
+            end: Position {
+                character: call.position.character + 6,
+                ..call.position
+            },
+        })
+    );
+    let edit: WorkspaceEdit = serde_json::from_value(client.request(
+        Rename::METHOD,
+        RenameParams {
+            text_document_position: call,
+            new_name: "assist".into(),
+            work_done_progress_params: Default::default(),
+        },
+    ))
+    .unwrap();
+    let files: Vec<(Uri, Vec<TextEdit>)> = edit.changes.unwrap().into_iter().collect();
+    let [(uri, edits)] = files.as_slice() else {
+        panic!("{files:#?}")
+    };
+    assert_eq!(*uri, client.main_uri);
+    let mut edits = edits.clone();
+    edits.sort_by_key(|edit| edit.range.start);
+    assert_eq!(
+        edits
+            .iter()
+            .map(|edit| edit.range.start)
+            .collect::<Vec<_>>(),
+        [position_of(&text, "helper()"), name]
+    );
+    assert!(edits.iter().all(|edit| edit.new_text == "assist"));
+
+    // 8. Formatting rewrites misformatted code.
     client.change(3, main_kix(HELPER_MISFORMATTED));
     let edits: Vec<TextEdit> = serde_json::from_value(client.request(
         Formatting::METHOD,
@@ -363,7 +429,7 @@ fn server_end_to_end() {
         edits[0].new_text
     );
 
-    // 7. `shutdown` and `exit` end the server.
+    // 9. `shutdown` and `exit` end the server.
     client.request(Shutdown::METHOD, ());
     client.notify(Exit::METHOD, ());
     let Client {

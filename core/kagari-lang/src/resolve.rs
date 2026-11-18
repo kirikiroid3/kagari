@@ -52,6 +52,8 @@ pub struct StoreResolution {
     pub const_args: FxHashMap<TypeRefId, Resolution>,
     /// Paths in range patterns: `(pat, 0)` for the start, `(pat, 1)` for the end.
     pub range_bounds: FxHashMap<(PatId, u8), Resolution>,
+    /// What segment `i` (not the last) of the path owned by a node resolved to.
+    pub prefixes: FxHashMap<(NodeId, u32), Resolution>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -393,6 +395,10 @@ impl<'a> Resolver<'a> {
     fn resolve_path_reported(&mut self, path: &Path, ns: Namespace, node: NodeId) -> Resolution {
         let result = self.resolve_path(path, ns, node);
         self.diagnostics.extend(result.diagnostics);
+        for (index, prefix) in result.prefixes.into_iter().enumerate() {
+            let index = u32::try_from(index).unwrap_or(u32::MAX);
+            self.out.prefixes.insert((node, index), prefix);
+        }
         self.resolve_path_args(path);
         result.resolved.unwrap_or(Resolution::Error)
     }

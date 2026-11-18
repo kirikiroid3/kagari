@@ -4,7 +4,7 @@ use kagari_syntax::{SyntaxKind, SyntaxNode, TextRange, TextSize};
 use rowan::NodeOrToken;
 
 use super::header::{collapse_whitespace, doc_comment, item_header};
-use super::lookup::{Found, reference_at};
+use super::lookup::{FieldId, Found, field_decls, reference_at};
 use crate::db::Db;
 use crate::def_map::{Def, Resolution, def_maps};
 use crate::infer::inference;
@@ -55,6 +55,13 @@ pub fn hover(db: &dyn Db, program: Program, file: SourceFile, offset: TextSize) 
                 doc_comment(&node),
             )
         }
+        Found::Field(field) => {
+            let node = field_node(db, *field)?;
+            (
+                collapse_whitespace(&node.text().to_string()),
+                doc_comment(&node),
+            )
+        }
         Found::Res(Resolution::Def(def @ Def::Module(_)))
         | Found::DefSite(def @ Def::Module(_)) => {
             let maps = def_maps(db, program);
@@ -81,26 +88,44 @@ pub fn hover(db: &dyn Db, program: Program, file: SourceFile, offset: TextSize) 
 }
 
 /// The syntax node of `item`.
-fn item_node(db: &dyn Db, item: ItemId) -> Option<SyntaxNode> {
+pub(crate) fn item_node(db: &dyn Db, item: ItemId) -> Option<SyntaxNode> {
     let src = item_source_map(db, item.file).items.get(item.index.idx())?;
     Some(src.ptr.to_node(&parse(db, item.file).syntax_node()))
 }
 
 /// The `VARIANT` node of variant `index` of `enum_item`.
-fn variant_node(db: &dyn Db, enum_item: ItemId, index: u32) -> Option<SyntaxNode> {
+pub(crate) fn variant_node(db: &dyn Db, enum_item: ItemId, index: u32) -> Option<SyntaxNode> {
     let src = item_source_map(db, enum_item.file)
         .items
         .get(enum_item.index.idx())?;
     let name = *src.variants.get(usize::try_from(index).ok()?)?;
-    let root = parse(db, enum_item.file).syntax_node();
-    if !root.text_range().contains_range(name) {
+    ancestor_at(
+        &parse(db, enum_item.file).syntax_node(),
+        name,
+        SyntaxKind::VARIANT,
+    )
+}
+
+/// The `RECORD_FIELD` node that declares `field`.
+pub(crate) fn field_node(db: &dyn Db, field: FieldId) -> Option<SyntaxNode> {
+    let src = item_source_map(db, field.adt.file)
+        .items
+        .get(field.adt.index.idx())?;
+    let node = item_node(db, field.adt)?;
+    let (_, name) = field_decls(&node, &src.variants)
+        .into_iter()
+        .find(|(id, _)| *id == (field.variant, field.index))?;
+    ancestor_at(&node, name, SyntaxKind::RECORD_FIELD)
+}
+
+/// The nearest node of `kind` around `range`.
+fn ancestor_at(root: &SyntaxNode, range: TextRange, kind: SyntaxKind) -> Option<SyntaxNode> {
+    if !root.text_range().contains_range(range) {
         return None;
     }
-    let start = match root.covering_element(name) {
+    let start = match root.covering_element(range) {
         NodeOrToken::Node(node) => node,
         NodeOrToken::Token(token) => token.parent()?,
     };
-    start
-        .ancestors()
-        .find(|node| node.kind() == SyntaxKind::VARIANT)
+    start.ancestors().find(|node| node.kind() == kind)
 }

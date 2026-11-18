@@ -12,10 +12,11 @@ use lsp_server::{Connection, Message, Notification, Request, RequestId};
 use lsp_types::notification::{Notification as _, ShowMessage};
 use lsp_types::request::{RegisterCapability, Request as _};
 use lsp_types::{
-    DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, GlobPattern,
+    CompletionOptions, DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, GlobPattern,
     HoverProviderCapability, InitializeParams, MessageType, OneOf, Registration,
-    RegistrationParams, ServerCapabilities, ShowMessageParams, TextDocumentSyncCapability,
-    TextDocumentSyncKind, WatchKind, notification::DidChangeWatchedFiles,
+    RegistrationParams, RenameOptions, ServerCapabilities, ShowMessageParams,
+    TextDocumentSyncCapability, TextDocumentSyncKind, WatchKind,
+    notification::DidChangeWatchedFiles,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -48,6 +49,14 @@ pub(crate) fn run(connection: Connection) -> Result<(), LspError> {
         definition_provider: Some(OneOf::Left(true)),
         document_formatting_provider: Some(OneOf::Left(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
+        rename_provider: Some(OneOf::Right(RenameOptions {
+            prepare_provider: Some(true),
+            work_done_progress_options: Default::default(),
+        })),
+        completion_provider: Some(CompletionOptions {
+            trigger_characters: Some(vec![".".to_owned(), ":".to_owned()]),
+            ..CompletionOptions::default()
+        }),
         ..ServerCapabilities::default()
     };
     let params = connection.initialize(serde_json::to_value(capabilities)?)?;

@@ -4,7 +4,7 @@ Editor support has three parts with different jobs:
 
 | Part | Job | Source of truth for |
 | ---- | --- | ------------------- |
-| `kagari-lsp` (run by `kagari lsp`) | Semantic features over LSP: diagnostics, formatting, go to definition, hover, document symbols | Meaning (it runs the real compiler) |
+| `kagari-lsp` (run by `kagari lsp`) | Semantic features over LSP: diagnostics, formatting, go to definition, hover, document symbols, rename, completion | Meaning (it runs the real compiler) |
 | `tree-sitter-kagari` | An approximate, error-tolerant grammar for highlighting, brackets, indentation and outlines | Nothing; it follows `kagari-syntax` |
 | `zed-kagari` | Zed extension: wires the grammar, query files, `kagari lsp` and the `kagari dap` debug adapter together | Zed integration only |
 | `mdbook-kagari` (run by `mdbook build`) | Highlights the Develop Guide's Kagari code with the grammar and `highlights.scm` | Nothing; it reuses the grammar and the queries |
@@ -21,10 +21,10 @@ they support it. The user-facing setup is in the Reference's
 | `tooling/kagari-lsp/src/lib.rs` | `run(Connection)`, `run_stdio()` |
 | `tooling/kagari-lsp/src/server/mod.rs` | `Server` state, capabilities, initialize handshake, main loop, file-watcher registration |
 | `tooling/kagari-lsp/src/server/notifications.rs` | `didOpen`, `didChange`, `didClose`, `didChangeWatchedFiles` |
-| `tooling/kagari-lsp/src/server/requests.rs` | `formatting`, `definition`, `hover`, `documentSymbol`; panic isolation |
+| `tooling/kagari-lsp/src/server/requests.rs` | `formatting`, `definition`, `hover`, `documentSymbol`, `prepareRename`, `rename`, `completion`; panic isolation |
 | `tooling/kagari-lsp/src/diagnostics.rs` | Background diagnostics: compute on a database snapshot, publish, clear |
 | `tooling/kagari-lsp/src/projects.rs` | `LoadedProject`, project loading and lookup |
-| `tooling/kagari-lsp/src/convert.rs` | URI ↔ path, `SourceKind` by extension, symbol kinds, `DocumentSymbol` |
+| `tooling/kagari-lsp/src/convert.rs` | URI ↔ path, `SourceKind` by extension, symbol and completion kinds, `DocumentSymbol` |
 | `tooling/kagari-lsp/src/line_index/` | Byte offset ↔ LSP position (UTF-16 columns), with unit tests |
 | `tooling/kagari-lsp/src/std_files.rs` | Writes std files to a temp dir so the editor can open them |
 | `tooling/kagari-lsp/src/error.rs` | `LspError` (fatal: protocol, I/O, JSON, closed channel) |
@@ -65,7 +65,8 @@ The server uses `lsp-server` (the rust-analyzer transport) and `lsp-types`. `run
 `server::run`:
 
 1. `connection.initialize(capabilities)` performs the handshake. Capabilities: full text sync
-   (`TextDocumentSyncKind::FULL`), hover, definition, document formatting, document symbols.
+   (`TextDocumentSyncKind::FULL`), hover, definition, document formatting, document symbols,
+   rename with `prepareRename`, completion with the trigger characters `.` and `:`.
 2. Builds `Server { sender, db: RootDatabase::new(Arc::new(OsFileSystem)), projects, open,
    published, roots, shown_errors }`. `roots` are the workspace folders (or `rootUri` for clients
    without folders).
@@ -136,11 +137,13 @@ responsive.
 
 ### Requests
 
-`requests::dispatch` maps a method to a `fn(&Server, Value) -> Result<Value, serde_json::Error>`
+`requests::dispatch` maps a method to a `fn(&Server, Value) -> Result<Value, RequestError>`
 and wraps the call in `catch_unwind`: a panicking handler logs to stderr and returns
 `InternalError` instead of taking the server down. Unknown methods get `MethodNotFound`; bad
-params get `InvalidParams`. Every handler returns `null` when it has no answer (outside a project,
-no reference at the position).
+params (`RequestError::Params`) get `InvalidParams`; a request that cannot be done
+(`RequestError::Failed`, a refused rename) gets `RequestFailed` with a message for the user.
+Every handler returns `null` when it has no answer (outside a project, no reference at the
+position).
 
 | Request | Implementation |
 | ------- | -------------- |
@@ -148,6 +151,9 @@ no reference at the position).
 | `textDocument/definition` | `locate` (project program, `SourceFile`, byte offset) → `ide::definition` → `Location`; std targets are materialized first |
 | `textDocument/hover` | `ide::hover`; Markdown content and the reference's range |
 | `textDocument/documentSymbol` | `ide::file_symbols` → nested `DocumentSymbol`s; works for loose files too |
+| `textDocument/prepareRename` | `ide::prepare_rename` → `PrepareRenameResponse::Range`; a `RenameError` becomes `RequestFailed` |
+| `textDocument/rename` | `ide::rename` → a `WorkspaceEdit` with `changes` (every client supports it, unlike `documentChanges`; its `HashMap<Uri, …>` needs `#[allow(clippy::mutable_key_type)]`, a false positive for `Uri`). Ranges are converted with each file's database text, which is the editor's text for open files |
+| `textDocument/completion` | `ide::completions` → `CompletionResponse::Array`; each item has its kind (`convert::completion_kind`), detail, Markdown documentation and a `textEdit` replacing the word at the cursor |
 
 `LineIndex` converts between byte offsets and LSP positions. LSP columns count UTF-16 code
 units, which matters for Japanese text: `position` counts `encode_utf16` units from the line
@@ -168,9 +174,10 @@ file is a loose file to the server: opening it gives syntax diagnostics only.
 `tooling/kagari-lsp/tests/lsp.rs` writes a project into a temp dir, runs `kagari_lsp::run` on a
 thread over `Connection::memory()`, and drives one scenario: open a file with a type error (an
 `E2…` diagnostic is published), fix it (diagnostics cleared), hover (header and doc comment),
-go to definition, document symbols, formatting, then `shutdown`/`exit`. The client helper skips
-unrelated messages and waits up to 60 s per message. `line_index/tests.rs` covers the position
-conversions. Run `cargo test -p kagari-lsp`.
+go to definition, document symbols, completion (kind, detail and replaced range), prepare rename
+and rename, formatting, then `shutdown`/`exit`. The client helper skips unrelated messages and
+waits up to 60 s per message. `line_index/tests.rs` covers the position conversions. Run
+`cargo test -p kagari-lsp`.
 
 ## Tree-sitter grammar
 

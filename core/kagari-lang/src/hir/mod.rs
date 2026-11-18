@@ -399,6 +399,8 @@ pub struct MatchArm {
 pub enum FieldName {
     Named(Name),
     Index(u32),
+    /// `base.` with the name not written yet (a syntax error); the base is still checked.
+    Missing,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

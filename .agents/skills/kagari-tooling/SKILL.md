@@ -13,7 +13,7 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
 | `tooling/kagari-cli` | The `kagari` binary: `init`, `check`, `build` (`--profile debug`/`release`), `clean`, `release` (`--windows`/`--linux`/`--macos`: build, download the runtime, write `<out-dir>/release/<platform>/<name>.iso`, or `<name>.zip` holding a signed `<name>.app` for macOS, which needs `project.identifier`), `fmt`, `disasm`, `lsp`, `debug`, `dap`; `analysis_cache.rs`, `outputs.rs` (what is written/removed in `out-dir`); `command/release/` (`download.rs`: the hard-coded download server, `KAGARI_DOWNLOAD_URL`; `iso.rs`: the ISO 9660 + Joliet + Rock Ridge writer; `zip.rs`: the ZIP writer with Unix modes and ZIP64; `macos/mod.rs`: the app bundle, `Info.plist`, `CodeResources`; `macos/sign.rs`: the ad hoc Mach-O signer); `debugger.rs` (projects for the story debugger: `open`, the DAP `Launcher`; the REPL and adapter live in `kagari-debugger`'s `client`/`dap` features); new-project `template/` |
 | `tooling/kagari-fmt` | Width-based formatter (`MAX_WIDTH` 100, `INDENT` 4, not configurable) |
 | `tooling/kagari-lsp` | Language server (lsp-server, crossbeam, salsa snapshots) |
-| `core/kagari-lang/src/ide` | Go to definition, hover, file symbols over salsa queries |
+| `core/kagari-lang/src/ide` | Go to definition, hover, file symbols, rename, completion over salsa queries |
 | `tooling/tree-sitter-kagari` | Editor grammar; `src/parser.c`, `src/grammar.json`, `src/node-types.json` are generated |
 | `tooling/zed-kagari` | Zed extension (language server, debug adapter `Kagari` with schema `debug_adapter_schemas/Kagari.json`); excluded from the Cargo workspace |
 | `tooling/mdbook-kagari` | mdBook preprocessor: highlights the Develop Guide's `kis`/`kix` blocks with the grammar's `parser.c` and Zed's `highlights.scm` (`docs/dev/src/process/docs.md#code-highlighting`) |
@@ -25,7 +25,7 @@ description: Load when changing tooling/* (kagari-cli, kagari-project, kagari-fm
 - `docs/dev/src/formats/cache.md` — `.kagari-cache` files: analysis cache, debug artifact.
 - `docs/dev/src/tooling/fmt.md` — Doc model, printer, comments, verify, idempotence.
 - `docs/dev/src/tooling/lsp.md` — server threads, sync, diagnostics, grammar, Zed.
-- `docs/dev/src/compiler/ide.md` — `reference_at`, definition, hover, symbols.
+- `docs/dev/src/compiler/ide.md` — reference sites, definition, hover, symbols, rename, completion.
 
 ## Invariants
 

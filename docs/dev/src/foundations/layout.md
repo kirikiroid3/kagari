@@ -159,7 +159,8 @@ not configurable). It refuses files with syntax errors. Backs `kagari fmt` and L
 [Formatter](../tooling/fmt.md).
 
 **`kagari-lsp`** — The language server over stdio: diagnostics, formatting, go to definition,
-hover and document symbols, on top of the compiler's salsa database. `kagari lsp` runs it. See
+hover, document symbols, rename and completion, on top of the compiler's salsa database.
+`kagari lsp` runs it. See
 [Language Server and Editors](../tooling/lsp.md).
 
 **`mdbook-kagari`** — The mdBook preprocessor that the Develop Guide runs (`[preprocessor.kagari]`
