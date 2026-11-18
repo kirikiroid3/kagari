@@ -61,6 +61,7 @@ pub enum CompletionKind {
     Local,
     TypeParam,
     Primitive,
+    Keyword,
 }
 
 /// What can be written at `offset` in `file`. `None` outside the program, inside comments and
@@ -77,6 +78,8 @@ pub fn completions(
     }
     let root = parse(db, file).syntax_node();
     let token = root.token_at_offset(offset).left_biased()?;
+    // The node the cursor is in: the word's parent, or the parent of the token before it.
+    let here = token.parent();
     let inside = token.text_range().start() < offset;
     let (word, before) = match token.kind() {
         SyntaxKind::LINE_COMMENT => return None,
@@ -105,7 +108,7 @@ pub fn completions(
         out: Vec::new(),
         seen: FxHashSet::default(),
     };
-    let items = cx.complete(word.as_ref(), before.as_ref())?;
+    let items = cx.complete(word.as_ref(), before.as_ref(), here)?;
     Some(Completions { range, items })
 }
 
@@ -186,6 +189,7 @@ impl Cx<'_> {
         mut self,
         word: Option<&SyntaxToken>,
         before: Option<&SyntaxToken>,
+        here: Option<SyntaxNode>,
     ) -> Option<Vec<CompletionItem>> {
         let before_kind = before.map(SyntaxToken::kind);
         if let Some(colons) = before.and_then(path_separator) {
@@ -212,9 +216,19 @@ impl Cx<'_> {
                     return Some(self.out);
                 }
                 if in_record.is_none() && declares_name(word, before_kind) {
-                    return None;
+                    // `let |` and `let m|` may still become `let mut`.
+                    if before_kind != Some(SyntaxKind::LET_KW) {
+                        return None;
+                    }
+                    self.push_keywords(&["mut"]);
+                    return Some(self.out);
                 }
-                self.scope(types_only(word, before));
+                let types_only = types_only(word, before);
+                let context = keyword_context(here, word, before, types_only);
+                if !matches!(context, KeywordContext::Item | KeywordContext::Assoc) {
+                    self.scope(types_only);
+                }
+                self.keywords(context, before);
             }
         }
         Some(self.out)
@@ -295,6 +309,99 @@ impl Cx<'_> {
                 .map(|node| collapse_whitespace(&node.text().to_string())),
             node.as_ref().map(doc_comment),
         );
+    }
+
+    // ---- keywords ----
+
+    fn push_keywords(&mut self, keywords: &[&str]) {
+        for keyword in keywords {
+            self.push(keyword, CompletionKind::Keyword, None, None);
+        }
+    }
+
+    /// The keywords that can start what is written at the offset.
+    fn keywords(&mut self, context: KeywordContext, before: Option<&SyntaxToken>) {
+        let before_kind = before.map(SyntaxToken::kind);
+        match context {
+            KeywordContext::Item | KeywordContext::Assoc => {
+                let keywords: &[&str] = if context == KeywordContext::Item {
+                    ITEM_KEYWORDS
+                } else {
+                    ASSOC_KEYWORDS
+                };
+                for keyword in keywords {
+                    // `pub pub` is not a thing.
+                    if !(*keyword == "pub" && before_kind == Some(SyntaxKind::PUB_KW)) {
+                        self.push_keywords(&[keyword]);
+                    }
+                }
+            }
+            KeywordContext::Statement | KeywordContext::Expression => {
+                if context == KeywordContext::Statement {
+                    self.push_keywords(&["let"]);
+                    if before.is_some_and(ends_open_if) {
+                        self.push_keywords(&["else"]);
+                    }
+                }
+                self.push_keywords(EXPR_KEYWORDS);
+                if self.owner_is_fn() {
+                    self.push_keywords(&["return"]);
+                }
+                if self.in_loop() {
+                    self.push_keywords(&["break", "continue"]);
+                }
+                if before_kind == Some(SyntaxKind::AMP) {
+                    self.push_keywords(&["mut"]);
+                }
+                self.push_path_roots();
+                if context == KeywordContext::Statement {
+                    // Items can be declared in blocks.
+                    self.push_keywords(BLOCK_ITEM_KEYWORDS);
+                }
+            }
+            KeywordContext::Type => {
+                self.push_path_roots();
+                self.push_keywords(TYPE_KEYWORDS);
+            }
+            KeywordContext::UsePath => self.push_keywords(&["crate", "self", "super"]),
+            KeywordContext::None => {}
+        }
+    }
+
+    /// `crate`, `super` and, inside an impl or trait, `Self`.
+    fn push_path_roots(&mut self) {
+        if self.self_owner().is_some() {
+            self.push_keywords(&["Self"]);
+        }
+        self.push_keywords(&["crate", "super"]);
+    }
+
+    fn owner_is_fn(&self) -> bool {
+        self.owner.is_some_and(|owner| {
+            matches!(
+                item_tree(self.db, owner.file)
+                    .item(owner.index)
+                    .map(|data| &data.kind),
+                Some(ItemKind::Fn { .. })
+            )
+        })
+    }
+
+    /// Whether the offset is in a loop of the innermost function or closure.
+    fn in_loop(&self) -> bool {
+        let Some(token) = self.root.token_at_offset(self.offset).left_biased() else {
+            return false;
+        };
+        for node in token.parent_ancestors() {
+            match node.kind() {
+                SyntaxKind::LOOP_EXPR | SyntaxKind::WHILE_EXPR | SyntaxKind::FOR_EXPR => {
+                    return true;
+                }
+                SyntaxKind::CLOSURE_EXPR | SyntaxKind::FN => return false,
+                _ => {}
+            }
+        }
+        false
     }
 
     // ---- `receiver.` ----
@@ -757,6 +864,144 @@ fn path_separator(token: &SyntaxToken) -> Option<SyntaxToken> {
         }),
         _ => None,
     }
+}
+
+/// Where a keyword would be written.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum KeywordContext {
+    /// Among the items of a file or an inline module.
+    Item,
+    /// Among the items of an `impl`.
+    Assoc,
+    /// At the start of a statement in a block.
+    Statement,
+    /// Inside an expression.
+    Expression,
+    Type,
+    /// The first segment of a `use` path.
+    UsePath,
+    /// Anywhere else (attributes, parameter lists, field lists…): no keywords.
+    None,
+}
+
+const ITEM_KEYWORDS: &[&str] = &[
+    "fn", "struct", "enum", "type", "const", "static", "mod", "use", "impl", "pub", "pushdown",
+];
+const ASSOC_KEYWORDS: &[&str] = &["fn", "const", "type", "pub", "pushdown"];
+const BLOCK_ITEM_KEYWORDS: &[&str] = &[
+    "fn", "struct", "enum", "type", "const", "static", "mod", "use", "impl", "pushdown",
+];
+const EXPR_KEYWORDS: &[&str] = &["if", "match", "loop", "while", "for", "true", "false"];
+/// Pointer and closure types: `fn(…)`, `const fn(…)`, `pushdown fn(…)`, `scene fn(…)`.
+const TYPE_KEYWORDS: &[&str] = &["fn", "const", "pushdown", "scene"];
+
+/// Which keywords fit at the cursor, found from `here` (the node the cursor is in): leave every
+/// node that the word being typed starts, and path and statement wrappers, then look at the
+/// node reached.
+fn keyword_context(
+    here: Option<SyntaxNode>,
+    word: Option<&SyntaxToken>,
+    before: Option<&SyntaxToken>,
+    types_only: bool,
+) -> KeywordContext {
+    if types_only {
+        return KeywordContext::Type;
+    }
+    let Some(mut node) = here else {
+        return KeywordContext::None;
+    };
+    // `pub |` is an item, even where the parser joined `pub` to the item on the next line.
+    if before.is_some_and(|token| token.kind() == SyntaxKind::PUB_KW) {
+        let assoc = node
+            .ancestors()
+            .any(|node| node.kind() == SyntaxKind::ASSOC_ITEM_LIST);
+        return if assoc {
+            KeywordContext::Assoc
+        } else {
+            KeywordContext::Item
+        };
+    }
+    loop {
+        let starts_with_word = word.is_some_and(|word| first_token(&node).as_ref() == Some(word));
+        let wrapper = matches!(
+            node.kind(),
+            SyntaxKind::NAME_REF
+                | SyntaxKind::PATH_SEGMENT
+                | SyntaxKind::PATH
+                | SyntaxKind::PATH_EXPR
+                | SyntaxKind::EXPR_STMT
+                | SyntaxKind::ERROR
+        );
+        match node.parent() {
+            Some(parent) if starts_with_word || wrapper => node = parent,
+            _ => break,
+        }
+    }
+    match node.kind() {
+        SyntaxKind::SOURCE_FILE | SyntaxKind::ITEM_LIST => KeywordContext::Item,
+        SyntaxKind::ASSOC_ITEM_LIST => KeywordContext::Assoc,
+        SyntaxKind::BLOCK_EXPR => KeywordContext::Statement,
+        SyntaxKind::USE | SyntaxKind::USE_TREE | SyntaxKind::USE_TREE_LIST => {
+            KeywordContext::UsePath
+        }
+        SyntaxKind::LET_STMT
+        | SyntaxKind::LET_EXPR
+        | SyntaxKind::CONST
+        | SyntaxKind::STATIC
+        | SyntaxKind::BIN_EXPR
+        | SyntaxKind::PREFIX_EXPR
+        | SyntaxKind::REF_EXPR
+        | SyntaxKind::RANGE_EXPR
+        | SyntaxKind::PAREN_EXPR
+        | SyntaxKind::TUPLE_EXPR
+        | SyntaxKind::ARRAY_EXPR
+        | SyntaxKind::INDEX_EXPR
+        | SyntaxKind::ARG_LIST
+        | SyntaxKind::RECORD_EXPR_FIELD
+        | SyntaxKind::IF_EXPR
+        | SyntaxKind::MATCH_EXPR
+        | SyntaxKind::MATCH_ARM
+        | SyntaxKind::MATCH_GUARD
+        | SyntaxKind::WHILE_EXPR
+        | SyntaxKind::FOR_EXPR
+        | SyntaxKind::RETURN_EXPR
+        | SyntaxKind::BREAK_EXPR
+        | SyntaxKind::CLOSURE_EXPR
+        | SyntaxKind::FORM_EXPR
+        | SyntaxKind::FORM_ATTR
+        | SyntaxKind::FORM_ARM
+        | SyntaxKind::FORM_GUARD
+        | SyntaxKind::TEXT_INTERP
+        | SyntaxKind::TEXT_EFFECT => KeywordContext::Expression,
+        _ => KeywordContext::None,
+    }
+}
+
+/// The first token of `node` that is not trivia.
+fn first_token(node: &SyntaxNode) -> Option<SyntaxToken> {
+    node.descendants_with_tokens()
+        .filter_map(|element| element.into_token())
+        .find(|token| !token.kind().is_trivia())
+}
+
+/// Whether `token` closes the last block of an `if` that has no `else` yet.
+fn ends_open_if(token: &SyntaxToken) -> bool {
+    if token.kind() != SyntaxKind::R_CURLY {
+        return false;
+    }
+    let Some(block) = token
+        .parent()
+        .filter(|node| node.kind() == SyntaxKind::BLOCK_EXPR)
+    else {
+        return false;
+    };
+    block.parent().is_some_and(|parent| {
+        parent.kind() == SyntaxKind::IF_EXPR
+            && parent.last_child().as_ref() == Some(&block)
+            && !parent
+                .children_with_tokens()
+                .any(|child| child.kind() == SyntaxKind::ELSE_KW)
+    })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

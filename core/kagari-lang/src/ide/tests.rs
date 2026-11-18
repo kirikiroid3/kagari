@@ -530,17 +530,103 @@ fn completion_lists_the_names_in_scope() {
     ] {
         assert!(has(&labels, "Mood", CompletionKind::Enum), "{labels:?}");
         assert!(has(&labels, "u32", CompletionKind::Primitive), "{labels:?}");
+        assert!(has(&labels, "fn", CompletionKind::Keyword), "{labels:?}");
         assert!(
             !labels
                 .iter()
-                .any(|(label, _)| label == "moods" || label == "screen"),
+                .any(|(label, _)| ["moods", "screen", "if"].contains(&label.as_str())),
             "{labels:?}"
         );
     }
     // A name being declared gets no completions.
     let mut f = fixture();
-    let text = MAIN_SOURCE.replacen("let x", "let xy", 1);
-    let offset = offset_of(&text, "let xy", 0, 6);
+    let text = MAIN_SOURCE.replacen("fn uses", "fn usesx", 1);
+    let offset = offset_of(&text, "fn usesx", 0, 8);
     f.db.set_file_text(FilePath::disk(MAIN), Some(text));
     assert_eq!(completions(&f.db, f.program, f.main, offset), None);
+}
+
+fn keywords(labels: &[(String, CompletionKind)]) -> Vec<&str> {
+    labels
+        .iter()
+        .filter(|(_, kind)| *kind == CompletionKind::Keyword)
+        .map(|(label, _)| label.as_str())
+        .collect()
+}
+
+#[test]
+fn completion_offers_the_keywords_that_fit() {
+    // Among items: item keywords only, no names.
+    let labels = labels_at("struct Counter {", "str\nstruct Counter {", "\nstr");
+    assert_eq!(
+        keywords(&labels),
+        [
+            "fn", "struct", "enum", "type", "const", "static", "mod", "use", "impl", "pub",
+            "pushdown"
+        ]
+    );
+    assert_eq!(labels.len(), 11, "{labels:?}");
+    let labels = labels_at("    fn get(", "    pz\n    fn get(", "    pz");
+    assert_eq!(
+        keywords(&labels),
+        ["fn", "const", "type", "pub", "pushdown"]
+    );
+    let labels = labels_at("struct Counter {", "pub \nstruct Counter {", "pub ");
+    assert_eq!(
+        keywords(&labels),
+        [
+            "fn", "struct", "enum", "type", "const", "static", "mod", "use", "impl", "pushdown"
+        ]
+    );
+
+    // At the start of a statement: `let`, control flow, path roots and block items, after the
+    // locals; `return` in a function, `break` only in a loop.
+    let labels = labels_at(
+        "    let c = Counter",
+        "    lez\n    let c = Counter",
+        "    lez",
+    );
+    assert!(has(&labels, "x", CompletionKind::Local), "{labels:?}");
+    let found = keywords(&labels);
+    for keyword in [
+        "let", "if", "match", "loop", "return", "true", "crate", "struct",
+    ] {
+        assert!(found.contains(&keyword), "{keyword} missing in {found:?}");
+    }
+    assert!(
+        !found.contains(&"break") && !found.contains(&"else"),
+        "{found:?}"
+    );
+    let labels = labels_at(
+        "    let c = Counter",
+        "    loop {\n        br\n    }\n    let c = Counter",
+        "        br",
+    );
+    assert!(keywords(&labels).contains(&"break"), "{labels:?}");
+
+    // After an `if` without `else`.
+    let labels = labels_at(
+        "        Mood::Calm\n    } else {\n        Mood::Angry\n    }",
+        "        Mood::Calm\n    }\n    el",
+        "\n    el",
+    );
+    assert!(keywords(&labels).contains(&"else"), "{labels:?}");
+
+    // Inside an expression: no `let`, no items.
+    let labels = labels_at("u32 = other::helper();", "u32 = tr;", "= tr");
+    let found = keywords(&labels);
+    assert!(
+        found.contains(&"true") && found.contains(&"if"),
+        "{found:?}"
+    );
+    assert!(
+        !found.contains(&"let") && !found.contains(&"struct"),
+        "{found:?}"
+    );
+
+    // `let` may be followed by `mut`; a `use` path starts with a path root.
+    let labels = labels_at("let x: u32", "let x: u32", "    let ");
+    assert_eq!(labels, [("mut".to_owned(), CompletionKind::Keyword)]);
+    let labels = labels_at("use std::screen::size;", "use cr;", "use cr");
+    assert_eq!(keywords(&labels), ["crate", "self", "super"]);
 }

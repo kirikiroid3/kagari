@@ -67,7 +67,9 @@ pub fn completion_kind(kind: CompletionKind) -> lsp_types::CompletionItemKind {
         CompletionKind::Static | CompletionKind::Local => lsp_types::CompletionItemKind::VARIABLE,
         CompletionKind::Trait => lsp_types::CompletionItemKind::INTERFACE,
         CompletionKind::Field => lsp_types::CompletionItemKind::FIELD,
-        CompletionKind::Primitive => lsp_types::CompletionItemKind::KEYWORD,
+        CompletionKind::Primitive | CompletionKind::Keyword => {
+            lsp_types::CompletionItemKind::KEYWORD
+        }
     }
 }
 

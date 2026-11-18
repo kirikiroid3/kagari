@@ -230,8 +230,9 @@ cursor is in or right after, else an empty range at the offset; each `Completion
 variant's text, `let [mut ]x: Ty` for a local, `mod <path>` for a module) and the doc comment.
 It returns `None` outside the program, inside comments and string literals,
 and where a name is being declared (the word is in a `NAME`, or the previous token is `let`,
-`mut`, `fn`, `struct`, `enum`, `trait`, `mod`, `type`, `const`, `static`). Labels are unique: the
-first one offered wins, so locals shadow items and inner items shadow outer ones.
+`mut`, `fn`, `struct`, `enum`, `trait`, `mod`, `type`, `const`, `static`), except that after
+`let` it offers the keyword `mut`. Labels are unique: the first one offered wins, so locals
+shadow items and inner items shadow outer ones.
 
 The **context** is the previous non-trivia token before the word:
 
@@ -241,7 +242,7 @@ The **context** is the previous non-trivia token before the word:
 | `::` (a `COLON2`, or two adjacent `:` when nothing follows: the parser glues `::` only before a segment) | The qualifier's members | The qualifier is the outermost `PATH` ending at the token before `::`, lowered with `lower_path` and resolved in the types namespace from the module at the offset (`Self::` from the enclosing impl or trait). A module gives its visible scope entries, a struct, enum, alias or primitive its variants and associated items (`DefMaps::inherent`, then trait impls), a trait its items |
 | `{` or `,` in a `USE_TREE_LIST` | The members of the list's path | The paths of the enclosing `USE_TREE`s, joined |
 | A field position of a `RECORD_EXPR_FIELD_LIST` / `RECORD_PAT_FIELD_LIST` | The fields not written yet | The record at the list's parent range, `inference.records` / `pat_ctors`; for an expression, the scope follows |
-| Anything else | The scope | Locals in scope, generic parameters of the item and of its impl or trait, the entries of the module at the offset and of its enclosing block modules up to the named module, `std`, the prelude and the primitive types. In a `PATH_TYPE`, or after the `:` of a `let`, parameter, field, `const` or `static` or after `->`, only the types namespace (and no locals) |
+| Anything else | The scope, then keywords | Locals in scope, generic parameters of the item and of its impl or trait, the entries of the module at the offset and of its enclosing block modules up to the named module, `std`, the prelude and the primitive types. In a `PATH_TYPE`, or after the `:` of a `let`, parameter, field, `const` or `static` or after `->`, only the types namespace (and no locals). Among items, keywords only (below) |
 
 The module at the offset is the smallest block with items (`ItemSourceMap::blocks` whose
 `block_modules` entry exists) containing it, else the inline module of a `mod` item, the module of
@@ -251,6 +252,24 @@ A local is in scope when its pattern ends before the offset and the offset is in
 found from the binding's `IDENT_PAT` upwards: after a `LET_STMT` to the end of its block; in the
 `BLOCK_EXPR` guarded by a `LET_EXPR` (`if let`, `while let`); in the body of a `FOR_EXPR`; in a
 `MATCH_ARM`, `CLOSURE_EXPR` or `FN`. `self` is always in scope in its body.
+
+**Keywords** (`CompletionKind::Keyword`) follow from a `KeywordContext`. `keyword_context` starts
+at the node the cursor is in (the word's parent, or the parent of the token at the offset) and
+climbs out of every node the word starts and of the wrappers `NAME_REF`, `PATH_SEGMENT`, `PATH`,
+`PATH_EXPR`, `EXPR_STMT` and `ERROR` (a stray word among items is an `ERROR` node). The node it
+stops at decides:
+
+| Stops at | Context | Keywords |
+| -------- | ------- | -------- |
+| `SOURCE_FILE`, `ITEM_LIST`; or the previous token is `pub` | `Item` | `fn struct enum type const static mod use impl pub pushdown` (no `pub` after `pub`; no `trait`, which only std declares). No names |
+| `ASSOC_ITEM_LIST` (also after `pub` inside one) | `Assoc` | `fn const type pub pushdown`. No names |
+| `BLOCK_EXPR` | `Statement` | `let`, the expression keywords, the item keywords without `pub`; `else` when the previous token closes the last block of an `IF_EXPR` without `else` |
+| An expression node (`LET_STMT`, `BIN_EXPR`, `ARG_LIST`, `MATCH_ARM`, form attributes and elements, `TEXT_INTERP`, `CONST`/`STATIC` initializers, …) | `Expression` | `if match loop while for true false crate super`; `Self` with an impl or trait; `return` when the owner is a `fn`; `break continue` inside a `LOOP_EXPR`/`WHILE_EXPR`/`FOR_EXPR` of the same function or closure; `mut` after `&` |
+| `USE`, `USE_TREE`, `USE_TREE_LIST` | `UsePath` | `crate self super` |
+| Anything else (attributes, parameter, field and variant lists, generic parameter lists) | `None` | none |
+
+A type position (`types_only`) is `Type`: `crate super`, `Self`, and `fn const pushdown scene` for
+function pointer and closure types.
 
 Typing `value.` leaves a `FIELD_EXPR` without a name; it lowers to `Expr::Field { name:
 FieldName::Missing }`, which inference checks as its base only (the parser already reported the
@@ -288,7 +307,9 @@ function in the other file, a method and a function imported under an alias (the
 each followed by checking the renamed program again; rename refusals, including a name one `use`
 imports twice; completion after `.`,
 after `Enum::` (unglued colons) and `module::`, in a `use` list, in scope, in a struct
-expression, in types only (after `:` and in a type path), and none at a declared name.
+expression, in types only (after `:` and in a type path), none at a declared name, and the
+keywords of each `KeywordContext` (items, `impl` items, after `pub`, statements, `break` in a
+loop, `else` after an `if`, expressions, `mut` after `let`, `use` paths).
 Completion tests edit the text with `set_file_text`.
 The first test asserts the fixture has no diagnostics; keep it passing when the std or the
 language changes, or every other test silently tests a broken program.
@@ -319,6 +340,9 @@ End-to-end behaviour through the protocol is covered by `tooling/kagari-lsp/test
   `definition::target`, `hover`, `rename::symbol_name`/`symbol_file`, and
   `debug::resolution_dump`.
 - New syntax that binds a local: teach `completion::in_scope` its scope.
+- New keyword or construct that a keyword starts: add it to the keyword lists of
+  `completion.rs` (`ITEM_KEYWORDS`, `EXPR_KEYWORDS`, …) and, for a new node kind that holds
+  expressions, to the `Expression` arm of `keyword_context`.
 - New request (for example references, which `item_sites` and `Found::symbol` already support):
   add a function here that returns compiler types, a handler in
   `kagari-lsp/src/server/requests.rs`, the capability in `server/mod.rs`, a unit test in
