@@ -11,10 +11,11 @@
     locale (`/reference/…`), English is under `/en/` (`/en/reference/…`).
   - `theme.config.json`: site identity, locales, header links and the sidebar (`docsNav`), which
     lists every page in order.
-  - `astro.config.ts` (Kagari code highlighting), `src/markdown.ts` (remark plugins for links,
-    heading ids and diagrams), `src/components/Home.astro` (the landing page, used by
-    `src/pages/index.astro` and `src/pages/en/index.astro`), `src/components/SiteBrand.astro`
-    (Lotus override: the header logo links to the current locale's home), `src/styles/site.css`.
+  - `astro.config.ts` (Kagari code highlighting, the search index), `src/markdown.ts` (remark
+    plugins for links, heading ids and diagrams), `src/components/Home.astro` (the landing page,
+    used by `src/pages/index.astro` and `src/pages/en/index.astro`),
+    `src/components/SiteBrand.astro` (Lotus override: the header logo links to the current
+    locale's home), `src/styles/site.css`, `public/search/pagefind.js` (see [Search](#search)).
   - `grammars/kagari.tmLanguage.json`: the site's copy of the Kagari TextMate grammar (see
     [Code highlighting](#code-highlighting)).
   - Hosting: Vercel, building the `kagari-doc` repository from its root with its `vercel.json`
@@ -101,10 +102,17 @@ because the guide is not published with the site.
 
 - **Page shape.** Pages are plain Markdown (`.md`, not MDX). The title is the frontmatter `title`
   (a page has no `#` heading); a `sidebar.label` overrides the sidebar text when it should be
-  shorter. Sections start at `##`.
+  shorter. Sections start at `##`. Pages that are not the API of a std module (the Tutorial, the
+  Language Reference, Diagnostics, and the introduction, guides and appendices of the STD
+  Reference) also carry a `description`: one or two plain-text sentences (no Markdown, no `"`)
+  that say what the page covers, in the words a reader would search for. The site shows it under
+  the title, puts it in the page's `<meta name="description">` and indexes it for search. The
+  `ja` page has its own description, written in Japanese. Module pages of the STD Reference
+  have none: their `> **Stability:**` line is the summary.
   ```markdown
   ---
-  title: "std::screen"
+  title: "Steps"
+  description: "The points where the story waits for the player: lines of text written with s!, …"
   ---
   ```
 - **Navigation.** A new page gets an entry in `docsNav` of `docs/site/theme.config.json`, which
@@ -372,6 +380,29 @@ bumps, never deploy the site. Because Vercel sees only `kagari-doc`, the site im
 from outside it. The Node.js version in the project
 settings must satisfy `engines`. The domain is `kagari.suitsu31.club` (`site` in
 `astro.config.ts`, used for canonical URLs).
+
+### Search
+
+The site's search is [Pagefind](https://pagefind.app/) (`search.provider` in
+`theme.config.json`), which indexes the built HTML: code blocks and headings included, one index
+per language. Lotus's built-in `local` provider is not used: it indexes one entry per page,
+drops code blocks and `_`, and ranks every body match the same, so most identifiers cannot be
+found with it.
+
+- **Index.** A build hook in `astro.config.ts` writes the index to `dist/pagefind/` at the end
+  of `pnpm run build`. It replaces Lotus's own hook, which fails with Astro 7 ("Vite module
+  runner has been closed"); drop the replacement when Lotus fixes that. Only the content of a
+  page (`data-pagefind-body`, set by Lotus's layout) is indexed.
+- **Results.** The search dialog is Lotus's. It loads `/search/pagefind.js`
+  (`search.outputSubdir: "search"`), which is `public/search/pagefind.js`: a wrapper around the
+  real bundle in `/pagefind/` that returns, for each of the first 8 pages, the section that
+  matches best (a heading that contains the query, else the section with the most matches) as
+  "page › section" with a plain-text excerpt. Lotus alone would show the first matching section.
+- **Preview.** `pnpm run dev` has no index, so the dialog reports that search is unavailable.
+  To try the search, build and run `pnpm run preview`.
+- **Writing for search.** A result is a section, so an item can be found only as well as its
+  heading names it: give each public std item its own heading with its name
+  (`Type::method(args)`), and put the words a reader would type into the `description`.
 
 ## Code highlighting
 

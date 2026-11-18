@@ -19,7 +19,11 @@ Depth: `docs/dev/src/process/docs.md` (the full policy). Read it before a larger
 
 The site (`docs/site`, a git submodule: the repository `kirikiroid3/kagari-doc`) is Astro with
 the Lotus theme, published at `https://kagari.suitsu31.club`
-(ja at `/`, en at `/en/`). Pages are plain `.md` with a frontmatter `title` and no `#` heading.
+(ja at `/`, en at `/en/`). Pages are plain `.md` with a frontmatter `title` and no `#` heading;
+pages other than std module pages also have a `description` (plain text, one or two sentences in
+the page's language, in the words a reader would search for). Search is Pagefind over the built
+HTML and returns sections, so every item needs a heading with its name; it works in
+`pnpm run build` + `pnpm run preview`, not in `pnpm run dev` (`docs.md#search`).
 `docsNav` in `docs/site/theme.config.json` lists every page in sidebar order (entries are paths
 without locale and `.md`; `x/index.md` is `x`); add new pages there or `check-books.py` fails.
 The landing page is `docs/site/src/components/Home.astro`. The Develop Guide is a standalone
